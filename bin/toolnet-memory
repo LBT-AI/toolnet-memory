@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -e
+
+SOURCE="${BASH_SOURCE[0]}"
+
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+
+  [[ "$SOURCE" != /* ]] &&
+    SOURCE="$DIR/$SOURCE"
+done
+
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." >/dev/null 2>&1 && pwd)"
+TSX="$ROOT/node_modules/.bin/tsx"
+
+if [ ! -x "$TSX" ]; then
+  echo "tsx not found. Run npm install first."
+  exit 1
+fi
+
+COMMAND="${1:-help}"
+
+case "$COMMAND" in
+  doctor)
+    exec "$TSX" "$ROOT/src/production/doctor.ts"
+    ;;
+
+  run)
+    exec "$TSX" "$ROOT/src/index.ts"
+    ;;
+
+  mcp)
+    exec "$TSX" "$ROOT/src/mcp/bootstrap.ts"
+    ;;
+
+  index)
+    exec "$TSX" "$ROOT/src/production/full-index.ts"
+    ;;
+
+  index:graph)
+    exec "$TSX" "$ROOT/src/code-intelligence/test-index.ts"
+    ;;
+
+  incremental)
+    exec "$TSX" "$ROOT/src/code-intelligence/test-incremental.ts"
+    ;;
+
+  semantic)
+    shift
+    exec "$TSX" "$ROOT/src/code-intelligence/test-semantic.ts" "$@"
+    ;;
+
+  impact)
+    shift
+    exec "$TSX" "$ROOT/src/code-intelligence/test-impact.ts" "$@"
+    ;;
+
+  snapshot:list)
+    exec "$TSX" "$ROOT/src/production/snapshot-cli.ts" list
+    ;;
+
+  snapshot:create)
+    shift
+    exec "$TSX" "$ROOT/src/production/snapshot-cli.ts" create "$@"
+    ;;
+
+  snapshot:restore)
+    shift
+    exec "$TSX" "$ROOT/src/production/snapshot-cli.ts" restore "$@"
+    ;;
+
+  recover)
+    exec "$TSX" "$ROOT/src/production/snapshot-cli.ts" recover-latest
+    ;;
+
+  help|--help|-h)
+    cat <<'HELP'
+ToolNet Memory
+
+Commands:
+  toolnet-memory doctor
+  toolnet-memory run
+  toolnet-memory mcp
+  toolnet-memory index
+  toolnet-memory index:graph
+  toolnet-memory incremental
+  toolnet-memory semantic "query"
+  toolnet-memory impact [file]
+  toolnet-memory snapshot:list
+  toolnet-memory snapshot:create "reason"
+  toolnet-memory snapshot:restore <id>
+  toolnet-memory recover
+HELP
+    ;;
+
+  *)
+    echo "Unknown command: $COMMAND"
+    echo "Run: toolnet-memory help"
+    exit 1
+    ;;
+esac

@@ -1,0 +1,17 @@
+memory:
+  auto_capture: true
+  auto_retrieve: true
+  auto_summarize: true
+  auto_sync: true
+
+retrieval:
+  max_candidates: 50
+  rerank_top: 10
+  final_context: 5
+  token_budget: 2000
+
+storage:
+  provider: huggingface
+
+cache:
+  max_mb: 200

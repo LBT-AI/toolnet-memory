@@ -1,0 +1,1662 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+
+  <title>
+    ToolNet Memory · Graph
+  </title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+
+      background:
+        #050608;
+
+      color:
+        #f6f7f9;
+
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    }
+
+    #graph {
+      position: fixed;
+      inset: 0;
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 20;
+
+      border:
+        1px solid
+        rgba(255,255,255,.12);
+
+      background:
+        rgba(10,12,17,.88);
+
+      backdrop-filter:
+        blur(20px);
+
+      -webkit-backdrop-filter:
+        blur(20px);
+
+      box-shadow:
+        0 22px 60px
+        rgba(0,0,0,.42);
+
+      border-radius:
+        18px;
+    }
+
+    #toolbar {
+      top:
+        max(
+          14px,
+          env(safe-area-inset-top)
+        );
+
+      left:
+        14px;
+
+      right:
+        14px;
+
+      padding:
+        14px;
+
+      display:
+        grid;
+
+      grid-template-columns:
+        auto minmax(170px, 1fr)
+        minmax(170px, 1fr)
+        minmax(150px, .7fr)
+        minmax(150px, .7fr)
+        auto;
+
+      gap:
+        10px;
+
+      align-items:
+        center;
+    }
+
+    .brand {
+      padding:
+        0 8px;
+
+      white-space:
+        nowrap;
+
+      font-weight:
+        750;
+
+      font-size:
+        18px;
+    }
+
+    .brand span {
+      opacity:
+        .45;
+
+      font-weight:
+        500;
+    }
+
+    input,
+    select,
+    button {
+      height:
+        42px;
+
+      min-width:
+        0;
+
+      border:
+        1px solid
+        rgba(255,255,255,.12);
+
+      border-radius:
+        11px;
+
+      background:
+        rgba(255,255,255,.06);
+
+      color:
+        white;
+
+      padding:
+        0 12px;
+
+      outline:
+        none;
+
+      font:
+        inherit;
+    }
+
+    button {
+      cursor:
+        pointer;
+    }
+
+    #project {
+      font-weight:
+        650;
+    }
+
+    #stats {
+      left:
+        14px;
+
+      bottom:
+        max(
+          14px,
+          env(safe-area-inset-bottom)
+        );
+
+      min-width:
+        220px;
+
+      padding:
+        14px 16px;
+
+      font-size:
+        13px;
+
+      line-height:
+        1.7;
+    }
+
+    .status {
+      margin-top:
+        5px;
+
+      opacity:
+        .55;
+
+      font-size:
+        11px;
+    }
+
+    #details {
+      top:
+        96px;
+
+      right:
+        14px;
+
+      bottom:
+        14px;
+
+      width:
+        min(
+          410px,
+          calc(100vw - 28px)
+        );
+
+      padding:
+        68px 20px 20px;
+
+      overflow-y:
+        auto;
+
+      transform:
+        translateX(
+          calc(100% + 30px)
+        );
+
+      transition:
+        transform .2s ease;
+    }
+
+    #details.open {
+      transform:
+        translateX(0);
+    }
+
+    .details-close {
+      position:
+        absolute;
+
+      top:
+        14px;
+
+      right:
+        14px;
+
+      width:
+        44px;
+
+      height:
+        44px;
+
+      display:
+        grid;
+
+      place-items:
+        center;
+
+      padding:
+        0;
+
+      border-radius:
+        50%;
+
+      font-size:
+        28px;
+
+      line-height:
+        1;
+    }
+
+    .detail-title {
+      font-size:
+        21px;
+
+      font-weight:
+        750;
+
+      line-height:
+        1.25;
+
+      overflow-wrap:
+        anywhere;
+    }
+
+    .path {
+      margin-top:
+        8px;
+
+      opacity:
+        .55;
+
+      font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        monospace;
+
+      font-size:
+        12px;
+
+      overflow-wrap:
+        anywhere;
+    }
+
+    .tag {
+      display:
+        inline-flex;
+
+      margin:
+        10px 5px 0 0;
+
+      padding:
+        5px 9px;
+
+      border:
+        1px solid
+        rgba(255,255,255,.12);
+
+      border-radius:
+        999px;
+
+      background:
+        rgba(255,255,255,.06);
+
+      font-size:
+        11px;
+    }
+
+    .section {
+      margin-top:
+        24px;
+    }
+
+    .section-title {
+      margin-bottom:
+        8px;
+
+      opacity:
+        .5;
+
+      font-size:
+        11px;
+
+      letter-spacing:
+        .1em;
+
+      text-transform:
+        uppercase;
+    }
+
+    .row {
+      display:
+        flex;
+
+      justify-content:
+        space-between;
+
+      gap:
+        12px;
+
+      padding:
+        9px 0;
+
+      border-bottom:
+        1px solid
+        rgba(255,255,255,.06);
+
+      font-size:
+        13px;
+    }
+
+    #loading {
+      position:
+        fixed;
+
+      inset:
+        0;
+
+      z-index:
+        100;
+
+      display:
+        grid;
+
+      place-items:
+        center;
+
+      background:
+        #050608;
+
+      padding:
+        24px;
+
+      text-align:
+        center;
+    }
+
+    @media (
+      max-width: 1000px
+    ) {
+      #toolbar {
+        grid-template-columns:
+          1fr 1fr;
+
+        top:
+          max(
+            10px,
+            env(safe-area-inset-top)
+          );
+
+        left:
+          10px;
+
+        right:
+          10px;
+      }
+
+      .brand {
+        grid-column:
+          1 / -1;
+
+        font-size:
+          17px;
+      }
+
+      #search {
+        grid-column:
+          1 / -1;
+      }
+
+      #details {
+        top:
+          10px;
+
+        right:
+          10px;
+
+        bottom:
+          10px;
+      }
+
+      #stats {
+        left:
+          10px;
+
+        bottom:
+          max(
+            10px,
+            env(safe-area-inset-bottom)
+          );
+      }
+    }
+
+    @media (
+      max-width: 1000px
+    ) {
+      #toolbar {
+        grid-template-columns:
+          repeat(12, minmax(0, 1fr));
+      }
+
+      .brand {
+        grid-column:
+          1 / -1;
+      }
+
+      #project {
+        grid-column:
+          1 / 10;
+
+        width:
+          100%;
+      }
+
+      #reset {
+        grid-column:
+          10 / 13;
+
+        width:
+          100%;
+
+        padding-left:
+          8px;
+
+        padding-right:
+          8px;
+      }
+
+      #search {
+        grid-column:
+          1 / -1;
+
+        width:
+          100%;
+      }
+
+      #cluster {
+        grid-column:
+          1 / 7;
+
+        width:
+          100%;
+      }
+
+      #edge {
+        grid-column:
+          7 / 13;
+
+        width:
+          100%;
+      }
+    }
+
+  </style>
+</head>
+
+<body>
+  <div id="loading">
+    Loading ToolNet projects…
+  </div>
+
+  <div id="graph"></div>
+
+  <div
+    id="toolbar"
+    class="panel"
+  >
+    <div class="brand">
+      ToolNet Memory
+      <span>/ Graph</span>
+    </div>
+
+    <select
+      id="project"
+      aria-label="Project"
+    >
+      <option>
+        Loading…
+      </option>
+    </select>
+
+    <button id="reset">
+      Reset
+    </button>
+
+    <input
+      id="search"
+      placeholder="Search symbol or file…"
+    />
+
+    <select
+      id="cluster"
+      aria-label="Subsystem"
+    >
+      <option value="">
+        All subsystems
+      </option>
+    </select>
+
+    <select
+      id="edge"
+      aria-label="Relation"
+    >
+      <option value="">
+        All relations
+      </option>
+    </select>
+
+  </div>
+
+  <div
+    id="stats"
+    class="panel"
+  ></div>
+
+  <div
+    id="details"
+    class="panel"
+  ></div>
+
+  <script src="/vendor/3d-force-graph.min.js"></script>
+
+  <script>
+    const state = {
+      raw:
+        null,
+
+      graph:
+        null,
+
+      project:
+        "",
+
+      search:
+        "",
+
+      cluster:
+        "",
+
+      edge:
+        "",
+
+      selected:
+        null,
+    };
+
+    const graphEl =
+      document.getElementById(
+        "graph"
+      );
+
+    const projectEl =
+      document.getElementById(
+        "project"
+      );
+
+    const searchEl =
+      document.getElementById(
+        "search"
+      );
+
+    const clusterEl =
+      document.getElementById(
+        "cluster"
+      );
+
+    const edgeEl =
+      document.getElementById(
+        "edge"
+      );
+
+    const statsEl =
+      document.getElementById(
+        "stats"
+      );
+
+    const detailsEl =
+      document.getElementById(
+        "details"
+      );
+
+    const colors = [
+      "#62a8ff",
+      "#ff8f6b",
+      "#67d49b",
+      "#c493ff",
+      "#ffd166",
+      "#73d2de",
+      "#ff6b9a",
+      "#9fd356",
+      "#e5989b",
+      "#8ecae6",
+      "#c9cba3",
+      "#f4a261",
+    ];
+
+    function escapeHtml(
+      value
+    ) {
+      return String(
+        value ?? ""
+      )
+        .replaceAll(
+          "&",
+          "&amp;"
+        )
+        .replaceAll(
+          "<",
+          "&lt;"
+        )
+        .replaceAll(
+          ">",
+          "&gt;"
+        )
+        .replaceAll(
+          '"',
+          "&quot;"
+        )
+        .replaceAll(
+          "'",
+          "&#039;"
+        );
+    }
+
+    function hashCode(
+      value
+    ) {
+      let hash =
+        0;
+
+      for (
+        let i = 0;
+        i < value.length;
+        i++
+      ) {
+        hash =
+          (
+            (
+              hash << 5
+            ) -
+            hash
+          ) +
+          value.charCodeAt(
+            i
+          );
+
+        hash |=
+          0;
+      }
+
+      return Math.abs(
+        hash
+      );
+    }
+
+    function nodeColor(
+      node
+    ) {
+      const value =
+        node.clusterLabel ||
+        node.cluster ||
+        node.layer ||
+        node.type ||
+        "other";
+
+      return colors[
+        hashCode(
+          value
+        ) %
+        colors.length
+      ];
+    }
+
+    function linkColor(
+      link
+    ) {
+      const map = {
+        CALL_REFERENCE:
+          "rgba(255,190,90,.72)",
+
+        CALLS:
+          "rgba(255,255,255,.30)",
+
+        IMPORTS:
+          "rgba(100,170,255,.46)",
+
+        USES_TYPE:
+          "rgba(190,130,255,.44)",
+
+        WRITES:
+          "rgba(255,100,100,.60)",
+
+        TESTS:
+          "rgba(100,220,150,.42)",
+
+        IMPLEMENTS:
+          "rgba(100,220,220,.48)",
+
+        INHERITS:
+          "rgba(235,140,255,.50)",
+      };
+
+      return (
+        map[link.type] ||
+        "rgba(255,255,255,.18)"
+      );
+    }
+
+    function closeDetails() {
+      state.selected =
+        null;
+
+      detailsEl
+        .classList
+        .remove(
+          "open"
+        );
+
+      detailsEl.innerHTML =
+        "";
+    }
+
+    function showDetails(
+      node
+    ) {
+      state.selected =
+        node;
+
+      detailsEl
+        .classList
+        .add(
+          "open"
+        );
+
+      detailsEl.innerHTML = `
+        <button
+          class="details-close"
+          id="details-close"
+          type="button"
+          aria-label="Close"
+        >
+          &times;
+        </button>
+
+        <div class="detail-title">
+          ${escapeHtml(
+            node.qualifiedName ||
+            node.name
+          )}
+        </div>
+
+        <div class="path">
+          ${escapeHtml(
+            node.filePath
+          )}
+        </div>
+
+        <div>
+          <span class="tag">
+            ${escapeHtml(
+              node.type
+            )}
+          </span>
+
+          ${
+            node.clusterLabel
+              ? `
+                <span class="tag">
+                  ${escapeHtml(
+                    node.clusterLabel
+                  )}
+                </span>
+              `
+              : ""
+          }
+
+          ${
+            node.layer
+              ? `
+                <span class="tag">
+                  ${escapeHtml(
+                    node.layer
+                  )}
+                </span>
+              `
+              : ""
+          }
+
+          ${
+            node.deadCode
+              ? `
+                <span class="tag">
+                  dead-code:
+                  ${escapeHtml(
+                    node.deadCode
+                      .confidence
+                  )}
+                </span>
+              `
+              : ""
+          }
+        </div>
+
+        <div class="section">
+          <div class="section-title">
+            Graph
+          </div>
+
+          <div class="row">
+            <span>Incoming</span>
+            <strong>
+              ${node.incoming}
+            </strong>
+          </div>
+
+          <div class="row">
+            <span>Outgoing</span>
+            <strong>
+              ${node.outgoing}
+            </strong>
+          </div>
+
+          ${
+            node.hotspotScore != null
+              ? `
+                <div class="row">
+                  <span>Hotspot</span>
+                  <strong>
+                    ${node.hotspotScore}
+                  </strong>
+                </div>
+              `
+              : ""
+          }
+        </div>
+
+        <div class="section">
+          <div class="section-title">
+            Project
+          </div>
+
+          <div class="row">
+            <span>Name</span>
+            <strong>
+              ${escapeHtml(
+                state.raw
+                  ?.dashboard
+                  ?.name ??
+                state.project
+              )}
+            </strong>
+          </div>
+        </div>
+      `;
+
+      document
+        .getElementById(
+          "details-close"
+        )
+        ?.addEventListener(
+          "click",
+          event => {
+            event.stopPropagation();
+            closeDetails();
+          }
+        );
+    }
+
+    function populateFilters() {
+      clusterEl.innerHTML =
+        '<option value="">All subsystems</option>';
+
+      edgeEl.innerHTML =
+        '<option value="">All relations</option>';
+
+      const clusters =
+        [
+          ...new Set(
+            state.raw.nodes
+              .map(
+                node =>
+                  node.clusterLabel
+              )
+              .filter(Boolean)
+          )
+        ]
+          .sort();
+
+      for (
+        const value
+        of clusters
+      ) {
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          value;
+
+        option.textContent =
+          value;
+
+        clusterEl.appendChild(
+          option
+        );
+      }
+
+      const edges =
+        [
+          ...new Set(
+            state.raw.links
+              .map(
+                link =>
+                  link.type
+              )
+          )
+        ]
+          .sort();
+
+      for (
+        const value
+        of edges
+      ) {
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          value;
+
+        option.textContent =
+          value;
+
+        edgeEl.appendChild(
+          option
+        );
+      }
+    }
+
+    function filteredData() {
+      const search =
+        state.search
+          .trim()
+          .toLowerCase();
+
+      let nodes =
+        state.raw.nodes;
+
+      if (
+        state.cluster
+      ) {
+        nodes =
+          nodes.filter(
+            node =>
+              node.clusterLabel ===
+              state.cluster
+          );
+      }
+
+      if (
+        search
+      ) {
+        nodes =
+          nodes.filter(
+            node =>
+              node.name
+                ?.toLowerCase()
+                .includes(
+                  search
+                ) ||
+
+              node.qualifiedName
+                ?.toLowerCase()
+                .includes(
+                  search
+                ) ||
+
+              node.filePath
+                ?.toLowerCase()
+                .includes(
+                  search
+                )
+          );
+      }
+
+      const ids =
+        new Set(
+          nodes.map(
+            node =>
+              node.id
+          )
+        );
+
+      let links =
+        state.raw.links
+          .filter(
+            link => {
+              const source =
+                typeof link.source ===
+                  "object"
+                  ? link.source.id
+                  : link.source;
+
+              const target =
+                typeof link.target ===
+                  "object"
+                  ? link.target.id
+                  : link.target;
+
+              return (
+                ids.has(
+                  source
+                ) &&
+                ids.has(
+                  target
+                )
+              );
+            }
+          );
+
+      if (
+        state.edge
+      ) {
+        links =
+          links.filter(
+            link =>
+              link.type ===
+              state.edge
+          );
+      }
+
+      return {
+        nodes:
+          nodes.map(
+            node => ({
+              ...node
+            })
+          ),
+
+        links:
+          links.map(
+            link => ({
+              ...link,
+
+              source:
+                typeof link.source ===
+                  "object"
+                  ? link.source.id
+                  : link.source,
+
+              target:
+                typeof link.target ===
+                  "object"
+                  ? link.target.id
+                  : link.target,
+            })
+          ),
+      };
+    }
+
+    function renderStats(
+      data
+    ) {
+      const dashboard =
+        state.raw.dashboard ||
+        {};
+
+      statsEl.innerHTML = `
+        <div>
+          <strong>
+            ${data.nodes.length}
+          </strong>
+          nodes
+        </div>
+
+        <div>
+          <strong>
+            ${data.links.length}
+          </strong>
+          relationships
+        </div>
+
+        <div>
+          <strong>
+            ${state.raw.summary.files}
+          </strong>
+          files
+        </div>
+
+        <div>
+          <strong>
+            ${state.raw.summary.clusters}
+          </strong>
+          subsystems
+        </div>
+
+        <div class="status">
+          ${escapeHtml(
+            dashboard.name ||
+            state.project
+          )}
+
+          ${
+            dashboard.hasArchitecture
+              ? " · architecture"
+              : ""
+          }
+
+          ${
+            dashboard.hasAnalysis
+              ? " · analysis"
+              : ""
+          }
+        </div>
+      `;
+    }
+
+    function applyFilters() {
+      const data =
+        filteredData();
+
+      state.graph.graphData(
+        data
+      );
+
+      renderStats(
+        data
+      );
+    }
+
+    async function loadProject(
+      project
+    ) {
+      closeDetails();
+
+      document.body
+        .appendChild(
+          (() => {
+            let loading =
+              document.getElementById(
+                "loading"
+              );
+
+            if (!loading) {
+              loading =
+                document.createElement(
+                  "div"
+                );
+
+              loading.id =
+                "loading";
+
+              document.body
+                .appendChild(
+                  loading
+                );
+            }
+
+            loading.textContent =
+              `Loading ${project}…`;
+
+            return document
+              .createDocumentFragment();
+          })()
+        );
+
+      const response =
+        await fetch(
+          `/api/graph?project=${
+            encodeURIComponent(
+              project
+            )
+          }`
+        );
+
+      if (
+        !response.ok
+      ) {
+        const error =
+          await response
+            .json()
+            .catch(
+              () => null
+            );
+
+        throw new Error(
+          error?.error ||
+          "Unable to load graph"
+        );
+      }
+
+      state.project =
+        project;
+
+      state.raw =
+        await response.json();
+
+      state.search =
+        "";
+
+      state.cluster =
+        "";
+
+      state.edge =
+        "";
+
+      searchEl.value =
+        "";
+
+      clusterEl.value =
+        "";
+
+      edgeEl.value =
+        "";
+
+      populateFilters();
+
+      const data =
+        filteredData();
+
+      if (
+        !state.graph
+      ) {
+        state.graph =
+          ForceGraph3D()(
+            graphEl
+          )
+            .backgroundColor(
+              "#050608"
+            )
+
+            .nodeLabel(
+              node =>
+                `${node.qualifiedName || node.name}\n${node.filePath}`
+            )
+
+            .nodeColor(
+              node =>
+                nodeColor(
+                  node
+                )
+            )
+
+            .nodeVal(
+              node =>
+                2 +
+                Math.min(
+                  10,
+                  Math.log2(
+                    1 +
+                    node.incoming +
+                    node.outgoing
+                  )
+                )
+            )
+
+            .linkColor(
+              link =>
+                linkColor(
+                  link
+                )
+            )
+
+            .linkOpacity(
+              .5
+            )
+
+            .linkWidth(
+              link =>
+                link.type ===
+                  "CALL_REFERENCE"
+                  ? 1.2
+                  : .45
+            )
+
+            .linkDirectionalParticles(
+              link =>
+                link.type ===
+                  "CALL_REFERENCE"
+                  ? 1
+                  : 0
+            )
+
+            .linkDirectionalParticleWidth(
+              1.5
+            )
+
+            .onBackgroundClick(
+              () => {
+                closeDetails();
+              }
+            )
+
+            .onNodeClick(
+              node => {
+                showDetails(
+                  node
+                );
+
+                const distance =
+                  70;
+
+                const length =
+                  Math.hypot(
+                    node.x || 1,
+                    node.y || 1,
+                    node.z || 1
+                  );
+
+                const ratio =
+                  1 +
+                  distance /
+                  length;
+
+                state.graph
+                  .cameraPosition(
+                    {
+                      x:
+                        node.x *
+                        ratio,
+
+                      y:
+                        node.y *
+                        ratio,
+
+                      z:
+                        node.z *
+                        ratio,
+                    },
+
+                    node,
+
+                    900
+                  );
+              }
+            );
+      }
+
+      state.graph.graphData(
+        data
+      );
+
+      renderStats(
+        data
+      );
+
+      document.title =
+        `${
+          state.raw.dashboard?.name ||
+          project
+        } · ToolNet Graph`;
+
+      const loading =
+        document.getElementById(
+          "loading"
+        );
+
+      if (
+        loading
+      ) {
+        loading.remove();
+      }
+
+      setTimeout(
+        () => {
+          state.graph
+            .zoomToFit(
+              700,
+              60
+            );
+        },
+        300
+      );
+    }
+
+    async function main() {
+      const response =
+        await fetch(
+          "/api/projects"
+        );
+
+      if (
+        !response.ok
+      ) {
+        throw new Error(
+          "Unable to load ToolNet projects"
+        );
+      }
+
+      const catalog =
+        await response.json();
+
+      projectEl.innerHTML =
+        "";
+
+      for (
+        const project
+        of catalog.projects
+      ) {
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          project.remote;
+
+        option.textContent =
+          project.hasGraph
+            ? project.name
+            : `${project.name} · not indexed`;
+
+        option.disabled =
+          !project.hasGraph;
+
+        projectEl.appendChild(
+          option
+        );
+      }
+
+      const requested =
+        new URLSearchParams(
+          window.location.search
+        ).get(
+          "project"
+        );
+
+      const requestedValid =
+        catalog.projects
+          .some(
+            project =>
+              project.remote ===
+                requested &&
+              project.hasGraph
+          );
+
+      const selected =
+        requestedValid
+          ? requested
+          : catalog.defaultProject;
+
+      if (!selected) {
+        throw new Error(
+          "No indexed projects found"
+        );
+      }
+
+      projectEl.value =
+        selected;
+
+      await loadProject(
+        selected
+      );
+    }
+
+    projectEl.addEventListener(
+      "change",
+      async () => {
+        const project =
+          projectEl.value;
+
+        if (!project) {
+          return;
+        }
+
+        const url =
+          new URL(
+            window.location.href
+          );
+
+        url.searchParams.set(
+          "project",
+          project
+        );
+
+        history.replaceState(
+          {},
+          "",
+          url
+        );
+
+        try {
+          await loadProject(
+            project
+          );
+        } catch (
+          error
+        ) {
+          alert(
+            error.message
+          );
+        }
+      }
+    );
+
+    searchEl.addEventListener(
+      "input",
+      () => {
+        state.search =
+          searchEl.value;
+
+        applyFilters();
+      }
+    );
+
+    clusterEl.addEventListener(
+      "change",
+      () => {
+        state.cluster =
+          clusterEl.value;
+
+        applyFilters();
+      }
+    );
+
+    edgeEl.addEventListener(
+      "change",
+      () => {
+        state.edge =
+          edgeEl.value;
+
+        applyFilters();
+      }
+    );
+
+    document
+      .getElementById(
+        "reset"
+      )
+      .addEventListener(
+        "click",
+        () => {
+          searchEl.value =
+            "";
+
+          clusterEl.value =
+            "";
+
+          edgeEl.value =
+            "";
+
+          state.search =
+            "";
+
+          state.cluster =
+            "";
+
+          state.edge =
+            "";
+
+          closeDetails();
+
+          applyFilters();
+
+          state.graph
+            .zoomToFit(
+              700,
+              60
+            );
+        }
+      );
+
+    document.addEventListener(
+      "keydown",
+      event => {
+        if (
+          event.key ===
+          "Escape"
+        ) {
+          closeDetails();
+        }
+      }
+    );
+
+    main().catch(
+      error => {
+        const loading =
+          document.getElementById(
+            "loading"
+          );
+
+        if (
+          loading
+        ) {
+          loading.textContent =
+            error.message;
+        }
+
+        console.error(
+          error
+        );
+      }
+    );
+  </script>
+</body>
+</html>

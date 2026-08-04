@@ -1,0 +1,52 @@
+{
+  "name": "toolnet-memory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "storage:test": "tsx src/storage/test-connection.ts",
+    "embedding:test": "tsx src/embeddings/test-connection.ts",
+    "vector:persist:test": "tsx src/retrieval/vector/test-persistence.ts",
+    "code:index:test": "tsx src/code-intelligence/test-index.ts",
+    "code:incremental:test": "tsx src/code-intelligence/test-incremental.ts",
+    "mcp": "tsx src/mcp/bootstrap.ts",
+    "snapshot:test": "tsx src/snapshot/test-snapshot.ts",
+    "code:semantic:test": "tsx src/code-intelligence/test-semantic.ts",
+    "doctor": "tsx src/production/doctor.ts",
+    "cli": "./bin/toolnet-memory",
+    "prod:check": "npm run build && npm test && npm run doctor",
+    "project:migrate": "tsx src/storage/project/migrate.ts",
+    "impact": "tsx src/code-intelligence/test-impact.ts",
+    "code:resolve:test": "tsx src/code-intelligence/test-resolution.ts",
+    "bucket:tree": "tsx src/storage/list-bucket-tree.ts",
+    "code:rich:test": "tsx src/code-intelligence/test-rich-graph.ts",
+    "storage:migrate:v2": "tsx src/storage/project/migrate-layout-v2.ts",
+    "storage:cleanup:v1": "tsx src/storage/project/cleanup-layout-v1.ts",
+    "code:architecture:test": "tsx src/code-intelligence/test-architecture.ts",
+    "code:analysis:test": "tsx src/code-intelligence/test-analysis.ts",
+    "code:visualization:test": "tsx src/code-intelligence/test-visualization.ts",
+    "graph:ui": "tsx src/visualization/server.ts",
+    "project:status": "tsx src/production/project-status.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1102.0",
+    "@aws-sdk/s3-request-presigner": "^3.1102.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "3d-force-graph": "^1.80.0",
+    "dotenv": "^17.4.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "bin": {
+    "toolnet-memory": "bin/toolnet-memory"
+  }
+}
