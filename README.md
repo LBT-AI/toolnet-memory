@@ -131,3 +131,17 @@ npm test
 ```
 
 > 1 folder = 1 project = 1 isolated memory universe.
+
+## Cài nhanh
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LBT-AI/toolnet-memory/main/scripts/install.sh | bash
+```
+
+Sau đó:
+
+```bash
+source ~/.profile
+cd ~/your-project
+toolnet-memory index
+```
