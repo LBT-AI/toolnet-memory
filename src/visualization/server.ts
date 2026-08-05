@@ -9,8 +9,13 @@ import {
 } from "node:http";
 
 import {
+  dirname,
   resolve,
 } from "node:path";
+
+import {
+  fileURLToPath,
+} from "node:url";
 
 import {
   loadConfig,
@@ -300,14 +305,24 @@ async function main() {
     );
   }
 
+  const moduleDir =
+    dirname(
+      fileURLToPath(
+        import.meta.url,
+      ),
+    );
+
   const publicDir =
     resolve(
-      "src/visualization/public",
+      moduleDir,
+      "public",
     );
 
   const vendorFile =
     resolve(
-      "node_modules/3d-force-graph/dist/3d-force-graph.min.js",
+      publicDir,
+      "vendor",
+      "3d-force-graph.min.js",
     );
 
   async function getCatalog() {

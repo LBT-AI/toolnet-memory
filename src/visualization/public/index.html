@@ -515,6 +515,220 @@
       }
     }
 
+
+    .intel-summary {
+      display:
+        grid;
+
+      grid-template-columns:
+        1fr 1fr;
+
+      gap:
+        8px;
+
+      margin-top:
+        18px;
+    }
+
+    .intel-card {
+      padding:
+        12px;
+
+      border:
+        1px solid
+        rgba(255,255,255,.08);
+
+      border-radius:
+        12px;
+
+      background:
+        rgba(255,255,255,.035);
+    }
+
+    .intel-card strong {
+      display:
+        block;
+
+      font-size:
+        18px;
+
+      margin-top:
+        3px;
+    }
+
+    .intel-card span {
+      opacity:
+        .55;
+
+      font-size:
+        11px;
+    }
+
+    .relation-list {
+      display:
+        flex;
+
+      flex-direction:
+        column;
+
+      gap:
+        6px;
+    }
+
+    .relation-item {
+      width:
+        100%;
+
+      height:
+        auto;
+
+      min-height:
+        44px;
+
+      padding:
+        9px 11px;
+
+      display:
+        block;
+
+      text-align:
+        left;
+
+      border-radius:
+        10px;
+
+      cursor:
+        pointer;
+    }
+
+    .relation-name {
+      display:
+        block;
+
+      font-size:
+        12px;
+
+      font-weight:
+        650;
+
+      overflow-wrap:
+        anywhere;
+    }
+
+    .relation-meta {
+      display:
+        block;
+
+      margin-top:
+        4px;
+
+      opacity:
+        .45;
+
+      font-size:
+        10px;
+
+      font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        monospace;
+
+      overflow-wrap:
+        anywhere;
+    }
+
+    .relation-more {
+      margin-top:
+        7px;
+
+      opacity:
+        .45;
+
+      font-size:
+        11px;
+    }
+
+    .risk {
+      display:
+        inline-flex;
+
+      padding:
+        5px 9px;
+
+      margin-top:
+        8px;
+
+      border:
+        1px solid
+        rgba(255,255,255,.12);
+
+      border-radius:
+        999px;
+
+      font-size:
+        11px;
+
+      font-weight:
+        700;
+    }
+
+    .path-actions {
+      display:
+        flex;
+
+      gap:
+        8px;
+
+      margin-top:
+        10px;
+    }
+
+    .path-actions button {
+      flex:
+        1;
+
+      height:
+        auto;
+
+      min-height:
+        40px;
+
+      white-space:
+        normal;
+    }
+
+    .path-chain {
+      display:
+        flex;
+
+      flex-direction:
+        column;
+
+      gap:
+        5px;
+
+      margin-top:
+        9px;
+    }
+
+    .path-node {
+      height:
+        auto;
+
+      min-height:
+        36px;
+
+      padding:
+        7px 10px;
+
+      text-align:
+        left;
+
+      font-size:
+        11px;
+    }
+
   </style>
 </head>
 
@@ -606,6 +820,12 @@
 
       selected:
         null,
+
+      pathStart:
+        null,
+
+      highlightedPath:
+        [],
     };
 
     const graphEl =
@@ -784,6 +1004,743 @@
         "";
     }
 
+    const CALL_RELATIONS =
+      new Set([
+        "CALLS",
+        "CALL_REFERENCE",
+      ]);
+
+    const DEPENDENCY_RELATIONS =
+      new Set([
+        "CALLS",
+        "CALL_REFERENCE",
+        "IMPORTS",
+        "USES_TYPE",
+        "WRITES",
+        "INHERITS",
+        "IMPLEMENTS",
+        "ROUTE",
+      ]);
+
+    const IMPACT_WEIGHTS = {
+      CALLS: 4,
+      CALL_REFERENCE: 6,
+      USES_TYPE: 4,
+      TESTS: 2,
+      ROUTE: 4,
+      WRITES: 3,
+      IMPORTS: 3,
+      INHERITS: 5,
+      IMPLEMENTS: 5,
+      DEFINES: 1,
+    };
+
+    function endpointId(
+      link,
+      side
+    ) {
+      const value =
+        link[side];
+
+      return typeof value ===
+        "object"
+        ? value.id
+        : value;
+    }
+
+    function rawNode(
+      id
+    ) {
+      return state.raw
+        ?.nodes
+        ?.find(
+          node =>
+            node.id === id
+        );
+    }
+
+    function uniqueNodes(
+      values
+    ) {
+      const map =
+        new Map();
+
+      for (
+        const node
+        of values
+      ) {
+        if (
+          node &&
+          !map.has(
+            node.id
+          )
+        ) {
+          map.set(
+            node.id,
+            node
+          );
+        }
+      }
+
+      return [
+        ...map.values()
+      ];
+    }
+
+    function relatedNodes(
+      nodeId,
+      direction,
+      allowed
+    ) {
+      const result =
+        [];
+
+      for (
+        const link
+        of state.raw.links
+      ) {
+        if (
+          allowed &&
+          !allowed.has(
+            link.type
+          )
+        ) {
+          continue;
+        }
+
+        const source =
+          endpointId(
+            link,
+            "source"
+          );
+
+        const target =
+          endpointId(
+            link,
+            "target"
+          );
+
+        if (
+          direction ===
+            "incoming" &&
+          target ===
+            nodeId
+        ) {
+          const node =
+            rawNode(
+              source
+            );
+
+          if (node) {
+            result.push(
+              node
+            );
+          }
+        }
+
+        if (
+          direction ===
+            "outgoing" &&
+          source ===
+            nodeId
+        ) {
+          const node =
+            rawNode(
+              target
+            );
+
+          if (node) {
+            result.push(
+              node
+            );
+          }
+        }
+      }
+
+      return uniqueNodes(
+        result
+      );
+    }
+
+    function blastRadius(
+      startId,
+      maxDepth = 3
+    ) {
+      const visited =
+        new Map();
+
+      const queue = [
+        {
+          id:
+            startId,
+
+          depth:
+            0,
+
+          score:
+            0,
+        }
+      ];
+
+      visited.set(
+        startId,
+        {
+          depth:
+            0,
+
+          score:
+            0,
+        }
+      );
+
+      while (
+        queue.length
+      ) {
+        const current =
+          queue.shift();
+
+        if (
+          current.depth >=
+          maxDepth
+        ) {
+          continue;
+        }
+
+        for (
+          const link
+          of state.raw.links
+        ) {
+          const weight =
+            IMPACT_WEIGHTS[
+              link.type
+            ];
+
+          if (!weight) {
+            continue;
+          }
+
+          const source =
+            endpointId(
+              link,
+              "source"
+            );
+
+          const target =
+            endpointId(
+              link,
+              "target"
+            );
+
+          /*
+           * Reverse traversal:
+           * if source depends on target,
+           * changing target may affect source.
+           */
+          if (
+            target !==
+            current.id
+          ) {
+            continue;
+          }
+
+          const nextDepth =
+            current.depth +
+            1;
+
+          const nextScore =
+            current.score +
+            weight *
+            (
+              maxDepth -
+              current.depth
+            );
+
+          const previous =
+            visited.get(
+              source
+            );
+
+          if (
+            !previous ||
+            nextDepth <
+              previous.depth ||
+            nextScore >
+              previous.score
+          ) {
+            visited.set(
+              source,
+              {
+                depth:
+                  nextDepth,
+
+                score:
+                  nextScore,
+              }
+            );
+
+            queue.push({
+              id:
+                source,
+
+              depth:
+                nextDepth,
+
+              score:
+                nextScore,
+            });
+          }
+        }
+      }
+
+      visited.delete(
+        startId
+      );
+
+      const impacted =
+        [
+          ...visited.entries()
+        ]
+          .map(
+            ([id, info]) => ({
+              node:
+                rawNode(
+                  id
+                ),
+
+              ...info,
+            })
+          )
+          .filter(
+            item =>
+              item.node
+          )
+          .sort(
+            (a, b) =>
+              b.score -
+              a.score
+          );
+
+      const score =
+        impacted.reduce(
+          (
+            total,
+            item
+          ) =>
+            total +
+            item.score,
+          0
+        );
+
+      let risk =
+        "LOW";
+
+      if (
+        score >= 250 ||
+        impacted.length >= 40
+      ) {
+        risk =
+          "CRITICAL";
+      } else if (
+        score >= 120 ||
+        impacted.length >= 20
+      ) {
+        risk =
+          "HIGH";
+      } else if (
+        score >= 40 ||
+        impacted.length >= 8
+      ) {
+        risk =
+          "MEDIUM";
+      }
+
+      return {
+        impacted,
+        score,
+        risk,
+      };
+    }
+
+    function shortestPath(
+      fromId,
+      toId,
+      maxDepth = 10
+    ) {
+      if (
+        fromId ===
+        toId
+      ) {
+        return [
+          fromId
+        ];
+      }
+
+      const queue = [
+        {
+          id:
+            fromId,
+
+          path: [
+            fromId
+          ],
+        }
+      ];
+
+      const visited =
+        new Set([
+          fromId
+        ]);
+
+      while (
+        queue.length
+      ) {
+        const current =
+          queue.shift();
+
+        if (
+          current.path.length >
+          maxDepth
+        ) {
+          continue;
+        }
+
+        for (
+          const link
+          of state.raw.links
+        ) {
+          if (
+            !DEPENDENCY_RELATIONS
+              .has(
+                link.type
+              )
+          ) {
+            continue;
+          }
+
+          if (
+            endpointId(
+              link,
+              "source"
+            ) !==
+            current.id
+          ) {
+            continue;
+          }
+
+          const next =
+            endpointId(
+              link,
+              "target"
+            );
+
+          if (
+            visited.has(
+              next
+            )
+          ) {
+            continue;
+          }
+
+          const path = [
+            ...current.path,
+            next,
+          ];
+
+          if (
+            next ===
+            toId
+          ) {
+            return path;
+          }
+
+          visited.add(
+            next
+          );
+
+          queue.push({
+            id:
+              next,
+
+            path,
+          });
+        }
+      }
+
+      return null;
+    }
+
+    function relationHtml(
+      title,
+      nodes,
+      limit = 8
+    ) {
+      const visible =
+        nodes.slice(
+          0,
+          limit
+        );
+
+      return `
+        <div class="section">
+          <div class="section-title">
+            ${escapeHtml(
+              title
+            )}
+            · ${nodes.length}
+          </div>
+
+          ${
+            visible.length
+              ? `
+                <div class="relation-list">
+                  ${
+                    visible
+                      .map(
+                        node => `
+                          <button
+                            class="relation-item"
+                            data-jump-node="${escapeHtml(
+                              node.id
+                            )}"
+                          >
+                            <span class="relation-name">
+                              ${escapeHtml(
+                                node.qualifiedName ||
+                                node.name
+                              )}
+                            </span>
+
+                            <span class="relation-meta">
+                              ${escapeHtml(
+                                node.filePath
+                              )}
+                            </span>
+                          </button>
+                        `
+                      )
+                      .join("")
+                  }
+                </div>
+              `
+              : `
+                <div class="muted">
+                  None
+                </div>
+              `
+          }
+
+          ${
+            nodes.length >
+            limit
+              ? `
+                <div class="relation-more">
+                  +${
+                    nodes.length -
+                    limit
+                  } more
+                </div>
+              `
+              : ""
+          }
+        </div>
+      `;
+    }
+
+    function resetPathHighlight() {
+      state.highlightedPath =
+        [];
+
+      if (
+        !state.graph
+      ) {
+        return;
+      }
+
+      state.graph
+        .linkWidth(
+          link =>
+            link.type ===
+              "CALL_REFERENCE"
+              ? 1.2
+              : .45
+        )
+        .linkColor(
+          link =>
+            linkColor(
+              link
+            )
+        );
+    }
+
+    function isPathLink(
+      link,
+      path
+    ) {
+      const source =
+        endpointId(
+          link,
+          "source"
+        );
+
+      const target =
+        endpointId(
+          link,
+          "target"
+        );
+
+      for (
+        let i = 0;
+        i <
+        path.length - 1;
+        i++
+      ) {
+        if (
+          path[i] ===
+            source &&
+          path[i + 1] ===
+            target
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    function highlightPath(
+      path
+    ) {
+      state.highlightedPath =
+        path || [];
+
+      if (
+        !state.graph
+      ) {
+        return;
+      }
+
+      state.graph
+        .linkWidth(
+          link =>
+            isPathLink(
+              link,
+              state.highlightedPath
+            )
+              ? 3.5
+              : (
+                  link.type ===
+                    "CALL_REFERENCE"
+                    ? 1.2
+                    : .35
+                )
+        )
+        .linkColor(
+          link =>
+            isPathLink(
+              link,
+              state.highlightedPath
+            )
+              ? "rgba(255,225,80,.98)"
+              : linkColor(
+                  link
+                )
+        );
+    }
+
+    function flyToNode(
+      node
+    ) {
+      const distance =
+        70;
+
+      const length =
+        Math.hypot(
+          node.x || 1,
+          node.y || 1,
+          node.z || 1
+        );
+
+      const ratio =
+        1 +
+        distance /
+        length;
+
+      state.graph
+        .cameraPosition(
+          {
+            x:
+              node.x *
+              ratio,
+
+            y:
+              node.y *
+              ratio,
+
+            z:
+              node.z *
+              ratio,
+          },
+
+          node,
+
+          800
+        );
+    }
+
+    function jumpToNode(
+      id
+    ) {
+      /*
+       * Clear filters if destination is hidden.
+       */
+      searchEl.value =
+        "";
+
+      clusterEl.value =
+        "";
+
+      edgeEl.value =
+        "";
+
+      state.search =
+        "";
+
+      state.cluster =
+        "";
+
+      state.edge =
+        "";
+
+      applyFilters();
+
+      setTimeout(
+        () => {
+          const node =
+            state.graph
+              .graphData()
+              .nodes
+              .find(
+                item =>
+                  item.id ===
+                  id
+              );
+
+          if (!node) {
+            return;
+          }
+
+          showDetails(
+            node
+          );
+
+          flyToNode(
+            node
+          );
+        },
+        100
+      );
+    }
+
     function showDetails(
       node
     ) {
@@ -795,6 +1752,70 @@
         .add(
           "open"
         );
+
+      const callers =
+        relatedNodes(
+          node.id,
+          "incoming",
+          CALL_RELATIONS
+        );
+
+      const callees =
+        relatedNodes(
+          node.id,
+          "outgoing",
+          CALL_RELATIONS
+        );
+
+      const dependencies =
+        relatedNodes(
+          node.id,
+          "outgoing",
+          DEPENDENCY_RELATIONS
+        );
+
+      const dependents =
+        relatedNodes(
+          node.id,
+          "incoming",
+          DEPENDENCY_RELATIONS
+        );
+
+      const blast =
+        blastRadius(
+          node.id,
+          3
+        );
+
+      let path =
+        null;
+
+      if (
+        state.pathStart &&
+        state.pathStart !==
+          node.id
+      ) {
+        path =
+          shortestPath(
+            state.pathStart,
+            node.id
+          );
+
+        if (path) {
+          highlightPath(
+            path
+          );
+        } else {
+          resetPathHighlight();
+        }
+      }
+
+      const pathStartNode =
+        state.pathStart
+          ? rawNode(
+              state.pathStart
+            )
+          : null;
 
       detailsEl.innerHTML = `
         <button
@@ -865,55 +1886,202 @@
           }
         </div>
 
-        <div class="section">
-          <div class="section-title">
-            Graph
-          </div>
-
-          <div class="row">
-            <span>Incoming</span>
+        <div class="intel-summary">
+          <div class="intel-card">
+            <span>Callers</span>
             <strong>
-              ${node.incoming}
+              ${callers.length}
             </strong>
           </div>
 
-          <div class="row">
-            <span>Outgoing</span>
+          <div class="intel-card">
+            <span>Callees</span>
             <strong>
-              ${node.outgoing}
+              ${callees.length}
             </strong>
           </div>
 
-          ${
-            node.hotspotScore != null
-              ? `
-                <div class="row">
-                  <span>Hotspot</span>
-                  <strong>
-                    ${node.hotspotScore}
-                  </strong>
-                </div>
-              `
-              : ""
-          }
+          <div class="intel-card">
+            <span>Dependents</span>
+            <strong>
+              ${dependents.length}
+            </strong>
+          </div>
+
+          <div class="intel-card">
+            <span>Dependencies</span>
+            <strong>
+              ${dependencies.length}
+            </strong>
+          </div>
         </div>
 
         <div class="section">
           <div class="section-title">
-            Project
+            Blast Radius
           </div>
 
           <div class="row">
-            <span>Name</span>
+            <span>Risk</span>
             <strong>
-              ${escapeHtml(
-                state.raw
-                  ?.dashboard
-                  ?.name ??
-                state.project
-              )}
+              ${blast.risk}
             </strong>
           </div>
+
+          <div class="row">
+            <span>Impacted nodes</span>
+            <strong>
+              ${blast.impacted.length}
+            </strong>
+          </div>
+
+          <div class="row">
+            <span>Impact score</span>
+            <strong>
+              ${blast.score}
+            </strong>
+          </div>
+
+          <span class="risk">
+            ${blast.risk}
+          </span>
+        </div>
+
+        ${
+          blast.impacted.length
+            ? relationHtml(
+                "Top Impacted",
+                blast.impacted
+                  .slice(
+                    0,
+                    8
+                  )
+                  .map(
+                    item =>
+                      item.node
+                  )
+              )
+            : ""
+        }
+
+        ${relationHtml(
+          "Callers",
+          callers
+        )}
+
+        ${relationHtml(
+          "Callees",
+          callees
+        )}
+
+        ${relationHtml(
+          "Dependencies",
+          dependencies
+        )}
+
+        ${relationHtml(
+          "Dependents",
+          dependents
+        )}
+
+        <div class="section">
+          <div class="section-title">
+            Shortest Path
+          </div>
+
+          ${
+            !state.pathStart
+              ? `
+                <div class="muted">
+                  Chọn node này làm điểm bắt đầu,
+                  sau đó click node khác.
+                </div>
+              `
+              : `
+                <div class="path">
+                  From:
+                  ${escapeHtml(
+                    pathStartNode
+                      ?.qualifiedName ||
+                    pathStartNode
+                      ?.name ||
+                    state.pathStart
+                  )}
+                </div>
+              `
+          }
+
+          <div class="path-actions">
+            <button
+              id="path-start"
+              type="button"
+            >
+              ${
+                state.pathStart ===
+                  node.id
+                  ? "Start selected"
+                  : "Set path start"
+              }
+            </button>
+
+            ${
+              state.pathStart
+                ? `
+                  <button
+                    id="path-clear"
+                    type="button"
+                  >
+                    Clear path
+                  </button>
+                `
+                : ""
+            }
+          </div>
+
+          ${
+            state.pathStart &&
+            state.pathStart !==
+              node.id
+              ? (
+                  path
+                    ? `
+                      <div class="path-chain">
+                        ${
+                          path.map(
+                            id => {
+                              const item =
+                                rawNode(
+                                  id
+                                );
+
+                              return `
+                                <button
+                                  class="path-node"
+                                  data-jump-node="${escapeHtml(
+                                    id
+                                  )}"
+                                >
+                                  ${escapeHtml(
+                                    item?.qualifiedName ||
+                                    item?.name ||
+                                    id
+                                  )}
+                                </button>
+                              `;
+                            }
+                          ).join("")
+                        }
+                      </div>
+                    `
+                    : `
+                      <div class="relation-more">
+                        Không tìm thấy directed path
+                        trong 10 bước.
+                      </div>
+                    `
+                )
+              : ""
+          }
         </div>
       `;
 
@@ -926,6 +2094,67 @@
           event => {
             event.stopPropagation();
             closeDetails();
+          }
+        );
+
+      detailsEl
+        .querySelectorAll(
+          "[data-jump-node]"
+        )
+        .forEach(
+          element => {
+            element
+              .addEventListener(
+                "click",
+                event => {
+                  event.stopPropagation();
+
+                  jumpToNode(
+                    element.dataset
+                      .jumpNode
+                  );
+                }
+              );
+          }
+        );
+
+      document
+        .getElementById(
+          "path-start"
+        )
+        ?.addEventListener(
+          "click",
+          event => {
+            event.stopPropagation();
+
+            state.pathStart =
+              node.id;
+
+            resetPathHighlight();
+
+            showDetails(
+              node
+            );
+          }
+        );
+
+      document
+        .getElementById(
+          "path-clear"
+        )
+        ?.addEventListener(
+          "click",
+          event => {
+            event.stopPropagation();
+
+            state.pathStart =
+              null;
+
+            resetPathHighlight();
+
+            showDetails(
+              node
+            );
           }
         );
     }
@@ -1613,6 +2842,11 @@
 
           state.edge =
             "";
+
+          state.pathStart =
+            null;
+
+          resetPathHighlight();
 
           closeDetails();
 

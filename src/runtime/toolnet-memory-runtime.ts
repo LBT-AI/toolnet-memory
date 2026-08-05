@@ -58,6 +58,10 @@ import type {
 } from "../storage/types.js";
 
 import {
+  reconcileSessionMemoryJournal,
+} from "../session/learner/index.js";
+
+import {
   SnapshotManager,
 } from "../snapshot/index.js";
 
@@ -193,6 +197,15 @@ export class ToolNetMemoryRuntime {
 
     await this.processLock
       .acquire();
+
+    /*
+     * Session learners write immutable claims only.
+     * Reconcile them into current memory before runtime load.
+     */
+    await reconcileSessionMemoryJournal(
+      project,
+      this.options.storage,
+    );
 
     // Load persistent memory.
     const memories =

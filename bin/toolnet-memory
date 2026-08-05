@@ -6,72 +6,233 @@ SOURCE="${BASH_SOURCE[0]}"
 while [ -h "$SOURCE" ]; do
   DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
   SOURCE="$(readlink "$SOURCE")"
-
-  [[ "$SOURCE" != /* ]] &&
-    SOURCE="$DIR/$SOURCE"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 
 ROOT="$(cd -P "$(dirname "$SOURCE")/.." >/dev/null 2>&1 && pwd)"
+NODE="${NODE_BINARY:-node}"
 TSX="$ROOT/node_modules/.bin/tsx"
-
-if [ ! -x "$TSX" ]; then
-  echo "tsx not found. Run npm install first."
-  exit 1
-fi
 
 COMMAND="${1:-help}"
 
+run() {
+  DIST="$1"
+  SRC="$2"
+  shift 2
+
+  if [ -f "$ROOT/$DIST" ]; then
+    exec "$NODE" "$ROOT/$DIST" "$@"
+  fi
+
+  # Development checkout fallback only.
+  if [ -x "$TSX" ] && [ -f "$ROOT/$SRC" ]; then
+    exec "$TSX" "$ROOT/$SRC" "$@"
+  fi
+
+  echo "ToolNet production build missing."
+  echo "Run: npm run build:prod"
+  exit 1
+}
+
 case "$COMMAND" in
   doctor)
-    exec "$TSX" "$ROOT/src/production/doctor.ts"
+    run dist/production/doctor.js src/production/doctor.ts
     ;;
 
   run)
-    exec "$TSX" "$ROOT/src/index.ts"
+    run dist/index.js src/index.ts
     ;;
 
   mcp)
-    exec "$TSX" "$ROOT/src/mcp/bootstrap.ts"
+    run dist/mcp/bootstrap.js src/mcp/bootstrap.ts
     ;;
 
   index)
-    exec "$TSX" "$ROOT/src/production/full-index.ts"
+    run dist/production/full-index.js src/production/full-index.ts
     ;;
 
   index:graph)
-    exec "$TSX" "$ROOT/src/code-intelligence/test-index.ts"
+    run dist/code-intelligence/test-index.js src/code-intelligence/test-index.ts
     ;;
 
   incremental)
-    exec "$TSX" "$ROOT/src/code-intelligence/test-incremental.ts"
+    run dist/code-intelligence/test-incremental.js src/code-intelligence/test-incremental.ts
     ;;
 
   semantic)
     shift
-    exec "$TSX" "$ROOT/src/code-intelligence/test-semantic.ts" "$@"
+    run dist/code-intelligence/test-semantic.js src/code-intelligence/test-semantic.ts "$@"
     ;;
 
   impact)
     shift
-    exec "$TSX" "$ROOT/src/code-intelligence/test-impact.ts" "$@"
+    run dist/code-intelligence/test-impact.js src/code-intelligence/test-impact.ts "$@"
     ;;
 
   snapshot:list)
-    exec "$TSX" "$ROOT/src/production/snapshot-cli.ts" list
+    run dist/production/snapshot-cli.js src/production/snapshot-cli.ts list
     ;;
 
   snapshot:create)
     shift
-    exec "$TSX" "$ROOT/src/production/snapshot-cli.ts" create "$@"
+    run dist/production/snapshot-cli.js src/production/snapshot-cli.ts create "$@"
     ;;
 
   snapshot:restore)
     shift
-    exec "$TSX" "$ROOT/src/production/snapshot-cli.ts" restore "$@"
+    run dist/production/snapshot-cli.js src/production/snapshot-cli.ts restore "$@"
     ;;
 
   recover)
-    exec "$TSX" "$ROOT/src/production/snapshot-cli.ts" recover-latest
+    run dist/production/snapshot-cli.js src/production/snapshot-cli.ts recover-latest
+    ;;
+
+  session:opencode-sync)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/opencode/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/opencode/cli.js" sync "$@"
+    fi
+
+    if [ -n "${TSX:-}" ] && [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/session/opencode/cli.ts" sync "$@"
+    fi
+
+    echo "OpenCode session adapter not found."
+    exit 1
+    ;;
+
+  session:opencode-recover)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/opencode/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/opencode/cli.js" recover "$@"
+    fi
+
+    if [ -n "${TSX:-}" ] && [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/session/opencode/cli.ts" recover "$@"
+    fi
+
+    echo "OpenCode session adapter not found."
+    exit 1
+    ;;
+
+  integrate:opencode)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/opencode/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/opencode/cli.js" install-plugin "$@"
+    fi
+
+    if [ -n "${TSX:-}" ] && [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/session/opencode/cli.ts" install-plugin "$@"
+    fi
+
+    echo "OpenCode plugin installer not found."
+    exit 1
+    ;;
+
+  session:agy-hook)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/agy/hook.js" ]; then
+      exec node "$ROOT/dist/src/session/agy/hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/session/agy/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
+  session:agy-sync)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/agy/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/agy/cli.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/agy/cli.ts" sync "$@"
+    ;;
+
+  session:agy-recover)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/agy/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/agy/cli.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/agy/cli.ts" recover "$@"
+    ;;
+
+  integrate:agy)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/agy/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/agy/cli.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/agy/cli.ts" install-hooks "$@"
+    ;;
+
+  session:codex-notify)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/codex/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/codex/cli.js" notify "$@"
+    fi
+
+    if [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/session/codex/cli.ts" notify "$@"
+    fi
+
+    exit 0
+    ;;
+
+  session:codex-sync)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/codex/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/codex/cli.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/codex/cli.ts" sync "$@"
+    ;;
+
+  session:codex-recover)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/codex/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/codex/cli.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/codex/cli.ts" recover "$@"
+    ;;
+
+  integrate:codex)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/codex/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/codex/cli.js" install-notify "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/codex/cli.ts" install-notify "$@"
+    ;;
+
+  memory:reconcile)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/learner/cli.js" ]; then
+      exec node "$ROOT/dist/src/session/learner/cli.js" reconcile "$@"
+    fi
+
+    if [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/session/learner/cli.ts" reconcile "$@"
+    fi
+
+    echo "Memory learner not found."
+    exit 1
     ;;
 
   help|--help|-h)
@@ -80,17 +241,26 @@ ToolNet Memory
 
 Commands:
   toolnet-memory doctor
-  toolnet-memory run
-  toolnet-memory mcp
   toolnet-memory index
   toolnet-memory index:graph
   toolnet-memory incremental
   toolnet-memory semantic "query"
   toolnet-memory impact [file]
+  toolnet-memory mcp
   toolnet-memory snapshot:list
   toolnet-memory snapshot:create "reason"
   toolnet-memory snapshot:restore <id>
   toolnet-memory recover
+  toolnet-memory integrate:opencode
+  toolnet-memory integrate:agy
+  toolnet-memory integrate:codex
+  toolnet-memory session:codex-sync <thread-id>
+  toolnet-memory session:codex-recover [--limit N]
+  toolnet-memory memory:reconcile [--project PATH]
+  toolnet-memory session:agy-sync <conversation-id> --transcript <path>
+  toolnet-memory session:agy-recover [--limit N]
+  toolnet-memory session:opencode-sync <session-id>
+  toolnet-memory session:opencode-recover [--limit N]
 HELP
     ;;
 

@@ -14,6 +14,14 @@ const GENERIC_TAGS =
     "file",
     "write",
     "command",
+    "learned",
+    "session",
+    "architecture",
+    "fix",
+    "context",
+    "opencode",
+    "agy",
+    "codex",
   ]);
 
 const STOPWORDS =

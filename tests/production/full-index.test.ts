@@ -9,28 +9,34 @@ import {
 } from "vitest";
 
 describe(
-  "Full project index pipeline",
+  "Production full index",
   () => {
-    it(
-      "contains all intelligence stages in dependency order",
-      () => {
-        const source =
-          readFileSync(
-            "src/production/full-index.ts",
-            "utf8",
-          );
+    const cli =
+      readFileSync(
+        "src/production/full-index.ts",
+        "utf8",
+      );
 
+    const pipeline =
+      readFileSync(
+        "src/production/index-pipeline.ts",
+        "utf8",
+      );
+
+    it(
+      "uses the 7 production stages in order",
+      () => {
         const stages = [
-          "test-index.ts",
-          "test-resolution.ts",
-          "test-rich-graph.ts",
-          "test-semantic.ts",
-          "test-architecture.ts",
-          "test-analysis.ts",
-          "test-visualization.ts",
+          '"source-index"',
+          '"type-resolution"',
+          '"rich-graph"',
+          '"semantic-index"',
+          '"architecture"',
+          '"analysis"',
+          '"visualization"',
         ];
 
-        let last =
+        let previous =
           -1;
 
         for (
@@ -38,64 +44,70 @@ describe(
           of stages
         ) {
           const position =
-            source.indexOf(
+            pipeline.indexOf(
               stage,
+              previous + 1,
             );
 
           expect(
             position,
           ).toBeGreaterThan(
-            last,
+            previous,
           );
 
-          last =
+          previous =
             position;
         }
       },
     );
 
     it(
-      "does not create snapshots automatically",
+      "does not depend on tsx or test entrypoints",
       () => {
         const source =
-          readFileSync(
-            "src/production/full-index.ts",
-            "utf8",
-          );
+          cli +
+          pipeline;
 
         expect(
           source,
         ).not.toContain(
-          "snapshot:create",
+          "spawnSync",
         );
 
         expect(
           source,
         ).not.toContain(
-          "SnapshotManager",
+          "node_modules/.bin/tsx",
+        );
+
+        expect(
+          source,
+        ).not.toMatch(
+          /test-(index|resolution|rich-graph|semantic|architecture|analysis|visualization)\.ts/,
         );
       },
     );
 
     it(
-      "uses a project-local concurrency lock",
+      "keeps project locking and does not auto snapshot",
       () => {
-        const source =
-          readFileSync(
-            "src/production/full-index.ts",
-            "utf8",
-          );
-
         expect(
-          source,
+          cli,
         ).toContain(
           "index.lock",
         );
 
         expect(
-          source,
+          cli,
         ).toContain(
-          "wx",
+          '"wx"',
+        );
+
+        expect(
+          cli +
+          pipeline,
+        ).not.toContain(
+          "SnapshotManager",
         );
       },
     );
