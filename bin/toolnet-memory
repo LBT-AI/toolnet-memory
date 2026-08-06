@@ -36,7 +36,7 @@ run() {
 
 case "$COMMAND" in
   doctor)
-    run dist/production/doctor.js src/production/doctor.ts
+    run dist/src/production/doctor.js src/production/doctor.ts
     ;;
 
   run)
@@ -44,47 +44,47 @@ case "$COMMAND" in
     ;;
 
   mcp)
-    run dist/mcp/bootstrap.js src/mcp/bootstrap.ts
+    run dist/src/mcp/bootstrap.js src/mcp/bootstrap.ts
     ;;
 
   index)
-    run dist/production/full-index.js src/production/full-index.ts
+    run dist/src/production/full-index.js src/production/full-index.ts
     ;;
 
   index:graph)
-    run dist/code-intelligence/test-index.js src/code-intelligence/test-index.ts
+    run dist/src/code-intelligence/test-index.js src/code-intelligence/test-index.ts
     ;;
 
   incremental)
-    run dist/code-intelligence/test-incremental.js src/code-intelligence/test-incremental.ts
+    run dist/src/code-intelligence/test-incremental.js src/code-intelligence/test-incremental.ts
     ;;
 
   semantic)
     shift
-    run dist/code-intelligence/test-semantic.js src/code-intelligence/test-semantic.ts "$@"
+    run dist/src/code-intelligence/test-semantic.js src/code-intelligence/test-semantic.ts "$@"
     ;;
 
   impact)
     shift
-    run dist/code-intelligence/test-impact.js src/code-intelligence/test-impact.ts "$@"
+    run dist/src/code-intelligence/test-impact.js src/code-intelligence/test-impact.ts "$@"
     ;;
 
   snapshot:list)
-    run dist/production/snapshot-cli.js src/production/snapshot-cli.ts list
+    run dist/src/production/snapshot-cli.js src/production/snapshot-cli.ts list
     ;;
 
   snapshot:create)
     shift
-    run dist/production/snapshot-cli.js src/production/snapshot-cli.ts create "$@"
+    run dist/src/production/snapshot-cli.js src/production/snapshot-cli.ts create "$@"
     ;;
 
   snapshot:restore)
     shift
-    run dist/production/snapshot-cli.js src/production/snapshot-cli.ts restore "$@"
+    run dist/src/production/snapshot-cli.js src/production/snapshot-cli.ts restore "$@"
     ;;
 
   recover)
-    run dist/production/snapshot-cli.js src/production/snapshot-cli.ts recover-latest
+    run dist/src/production/snapshot-cli.js src/production/snapshot-cli.ts recover-latest
     ;;
 
   session:opencode-sync)
