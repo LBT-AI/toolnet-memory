@@ -4,7 +4,7 @@
   "description": "Official installer for ToolNet Memory",
   "license": "MIT",
   "bin": {
-    "toolnet-memory-install": "./bin/install.js"
+    "toolnet-memory-install": "bin/install.js"
   },
   "files": [
     "bin"
