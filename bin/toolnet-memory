@@ -35,6 +35,18 @@ run() {
 }
 
 case "$COMMAND" in
+  setup)
+    if [ -f "$ROOT/dist/src/production/setup.js" ]; then
+      exec node "$ROOT/dist/src/production/setup.js" "$@"
+    elif [ -f "$ROOT/src/production/setup.ts" ]; then
+      exec npx --yes tsx "$ROOT/src/production/setup.ts" "$@"
+    else
+      echo "ToolNet setup module missing."
+      exit 1
+    fi
+    ;;
+
+
   doctor)
     run dist/src/production/doctor.js src/production/doctor.ts
     ;;
@@ -375,6 +387,7 @@ ToolNet Memory
 
 Commands:
   toolnet-memory doctor
+  toolnet-memory setup
   toolnet-memory index
   toolnet-memory index:graph
   toolnet-memory incremental

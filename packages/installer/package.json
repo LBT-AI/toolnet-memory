@@ -1,0 +1,15 @@
+{
+  "name": "toolnet-memory-install",
+  "version": "0.1.1",
+  "description": "Official installer for ToolNet Memory",
+  "license": "MIT",
+  "bin": {
+    "toolnet-memory-install": "./bin/install.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

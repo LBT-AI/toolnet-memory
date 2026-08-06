@@ -104,6 +104,29 @@ toolnet-memory doctor
 
 ---
 
+
+## First-time configuration
+
+After installation, ToolNet Memory can configure storage interactively:
+
+```bash
+toolnet-memory setup
+If Hugging Face storage is already configured, ToolNet detects it and keeps the existing configuration.
+For a new machine, the setup wizard asks for:
+HF_NAMESPACE
+HF_BUCKET
+HF_S3_ACCESS_KEY_ID
+HF_S3_SECRET_ACCESS_KEY
+Configuration is stored at:
+~/.config/toolnet-memory/.env
+Permissions are restricted automatically:
+~/.config/toolnet-memory      700
+~/.config/toolnet-memory/.env 600
+Your Hugging Face credentials belong to your own account and are never bundled with ToolNet Memory.
+The installer can launch this setup automatically on first install.
+ 
+⸻
+ 
 ## Core capabilities
 
 ### Persistent Project Memory
