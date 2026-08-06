@@ -2,9 +2,9 @@
 
 # TOOLNET MEMORY
 
-### Persistent memory & code intelligence for AI coding agents
+### Persistent project memory & code intelligence for AI coding agents
 
-**Keep project knowledge, work continuity and agent handoffs across sessions.**
+**Continue the same project across OpenCode, Agy and Codex without losing context.**
 
 [![npm](https://img.shields.io/npm/v/toolnet-memory?style=flat-square)](https://www.npmjs.com/package/toolnet-memory)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -14,19 +14,63 @@
 
 ---
 
-## What is ToolNet Memory?
+## What does ToolNet Memory do?
 
-ToolNet Memory is a lightweight persistent memory layer for AI coding agents.
+ToolNet Memory is a persistent memory layer for AI coding agents.
 
-It keeps project state alive when you:
+Its job is simple: **help the next AI understand the project before it continues the work.**
 
-- stop a session and continue tomorrow,
-- move from OpenCode to Agy or Codex,
-- hit token limits,
-- resume a partially completed plan,
-- need the next agent to understand not only **what to do next**, but also **why**.
+A coding agent normally loses important context when a session ends, tokens run out, you change tools, move to another VPS, or return to the project days later. The new agent may be able to read the source code, but it often does not know the original goal, why an architecture was chosen, what has already been completed, what is still in progress, or which project rules must not be violated.
 
-Instead of blindly telling the next agent “continue Phase 4”, ToolNet can preserve the project mission, current objective, rationale, completed work, active phase, blockers, rules and next actions.
+ToolNet Memory preserves that project knowledge separately from any single AI agent.
+
+```text
+OpenCode stops at Phase 3
+          ↓
+     ToolNet Memory
+          ↓
+Agy opens the same project
+          ↓
+Understands the mission, rationale,
+completed work, current objective,
+constraints and next actions
+          ↓
+Continues Phase 4
+          ↓
+Agy later stops at Phase 6
+          ↓
+     ToolNet Memory
+          ↓
+Codex continues Phase 7
+```
+
+It is **not just chat history**. ToolNet extracts and preserves durable working context such as:
+
+- what the project is building,
+- the current objective,
+- why the work matters,
+- why a specific implementation direction was chosen,
+- completed and active phases/tasks,
+- deliverables and Definition of Done,
+- architecture decisions,
+- dependencies and blockers,
+- project operating rules,
+- important warnings,
+- next actions.
+
+The result is a shared technical memory layer between your project and your AI coding agents:
+
+```text
+OpenCode / Agy / Codex
+          ↓
+    ToolNet Memory
+          ↓
+Project Memory + Work State
++ Semantic Context + Code Intelligence
+          ↓
+The next agent continues with context
+instead of restarting from zero
+```
 
 ---
 
@@ -104,23 +148,6 @@ Decisions
 Blockers
 Warnings
 Next Actions
-```
-
-Example:
-
-```text
-OpenCode
-  ↓
-Completes Phase 1–3
-  ↓
-ToolNet Memory
-  ↓
-Agy starts
-  ↓
-Understands mission, rationale,
-completed work and current objective
-  ↓
-Continues Phase 4
 ```
 
 ### Semantic Work Context
