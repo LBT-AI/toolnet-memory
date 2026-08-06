@@ -18,6 +18,10 @@ import {
   installOpenCodePlugin,
 } from "./plugin-installer.js";
 
+import {
+  refreshStartupBriefCache,
+} from "../../work-continuity/brief-cache.js";
+
 function valueAfter(
   args:
     string[],
@@ -174,33 +178,51 @@ async function main() {
       );
     }
 
+    const idle =
+      has(
+        args,
+        "--idle",
+      );
+
+    const error =
+      has(
+        args,
+        "--error",
+      );
+
+    const compacted =
+      has(
+        args,
+        "--compacted",
+      );
+
     const result =
       await syncOpenCodeSession({
         project,
         storage,
 
         nativeSessionId,
-
         dbPath,
-
-        idle:
-          has(
-            args,
-            "--idle",
-          ),
-
-        error:
-          has(
-            args,
-            "--error",
-          ),
-
-        compacted:
-          has(
-            args,
-            "--compacted",
-          ),
+        idle,
+        error,
+        compacted,
       });
+
+    if (
+      idle ||
+      compacted ||
+      error
+    ) {
+      try {
+        await refreshStartupBriefCache(
+          project,
+          storage,
+          900,
+        );
+      } catch {
+        // Derived cache must never break session capture.
+      }
+    }
 
     console.log(
       JSON.stringify(

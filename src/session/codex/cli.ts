@@ -46,6 +46,14 @@ import {
   installCodexNotify,
 } from "./notify-installer.js";
 
+import {
+  installCodexContextHook,
+} from "./context-hook-installer.js";
+
+import {
+  refreshStartupBriefCache,
+} from "../../work-continuity/brief-cache.js";
+
 function after(
   args:
     string[],
@@ -309,13 +317,14 @@ async function notify(
     return;
   }
 
+  const storage =
+    storageFor(
+      project,
+    );
+
   await syncCodexSession({
     project,
-
-    storage:
-      storageFor(
-        project,
-      ),
+    storage,
 
     threadId,
     rolloutPath,
@@ -326,6 +335,16 @@ async function notify(
     idle:
       true,
   });
+
+  try {
+    await refreshStartupBriefCache(
+      project,
+      storage,
+      900,
+    );
+  } catch {
+    // Derived cache must never break Codex notify.
+  }
 }
 
 async function main() {
@@ -342,13 +361,20 @@ async function main() {
     command ===
     "install-notify"
   ) {
+    const binary =
+      after(
+        args,
+        "--bin",
+      );
+
     const result =
       installCodexNotify({
-        binary:
-          after(
-            args,
-            "--bin",
-          ),
+        binary,
+      });
+
+    const contextHooks =
+      installCodexContextHook({
+        binary,
       });
 
     console.log(
@@ -363,6 +389,10 @@ async function main() {
         `✅ Previous notify preserved: ${result.previousFile}`,
       );
     }
+
+    console.log(
+      `✅ Codex SessionStart context hook: ${contextHooks}`,
+    );
 
     return;
   }

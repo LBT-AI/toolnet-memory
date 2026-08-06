@@ -25,6 +25,20 @@ import {
   SessionMemoryLearner,
 } from "./learner/learner.js";
 
+import {
+  WorkContinuityLearner,
+} from "../work-continuity/learner.js";
+
+import {
+  SemanticWorkLearner,
+} from "../work-continuity/semantic-learner.js";
+
+
+import {
+  SmartHandoffManager,
+} from "../work-continuity/handoff.js";
+
+
 export class SessionCore {
   readonly identity;
 
@@ -39,6 +53,16 @@ export class SessionCore {
 
   private readonly learner:
     SessionMemoryLearner;
+
+  private readonly continuity:
+    WorkContinuityLearner;
+
+  private readonly semantic:
+    SemanticWorkLearner;
+
+  private readonly handoff:
+    SmartHandoffManager;
+
 
   private readonly title?:
     string;
@@ -103,6 +127,48 @@ export class SessionCore {
 
         wal:
           this.wal,
+      });
+
+    this.continuity =
+      new WorkContinuityLearner({
+        project:
+          options.project,
+
+        storage:
+          options.storage,
+
+        identity:
+          this.identity,
+
+        wal:
+          this.wal,
+      });
+
+    this.semantic =
+      new SemanticWorkLearner({
+        project:
+          options.project,
+
+        storage:
+          options.storage,
+
+        identity:
+          this.identity,
+
+        wal:
+          this.wal,
+      });
+
+    this.handoff =
+      new SmartHandoffManager({
+        project:
+          options.project,
+
+        storage:
+          options.storage,
+
+        identity:
+          this.identity,
       });
   }
 
@@ -270,6 +336,94 @@ export class SessionCore {
           .learnNew();
       } catch {
         // Retry automatically on a later flush.
+      }
+    }
+
+    /*
+     * Work continuity is a separate projection from
+     * long-term memory.
+     *
+     * Failure here must never break session capture.
+     */
+    if (
+      process.env
+        .TOOLNET_WORK_CONTINUITY !==
+      "0"
+    ) {
+      try {
+        await this.continuity
+          .learnNew();
+      } catch {
+        // Immutable session WAL allows retry later.
+      }
+    }
+
+
+    /*
+     * Semantic continuity learns meaning, rationale,
+     * deliverables and completion criteria.
+     *
+     * It never invents missing rationale.
+     */
+    if (
+      process.env
+        .TOOLNET_SEMANTIC_CONTINUITY !==
+      "0"
+    ) {
+      try {
+        await this.semantic
+          .learnNew();
+      } catch {
+        // Derived projection: session capture must continue.
+      }
+    }
+
+    /*
+     * Smart Handoff checkpoint.
+     *
+     * We checkpoint on every durable flush, not only graceful
+     * session_end. This protects continuity when an agent hits
+     * token limit, terminal disconnect, crash, or user stops
+     * unexpectedly.
+     *
+     * Handoff IDs are state-digest based, so unchanged work
+     * does not create endless duplicate snapshots.
+     */
+    if (
+      process.env
+        .TOOLNET_SMART_HANDOFF !==
+      "0" &&
+      pending.events.length >
+      0
+    ) {
+      try {
+        const lastEvent =
+          pending.events[
+            pending.events.length -
+            1
+          ];
+
+        const explicitReason =
+          [
+            "session_idle",
+            "session_end",
+            "session_compact",
+          ].includes(
+            lastEvent.type,
+          )
+            ? lastEvent.type
+            : "checkpoint";
+
+        await this.handoff
+          .capture(
+            explicitReason,
+            lastEvent.sequence,
+          );
+      } catch {
+        /*
+         * Handoff is a derived projection.
+         * It must never break durable session capture.
+         */
       }
     }
 

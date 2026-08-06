@@ -235,6 +235,140 @@ case "$COMMAND" in
     exit 1
     ;;
 
+  project:manual-init)
+    shift
+
+    if [ -f "$ROOT/dist/src/project-manual/cli.js" ]; then
+      exec node "$ROOT/dist/src/project-manual/cli.js" init "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/project-manual/cli.ts" init "$@"
+    ;;
+
+  project:manual-show)
+    shift
+
+    if [ -f "$ROOT/dist/src/project-manual/cli.js" ]; then
+      exec node "$ROOT/dist/src/project-manual/cli.js" show "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/project-manual/cli.ts" show "$@"
+    ;;
+
+  project:manual-sync)
+    shift
+
+    if [ -f "$ROOT/dist/src/project-manual/cli.js" ]; then
+      exec node "$ROOT/dist/src/project-manual/cli.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/project-manual/cli.ts" sync "$@"
+    ;;
+
+  work:status)
+    shift
+
+    if [ -f "$ROOT/dist/src/work-continuity/cli.js" ]; then
+      exec node "$ROOT/dist/src/work-continuity/cli.js" status "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/cli.ts" status "$@"
+    ;;
+
+  work:json)
+    shift
+
+    if [ -f "$ROOT/dist/src/work-continuity/cli.js" ]; then
+      exec node "$ROOT/dist/src/work-continuity/cli.js" json "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/cli.ts" json "$@"
+    ;;
+
+  work:reconcile)
+    shift
+
+    if [ -f "$ROOT/dist/src/work-continuity/cli.js" ]; then
+      exec node "$ROOT/dist/src/work-continuity/cli.js" reconcile "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/cli.ts" reconcile "$@"
+    ;;
+
+  brief)
+    shift
+
+    if [ -f "$ROOT/dist/src/work-continuity/context-cli.js" ]; then
+      exec node "$ROOT/dist/src/work-continuity/context-cli.js" brief "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/context-cli.ts" brief "$@"
+    ;;
+
+  brief:json)
+    shift
+
+    if [ -f "$ROOT/dist/src/work-continuity/context-cli.js" ]; then
+      exec node "$ROOT/dist/src/work-continuity/context-cli.js" brief-json "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/context-cli.ts" brief-json "$@"
+    ;;
+
+  handoff:latest)
+    shift
+
+    if [ -f "$ROOT/dist/src/work-continuity/context-cli.js" ]; then
+      exec node "$ROOT/dist/src/work-continuity/context-cli.js" handoff-latest "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/context-cli.ts" handoff-latest "$@"
+    ;;
+
+  context:sync)
+    shift
+
+    if [ -f "$ROOT/dist/src/work-continuity/context-runtime-cli.js" ]; then
+      exec node "$ROOT/dist/src/work-continuity/context-runtime-cli.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/context-runtime-cli.ts" sync "$@"
+    ;;
+
+  context:print)
+    shift
+
+    if [ -f "$ROOT/dist/src/work-continuity/context-runtime-cli.js" ]; then
+      exec node "$ROOT/dist/src/work-continuity/context-runtime-cli.js" print "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/context-runtime-cli.ts" print "$@"
+    ;;
+
+  context:refresh)
+    shift
+
+    if [ -f "$ROOT/dist/src/work-continuity/context-runtime-cli.js" ]; then
+      exec node "$ROOT/dist/src/work-continuity/context-runtime-cli.js" refresh "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/context-runtime-cli.ts" refresh "$@"
+    ;;
+
+  session:codex-context)
+    shift
+
+    if [ -f "$ROOT/dist/src/session/codex/context-hook.js" ]; then
+      exec node "$ROOT/dist/src/session/codex/context-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/session/codex/context-hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
   help|--help|-h)
     cat <<'HELP'
 ToolNet Memory
@@ -257,6 +391,15 @@ Commands:
   toolnet-memory session:codex-sync <thread-id>
   toolnet-memory session:codex-recover [--limit N]
   toolnet-memory memory:reconcile [--project PATH]
+  toolnet-memory project:manual-init [--project PATH]
+  toolnet-memory project:manual-show [--project PATH]
+  toolnet-memory project:manual-sync [--project PATH]
+  toolnet-memory work:status [--project PATH]
+  toolnet-memory work:json [--project PATH]
+  toolnet-memory work:reconcile [--project PATH]
+  toolnet-memory brief [--project PATH] [--tokens N]
+  toolnet-memory brief:json [--project PATH] [--tokens N]
+  toolnet-memory handoff:latest [--project PATH]
   toolnet-memory session:agy-sync <conversation-id> --transcript <path>
   toolnet-memory session:agy-recover [--limit N]
   toolnet-memory session:opencode-sync <session-id>

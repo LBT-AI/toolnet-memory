@@ -9,6 +9,11 @@ import {
 } from "../../storage/index.js";
 
 import {
+  buildAgyPreInvocationOutput,
+  refreshStartupBriefCache,
+} from "../../work-continuity/index.js";
+
+import {
   findToolNetProject,
 } from "./project-resolver.js";
 
@@ -54,7 +59,8 @@ async function readStdin():
 }
 
 function strings(
-  value: unknown,
+  value:
+    unknown,
 ): string[] {
   if (
     !Array.isArray(
@@ -68,7 +74,8 @@ function strings(
     item =>
       typeof item ===
       "string",
-  ) as string[];
+  ) as
+    string[];
 }
 
 async function main() {
@@ -77,9 +84,9 @@ async function main() {
       process.argv[2] ??
       "post"
     ) as
-      "pre"
-      | "post"
-      | "stop";
+      "pre" |
+      "post" |
+      "stop";
 
   const input =
     await readStdin();
@@ -105,19 +112,20 @@ async function main() {
       input.workspacePaths,
     );
 
-  /*
-   * Global hook may run in projects which do not use ToolNet.
-   * Never create .toolnet there automatically.
-   */
   const project =
     findToolNetProject(
       workspacePaths,
     );
 
+  let hookOutput:
+    Record<
+      string,
+      unknown
+    > = {};
+
   if (
     project &&
-    conversationId &&
-    transcriptPath
+    conversationId
   ) {
     try {
       const config =
@@ -139,7 +147,8 @@ async function main() {
                 .localRoot,
           }),
           {
-            attempts: 3,
+            attempts:
+              2,
           },
         );
 
@@ -152,71 +161,113 @@ async function main() {
             project.name,
         );
 
-      await syncAgySession({
-        project,
-        storage,
-
-        conversationId,
-        transcriptPath,
-        workspacePaths,
-
-        artifactDirectoryPath:
-          typeof input
-            .artifactDirectoryPath ===
-            "string"
-            ? input
-                .artifactDirectoryPath
-            : undefined,
-
-        modelName:
-          typeof input
-            .modelName ===
-            "string"
-            ? input
-                .modelName
-            : undefined,
-
-        phase,
-
-        fullyIdle:
-          input.fullyIdle ===
-          true,
-
-        terminationReason:
-          typeof input
-            .terminationReason ===
-            "string"
-            ? input
-                .terminationReason
-            : undefined,
-
-        error:
-          typeof input.error ===
-            "string" &&
-          input.error
-            ? input.error
-            : undefined,
-      });
-    } catch (
-      error
-    ) {
       /*
-       * Capture must never break Agy.
+       * Session capture remains independent from context
+       * injection. One failure cannot break the other.
        */
-      console.error(
-        "[toolnet-memory]",
-        error instanceof Error
-          ? error.message
-          : String(
-              error,
-            ),
-      );
+      if (
+        transcriptPath
+      ) {
+        try {
+          await syncAgySession({
+            project,
+            storage,
+
+            conversationId,
+            transcriptPath,
+            workspacePaths,
+
+            artifactDirectoryPath:
+              typeof input
+                .artifactDirectoryPath ===
+                "string"
+                ? input
+                    .artifactDirectoryPath
+                : undefined,
+
+            modelName:
+              typeof input
+                .modelName ===
+                "string"
+                ? input
+                    .modelName
+                : undefined,
+
+            phase,
+
+            fullyIdle:
+              input.fullyIdle ===
+              true,
+
+            terminationReason:
+              typeof input
+                .terminationReason ===
+                "string"
+                ? input
+                    .terminationReason
+                : undefined,
+
+            error:
+              typeof input.error ===
+                "string" &&
+              input.error
+                ? input.error
+                : undefined,
+          });
+        } catch {
+          // Capture failure must not block Agy.
+        }
+      }
+
+      if (
+        phase ===
+        "pre"
+      ) {
+        try {
+          hookOutput =
+            await buildAgyPreInvocationOutput({
+              project,
+              storage,
+              conversationId,
+
+              invocationNum:
+                typeof input
+                  .invocationNum ===
+                  "number"
+                  ? input
+                      .invocationNum
+                  : undefined,
+            });
+        } catch {
+          hookOutput =
+            {};
+        }
+      }
+
+      /*
+       * End of one Agy execution:
+       * publish the newest compact Startup Brief so another
+       * agent/VPS can resume immediately.
+       */
+      if (
+        phase ===
+        "stop"
+      ) {
+        try {
+          await refreshStartupBriefCache(
+            project,
+            storage,
+            900,
+          );
+        } catch {
+          // Optional derived cache.
+        }
+      }
+    } catch {
+      // ToolNet must never break Agy.
     }
   }
 
-  /*
-   * Hooks communicate over stdout JSON.
-   */
   if (
     phase ===
     "stop"
@@ -227,11 +278,15 @@ async function main() {
           "stop",
       }),
     );
-  } else {
-    process.stdout.write(
-      "{}",
-    );
+
+    return;
   }
+
+  process.stdout.write(
+    JSON.stringify(
+      hookOutput,
+    ),
+  );
 }
 
 main().catch(
