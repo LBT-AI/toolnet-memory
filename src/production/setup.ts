@@ -4,6 +4,10 @@ import path from "node:path"
 import readline from "node:readline/promises"
 import { stdin as input, stdout as output } from "node:process"
 
+import {
+  installAutoIntegrations,
+} from "./auto-integrate.js"
+
 const CONFIG_DIR = path.join(os.homedir(), ".config", "toolnet-memory")
 const ENV_FILE = path.join(CONFIG_DIR, ".env")
 
@@ -121,6 +125,49 @@ async function hiddenQuestion(label: string): Promise<string> {
   })
 }
 
+
+function enableAutomaticAgentMemory() {
+  try {
+    const results =
+      installAutoIntegrations()
+
+    const installed =
+      results.filter(
+        item =>
+          item.installed,
+      )
+
+    if (
+      installed.length >
+      0
+    ) {
+      console.log("")
+      console.log("Automatic AI memory:")
+
+      for (
+        const item
+        of installed
+      ) {
+        const name =
+          item.agent === "agy"
+            ? "Agy / Antigravity"
+            : item.agent === "opencode"
+              ? "OpenCode"
+              : "Codex"
+
+        console.log(
+          `  ✓ ${name}`,
+        )
+      }
+    }
+  } catch {
+    /*
+     * Agent integration is optional.
+     * Setup/storage configuration must still succeed.
+     */
+  }
+}
+
 async function main() {
   const exists = fs.existsSync(ENV_FILE)
 
@@ -158,6 +205,8 @@ async function main() {
       console.log("  toolnet-memory setup")
     }
 
+    enableAutomaticAgentMemory()
+
     return
   }
 
@@ -177,6 +226,8 @@ async function main() {
       console.log("")
       console.log("✓ Existing Hugging Face configuration kept")
       console.log("")
+      enableAutomaticAgentMemory()
+
       console.log("Next:")
       console.log("  toolnet-memory doctor")
       return
@@ -274,6 +325,8 @@ async function main() {
 
   console.log("✓ Hugging Face configuration complete")
   console.log("")
+  enableAutomaticAgentMemory()
+
   console.log("Next:")
   console.log("  toolnet-memory doctor")
 }

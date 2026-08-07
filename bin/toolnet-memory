@@ -146,6 +146,11 @@ case "$COMMAND" in
     exit 1
     ;;
 
+  integrate:auto)
+    shift
+    run bundle/auto-integrate.js src/production/auto-integrate.ts "$@"
+    ;;
+
   integrate:opencode)
     shift
 
@@ -164,11 +169,11 @@ case "$COMMAND" in
   session:agy-hook)
     shift
 
-    if [ -f "$ROOT/dist/src/session/agy/hook.js" ]; then
-      exec node "$ROOT/dist/src/session/agy/hook.js" "$@"
+    if [ -f "$ROOT/bundle/agy-hook.js" ]; then
+      exec node "$ROOT/bundle/agy-hook.js" "$@"
     fi
 
-    if [ -x "${TSX:-}" ]; then
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/agy/hook.ts" ]; then
       exec "$TSX" "$ROOT/src/session/agy/hook.ts" "$@"
     fi
 
@@ -387,11 +392,11 @@ case "$COMMAND" in
   session:codex-context)
     shift
 
-    if [ -f "$ROOT/dist/src/session/codex/context-hook.js" ]; then
-      exec node "$ROOT/dist/src/session/codex/context-hook.js" "$@"
+    if [ -f "$ROOT/bundle/codex-context.js" ]; then
+      exec node "$ROOT/bundle/codex-context.js" "$@"
     fi
 
-    if [ -x "${TSX:-}" ]; then
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/codex/context-hook.ts" ]; then
       exec "$TSX" "$ROOT/src/session/codex/context-hook.ts" "$@"
     fi
 
@@ -416,6 +421,7 @@ Commands:
   toolnet-memory semantic "query"
   toolnet-memory impact [file]
   toolnet-memory mcp
+  toolnet-memory integrate:auto
   toolnet-memory snapshot:list
   toolnet-memory snapshot:create "reason"
   toolnet-memory snapshot:restore <id>

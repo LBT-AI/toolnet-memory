@@ -20,12 +20,16 @@ const entries = {
   "full-index": "src/production/full-index.ts",
   "doctor": "src/production/doctor.ts",
   "setup": "src/production/setup.ts",
+  "auto-integrate": "src/production/auto-integrate.ts",
   "mcp": "src/mcp/bootstrap.ts",
   "snapshot": "src/production/snapshot-cli.ts",
 
   "opencode": "src/session/opencode/cli.ts",
   "agy": "src/session/agy/cli.ts",
+  "agy-hook": "src/session/agy/hook.ts",
+
   "codex": "src/session/codex/cli.ts",
+  "codex-context": "src/session/codex/context-hook.ts",
 
   "learner": "src/session/learner/cli.ts",
   "project-manual": "src/project-manual/cli.ts",
