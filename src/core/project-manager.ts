@@ -106,6 +106,7 @@ function hasProjectManifest(
  */
 function findExistingProjectRoot(
   startPath: string,
+  stopAt?: string,
 ): string | null {
   let current =
     resolve(
@@ -128,7 +129,12 @@ function findExistingProjectRoot(
 
     if (
       current ===
-      filesystemRoot
+      filesystemRoot ||
+      (
+        stopAt &&
+        current ===
+          resolve(stopAt)
+      )
     ) {
       break;
     }
@@ -448,11 +454,53 @@ export class ProjectManager {
       );
 
     /*
-     * Existing project identity always wins.
+     * Determine the nearest repository boundary first.
+     *
+     * A ToolNet manifest belonging to a parent directory must
+     * never capture a nested repository. Example:
+     *
+     *   /home/user/.toolnet/project.json
+     *   /home/user/my-app/package.json
+     *
+     * my-app must become its own project instead of inheriting
+     * the HOME project identity.
+     */
+    const projectRoot =
+      findRepositoryRoot(
+        requestedPath,
+      );
+
+    const repositoryMarkers = [
+      ".git",
+      "package.json",
+      "pyproject.toml",
+      "Cargo.toml",
+      "go.mod",
+      "composer.json",
+    ];
+
+    const hasRepositoryBoundary =
+      repositoryMarkers.some(
+        (marker) =>
+          existsSync(
+            join(
+              projectRoot,
+              marker,
+            ),
+          ),
+      );
+
+    /*
+     * Existing identity wins only inside the current repository.
+     * If no repository marker exists, preserve legacy upward
+     * discovery behaviour.
      */
     const existingRoot =
       findExistingProjectRoot(
         requestedPath,
+        hasRepositoryBoundary
+          ? projectRoot
+          : undefined,
       );
 
     if (
@@ -503,11 +551,6 @@ export class ProjectManager {
     /*
      * First ToolNet initialization.
      */
-    const projectRoot =
-      findRepositoryRoot(
-        requestedPath,
-      );
-
     const now =
       new Date()
         .toISOString();
