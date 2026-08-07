@@ -10,7 +10,7 @@ import {
   createHash,
 } from "node:crypto";
 
-import ts from "typescript";
+import * as ts from "typescript";
 
 import type {
   CodeSymbol,

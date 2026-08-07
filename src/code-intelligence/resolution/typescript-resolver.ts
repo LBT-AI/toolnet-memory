@@ -12,7 +12,7 @@ import {
   resolve,
 } from "node:path";
 
-import ts from "typescript";
+import * as ts from "typescript";
 
 import type {
   CodeGraphStore,
