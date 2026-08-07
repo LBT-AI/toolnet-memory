@@ -36,8 +36,8 @@ run() {
 
 case "$COMMAND" in
   setup)
-    if [ -f "$ROOT/dist/src/production/setup.js" ]; then
-      exec node "$ROOT/dist/src/production/setup.js" "$@"
+    if [ -f "$ROOT/bundle/setup.js" ]; then
+      exec node "$ROOT/bundle/setup.js" "$@"
     elif [ -f "$ROOT/src/production/setup.ts" ]; then
       exec npx --yes tsx "$ROOT/src/production/setup.ts" "$@"
     else
@@ -48,7 +48,7 @@ case "$COMMAND" in
 
 
   doctor)
-    run dist/src/production/doctor.js src/production/doctor.ts
+    run bundle/doctor.js src/production/doctor.ts
     ;;
 
   run)
@@ -56,11 +56,11 @@ case "$COMMAND" in
     ;;
 
   mcp)
-    run dist/src/mcp/bootstrap.js src/mcp/bootstrap.ts
+    run bundle/mcp.js src/mcp/bootstrap.ts
     ;;
 
   index)
-    run dist/src/production/full-index.js src/production/full-index.ts
+    run bundle/full-index.js src/production/full-index.ts
     ;;
 
   index:graph)
@@ -82,28 +82,28 @@ case "$COMMAND" in
     ;;
 
   snapshot:list)
-    run dist/src/production/snapshot-cli.js src/production/snapshot-cli.ts list
+    run bundle/snapshot.js src/production/snapshot-cli.ts list
     ;;
 
   snapshot:create)
     shift
-    run dist/src/production/snapshot-cli.js src/production/snapshot-cli.ts create "$@"
+    run bundle/snapshot.js src/production/snapshot-cli.ts create "$@"
     ;;
 
   snapshot:restore)
     shift
-    run dist/src/production/snapshot-cli.js src/production/snapshot-cli.ts restore "$@"
+    run bundle/snapshot.js src/production/snapshot-cli.ts restore "$@"
     ;;
 
   recover)
-    run dist/src/production/snapshot-cli.js src/production/snapshot-cli.ts recover-latest
+    run bundle/snapshot.js src/production/snapshot-cli.ts recover-latest
     ;;
 
   session:opencode-sync)
     shift
 
-    if [ -f "$ROOT/dist/src/session/opencode/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/opencode/cli.js" sync "$@"
+    if [ -f "$ROOT/bundle/opencode.js" ]; then
+      exec node "$ROOT/bundle/opencode.js" sync "$@"
     fi
 
     if [ -n "${TSX:-}" ] && [ -x "${TSX:-}" ]; then
@@ -117,8 +117,8 @@ case "$COMMAND" in
   session:opencode-recover)
     shift
 
-    if [ -f "$ROOT/dist/src/session/opencode/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/opencode/cli.js" recover "$@"
+    if [ -f "$ROOT/bundle/opencode.js" ]; then
+      exec node "$ROOT/bundle/opencode.js" recover "$@"
     fi
 
     if [ -n "${TSX:-}" ] && [ -x "${TSX:-}" ]; then
@@ -132,8 +132,8 @@ case "$COMMAND" in
   integrate:opencode)
     shift
 
-    if [ -f "$ROOT/dist/src/session/opencode/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/opencode/cli.js" install-plugin "$@"
+    if [ -f "$ROOT/bundle/opencode.js" ]; then
+      exec node "$ROOT/bundle/opencode.js" install-plugin "$@"
     fi
 
     if [ -n "${TSX:-}" ] && [ -x "${TSX:-}" ]; then
@@ -161,8 +161,8 @@ case "$COMMAND" in
   session:agy-sync)
     shift
 
-    if [ -f "$ROOT/dist/src/session/agy/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/agy/cli.js" sync "$@"
+    if [ -f "$ROOT/bundle/agy.js" ]; then
+      exec node "$ROOT/bundle/agy.js" sync "$@"
     fi
 
     exec "$TSX" "$ROOT/src/session/agy/cli.ts" sync "$@"
@@ -171,8 +171,8 @@ case "$COMMAND" in
   session:agy-recover)
     shift
 
-    if [ -f "$ROOT/dist/src/session/agy/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/agy/cli.js" recover "$@"
+    if [ -f "$ROOT/bundle/agy.js" ]; then
+      exec node "$ROOT/bundle/agy.js" recover "$@"
     fi
 
     exec "$TSX" "$ROOT/src/session/agy/cli.ts" recover "$@"
@@ -181,8 +181,8 @@ case "$COMMAND" in
   integrate:agy)
     shift
 
-    if [ -f "$ROOT/dist/src/session/agy/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/agy/cli.js" install-hooks "$@"
+    if [ -f "$ROOT/bundle/agy.js" ]; then
+      exec node "$ROOT/bundle/agy.js" install-hooks "$@"
     fi
 
     exec "$TSX" "$ROOT/src/session/agy/cli.ts" install-hooks "$@"
@@ -191,8 +191,8 @@ case "$COMMAND" in
   session:codex-notify)
     shift
 
-    if [ -f "$ROOT/dist/src/session/codex/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/codex/cli.js" notify "$@"
+    if [ -f "$ROOT/bundle/codex.js" ]; then
+      exec node "$ROOT/bundle/codex.js" notify "$@"
     fi
 
     if [ -x "${TSX:-}" ]; then
@@ -205,8 +205,8 @@ case "$COMMAND" in
   session:codex-sync)
     shift
 
-    if [ -f "$ROOT/dist/src/session/codex/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/codex/cli.js" sync "$@"
+    if [ -f "$ROOT/bundle/codex.js" ]; then
+      exec node "$ROOT/bundle/codex.js" sync "$@"
     fi
 
     exec "$TSX" "$ROOT/src/session/codex/cli.ts" sync "$@"
@@ -215,8 +215,8 @@ case "$COMMAND" in
   session:codex-recover)
     shift
 
-    if [ -f "$ROOT/dist/src/session/codex/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/codex/cli.js" recover "$@"
+    if [ -f "$ROOT/bundle/codex.js" ]; then
+      exec node "$ROOT/bundle/codex.js" recover "$@"
     fi
 
     exec "$TSX" "$ROOT/src/session/codex/cli.ts" recover "$@"
@@ -225,8 +225,8 @@ case "$COMMAND" in
   integrate:codex)
     shift
 
-    if [ -f "$ROOT/dist/src/session/codex/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/codex/cli.js" install-notify "$@"
+    if [ -f "$ROOT/bundle/codex.js" ]; then
+      exec node "$ROOT/bundle/codex.js" install-notify "$@"
     fi
 
     exec "$TSX" "$ROOT/src/session/codex/cli.ts" install-notify "$@"
@@ -235,8 +235,8 @@ case "$COMMAND" in
   memory:reconcile)
     shift
 
-    if [ -f "$ROOT/dist/src/session/learner/cli.js" ]; then
-      exec node "$ROOT/dist/src/session/learner/cli.js" reconcile "$@"
+    if [ -f "$ROOT/bundle/learner.js" ]; then
+      exec node "$ROOT/bundle/learner.js" reconcile "$@"
     fi
 
     if [ -x "${TSX:-}" ]; then
@@ -250,8 +250,8 @@ case "$COMMAND" in
   project:manual-init)
     shift
 
-    if [ -f "$ROOT/dist/src/project-manual/cli.js" ]; then
-      exec node "$ROOT/dist/src/project-manual/cli.js" init "$@"
+    if [ -f "$ROOT/bundle/project-manual.js" ]; then
+      exec node "$ROOT/bundle/project-manual.js" init "$@"
     fi
 
     exec "$TSX" "$ROOT/src/project-manual/cli.ts" init "$@"
@@ -260,8 +260,8 @@ case "$COMMAND" in
   project:manual-show)
     shift
 
-    if [ -f "$ROOT/dist/src/project-manual/cli.js" ]; then
-      exec node "$ROOT/dist/src/project-manual/cli.js" show "$@"
+    if [ -f "$ROOT/bundle/project-manual.js" ]; then
+      exec node "$ROOT/bundle/project-manual.js" show "$@"
     fi
 
     exec "$TSX" "$ROOT/src/project-manual/cli.ts" show "$@"
@@ -270,8 +270,8 @@ case "$COMMAND" in
   project:manual-sync)
     shift
 
-    if [ -f "$ROOT/dist/src/project-manual/cli.js" ]; then
-      exec node "$ROOT/dist/src/project-manual/cli.js" sync "$@"
+    if [ -f "$ROOT/bundle/project-manual.js" ]; then
+      exec node "$ROOT/bundle/project-manual.js" sync "$@"
     fi
 
     exec "$TSX" "$ROOT/src/project-manual/cli.ts" sync "$@"
@@ -280,8 +280,8 @@ case "$COMMAND" in
   work:status)
     shift
 
-    if [ -f "$ROOT/dist/src/work-continuity/cli.js" ]; then
-      exec node "$ROOT/dist/src/work-continuity/cli.js" status "$@"
+    if [ -f "$ROOT/bundle/work-continuity.js" ]; then
+      exec node "$ROOT/bundle/work-continuity.js" status "$@"
     fi
 
     exec "$TSX" "$ROOT/src/work-continuity/cli.ts" status "$@"
@@ -290,8 +290,8 @@ case "$COMMAND" in
   work:json)
     shift
 
-    if [ -f "$ROOT/dist/src/work-continuity/cli.js" ]; then
-      exec node "$ROOT/dist/src/work-continuity/cli.js" json "$@"
+    if [ -f "$ROOT/bundle/work-continuity.js" ]; then
+      exec node "$ROOT/bundle/work-continuity.js" json "$@"
     fi
 
     exec "$TSX" "$ROOT/src/work-continuity/cli.ts" json "$@"
@@ -300,8 +300,8 @@ case "$COMMAND" in
   work:reconcile)
     shift
 
-    if [ -f "$ROOT/dist/src/work-continuity/cli.js" ]; then
-      exec node "$ROOT/dist/src/work-continuity/cli.js" reconcile "$@"
+    if [ -f "$ROOT/bundle/work-continuity.js" ]; then
+      exec node "$ROOT/bundle/work-continuity.js" reconcile "$@"
     fi
 
     exec "$TSX" "$ROOT/src/work-continuity/cli.ts" reconcile "$@"
@@ -310,8 +310,8 @@ case "$COMMAND" in
   brief)
     shift
 
-    if [ -f "$ROOT/dist/src/work-continuity/context-cli.js" ]; then
-      exec node "$ROOT/dist/src/work-continuity/context-cli.js" brief "$@"
+    if [ -f "$ROOT/bundle/context.js" ]; then
+      exec node "$ROOT/bundle/context.js" brief "$@"
     fi
 
     exec "$TSX" "$ROOT/src/work-continuity/context-cli.ts" brief "$@"
@@ -320,8 +320,8 @@ case "$COMMAND" in
   brief:json)
     shift
 
-    if [ -f "$ROOT/dist/src/work-continuity/context-cli.js" ]; then
-      exec node "$ROOT/dist/src/work-continuity/context-cli.js" brief-json "$@"
+    if [ -f "$ROOT/bundle/context.js" ]; then
+      exec node "$ROOT/bundle/context.js" brief-json "$@"
     fi
 
     exec "$TSX" "$ROOT/src/work-continuity/context-cli.ts" brief-json "$@"
@@ -330,8 +330,8 @@ case "$COMMAND" in
   handoff:latest)
     shift
 
-    if [ -f "$ROOT/dist/src/work-continuity/context-cli.js" ]; then
-      exec node "$ROOT/dist/src/work-continuity/context-cli.js" handoff-latest "$@"
+    if [ -f "$ROOT/bundle/context.js" ]; then
+      exec node "$ROOT/bundle/context.js" handoff-latest "$@"
     fi
 
     exec "$TSX" "$ROOT/src/work-continuity/context-cli.ts" handoff-latest "$@"
@@ -340,8 +340,8 @@ case "$COMMAND" in
   context:sync)
     shift
 
-    if [ -f "$ROOT/dist/src/work-continuity/context-runtime-cli.js" ]; then
-      exec node "$ROOT/dist/src/work-continuity/context-runtime-cli.js" sync "$@"
+    if [ -f "$ROOT/bundle/context-runtime.js" ]; then
+      exec node "$ROOT/bundle/context-runtime.js" sync "$@"
     fi
 
     exec "$TSX" "$ROOT/src/work-continuity/context-runtime-cli.ts" sync "$@"
@@ -350,8 +350,8 @@ case "$COMMAND" in
   context:print)
     shift
 
-    if [ -f "$ROOT/dist/src/work-continuity/context-runtime-cli.js" ]; then
-      exec node "$ROOT/dist/src/work-continuity/context-runtime-cli.js" print "$@"
+    if [ -f "$ROOT/bundle/context-runtime.js" ]; then
+      exec node "$ROOT/bundle/context-runtime.js" print "$@"
     fi
 
     exec "$TSX" "$ROOT/src/work-continuity/context-runtime-cli.ts" print "$@"
@@ -360,8 +360,8 @@ case "$COMMAND" in
   context:refresh)
     shift
 
-    if [ -f "$ROOT/dist/src/work-continuity/context-runtime-cli.js" ]; then
-      exec node "$ROOT/dist/src/work-continuity/context-runtime-cli.js" refresh "$@"
+    if [ -f "$ROOT/bundle/context-runtime.js" ]; then
+      exec node "$ROOT/bundle/context-runtime.js" refresh "$@"
     fi
 
     exec "$TSX" "$ROOT/src/work-continuity/context-runtime-cli.ts" refresh "$@"

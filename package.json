@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -41,7 +41,9 @@
     "work-continuity:test": "vitest run tests/work-continuity/work-continuity.test.ts",
     "work-handoff:test": "vitest run tests/work-continuity/handoff-brief.test.ts",
     "semantic-work:test": "vitest run tests/work-continuity/semantic-context.test.ts",
-    "context-injection:test": "vitest run tests/work-continuity/context-injection.test.ts"
+    "context-injection:test": "vitest run tests/work-continuity/context-injection.test.ts",
+    "build:bundle": "npm run build && node scripts/build-bundle.mjs",
+    "build:release": "npm run build:prod && node scripts/build-bundle.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",
@@ -52,17 +54,18 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "3d-force-graph": "^1.80.0",
+    "esbuild": "^0.28.1",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0",
-    "3d-force-graph": "^1.80.0"
+    "vitest": "^3.2.0"
   },
   "bin": {
     "toolnet-memory": "bin/toolnet-memory"
   },
   "files": [
-    "dist",
-    "bin",
+    "bundle",
+    "bin/toolnet-memory",
     "README.md",
     ".env.example"
   ],
