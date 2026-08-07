@@ -8,6 +8,15 @@ fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 
 const entries = {
+  "update": "src/production/update.ts",
+  "config": "src/production/config-cli.ts",
+
+  "runtime": "src/index.ts",
+  "graph-index": "src/code-intelligence/test-index.ts",
+  "incremental": "src/code-intelligence/test-incremental.ts",
+  "semantic": "src/code-intelligence/test-semantic.ts",
+  "impact": "src/code-intelligence/test-impact.ts",
+
   "full-index": "src/production/full-index.ts",
   "doctor": "src/production/doctor.ts",
   "setup": "src/production/setup.ts",

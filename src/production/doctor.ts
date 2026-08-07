@@ -31,20 +31,203 @@ import {
   ProductionHealth,
 } from "./health.js";
 
-async function main() {
+type DoctorResult = {
+  ok: boolean;
+  project?: string;
+
+  storage?: {
+    ok: boolean;
+    provider?: string;
+  } | null;
+
+  embedding?: {
+    ok: boolean;
+    dimensions?: number;
+    mode?: string;
+  } | null;
+
+  memory?: number;
+  graphSymbols?: number;
+  graphEdges?: number;
+  memoryVectors?: number;
+  codeChunks?: number;
+  codeVectors?: number;
+  snapshots?: number;
+
+  config?: {
+    ok: boolean;
+    errors?: string[];
+    warnings?: string[];
+  };
+
+  warnings?: string[];
+};
+
+function wantsJson(): boolean {
+  return process.argv.includes("--json");
+}
+
+function printHuman(result: DoctorResult): void {
+  console.log("");
+  console.log("ToolNet Memory Doctor");
+  console.log("=====================");
+  console.log("");
+
+  if (result.project) {
+    console.log(`Project: ${result.project}`);
+    console.log("");
+  }
+
+  if (result.storage) {
+    if (result.storage.ok) {
+      const provider =
+        typeof result.storage.provider === "string"
+          ? ` (${result.storage.provider})`
+          : "";
+
+      console.log(`✓ Storage${provider}`);
+    } else {
+      console.log("✗ Storage");
+    }
+  }
+
+  if (result.embedding) {
+    if (result.embedding.ok) {
+      const details: string[] = [];
+
+      if (typeof result.embedding.mode === "string") {
+        details.push(result.embedding.mode);
+      }
+
+      if (typeof result.embedding.dimensions === "number") {
+        details.push(`${result.embedding.dimensions} dimensions`);
+      }
+
+      console.log(
+        `✓ Embedding${
+          details.length
+            ? ` (${details.join(", ")})`
+            : ""
+        }`,
+      );
+    } else {
+      console.log("✗ Embedding");
+    }
+  }
+
+  if (
+    result.memory !== undefined ||
+    result.graphSymbols !== undefined ||
+    result.codeChunks !== undefined
+  ) {
+    console.log("");
+    console.log("Project data:");
+
+    if (result.memory !== undefined) {
+      console.log(`  Memories       ${result.memory}`);
+    }
+
+    if (result.graphSymbols !== undefined) {
+      console.log(`  Graph symbols  ${result.graphSymbols}`);
+    }
+
+    if (result.graphEdges !== undefined) {
+      console.log(`  Graph edges    ${result.graphEdges}`);
+    }
+
+    if (result.memoryVectors !== undefined) {
+      console.log(`  Memory vectors ${result.memoryVectors}`);
+    }
+
+    if (result.codeChunks !== undefined) {
+      console.log(`  Code chunks    ${result.codeChunks}`);
+    }
+
+    if (result.codeVectors !== undefined) {
+      console.log(`  Code vectors   ${result.codeVectors}`);
+    }
+
+    if (result.snapshots !== undefined) {
+      console.log(`  Snapshots      ${result.snapshots}`);
+    }
+  }
+
+  const errors =
+    result.config?.errors ?? [];
+
+  if (errors.length > 0) {
+    console.log("");
+    console.log("Configuration required:");
+
+    for (const error of errors) {
+      console.log(`  - ${error}`);
+    }
+  }
+
+  const warnings = [
+    ...(result.config?.warnings ?? []),
+    ...(result.warnings ?? []),
+  ];
+
+  const uniqueWarnings =
+    [...new Set(warnings)];
+
+  if (uniqueWarnings.length > 0) {
+    console.log("");
+    console.log("Warnings:");
+
+    for (const warning of uniqueWarnings) {
+      console.log(`  - ${warning}`);
+    }
+  }
+
+  console.log("");
+
+  if (result.ok) {
+    console.log("✓ ToolNet Memory is ready");
+  } else {
+    console.log("✗ ToolNet Memory requires attention");
+
+    if (errors.length > 0) {
+      console.log("");
+      console.log("Run:");
+      console.log("  toolnet-memory setup");
+    }
+  }
+
+  console.log("");
+}
+
+function output(result: DoctorResult): void {
+  if (wantsJson()) {
+    console.log(
+      JSON.stringify(
+        result,
+        null,
+        2,
+      ),
+    );
+  } else {
+    printHuman(result);
+  }
+}
+
+async function main(): Promise<void> {
   const configCheck =
     checkProductionConfig();
 
-  if (
-    !configCheck.ok
-  ) {
-    console.log({
+  if (!configCheck.ok) {
+    const result: DoctorResult = {
       ok: false,
-      config:
-        configCheck,
-    });
+      config: configCheck,
+      warnings:
+        configCheck.warnings,
+    };
 
-    process.exit(1);
+    output(result);
+
+    process.exitCode = 1;
+    return;
   }
 
   const config =
@@ -122,7 +305,7 @@ async function main() {
       project.id,
     );
 
-  console.log({
+  const result: DoctorResult = {
     ok:
       health.ok,
 
@@ -158,23 +341,43 @@ async function main() {
 
     warnings:
       configCheck.warnings,
-  });
+  };
 
-  if (
-    !health.ok
-  ) {
-    process.exit(1);
-  }
+  output(result);
+
+  process.exitCode =
+    result.ok
+      ? 0
+      : 1;
 }
 
 main().catch(
   (error) => {
-    console.error(
+    const message =
       error instanceof Error
         ? error.message
-        : error,
-    );
+        : String(error);
 
-    process.exit(1);
+    if (wantsJson()) {
+      console.log(
+        JSON.stringify(
+          {
+            ok: false,
+            error: message,
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.error("");
+      console.error("ToolNet Memory Doctor");
+      console.error("=====================");
+      console.error("");
+      console.error(`✗ ${message}`);
+      console.error("");
+    }
+
+    process.exitCode = 1;
   },
 );

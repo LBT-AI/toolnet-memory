@@ -13,6 +13,12 @@ ROOT="$(cd -P "$(dirname "$SOURCE")/.." >/dev/null 2>&1 && pwd)"
 NODE="${NODE_BINARY:-node}"
 TSX="$ROOT/node_modules/.bin/tsx"
 
+
+if [ "${1:-}" = "--version" ] || [ "${1:-}" = "-v" ]; then
+  node -e 'console.log("v" + require(process.argv[1]).version)' "$ROOT/package.json"
+  exit 0
+fi
+
 COMMAND="${1:-help}"
 
 run() {
@@ -35,6 +41,16 @@ run() {
 }
 
 case "$COMMAND" in
+  update)
+    shift
+    run bundle/update.js src/production/update.ts "$@"
+    ;;
+
+  config)
+    shift
+    run bundle/config.js src/production/config-cli.ts "$@"
+    ;;
+
   setup)
     if [ -f "$ROOT/bundle/setup.js" ]; then
       exec node "$ROOT/bundle/setup.js" "$@"
@@ -48,11 +64,12 @@ case "$COMMAND" in
 
 
   doctor)
-    run bundle/doctor.js src/production/doctor.ts
+    shift
+    run bundle/doctor.js src/production/doctor.ts "$@"
     ;;
 
   run)
-    run dist/index.js src/index.ts
+    run bundle/runtime.js src/index.ts
     ;;
 
   mcp)
@@ -64,21 +81,21 @@ case "$COMMAND" in
     ;;
 
   index:graph)
-    run dist/src/code-intelligence/test-index.js src/code-intelligence/test-index.ts
+    run bundle/graph-index.js src/code-intelligence/test-index.ts
     ;;
 
   incremental)
-    run dist/src/code-intelligence/test-incremental.js src/code-intelligence/test-incremental.ts
+    run bundle/incremental.js src/code-intelligence/test-incremental.ts
     ;;
 
   semantic)
     shift
-    run dist/src/code-intelligence/test-semantic.js src/code-intelligence/test-semantic.ts "$@"
+    run bundle/semantic.js src/code-intelligence/test-semantic.ts "$@"
     ;;
 
   impact)
     shift
-    run dist/src/code-intelligence/test-impact.js src/code-intelligence/test-impact.ts "$@"
+    run bundle/impact.js src/code-intelligence/test-impact.ts "$@"
     ;;
 
   snapshot:list)
@@ -386,8 +403,13 @@ case "$COMMAND" in
 ToolNet Memory
 
 Commands:
+  toolnet-memory --version
   toolnet-memory doctor
   toolnet-memory setup
+  toolnet-memory update
+  toolnet-memory config get KEY
+  toolnet-memory config set KEY VALUE
+  toolnet-memory config open
   toolnet-memory index
   toolnet-memory index:graph
   toolnet-memory incremental
