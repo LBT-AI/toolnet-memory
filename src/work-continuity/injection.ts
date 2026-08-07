@@ -214,7 +214,7 @@ export async function buildAgyPreInvocationOutput(
   return {
     injectSteps: [
       {
-        ephemeralMessage:
+        userMessage:
           cache.text,
       },
     ],

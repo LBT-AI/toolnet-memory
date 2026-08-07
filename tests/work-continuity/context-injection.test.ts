@@ -296,7 +296,7 @@ Phase 4.
         expect(
           JSON.stringify(first),
         ).toContain(
-          "ephemeralMessage",
+          "userMessage",
         );
 
         const second =
@@ -395,7 +395,7 @@ Phase 4.
             resumed,
           ),
         ).toContain(
-          "ephemeralMessage",
+          "userMessage",
         );
       },
     );
