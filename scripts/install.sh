@@ -11,6 +11,10 @@ LOG="${TMPDIR:-/tmp}/toolnet-memory-install-$$.log"
 
 export TERM="${TERM:-xterm}"
 
+# Some VPS providers advertise IPv6 but have unreliable IPv6 egress.
+# Prefer IPv4 for Node/npm while preserving user NODE_OPTIONS.
+NPM_NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--dns-result-order=ipv4first"
+
 # ==========================================================
 # TERMINAL
 # ==========================================================
@@ -246,14 +250,39 @@ prepare_installation() {
 }
 
 check_registry() {
-  with_timeout 15 npm ping --registry="$REGISTRY"
+  # First use HTTPS directly. curl handles dual-stack networking better
+  # than some Node/npm configurations on VPS providers.
+  if command -v curl >/dev/null 2>&1; then
+    if with_timeout 20 curl -fsS       --connect-timeout 10       --max-time 20       -o /dev/null       "$REGISTRY"; then
+      return 0
+    fi
+
+    # Retry explicitly over IPv4 when IPv6 routing is unreliable.
+    if with_timeout 20 curl -4 -fsS       --connect-timeout 10       --max-time 20       -o /dev/null       "$REGISTRY"; then
+      return 0
+    fi
+  fi
+
+  # Final npm-native probe, with retries and IPv4-first DNS ordering.
+  attempt=1
+  while [ "$attempt" -le 3 ]; do
+    if with_timeout 30       env NODE_OPTIONS="$NPM_NODE_OPTIONS"       npm ping --registry="$REGISTRY"; then
+      return 0
+    fi
+
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+
+  return 1
 }
 
 LATEST_VERSION=""
 
 resolve_latest() {
   LATEST_VERSION="$(
-    with_timeout 15 \
+    with_timeout 45 \
+      env NODE_OPTIONS="$NPM_NODE_OPTIONS" \
       npm view "${PACKAGE}@latest" version --silent --registry="$REGISTRY" \
       2>>"$LOG"
   )" || true
@@ -279,6 +308,7 @@ install_toolnet() {
   mkdir -p "$PREFIX" || return 1
 
   with_timeout "$INSTALL_TIMEOUT_SECONDS" \
+    env NODE_OPTIONS="$NPM_NODE_OPTIONS" \
     npm install \
       -g \
       --prefix "$PREFIX" \
@@ -287,10 +317,10 @@ install_toolnet() {
       --no-fund \
       --no-audit \
       --prefer-online \
-      --fetch-retries=2 \
+      --fetch-retries=4 \
       --fetch-retry-mintimeout=1000 \
-      --fetch-retry-maxtimeout=10000 \
-      --fetch-timeout=60000 \
+      --fetch-retry-maxtimeout=20000 \
+      --fetch-timeout=120000 \
       --loglevel=error
 
   rc=$?
