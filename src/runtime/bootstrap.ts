@@ -16,11 +16,9 @@ import {
 } from "./toolnet-memory-runtime.js";
 
 export function createToolNetMemoryRuntime(
-  rootPath: string =
-    process.cwd(),
+  rootPath: string = process.cwd(),
 ) {
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
   const project =
     new ProjectManager()
@@ -28,14 +26,11 @@ export function createToolNetMemoryRuntime(
 
   const rawStorage =
     createStorageProvider({
-      provider:
-        config.storage.provider,
-
-      huggingface:
-        config.storage.huggingface,
-
-      localRoot:
-        config.storage.localRoot,
+      provider: config.storage.provider,
+      r2: config.storage.r2,
+      s3: config.storage.s3,
+      huggingface: config.storage.huggingface,
+      localRoot: config.storage.localRoot,
     });
 
   const retryStorage =
@@ -44,8 +39,7 @@ export function createToolNetMemoryRuntime(
       {
         attempts:
           Number(
-            process.env
-              .TOOLNET_STORAGE_RETRIES ??
+            process.env.TOOLNET_STORAGE_RETRIES ??
             3,
           ),
       },
@@ -60,8 +54,7 @@ export function createToolNetMemoryRuntime(
     );
 
   const embeddingModel =
-    process.env
-      .HF_EMBEDDING_MODEL ??
+    process.env.HF_EMBEDDING_MODEL ??
     "sentence-transformers/all-MiniLM-L6-v2";
 
   return new ToolNetMemoryRuntime({
