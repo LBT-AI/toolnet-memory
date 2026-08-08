@@ -4,6 +4,7 @@ export * from "./memory-store.js";
 
 export * from "./local/index.js";
 export * from "./huggingface/index.js";
+export * from "./s3/index.js";
 
 export * from "./vector-store.js";
 export * from "./code-graph-store.js";
