@@ -10,7 +10,7 @@ import {
 } from "./index.js";
 
 function tree(keys: string[]) {
-  const root: any = {};
+  const root: Record<string, any> = {};
 
   for (const key of keys) {
     let node = root;
@@ -21,7 +21,7 @@ function tree(keys: string[]) {
     }
   }
 
-  function print(node: any, prefix = "") {
+  function print(node: Record<string, any>, prefix = "") {
     const entries = Object.keys(node).sort();
 
     entries.forEach((name, index) => {
@@ -47,6 +47,8 @@ async function main() {
   const storage = withStorageRetry(
     createStorageProvider({
       provider: config.storage.provider,
+      r2: config.storage.r2,
+      s3: config.storage.s3,
       huggingface: config.storage.huggingface,
       localRoot: config.storage.localRoot,
     }),
@@ -55,7 +57,17 @@ async function main() {
 
   const objects = await storage.list("");
 
-  console.log(`Bucket: ${process.env.HF_BUCKET}`);
+  const bucket =
+    config.storage.provider === "r2"
+      ? config.storage.r2.bucket
+      : config.storage.provider === "s3"
+        ? config.storage.s3.bucket
+        : config.storage.provider === "huggingface"
+          ? config.storage.huggingface.bucket
+          : "local";
+
+  console.log(`Provider: ${storage.name}`);
+  console.log(`Bucket: ${bucket ?? "unknown"}`);
   console.log(`Objects: ${objects.length}\n`);
 
   tree(objects.map((x) => x.key));
