@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a reproducible ToolNet Memory problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include API keys, access tokens, passwords, cookies, `.env` contents, or private project data.
+  - type: input
+    id: version
+    attributes:
+      label: ToolNet Memory version
+      placeholder: v0.2.9
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, Node.js version, and coding agent if relevant.
+      placeholder: Ubuntu 24.04, s390x, Node 22.x, Agy 1.x
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest safe sequence that reproduces the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove all secrets and private project content before pasting logs.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed all credentials and private project data from this report.
+          required: true
+        - label: I checked that I am using the latest available ToolNet Memory version.
+          required: true
