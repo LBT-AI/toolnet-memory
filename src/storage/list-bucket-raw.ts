@@ -10,6 +10,8 @@ const config = loadConfig();
 const storage = withStorageRetry(
   createStorageProvider({
     provider: config.storage.provider,
+    r2: config.storage.r2,
+    s3: config.storage.s3,
     huggingface: config.storage.huggingface,
     localRoot: config.storage.localRoot,
   }),
