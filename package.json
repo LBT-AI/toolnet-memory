@@ -1,7 +1,30 @@
 {
   "name": "toolnet-memory",
   "version": "0.2.9",
+  "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LBT-AI/toolnet-memory.git"
+  },
+  "homepage": "https://github.com/LBT-AI/toolnet-memory#readme",
+  "bugs": {
+    "url": "https://github.com/LBT-AI/toolnet-memory/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "ai",
+    "memory",
+    "coding-agents",
+    "mcp",
+    "opencode",
+    "codex",
+    "antigravity",
+    "code-intelligence"
+  ],
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
