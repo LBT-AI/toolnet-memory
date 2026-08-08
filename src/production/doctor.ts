@@ -152,8 +152,7 @@ function printHuman(result: DoctorResult): void {
     }
   }
 
-  const errors =
-    result.config?.errors ?? [];
+  const errors = result.config?.errors ?? [];
 
   if (errors.length > 0) {
     console.log("");
@@ -169,8 +168,7 @@ function printHuman(result: DoctorResult): void {
     ...(result.warnings ?? []),
   ];
 
-  const uniqueWarnings =
-    [...new Set(warnings)];
+  const uniqueWarnings = [...new Set(warnings)];
 
   if (uniqueWarnings.length > 0) {
     console.log("");
@@ -213,15 +211,13 @@ function output(result: DoctorResult): void {
 }
 
 async function main(): Promise<void> {
-  const configCheck =
-    checkProductionConfig();
+  const configCheck = checkProductionConfig();
 
   if (!configCheck.ok) {
     const result: DoctorResult = {
       ok: false,
       config: configCheck,
-      warnings:
-        configCheck.warnings,
+      warnings: configCheck.warnings,
     };
 
     output(result);
@@ -230,8 +226,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
   const project =
     new ProjectManager()
@@ -240,22 +235,18 @@ async function main(): Promise<void> {
   const storage =
     withStorageRetry(
       createStorageProvider({
-        provider:
-          config.storage.provider,
-
-        huggingface:
-          config.storage.huggingface,
-
-        localRoot:
-          config.storage.localRoot,
+        provider: config.storage.provider,
+        r2: config.storage.r2,
+        s3: config.storage.s3,
+        huggingface: config.storage.huggingface,
+        localRoot: config.storage.localRoot,
       }),
       {
         attempts: 3,
       },
     );
 
-  const embeddings =
-    createEmbeddingProvider();
+  const embeddings = createEmbeddingProvider();
 
   const health =
     await new ProductionHealth(
@@ -306,49 +297,23 @@ async function main(): Promise<void> {
     );
 
   const result: DoctorResult = {
-    ok:
-      health.ok,
-
-    project:
-      project.name,
-
-    storage:
-      health.storage,
-
-    embedding:
-      health.embedding,
-
-    memory:
-      memories.length,
-
-    graphSymbols:
-      graph?.symbols.length ?? 0,
-
-    graphEdges:
-      graph?.edges.length ?? 0,
-
-    memoryVectors:
-      vectors?.records.length ?? 0,
-
-    codeChunks:
-      chunks?.chunks.length ?? 0,
-
-    codeVectors:
-      codeVectors?.records.length ?? 0,
-
-    snapshots:
-      snapshots.length,
-
-    warnings:
-      configCheck.warnings,
+    ok: health.ok,
+    project: project.name,
+    storage: health.storage,
+    embedding: health.embedding,
+    memory: memories.length,
+    graphSymbols: graph?.symbols.length ?? 0,
+    graphEdges: graph?.edges.length ?? 0,
+    memoryVectors: vectors?.records.length ?? 0,
+    codeChunks: chunks?.chunks.length ?? 0,
+    codeVectors: codeVectors?.records.length ?? 0,
+    snapshots: snapshots.length,
+    warnings: configCheck.warnings,
   };
 
   output(result);
 
-  process.exitCode =
-    result.ok
-      ? 0
-      : 1;
+  process.exitCode = result.ok ? 0 : 1;
 }
 
 main().catch(
