@@ -4,7 +4,9 @@ set -u
 set -o pipefail
 
 PACKAGE="toolnet-memory"
+REGISTRY="https://registry.npmjs.org/"
 MIN_NODE_MAJOR=22
+INSTALL_TIMEOUT_SECONDS=600
 LOG="${TMPDIR:-/tmp}/toolnet-memory-install-$$.log"
 
 export TERM="${TERM:-xterm}"
@@ -47,14 +49,12 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-
 # ==========================================================
 # UI
 # ==========================================================
 
 header() {
   printf '\n'
-
   printf "${CYAN}${BOLD}"
   printf '╭──────────────────────────────────────────╮\n'
   printf '│              TOOLNET MEMORY              │\n'
@@ -86,46 +86,53 @@ bar() {
   printf '] %3d%%' "$percent"
 }
 
+format_duration() {
+  total="$1"
+  mins=$((total / 60))
+  secs=$((total % 60))
+  printf '%02d:%02d' "$mins" "$secs"
+}
+
 draw_stage() {
   icon="$1"
   title="$2"
   percent="$3"
+  elapsed="$4"
 
+  # Single-line redraw is much more reliable in Termius/mobile terminals.
   printf '\r\033[2K'
-  printf "${CYAN}%s${RESET} ${WHITE}%s${RESET}\n" "$icon" "$title"
-
-  printf '\033[2K'
+  printf "${CYAN}%s${RESET} ${WHITE}%-29s${RESET} " "$icon" "$title"
   bar "$percent"
-
-  # quay lên 1 dòng để lần sau redraw cả 2 dòng
-  printf '\033[1A'
+  printf " ${DIM}%s${RESET}" "$(format_duration "$elapsed")"
 }
 
 finish_stage() {
   title="$1"
+  elapsed="$2"
 
   printf '\r\033[2K'
-  printf "${GREEN}✓${RESET} ${WHITE}%s${RESET}\n" "$title"
-
-  printf '\033[2K'
+  printf "${GREEN}✓${RESET} ${WHITE}%-29s${RESET} " "$title"
   bar 100
-  printf '\n\n'
+  printf " ${DIM}%s${RESET}\n\n" "$(format_duration "$elapsed")"
 }
 
 plain_stage() {
   title="$1"
   shift
 
+  start="$(date +%s)"
   printf '%s... ' "$title"
 
   : >"$LOG"
 
   if "$@" >>"$LOG" 2>&1; then
-    printf 'OK\n'
+    elapsed=$(( $(date +%s) - start ))
+    printf 'OK (%s)\n' "$(format_duration "$elapsed")"
     return 0
   fi
 
-  printf 'FAILED\n'
+  elapsed=$(( $(date +%s) - start ))
+  printf 'FAILED (%s)\n' "$(format_duration "$elapsed")"
   return 1
 }
 
@@ -143,6 +150,7 @@ run_stage() {
   "$@" >>"$LOG" 2>&1 &
   pid=$!
 
+  start="$(date +%s)"
   percent=1
   frame=0
 
@@ -154,63 +162,50 @@ run_stage() {
       *) icon="●" ;;
     esac
 
-    draw_stage "$icon" "$title" "$percent"
+    elapsed=$(( $(date +%s) - start ))
+    draw_stage "$icon" "$title" "$percent" "$elapsed"
 
     frame=$(( (frame + 1) % 4 ))
 
+    # Progress is intentionally capped below 100 until the real command exits.
+    # The elapsed timer continues changing, so slow installs never look frozen.
     if [ "$percent" -lt 70 ]; then
       percent=$((percent + 2))
     elif [ "$percent" -lt 90 ]; then
       percent=$((percent + 1))
-    elif [ "$percent" -lt 97 ]; then
-      # đoạn cuối chậm hơn để không giả vờ hoàn tất
+    elif [ "$percent" -lt 95 ]; then
       percent=$((percent + 1))
     fi
 
-    sleep 0.10
+    sleep 0.15
   done
 
   wait "$pid"
   rc=$?
+  elapsed=$(( $(date +%s) - start ))
 
   if [ "$rc" -ne 0 ]; then
     printf '\r\033[2K'
-    printf "${RED}✗${RESET} %s\n" "$title"
-    printf '\033[2K\n'
+    printf "${RED}✗${RESET} ${WHITE}%s${RESET} ${DIM}(%s)${RESET}\n" \
+      "$title" "$(format_duration "$elapsed")"
     return "$rc"
   fi
 
-  while [ "$percent" -lt 100 ]; do
-    percent=$((percent + 1))
-
-    case "$frame" in
-      0) icon="○" ;;
-      1) icon="◔" ;;
-      2) icon="◑" ;;
-      *) icon="●" ;;
-    esac
-
-    draw_stage "$icon" "$title" "$percent"
-    frame=$(( (frame + 1) % 4 ))
-
-    sleep 0.025
-  done
-
-  finish_stage "$title"
+  finish_stage "$title" "$elapsed"
   return 0
 }
 
 fail() {
   message="$1"
 
-  printf '\n${RED}✗ %s${RESET}\n' "$message"
+  printf "\n${RED}✗ %s${RESET}\n" "$message"
 
   if [ -s "$LOG" ]; then
-    printf '\n${DIM}Last installer output:${RESET}\n'
+    printf "\n${DIM}Last installer output:${RESET}\n"
     tail -20 "$LOG"
   fi
 
-  printf '\n${DIM}Log: %s${RESET}\n' "$LOG"
+  printf "\n${DIM}Log: %s${RESET}\n" "$LOG"
   exit 1
 }
 
@@ -224,7 +219,6 @@ with_timeout() {
     "$@"
   fi
 }
-
 
 # ==========================================================
 # INSTALL TASKS
@@ -241,8 +235,7 @@ prepare_installation() {
     return 1
   }
 
-  major="$(node -p 'Number(process.versions.node.split(".")[0])')" ||
-    return 1
+  major="$(node -p 'Number(process.versions.node.split(".")[0])')" || return 1
 
   if [ "$major" -lt "$MIN_NODE_MAJOR" ]; then
     echo "Node.js 22+ required. Current: $(node -v)"
@@ -252,17 +245,19 @@ prepare_installation() {
   return 0
 }
 
+check_registry() {
+  with_timeout 15 npm ping --registry="$REGISTRY"
+}
+
 LATEST_VERSION=""
 
 resolve_latest() {
   LATEST_VERSION="$(
-    with_timeout 10 \
-      npm view "${PACKAGE}@latest" version --silent \
+    with_timeout 15 \
+      npm view "${PACKAGE}@latest" version --silent --registry="$REGISTRY" \
       2>>"$LOG"
   )" || true
 
-  # Version lookup chỉ để hiển thị.
-  # Nếu registry chậm, installer vẫn tiếp tục bằng @latest.
   if [ -z "$LATEST_VERSION" ]; then
     echo "Version lookup timed out; continuing with @latest."
   fi
@@ -272,10 +267,7 @@ resolve_latest() {
 
 determine_install_prefix() {
   if [ "$(id -u)" -eq 0 ]; then
-    PREFIX="$(
-      npm prefix -g 2>/dev/null ||
-      printf '/usr/local'
-    )"
+    PREFIX="$(npm prefix -g 2>/dev/null || printf '/usr/local')"
   else
     PREFIX="${TOOLNET_PREFIX:-$HOME/.local}"
   fi
@@ -286,14 +278,28 @@ determine_install_prefix() {
 install_toolnet() {
   mkdir -p "$PREFIX" || return 1
 
-  with_timeout 240 \
+  with_timeout "$INSTALL_TIMEOUT_SECONDS" \
     npm install \
       -g \
       --prefix "$PREFIX" \
       "${PACKAGE}@latest" \
+      --registry="$REGISTRY" \
       --no-fund \
       --no-audit \
+      --prefer-online \
+      --fetch-retries=2 \
+      --fetch-retry-mintimeout=1000 \
+      --fetch-retry-maxtimeout=10000 \
+      --fetch-timeout=60000 \
       --loglevel=error
+
+  rc=$?
+
+  if [ "$rc" -eq 124 ]; then
+    echo "npm install timed out after ${INSTALL_TIMEOUT_SECONDS} seconds."
+  fi
+
+  return "$rc"
 }
 
 configure_path() {
@@ -301,7 +307,6 @@ configure_path() {
 
   if [ "$(id -u)" -ne 0 ]; then
     PROFILE="$HOME/.profile"
-
     touch "$PROFILE"
 
     if [ "$BIN_DIR" = "$HOME/.local/bin" ]; then
@@ -319,16 +324,13 @@ find_toolnet() {
   fi
 
   TOOLNET_BIN="$(command -v toolnet-memory 2>/dev/null || true)"
-
   [ -n "$TOOLNET_BIN" ] && [ -x "$TOOLNET_BIN" ]
 }
 
 verify_toolnet() {
   find_toolnet || return 1
-
   "$TOOLNET_BIN" --version
 }
-
 
 # ==========================================================
 # RUN
@@ -346,6 +348,11 @@ run_stage \
   "Preparing installation" \
   prepare_installation ||
   fail "Environment check failed"
+
+run_stage \
+  "Checking npm registry" \
+  check_registry ||
+  fail "npm registry is unreachable"
 
 run_stage \
   "Resolving latest version" \
@@ -366,13 +373,11 @@ run_stage \
   verify_toolnet ||
   fail "ToolNet Memory verification failed"
 
-
 # ==========================================================
 # SETUP
 # ==========================================================
 
-find_toolnet ||
-  fail "toolnet-memory executable not found"
+find_toolnet || fail "toolnet-memory executable not found"
 
 if [ "$TTY" -eq 1 ]; then
   printf '\033[?25h'
@@ -386,15 +391,11 @@ else
   "$TOOLNET_BIN" setup </dev/null || true
 fi
 
-
 # ==========================================================
 # DONE
 # ==========================================================
 
-VERSION="$(
-  "$TOOLNET_BIN" --version 2>/dev/null ||
-  printf 'unknown'
-)"
+VERSION="$("$TOOLNET_BIN" --version 2>/dev/null || printf 'unknown')"
 
 printf '\n'
 printf "${GREEN}✓${RESET} ${BOLD}${WHITE}TOOLNET MEMORY installed successfully${RESET}\n"
