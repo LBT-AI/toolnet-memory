@@ -1,0 +1,48 @@
+name: Feature request
+description: Propose an improvement to ToolNet Memory
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What workflow or limitation should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the desired behavior and normal user workflow.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Project memory
+        - Session integration
+        - Work continuity
+        - Code intelligence
+        - Storage
+        - MCP
+        - CLI / Installer
+        - Git intelligence
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility considerations
+      description: Note any impact on project isolation, storage layout, Agy/OpenCode/Codex integrations, or existing CLI commands.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: This proposal does not require exposing user credentials or private project data.
+          required: true
