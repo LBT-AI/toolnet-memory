@@ -12,14 +12,7 @@ import {
 } from './session-memory-policy.js';
 
 export type FactCategory =
-  | 'rule'
-  | 'decision'
-  | 'fix'
-  | 'file'
-  | 'blocker'
-  | 'next_action'
-  | 'deploy'
-  | 'architecture';
+  'rule' | 'decision' | 'fix' | 'file' | 'blocker' | 'next_action' | 'deploy' | 'architecture';
 
 export interface DurableFact {
   category: FactCategory;
@@ -242,9 +235,7 @@ export function extractSessionMemory(
   const durableFacts = extractFacts(filtered, sessionId);
 
   // Categorize facts
-  const decisions = durableFacts
-    .filter((f) => f.category === 'decision')
-    .map((f) => f.text);
+  const decisions = durableFacts.filter((f) => f.category === 'decision').map((f) => f.text);
 
   const projectRules = durableFacts.filter((f) => f.category === 'rule').map((f) => f.text);
 
@@ -252,13 +243,9 @@ export function extractSessionMemory(
 
   const bugsFixed = durableFacts.filter((f) => f.category === 'fix').map((f) => f.text);
 
-  const blockers = durableFacts
-    .filter((f) => f.category === 'blocker')
-    .map((f) => f.text);
+  const blockers = durableFacts.filter((f) => f.category === 'blocker').map((f) => f.text);
 
-  const nextActions = durableFacts
-    .filter((f) => f.category === 'next_action')
-    .map((f) => f.text);
+  const nextActions = durableFacts.filter((f) => f.category === 'next_action').map((f) => f.text);
 
   const commands = durableFacts.filter((f) => f.category === 'deploy').map((f) => f.text);
 

@@ -76,11 +76,7 @@ function extractDeployScripts(packageJson: any): string[] {
 
   if (packageJson.scripts) {
     for (const [name, command] of Object.entries(packageJson.scripts)) {
-      if (
-        name.includes('deploy') ||
-        name.includes('release') ||
-        name.includes('publish')
-      ) {
+      if (name.includes('deploy') || name.includes('release') || name.includes('publish')) {
         scripts.push(`npm run ${name}`);
       }
     }
@@ -138,10 +134,7 @@ export function detectConflict(
   if (evidence.framework) {
     const frameworks = ['express', 'fastify', 'nestjs', 'koa', 'hapi'];
     for (const fw of frameworks) {
-      if (
-        lowerMemory.includes(fw) &&
-        !evidence.framework.toLowerCase().includes(fw)
-      ) {
+      if (lowerMemory.includes(fw) && !evidence.framework.toLowerCase().includes(fw)) {
         return {
           conflict: true,
           reason: `Memory mentions ${fw} but project uses ${evidence.framework}`,
@@ -154,10 +147,7 @@ export function detectConflict(
   if (evidence.database) {
     const databases = ['postgresql', 'mysql', 'sqlite', 'mongodb', 'redis'];
     for (const db of databases) {
-      if (
-        lowerMemory.includes(db) &&
-        !evidence.database.toLowerCase().includes(db)
-      ) {
+      if (lowerMemory.includes(db) && !evidence.database.toLowerCase().includes(db)) {
         return {
           conflict: true,
           reason: `Memory mentions ${db} but project uses ${evidence.database}`,
@@ -170,10 +160,7 @@ export function detectConflict(
   if (evidence.stateManagement) {
     const stateLibs = ['redux', 'zustand', 'mobx', 'recoil', 'jotai'];
     for (const lib of stateLibs) {
-      if (
-        lowerMemory.includes(lib) &&
-        !evidence.stateManagement.toLowerCase().includes(lib)
-      ) {
+      if (lowerMemory.includes(lib) && !evidence.stateManagement.toLowerCase().includes(lib)) {
         return {
           conflict: true,
           reason: `Memory mentions ${lib} but project uses ${evidence.stateManagement}`,
@@ -227,9 +214,7 @@ export function isDangerousPath(path: string): { dangerous: boolean; reason?: st
 /**
  * Check if command is dangerous
  */
-export function isDangerousCommand(
-  command: string
-): { dangerous: boolean; reason?: string } {
+export function isDangerousCommand(command: string): { dangerous: boolean; reason?: string } {
   const lowerCmd = command.toLowerCase();
 
   // Destructive commands

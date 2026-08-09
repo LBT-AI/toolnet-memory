@@ -77,10 +77,7 @@ export function compactBullets(text: string, maxLines: number): string {
  * Enforce context budget across multiple sections
  * Prioritizes sections by priority score
  */
-export function enforceContextBudget(
-  sections: ContextSection[],
-  config: BudgetConfig
-): string {
+export function enforceContextBudget(sections: ContextSection[], config: BudgetConfig): string {
   const { maxTokens, trimMarker = '[Context trimmed by ToolNet Memory token budget]' } = config;
 
   if (sections.length === 0) {

@@ -66,11 +66,7 @@ function extractProfileRules(profilePath: string): ProjectRule[] {
     }
 
     // Extract rule patterns
-    if (
-      trimmed.startsWith('-') ||
-      trimmed.startsWith('*') ||
-      /^\d+\./.test(trimmed)
-    ) {
+    if (trimmed.startsWith('-') || trimmed.startsWith('*') || /^\d+\./.test(trimmed)) {
       const ruleText = trimmed.replace(/^[-*]\s*/, '').replace(/^\d+\.\s*/, '');
 
       if (ruleText.length < 10) continue;
@@ -79,9 +75,7 @@ function extractProfileRules(profilePath: string): ProjectRule[] {
       let category: ProjectRule['category'] = undefined;
 
       // Detect severity
-      if (
-        /\b(never|must not|forbidden|prohibited|critical)\b/i.test(ruleText)
-      ) {
+      if (/\b(never|must not|forbidden|prohibited|critical)\b/i.test(ruleText)) {
         severity = 'high';
       } else if (/\b(always|must|required)\b/i.test(ruleText)) {
         severity = 'medium';

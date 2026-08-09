@@ -275,10 +275,7 @@ export function checkMemoryConflict(
 /**
  * General project check
  */
-export function checkProject(
-  project: ProjectManifest,
-  config: GuardConfig
-): GuardResult {
+export function checkProject(project: ProjectManifest, config: GuardConfig): GuardResult {
   const rules = loadProjectRules(project);
   const evidence = collectEvidence(project);
 

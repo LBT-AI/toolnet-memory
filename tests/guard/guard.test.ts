@@ -3,7 +3,11 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { loadProjectRules, extractSourcePath, extractDeployCommand } from '../../src/guard/rules.js';
+import {
+  loadProjectRules,
+  extractSourcePath,
+  extractDeployCommand,
+} from '../../src/guard/rules.js';
 import { checkPath, checkCommand } from '../../src/guard/detector.js';
 import { collectEvidence, isDangerousPath, isDangerousCommand } from '../../src/guard/evidence.js';
 import type { ProjectManifest } from '../../src/core/types.js';
@@ -87,14 +91,17 @@ Source path: /project/src
 
       writeFileSync(join(testProjectPath, '.toolnet', 'profile.md'), profileContent);
 
-      const result = checkPath(
-        testProject,
-        '/var/www/app/theme/header.php',
-        { mode: 'warn', checkPaths: true, checkCommands: true, checkArchitecture: true }
-      );
+      const result = checkPath(testProject, '/var/www/app/theme/header.php', {
+        mode: 'warn',
+        checkPaths: true,
+        checkCommands: true,
+        checkArchitecture: true,
+      });
 
       expect(result.warnings.length).toBeGreaterThan(0);
-      const warning = result.warnings.find((w) => w.type === 'rule_violation' || w.type === 'dangerous_path');
+      const warning = result.warnings.find(
+        (w) => w.type === 'rule_violation' || w.type === 'dangerous_path'
+      );
       expect(warning).toBeDefined();
       expect(warning?.severity).toMatch(/high|critical/);
     });
@@ -106,11 +113,12 @@ Source path: /project/src
 
       writeFileSync(join(testProjectPath, '.toolnet', 'profile.md'), profileContent);
 
-      const result = checkPath(
-        testProject,
-        '/other/path/file.ts',
-        { mode: 'warn', checkPaths: true, checkCommands: true, checkArchitecture: true }
-      );
+      const result = checkPath(testProject, '/other/path/file.ts', {
+        mode: 'warn',
+        checkPaths: true,
+        checkCommands: true,
+        checkArchitecture: true,
+      });
 
       expect(result.sourcePath).toBe('/project/src');
     });
@@ -122,25 +130,29 @@ Source path: /project/src
 
       writeFileSync(join(testProjectPath, '.toolnet', 'profile.md'), profileContent);
 
-      const result = checkPath(
-        testProject,
-        '/project/src/components/Button.tsx',
-        { mode: 'warn', checkPaths: true, checkCommands: true, checkArchitecture: true }
-      );
+      const result = checkPath(testProject, '/project/src/components/Button.tsx', {
+        mode: 'warn',
+        checkPaths: true,
+        checkCommands: true,
+        checkArchitecture: true,
+      });
 
       // Should have fewer or no warnings for files in source path
-      const highWarnings = result.warnings.filter((w) => w.severity === 'high' || w.severity === 'critical');
+      const highWarnings = result.warnings.filter(
+        (w) => w.severity === 'high' || w.severity === 'critical'
+      );
       expect(highWarnings.length).toBe(0);
     });
   });
 
   describe('Command Checking', () => {
     it('warns on rm -rf /', () => {
-      const result = checkCommand(
-        testProject,
-        'rm -rf /',
-        { mode: 'warn', checkPaths: true, checkCommands: true, checkArchitecture: true }
-      );
+      const result = checkCommand(testProject, 'rm -rf /', {
+        mode: 'warn',
+        checkPaths: true,
+        checkCommands: true,
+        checkArchitecture: true,
+      });
 
       expect(result.warnings.length).toBeGreaterThan(0);
       const warning = result.warnings.find((w) => w.type === 'dangerous_command');
@@ -155,11 +167,12 @@ Deploy command: npm run deploy:prod
 
       writeFileSync(join(testProjectPath, '.toolnet', 'profile.md'), profileContent);
 
-      const result = checkCommand(
-        testProject,
-        'npm run deploy:prod',
-        { mode: 'warn', checkPaths: true, checkCommands: true, checkArchitecture: true }
-      );
+      const result = checkCommand(testProject, 'npm run deploy:prod', {
+        mode: 'warn',
+        checkPaths: true,
+        checkCommands: true,
+        checkArchitecture: true,
+      });
 
       expect(result.deployCommand).toBe('npm run deploy:prod');
       // Should not have critical warnings for approved deploy command
@@ -281,11 +294,12 @@ Source path: /project/src
 
   describe('JSON Output', () => {
     it('produces valid JSON output', () => {
-      const result = checkPath(
-        testProject,
-        '/var/www/app/file.php',
-        { mode: 'warn', checkPaths: true, checkCommands: true, checkArchitecture: true }
-      );
+      const result = checkPath(testProject, '/var/www/app/file.php', {
+        mode: 'warn',
+        checkPaths: true,
+        checkCommands: true,
+        checkArchitecture: true,
+      });
 
       const json = JSON.stringify(result);
       const parsed = JSON.parse(json);
@@ -303,11 +317,12 @@ API Key: sk_live_1234567890
 
       writeFileSync(join(testProjectPath, '.toolnet', 'profile.md'), profileContent);
 
-      const result = checkPath(
-        testProject,
-        '/project/src/file.ts',
-        { mode: 'warn', checkPaths: true, checkCommands: true, checkArchitecture: true }
-      );
+      const result = checkPath(testProject, '/project/src/file.ts', {
+        mode: 'warn',
+        checkPaths: true,
+        checkCommands: true,
+        checkArchitecture: true,
+      });
 
       const json = JSON.stringify(result);
 

@@ -26,8 +26,7 @@ export function loadSessionMemoryPolicy(): SessionMemoryPolicy {
   const config = loadConfig();
 
   // Session save mode
-  const sessionSave = (process.env.TOOLNET_SESSION_SAVE ||
-    'summary') as SessionMemoryMode;
+  const sessionSave = (process.env.TOOLNET_SESSION_SAVE || 'summary') as SessionMemoryMode;
 
   // Raw transcript archiving
   const rawTranscript =
@@ -36,13 +35,10 @@ export function loadSessionMemoryPolicy(): SessionMemoryPolicy {
     sessionSave === 'full';
 
   // Memory promotion mode
-  const memoryPromotion = (process.env.TOOLNET_MEMORY_PROMOTION ||
-    'conservative') as PromotionMode;
+  const memoryPromotion = (process.env.TOOLNET_MEMORY_PROMOTION || 'conservative') as PromotionMode;
 
   // Minimum score for promotion
-  const promoteMinScore = parseFloat(
-    process.env.TOOLNET_PROMOTE_MIN_SCORE || '0.65'
-  );
+  const promoteMinScore = parseFloat(process.env.TOOLNET_PROMOTE_MIN_SCORE || '0.65');
 
   // Session summary max tokens
   const sessionSummaryMaxTokens = parseInt(
