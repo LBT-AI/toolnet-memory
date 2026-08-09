@@ -15,6 +15,8 @@ import type { SessionEventInput } from '../types.js';
 import { SessionCore } from '../core.js';
 
 import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
+import { extractSessionMemory } from '../session-extractor.js';
+import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
 
 interface OpenCodeRow {
   [key: string]: unknown;
@@ -721,6 +723,23 @@ export async function syncOpenCodeSession(
     core.setSourceCursor('opencode.message', encodeCursor(nextMessageCursor));
 
     core.setSourceCursor('opencode.part', encodeCursor(nextPartCursor));
+
+    // Extract session memory (summary + durable facts)
+    if (options.idle && filteredTimed.length > 0) {
+      try {
+        const messages = filteredTimed.map((item) => JSON.stringify(item.event.data));
+        const extraction = extractSessionMemory(messages, options.nativeSessionId);
+
+        core.setSourceCursor('opencode.session.summary', extraction.summary);
+        core.setSourceCursor('opencode.session.facts_count', extraction.durableFacts.length);
+
+        if (shouldArchiveRawTranscript() && !shouldArchiveRemote()) {
+          core.setSourceCursor('opencode.raw_transcript.archived', 'local');
+        }
+      } catch {
+        // Extraction failure should not break session sync
+      }
+    }
 
     const flushed = await core.flush();
 

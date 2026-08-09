@@ -9,6 +9,8 @@ import { inspectCodexRollout, pathBelongsToProject } from './discovery.js';
 import { readCodexRollout } from './rollout.js';
 
 import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
+import { extractSessionMemory } from '../session-extractor.js';
+import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
 
 export interface CodexSyncOptions {
   project: ProjectManifest;
@@ -194,6 +196,23 @@ export async function syncCodexSession(options: CodexSyncOptions) {
 
   if (options.turnId) {
     core.setSourceCursor('codex.last.turn', options.turnId);
+  }
+
+  // Extract session memory (summary + durable facts)
+  if (options.idle && filteredEvents.length > 0) {
+    try {
+      const messages = filteredEvents.map((e) => JSON.stringify(e.data));
+      const extraction = extractSessionMemory(messages, threadId);
+
+      core.setSourceCursor('codex.session.summary', extraction.summary);
+      core.setSourceCursor('codex.session.facts_count', extraction.durableFacts.length);
+
+      if (shouldArchiveRawTranscript() && !shouldArchiveRemote()) {
+        core.setSourceCursor('codex.raw_transcript.archived', 'local');
+      }
+    } catch {
+      // Extraction failure should not break session sync
+    }
   }
 
   const flushed = await core.flush();

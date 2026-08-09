@@ -269,6 +269,17 @@ case "$COMMAND" in
     exit 1
     ;;
 
+  memory:review)
+    shift
+
+    if [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/session/memory-review-cli.ts" "$@"
+    fi
+
+    echo "Memory review not available."
+    exit 1
+    ;;
+
   project:manual-init)
     shift
 
@@ -443,7 +454,11 @@ MANUAL DEEP RECOVERY (do not run automatically):
   toolnet-memory session:opencode-recover [--limit N] Recover OpenCode sessions
 
 MEMORY OPERATIONS:
+  toolnet-memory memory:review [--project PATH] [--session ID]
   toolnet-memory memory:reconcile [--project PATH]
+
+NOTE: Raw transcripts are not injected into prompts.
+      Durable memory is promoted selectively based on importance scoring.
 
 PROJECT MANUAL:
   toolnet-memory project:manual-init [--project PATH]

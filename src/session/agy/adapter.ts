@@ -13,6 +13,8 @@ import { SessionCore } from '../core.js';
 import { readAgyTranscript } from './transcript.js';
 
 import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
+import { extractSessionMemory } from '../session-extractor.js';
+import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
 
 export interface AgySyncOptions {
   project: ProjectManifest;
@@ -222,6 +224,29 @@ export async function syncAgySession(options: AgySyncOptions): Promise<AgySyncRe
 
   if (options.phase) {
     core.setSourceCursor('agy.last.phase', options.phase);
+  }
+
+  // Extract session memory (summary + durable facts)
+  if (options.phase === 'stop' && filteredEvents.length > 0) {
+    try {
+      const messages = filteredEvents.map((e) => JSON.stringify(e.data));
+      const extraction = extractSessionMemory(messages, conversationId);
+
+      // Store extraction metadata
+      core.setSourceCursor('agy.session.summary', extraction.summary);
+      core.setSourceCursor('agy.session.facts_count', extraction.durableFacts.length);
+
+      // Archive raw transcript only if policy allows
+      if (shouldArchiveRawTranscript()) {
+        const archiveRemote = shouldArchiveRemote();
+        if (!archiveRemote) {
+          // Local archive only - don't upload raw transcript
+          core.setSourceCursor('agy.raw_transcript.archived', 'local');
+        }
+      }
+    } catch {
+      // Extraction failure should not break session sync
+    }
   }
 
   const flushed = await core.flush();
