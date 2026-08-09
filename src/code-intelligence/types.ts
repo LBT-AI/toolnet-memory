@@ -1,16 +1,10 @@
-import type {
-  CodeSymbol,
-  GraphEdge,
-} from "../core/types.js";
+import type { CodeSymbol, GraphEdge } from '../core/types.js';
 
 export interface ImportBinding {
   localName: string;
   importedName: string;
 
-  kind:
-    | "named"
-    | "default"
-    | "namespace";
+  kind: 'named' | 'default' | 'namespace';
 }
 
 export interface ParsedImport {
@@ -31,25 +25,19 @@ export interface ParsedHeritage {
   fromId: string;
   targetName: string;
 
-  type:
-    | "INHERITS"
-    | "IMPLEMENTS";
+  type: 'INHERITS' | 'IMPLEMENTS';
 }
 
 export interface ParsedFile {
   filePath: string;
 
-  symbols:
-    CodeSymbol[];
+  symbols: CodeSymbol[];
 
-  imports:
-    ParsedImport[];
+  imports: ParsedImport[];
 
-  calls:
-    ParsedCall[];
+  calls: ParsedCall[];
 
-  heritage:
-    ParsedHeritage[];
+  heritage: ParsedHeritage[];
 }
 
 export interface CodeGraphSnapshot {
@@ -59,9 +47,7 @@ export interface CodeGraphSnapshot {
 
   files: number;
 
-  symbols:
-    CodeSymbol[];
+  symbols: CodeSymbol[];
 
-  edges:
-    GraphEdge[];
+  edges: GraphEdge[];
 }

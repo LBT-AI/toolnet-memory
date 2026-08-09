@@ -1,22 +1,12 @@
-import {
-  mkdirSync,
-} from "node:fs";
+import { mkdirSync } from 'node:fs';
 
-import {
-  join,
-} from "node:path";
+import { join } from 'node:path';
 
-import type {
-  ProjectManifest,
-} from "../core/types.js";
+import type { ProjectManifest } from '../core/types.js';
 
-import type {
-  StorageProvider,
-} from "../storage/types.js";
+import type { StorageProvider } from '../storage/types.js';
 
-import {
-  writeJsonAtomic,
-} from "../session/utils.js";
+import { writeJsonAtomic } from '../session/utils.js';
 
 import type {
   SemanticObservation,
@@ -24,220 +14,97 @@ import type {
   SemanticPhaseContext,
   SemanticValue,
   SemanticWorkState,
-} from "./semantic-types.js";
+} from './semantic-types.js';
 
-function valueOf(
-  item:
-    SemanticObservation,
-): SemanticValue {
+function valueOf(item: SemanticObservation): SemanticValue {
   return {
-    value:
-      item.value,
+    value: item.value,
 
-    confidence:
-      item.confidence,
+    confidence: item.confidence,
 
-    evidence:
-      item.evidence,
+    evidence: item.evidence,
   };
 }
 
 function isLater(
-  incoming:
-    SemanticValue,
+  incoming: SemanticValue,
 
-  previous:
-    SemanticValue |
-    undefined,
+  previous: SemanticValue | undefined
 ): boolean {
-  if (
-    !previous
-  ) {
+  if (!previous) {
     return true;
   }
 
-  const time =
-    incoming
-      .evidence
-      .occurredAt
-      .localeCompare(
-        previous
-          .evidence
-          .occurredAt,
-      );
+  const time = incoming.evidence.occurredAt.localeCompare(previous.evidence.occurredAt);
 
-  if (
-    time !==
-    0
-  ) {
-    return time >
-      0;
+  if (time !== 0) {
+    return time > 0;
   }
 
-  if (
-    incoming
-      .evidence
-      .sessionKey ===
-    previous
-      .evidence
-      .sessionKey
-  ) {
-    return (
-      incoming
-        .evidence
-        .sequence >=
-      previous
-        .evidence
-        .sequence
-    );
+  if (incoming.evidence.sessionKey === previous.evidence.sessionKey) {
+    return incoming.evidence.sequence >= previous.evidence.sequence;
   }
 
-  return (
-    incoming.confidence >=
-    previous.confidence
-  );
+  return incoming.confidence >= previous.confidence;
 }
 
 function latest(
-  previous:
-    SemanticValue |
-    undefined,
+  previous: SemanticValue | undefined,
 
-  incoming:
-    SemanticValue,
+  incoming: SemanticValue
 ): SemanticValue {
-  return isLater(
-    incoming,
-    previous,
-  )
-    ? incoming
-    : previous!;
+  return isLater(incoming, previous) ? incoming : previous!;
 }
 
 function uniqueValues(
-  values:
-    SemanticValue[],
+  values: SemanticValue[],
 
-  limit =
-    30,
+  limit = 30
 ): SemanticValue[] {
-  const seen =
-    new Set<
-      string
-    >();
+  const seen = new Set<string>();
 
-  const output:
-    SemanticValue[] =
-    [];
+  const output: SemanticValue[] = [];
 
-  for (
-    const value
-    of values
-  ) {
-    const key =
-      value.value
-        .normalize(
-          "NFKC",
-        )
-        .toLowerCase()
-        .replace(
-          /\s+/g,
-          " ",
-        )
-        .trim();
+  for (const value of values) {
+    const key = value.value.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
 
-    if (
-      !key ||
-      seen.has(
-        key,
-      )
-    ) {
+    if (!key || seen.has(key)) {
       continue;
     }
 
-    seen.add(
-      key,
-    );
+    seen.add(key);
 
-    output.push(
-      value,
-    );
+    output.push(value);
   }
 
-  return output.slice(
-    -limit,
-  );
+  return output.slice(-limit);
 }
 
 async function loadBatches(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  storage:
-    StorageProvider,
-): Promise<
-  SemanticObservationBatch[]
-> {
-  const prefix =
-    `projects/${project.id}/work/semantic/observations/`;
+  storage: StorageProvider
+): Promise<SemanticObservationBatch[]> {
+  const prefix = `projects/${project.id}/work/semantic/observations/`;
 
-  const objects =
-    await storage.list(
-      prefix,
-    );
+  const objects = await storage.list(prefix);
 
-  const batches:
-    SemanticObservationBatch[] =
-    [];
+  const batches: SemanticObservationBatch[] = [];
 
-  for (
-    const object
-    of objects
-      .filter(
-        item =>
-          item.key.endsWith(
-            ".json",
-          ),
-      )
-      .sort(
-        (
-          left,
-          right,
-        ) =>
-          left.key.localeCompare(
-            right.key,
-          ),
-      )
-  ) {
-    const text =
-      await storage
-        .getText(
-          object.key,
-        );
+  for (const object of objects
+    .filter((item) => item.key.endsWith('.json'))
+    .sort((left, right) => left.key.localeCompare(right.key))) {
+    const text = await storage.getText(object.key);
 
-    if (
-      !text
-    ) {
+    if (!text) {
       continue;
     }
 
     try {
-      const parsed =
-        JSON.parse(
-          text,
-        ) as
-          SemanticObservationBatch;
+      const parsed = JSON.parse(text) as SemanticObservationBatch;
 
-      if (
-        parsed.version ===
-          1 &&
-        Array.isArray(
-          parsed.observations,
-        )
-      ) {
-        batches.push(
-          parsed,
-        );
+      if (parsed.version === 1 && Array.isArray(parsed.observations)) {
+        batches.push(parsed);
       }
     } catch {
       // Optional derived projection.
@@ -247,339 +114,163 @@ async function loadBatches(
   return batches;
 }
 
-function emptyPhase(
-  observation:
-    SemanticObservation,
-): SemanticPhaseContext {
+function emptyPhase(observation: SemanticObservation): SemanticPhaseContext {
   return {
-    key:
-      observation.scopeKey ??
-      `phase:${observation.scopeOrder ?? 0}`,
+    key: observation.scopeKey ?? `phase:${observation.scopeOrder ?? 0}`,
 
-    order:
-      observation.scopeOrder ??
-      0,
+    order: observation.scopeOrder ?? 0,
 
-    acceptanceCriteria:
-      [],
+    acceptanceCriteria: [],
 
-    dependencies:
-      [],
+    dependencies: [],
 
-    openQuestions:
-      [],
+    openQuestions: [],
 
-    constraints:
-      [],
+    constraints: [],
 
-    notes:
-      [],
+    notes: [],
   };
 }
 
 export async function reconcileSemanticWorkState(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  storage:
-    StorageProvider,
-): Promise<
-  SemanticWorkState
-> {
-  const batches =
-    await loadBatches(
-      project,
-      storage,
-    );
+  storage: StorageProvider
+): Promise<SemanticWorkState> {
+  const batches = await loadBatches(project, storage);
 
-  const observations =
-    batches
-      .flatMap(
-        batch =>
-          batch.observations,
-      )
-      .sort(
-        (
-          left,
-          right,
-        ) => {
-          const time =
-            left.evidence
-              .occurredAt
-              .localeCompare(
-                right.evidence
-                  .occurredAt,
-              );
+  const observations = batches
+    .flatMap((batch) => batch.observations)
+    .sort((left, right) => {
+      const time = left.evidence.occurredAt.localeCompare(right.evidence.occurredAt);
 
-          if (
-            time !==
-            0
-          ) {
-            return time;
-          }
+      if (time !== 0) {
+        return time;
+      }
 
-          if (
-            left.evidence
-              .sessionKey ===
-            right.evidence
-              .sessionKey
-          ) {
-            return (
-              left.evidence
-                .sequence -
-              right.evidence
-                .sequence
-            );
-          }
+      if (left.evidence.sessionKey === right.evidence.sessionKey) {
+        return left.evidence.sequence - right.evidence.sequence;
+      }
 
-          return left.id
-            .localeCompare(
-              right.id,
-            );
-        },
-      );
+      return left.id.localeCompare(right.id);
+    });
 
-  let mission:
-    SemanticValue |
-    undefined;
+  let mission: SemanticValue | undefined;
 
-  let activeObjective:
-    SemanticValue |
-    undefined;
+  let activeObjective: SemanticValue | undefined;
 
-  let why:
-    SemanticValue |
-    undefined;
+  let why: SemanticValue | undefined;
 
-  let desiredOutcome:
-    SemanticValue |
-    undefined;
+  let desiredOutcome: SemanticValue | undefined;
 
-  let planRationale:
-    SemanticValue |
-    undefined;
+  let planRationale: SemanticValue | undefined;
 
-  const phases =
-    new Map<
-      string,
-      SemanticPhaseContext
-    >();
+  const phases = new Map<string, SemanticPhaseContext>();
 
-  const openQuestions:
-    SemanticValue[] =
-    [];
+  const openQuestions: SemanticValue[] = [];
 
-  const constraints:
-    SemanticValue[] =
-    [];
+  const constraints: SemanticValue[] = [];
 
-  const notes:
-    SemanticValue[] =
-    [];
+  const notes: SemanticValue[] = [];
 
-  for (
-    const observation
-    of observations
-  ) {
-    const value =
-      valueOf(
-        observation,
-      );
+  for (const observation of observations) {
+    const value = valueOf(observation);
 
-    if (
-      observation.scope ===
-        "phase" &&
-      observation.scopeKey
-    ) {
-      const phase =
-        phases.get(
-          observation
-            .scopeKey,
-        ) ??
-        emptyPhase(
-          observation,
-        );
+    if (observation.scope === 'phase' && observation.scopeKey) {
+      const phase = phases.get(observation.scopeKey) ?? emptyPhase(observation);
 
-      switch (
-        observation.kind
-      ) {
-        case "phase_objective":
-          phase.objective =
-            latest(
-              phase.objective,
-              value,
-            );
+      switch (observation.kind) {
+        case 'phase_objective':
+          phase.objective = latest(phase.objective, value);
           break;
 
-        case "phase_why":
-          phase.why =
-            latest(
-              phase.why,
-              value,
-            );
+        case 'phase_why':
+          phase.why = latest(phase.why, value);
           break;
 
-        case "phase_deliverable":
-          phase.deliverable =
-            latest(
-              phase.deliverable,
-              value,
-            );
+        case 'phase_deliverable':
+          phase.deliverable = latest(phase.deliverable, value);
           break;
 
-        case "acceptance_criterion":
-          phase.acceptanceCriteria
-            .push(
-              value,
-            );
+        case 'acceptance_criterion':
+          phase.acceptanceCriteria.push(value);
           break;
 
-        case "dependency":
-          phase.dependencies
-            .push(
-              value,
-            );
+        case 'dependency':
+          phase.dependencies.push(value);
           break;
 
-        case "open_question":
-          phase.openQuestions
-            .push(
-              value,
-            );
+        case 'open_question':
+          phase.openQuestions.push(value);
           break;
 
-        case "constraint":
-          phase.constraints
-            .push(
-              value,
-            );
+        case 'constraint':
+          phase.constraints.push(value);
           break;
 
-        case "note":
-          phase.notes
-            .push(
-              value,
-            );
+        case 'note':
+          phase.notes.push(value);
           break;
       }
 
-      phases.set(
-        phase.key,
-        phase,
-      );
+      phases.set(phase.key, phase);
 
       continue;
     }
 
-    switch (
-      observation.kind
-    ) {
-      case "mission":
-        mission =
-          latest(
-            mission,
-            value,
-          );
+    switch (observation.kind) {
+      case 'mission':
+        mission = latest(mission, value);
         break;
 
-      case "objective":
-        activeObjective =
-          latest(
-            activeObjective,
-            value,
-          );
+      case 'objective':
+        activeObjective = latest(activeObjective, value);
         break;
 
-      case "why":
-        why =
-          latest(
-            why,
-            value,
-          );
+      case 'why':
+        why = latest(why, value);
         break;
 
-      case "desired_outcome":
-        desiredOutcome =
-          latest(
-            desiredOutcome,
-            value,
-          );
+      case 'desired_outcome':
+        desiredOutcome = latest(desiredOutcome, value);
         break;
 
-      case "plan_rationale":
-        planRationale =
-          latest(
-            planRationale,
-            value,
-          );
+      case 'plan_rationale':
+        planRationale = latest(planRationale, value);
         break;
 
-      case "open_question":
-        openQuestions.push(
-          value,
-        );
+      case 'open_question':
+        openQuestions.push(value);
         break;
 
-      case "constraint":
-        constraints.push(
-          value,
-        );
+      case 'constraint':
+        constraints.push(value);
         break;
 
-      case "note":
-        notes.push(
-          value,
-        );
+      case 'note':
+        notes.push(value);
         break;
     }
   }
 
-  for (
-    const phase
-    of phases.values()
-  ) {
-    phase.acceptanceCriteria =
-      uniqueValues(
-        phase.acceptanceCriteria,
-        20,
-      );
+  for (const phase of phases.values()) {
+    phase.acceptanceCriteria = uniqueValues(phase.acceptanceCriteria, 20);
 
-    phase.dependencies =
-      uniqueValues(
-        phase.dependencies,
-        15,
-      );
+    phase.dependencies = uniqueValues(phase.dependencies, 15);
 
-    phase.openQuestions =
-      uniqueValues(
-        phase.openQuestions,
-        15,
-      );
+    phase.openQuestions = uniqueValues(phase.openQuestions, 15);
 
-    phase.constraints =
-      uniqueValues(
-        phase.constraints,
-        15,
-      );
+    phase.constraints = uniqueValues(phase.constraints, 15);
 
-    phase.notes =
-      uniqueValues(
-        phase.notes,
-        20,
-      );
+    phase.notes = uniqueValues(phase.notes, 20);
   }
 
-  const state:
-    SemanticWorkState =
-  {
-    version:
-      1,
+  const state: SemanticWorkState = {
+    version: 1,
 
-    projectId:
-      project.id,
+    projectId: project.id,
 
-    projectName:
-      project.name,
+    projectName: project.name,
 
     mission,
 
@@ -591,112 +282,51 @@ export async function reconcileSemanticWorkState(
 
     planRationale,
 
-    phases:
-      Array.from(
-        phases.values(),
-      ).sort(
-        (
-          left,
-          right,
-        ) =>
-          left.order -
-          right.order,
-      ),
+    phases: Array.from(phases.values()).sort((left, right) => left.order - right.order),
 
-    openQuestions:
-      uniqueValues(
-        openQuestions,
-        20,
-      ),
+    openQuestions: uniqueValues(openQuestions, 20),
 
-    constraints:
-      uniqueValues(
-        constraints,
-        20,
-      ),
+    constraints: uniqueValues(constraints, 20),
 
-    notes:
-      uniqueValues(
-        notes,
-        20,
-      ),
+    notes: uniqueValues(notes, 20),
 
-    updatedAt:
-      observations.length
-        ? observations[
-            observations.length -
-            1
-          ].evidence
-            .occurredAt
-        : new Date()
-            .toISOString(),
+    updatedAt: observations.length
+      ? observations[observations.length - 1].evidence.occurredAt
+      : new Date().toISOString(),
   };
 
-  const localDirectory =
-    join(
-      project.rootPath,
-      ".toolnet",
-      "work",
-    );
+  const localDirectory = join(project.rootPath, '.toolnet', 'work');
 
-  mkdirSync(
-    localDirectory,
-    {
-      recursive:
-        true,
-    },
-  );
+  mkdirSync(localDirectory, {
+    recursive: true,
+  });
 
-  writeJsonAtomic(
-    join(
-      localDirectory,
-      "semantic-current.json",
-    ),
-    state,
-  );
+  writeJsonAtomic(join(localDirectory, 'semantic-current.json'), state);
 
   await storage.put(
     `projects/${project.id}/work/semantic/current.json`,
 
-    JSON.stringify(
-      state,
-      null,
-      2,
-    ) +
-      "\n",
+    JSON.stringify(state, null, 2) + '\n',
 
-    "application/json",
+    'application/json'
   );
 
   return state;
 }
 
 export async function loadSemanticWorkState(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  storage:
-    StorageProvider,
-): Promise<
-  SemanticWorkState |
-    null
-> {
-  const text =
-    await storage.getText(
-      `projects/${project.id}/work/semantic/current.json`,
-    );
+  storage: StorageProvider
+): Promise<SemanticWorkState | null> {
+  const text = await storage.getText(`projects/${project.id}/work/semantic/current.json`);
 
-  if (
-    !text
-  ) {
+  if (!text) {
     return null;
   }
 
   try {
-    return JSON.parse(
-      text,
-    ) as
-      SemanticWorkState;
+    return JSON.parse(text) as SemanticWorkState;
   } catch {
     return null;
   }

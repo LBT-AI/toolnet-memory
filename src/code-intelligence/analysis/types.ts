@@ -1,7 +1,4 @@
-export type DeadCodeConfidence =
-  | "high"
-  | "medium"
-  | "low";
+export type DeadCodeConfidence = 'high' | 'medium' | 'low';
 
 export interface DeadCodeCandidate {
   symbolId: string;
@@ -37,6 +34,5 @@ export interface CodeAnalysisSnapshot {
 
   deadCode: DeadCodeCandidate[];
 
-  dependencies:
-    FileDependency[];
+  dependencies: FileDependency[];
 }

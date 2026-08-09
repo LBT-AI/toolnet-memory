@@ -1,222 +1,91 @@
-import type {
-  CodeSymbol,
-  GraphEdge,
-} from "../../core/types.js";
+import type { CodeSymbol, GraphEdge } from '../../core/types.js';
 
-import type {
-  CodeGraphStore,
-} from "../graph/graph-store.js";
+import type { CodeGraphStore } from '../graph/graph-store.js';
 
-import type {
-  GraphNeighborhood,
-  GraphPath,
-  GraphQueryNode,
-} from "./types.js";
+import type { GraphNeighborhood, GraphPath, GraphQueryNode } from './types.js';
 
-const DEPENDENCY_EDGES =
-  new Set<
-    GraphEdge["type"]
-  >([
-    "CALLS",
-    "CALL_REFERENCE",
-    "IMPORTS",
-    "USES_TYPE",
-    "WRITES",
-    "INHERITS",
-    "IMPLEMENTS",
-    "ROUTE",
-  ]);
+const DEPENDENCY_EDGES = new Set<GraphEdge['type']>([
+  'CALLS',
+  'CALL_REFERENCE',
+  'IMPORTS',
+  'USES_TYPE',
+  'WRITES',
+  'INHERITS',
+  'IMPLEMENTS',
+  'ROUTE',
+]);
 
-const CALL_EDGES =
-  new Set<
-    GraphEdge["type"]
-  >([
-    "CALLS",
-    "CALL_REFERENCE",
-  ]);
+const CALL_EDGES = new Set<GraphEdge['type']>(['CALLS', 'CALL_REFERENCE']);
 
 export class GraphQueryEngine {
-  constructor(
-    private readonly graph:
-      CodeGraphStore,
-  ) {}
+  constructor(private readonly graph: CodeGraphStore) {}
 
-  findSymbols(
-    projectId: string,
-    query: string,
-  ): CodeSymbol[] {
-    const normalized =
-      query
-        .trim()
-        .toLowerCase();
+  findSymbols(projectId: string, query: string): CodeSymbol[] {
+    const normalized = query.trim().toLowerCase();
 
     if (!normalized) {
       return [];
     }
 
     return this.graph
-      .allSymbols(
-        projectId,
-      )
+      .allSymbols(projectId)
       .filter(
         (symbol) =>
-          symbol.name
-            .toLowerCase()
-            .includes(
-              normalized,
-            ) ||
-          (
-            symbol.qualifiedName
-              ?.toLowerCase()
-              .includes(
-                normalized,
-              ) ??
-            false
-          ) ||
-          symbol.filePath
-            .toLowerCase()
-            .includes(
-              normalized,
-            ),
+          symbol.name.toLowerCase().includes(normalized) ||
+          (symbol.qualifiedName?.toLowerCase().includes(normalized) ?? false) ||
+          symbol.filePath.toLowerCase().includes(normalized)
       )
-      .sort(
-        (a, b) => {
-          const aExact =
-            a.name
-              .toLowerCase() ===
-            normalized;
+      .sort((a, b) => {
+        const aExact = a.name.toLowerCase() === normalized;
 
-          const bExact =
-            b.name
-              .toLowerCase() ===
-            normalized;
+        const bExact = b.name.toLowerCase() === normalized;
 
-          if (
-            aExact !==
-            bExact
-          ) {
-            return aExact
-              ? -1
-              : 1;
-          }
+        if (aExact !== bExact) {
+          return aExact ? -1 : 1;
+        }
 
-          return (
-            a.filePath
-              .localeCompare(
-                b.filePath,
-              )
-          );
-        },
-      );
+        return a.filePath.localeCompare(b.filePath);
+      });
   }
 
-  callers(
-    projectId: string,
-    symbolId: string,
-  ): CodeSymbol[] {
-    return this.relatedIncoming(
-      projectId,
-      symbolId,
-      CALL_EDGES,
-    );
+  callers(projectId: string, symbolId: string): CodeSymbol[] {
+    return this.relatedIncoming(projectId, symbolId, CALL_EDGES);
   }
 
-  callees(
-    projectId: string,
-    symbolId: string,
-  ): CodeSymbol[] {
-    return this.relatedOutgoing(
-      projectId,
-      symbolId,
-      CALL_EDGES,
-    );
+  callees(projectId: string, symbolId: string): CodeSymbol[] {
+    return this.relatedOutgoing(projectId, symbolId, CALL_EDGES);
   }
 
-  dependents(
-    projectId: string,
-    symbolId: string,
-  ): CodeSymbol[] {
-    return this.relatedIncoming(
-      projectId,
-      symbolId,
-      DEPENDENCY_EDGES,
-    );
+  dependents(projectId: string, symbolId: string): CodeSymbol[] {
+    return this.relatedIncoming(projectId, symbolId, DEPENDENCY_EDGES);
   }
 
-  dependencies(
-    projectId: string,
-    symbolId: string,
-  ): CodeSymbol[] {
-    return this.relatedOutgoing(
-      projectId,
-      symbolId,
-      DEPENDENCY_EDGES,
-    );
+  dependencies(projectId: string, symbolId: string): CodeSymbol[] {
+    return this.relatedOutgoing(projectId, symbolId, DEPENDENCY_EDGES);
   }
 
-  neighborhood(
-    projectId: string,
-    symbolId: string,
-    depth = 1,
-  ): GraphNeighborhood | null {
-    const center =
-      this.graph.getSymbol(
-        symbolId,
-      );
+  neighborhood(projectId: string, symbolId: string, depth = 1): GraphNeighborhood | null {
+    const center = this.graph.getSymbol(symbolId);
 
-    if (
-      !center ||
-      center.projectId !==
-        projectId
-    ) {
+    if (!center || center.projectId !== projectId) {
       return null;
     }
 
     return {
       center,
 
-      incoming:
-        this.walk(
-          projectId,
-          symbolId,
-          "incoming",
-          depth,
-        ),
+      incoming: this.walk(projectId, symbolId, 'incoming', depth),
 
-      outgoing:
-        this.walk(
-          projectId,
-          symbolId,
-          "outgoing",
-          depth,
-        ),
+      outgoing: this.walk(projectId, symbolId, 'outgoing', depth),
     };
   }
 
-  shortestPath(
-    projectId: string,
-    fromId: string,
-    toId: string,
-    maxDepth = 12,
-  ): GraphPath {
-    const from =
-      this.graph.getSymbol(
-        fromId,
-      );
+  shortestPath(projectId: string, fromId: string, toId: string, maxDepth = 12): GraphPath {
+    const from = this.graph.getSymbol(fromId);
 
-    const to =
-      this.graph.getSymbol(
-        toId,
-      );
+    const to = this.graph.getSymbol(toId);
 
-    if (
-      !from ||
-      !to ||
-      from.projectId !==
-        projectId ||
-      to.projectId !==
-        projectId
-    ) {
+    if (!from || !to || from.projectId !== projectId || to.projectId !== projectId) {
       return {
         found: false,
         distance: -1,
@@ -225,10 +94,7 @@ export class GraphQueryEngine {
       };
     }
 
-    if (
-      fromId ===
-      toId
-    ) {
+    if (fromId === toId) {
       return {
         found: true,
         distance: 0,
@@ -237,128 +103,66 @@ export class GraphQueryEngine {
       };
     }
 
-    const edges =
-      this.graph
-        .allEdges(
-          projectId,
-        )
-        .filter(
-          (edge) =>
-            DEPENDENCY_EDGES.has(
-              edge.type,
-            ),
-        );
+    const edges = this.graph.allEdges(projectId).filter((edge) => DEPENDENCY_EDGES.has(edge.type));
 
-    const outgoing =
-      new Map<
-        string,
-        GraphEdge[]
-      >();
+    const outgoing = new Map<string, GraphEdge[]>();
 
-    for (
-      const edge
-      of edges
-    ) {
-      const list =
-        outgoing.get(
-          edge.from,
-        ) ?? [];
+    for (const edge of edges) {
+      const list = outgoing.get(edge.from) ?? [];
 
-      list.push(
-        edge,
-      );
+      list.push(edge);
 
-      outgoing.set(
-        edge.from,
-        list,
-      );
+      outgoing.set(edge.from, list);
     }
 
-    const queue:
-      {
-        id: string;
-        depth: number;
-      }[] = [
+    const queue: {
+      id: string;
+      depth: number;
+    }[] = [
       {
         id: fromId,
         depth: 0,
       },
     ];
 
-    const visited =
-      new Set<string>([
-        fromId,
-      ]);
+    const visited = new Set<string>([fromId]);
 
-    const previous =
-      new Map<
-        string,
-        {
-          node:
-            string;
-          edge:
-            GraphEdge;
-        }
-      >();
+    const previous = new Map<
+      string,
+      {
+        node: string;
+        edge: GraphEdge;
+      }
+    >();
 
-    while (
-      queue.length > 0
-    ) {
-      const current =
-        queue.shift()!;
+    while (queue.length > 0) {
+      const current = queue.shift()!;
 
-      if (
-        current.depth >=
-        maxDepth
-      ) {
+      if (current.depth >= maxDepth) {
         continue;
       }
 
-      for (
-        const edge
-        of outgoing.get(
-          current.id,
-        ) ?? []
-      ) {
-        if (
-          visited.has(
-            edge.to,
-          )
-        ) {
+      for (const edge of outgoing.get(current.id) ?? []) {
+        if (visited.has(edge.to)) {
           continue;
         }
 
-        visited.add(
-          edge.to,
-        );
+        visited.add(edge.to);
 
-        previous.set(
-          edge.to,
-          {
-            node:
-              current.id,
+        previous.set(edge.to, {
+          node: current.id,
 
-            edge,
-          },
-        );
+          edge,
+        });
 
-        if (
-          edge.to ===
-          toId
-        ) {
-          return this.buildPath(
-            fromId,
-            toId,
-            previous,
-          );
+        if (edge.to === toId) {
+          return this.buildPath(fromId, toId, previous);
         }
 
         queue.push({
-          id:
-            edge.to,
+          id: edge.to,
 
-          depth:
-            current.depth + 1,
+          depth: current.depth + 1,
         });
       }
     }
@@ -374,34 +178,22 @@ export class GraphQueryEngine {
   private buildPath(
     fromId: string,
     toId: string,
-    previous:
-      Map<
-        string,
-        {
-          node: string;
-          edge: GraphEdge;
-        }
-      >,
+    previous: Map<
+      string,
+      {
+        node: string;
+        edge: GraphEdge;
+      }
+    >
   ): GraphPath {
-    const symbolIds:
-      string[] = [
-      toId,
-    ];
+    const symbolIds: string[] = [toId];
 
-    const edges:
-      GraphEdge[] = [];
+    const edges: GraphEdge[] = [];
 
-    let current =
-      toId;
+    let current = toId;
 
-    while (
-      current !==
-      fromId
-    ) {
-      const previousNode =
-        previous.get(
-          current,
-        );
+    while (current !== fromId) {
+      const previousNode = previous.get(current);
 
       if (!previousNode) {
         return {
@@ -412,43 +204,24 @@ export class GraphQueryEngine {
         };
       }
 
-      edges.push(
-        previousNode.edge,
-      );
+      edges.push(previousNode.edge);
 
-      current =
-        previousNode.node;
+      current = previousNode.node;
 
-      symbolIds.push(
-        current,
-      );
+      symbolIds.push(current);
     }
 
     symbolIds.reverse();
     edges.reverse();
 
-    const symbols =
-      symbolIds
-        .map(
-          (id) =>
-            this.graph.getSymbol(
-              id,
-            ),
-        )
-        .filter(
-          (
-            symbol,
-          ): symbol is CodeSymbol =>
-            Boolean(
-              symbol,
-            ),
-        );
+    const symbols = symbolIds
+      .map((id) => this.graph.getSymbol(id))
+      .filter((symbol): symbol is CodeSymbol => Boolean(symbol));
 
     return {
       found: true,
 
-      distance:
-        edges.length,
+      distance: edges.length,
 
       symbols,
 
@@ -459,121 +232,67 @@ export class GraphQueryEngine {
   private walk(
     projectId: string,
     symbolId: string,
-    direction:
-      | "incoming"
-      | "outgoing",
-    maxDepth: number,
+    direction: 'incoming' | 'outgoing',
+    maxDepth: number
   ): GraphQueryNode[] {
-    const edges =
-      this.graph
-        .allEdges(
-          projectId,
-        )
-        .filter(
-          (edge) =>
-            DEPENDENCY_EDGES.has(
-              edge.type,
-            ),
-        );
+    const edges = this.graph.allEdges(projectId).filter((edge) => DEPENDENCY_EDGES.has(edge.type));
 
-    const queue:
+    const queue: {
+      id: string;
+      depth: number;
+    }[] = [
       {
-        id: string;
-        depth: number;
-      }[] = [
-      {
-        id:
-          symbolId,
+        id: symbolId,
 
-        depth:
-          0,
+        depth: 0,
       },
     ];
 
-    const visited =
-      new Set<string>([
-        symbolId,
-      ]);
+    const visited = new Set<string>([symbolId]);
 
-    const output:
-      GraphQueryNode[] =
-      [];
+    const output: GraphQueryNode[] = [];
 
-    while (
-      queue.length >
-      0
-    ) {
-      const current =
-        queue.shift()!;
+    while (queue.length > 0) {
+      const current = queue.shift()!;
 
-      if (
-        current.depth >=
-        maxDepth
-      ) {
+      if (current.depth >= maxDepth) {
         continue;
       }
 
-      for (
-        const edge
-        of edges
-      ) {
+      for (const edge of edges) {
         const matches =
-          direction ===
-            "incoming"
-            ? edge.to ===
-              current.id
-            : edge.from ===
-              current.id;
+          direction === 'incoming' ? edge.to === current.id : edge.from === current.id;
 
         if (!matches) {
           continue;
         }
 
-        const nextId =
-          direction ===
-            "incoming"
-            ? edge.from
-            : edge.to;
+        const nextId = direction === 'incoming' ? edge.from : edge.to;
 
-        if (
-          visited.has(
-            nextId,
-          )
-        ) {
+        if (visited.has(nextId)) {
           continue;
         }
 
-        const symbol =
-          this.graph.getSymbol(
-            nextId,
-          );
+        const symbol = this.graph.getSymbol(nextId);
 
         if (!symbol) {
           continue;
         }
 
-        visited.add(
-          nextId,
-        );
+        visited.add(nextId);
 
         output.push({
           symbol,
 
-          depth:
-            current.depth +
-            1,
+          depth: current.depth + 1,
 
-          via:
-            edge,
+          via: edge,
         });
 
         queue.push({
-          id:
-            nextId,
+          id: nextId,
 
-          depth:
-            current.depth +
-            1,
+          depth: current.depth + 1,
         });
       }
     }
@@ -584,94 +303,34 @@ export class GraphQueryEngine {
   private relatedIncoming(
     projectId: string,
     symbolId: string,
-    types:
-      Set<
-        GraphEdge["type"]
-      >,
+    types: Set<GraphEdge['type']>
   ): CodeSymbol[] {
-    const ids =
-      new Set(
-        this.graph
-          .allEdges(
-            projectId,
-          )
-          .filter(
-            (edge) =>
-              edge.to ===
-                symbolId &&
-              types.has(
-                edge.type,
-              ),
-          )
-          .map(
-            (edge) =>
-              edge.from,
-          ),
-      );
+    const ids = new Set(
+      this.graph
+        .allEdges(projectId)
+        .filter((edge) => edge.to === symbolId && types.has(edge.type))
+        .map((edge) => edge.from)
+    );
 
-    return [
-      ...ids,
-    ]
-      .map(
-        (id) =>
-          this.graph.getSymbol(
-            id,
-          ),
-      )
-      .filter(
-        (
-          symbol,
-        ): symbol is CodeSymbol =>
-          Boolean(
-            symbol,
-          ),
-      );
+    return [...ids]
+      .map((id) => this.graph.getSymbol(id))
+      .filter((symbol): symbol is CodeSymbol => Boolean(symbol));
   }
 
   private relatedOutgoing(
     projectId: string,
     symbolId: string,
-    types:
-      Set<
-        GraphEdge["type"]
-      >,
+    types: Set<GraphEdge['type']>
   ): CodeSymbol[] {
-    const ids =
-      new Set(
-        this.graph
-          .allEdges(
-            projectId,
-          )
-          .filter(
-            (edge) =>
-              edge.from ===
-                symbolId &&
-              types.has(
-                edge.type,
-              ),
-          )
-          .map(
-            (edge) =>
-              edge.to,
-          ),
-      );
+    const ids = new Set(
+      this.graph
+        .allEdges(projectId)
+        .filter((edge) => edge.from === symbolId && types.has(edge.type))
+        .map((edge) => edge.to)
+    );
 
-    return [
-      ...ids,
-    ]
-      .map(
-        (id) =>
-          this.graph.getSymbol(
-            id,
-          ),
-      )
-      .filter(
-        (
-          symbol,
-        ): symbol is CodeSymbol =>
-          Boolean(
-            symbol,
-          ),
-      );
+    return [...ids]
+      .map((id) => this.graph.getSymbol(id))
+      .filter((symbol): symbol is CodeSymbol => Boolean(symbol));
   }
 }

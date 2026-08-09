@@ -1,67 +1,31 @@
-import type {
-  VisualizationGraph,
-} from "../code-intelligence/visualization/types.js";
+import type { VisualizationGraph } from '../code-intelligence/visualization/types.js';
 
-import type {
-  StorageProvider,
-} from "./types.js";
+import type { StorageProvider } from './types.js';
 
 export class PersistentVisualizationStore {
-  constructor(
-    private readonly storage:
-      StorageProvider,
-  ) {}
+  constructor(private readonly storage: StorageProvider) {}
 
-  private key(
-    projectId: string,
-  ): string {
-    return [
-      "projects",
-      projectId,
-      "code",
-      "visualization",
-      "graph.json",
-    ].join("/");
+  private key(projectId: string): string {
+    return ['projects', projectId, 'code', 'visualization', 'graph.json'].join('/');
   }
 
-  async load(
-    projectId: string,
-  ): Promise<
-    VisualizationGraph |
-    null
-  > {
-    const text =
-      await this.storage.getText(
-        this.key(
-          projectId,
-        ),
-      );
+  async load(projectId: string): Promise<VisualizationGraph | null> {
+    const text = await this.storage.getText(this.key(projectId));
 
     if (!text) {
       return null;
     }
 
-    return JSON.parse(
-      text,
-    ) as VisualizationGraph;
+    return JSON.parse(text) as VisualizationGraph;
   }
 
-  async save(
-    graph:
-      VisualizationGraph,
-  ): Promise<void> {
+  async save(graph: VisualizationGraph): Promise<void> {
     await this.storage.put(
-      this.key(
-        graph.projectId,
-      ),
+      this.key(graph.projectId),
 
-      JSON.stringify(
-        graph,
-        null,
-        2,
-      ),
+      JSON.stringify(graph, null, 2),
 
-      "application/json",
+      'application/json'
     );
   }
 }

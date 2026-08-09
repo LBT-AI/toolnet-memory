@@ -1,116 +1,65 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  MemoryEngine,
-  ProjectManager,
-  loadConfig,
-} from "../../core/index.js";
+import { MemoryEngine, ProjectManager, loadConfig } from '../../core/index.js';
 
-import {
-  createEmbeddingProvider,
-} from "../../embeddings/index.js";
+import { createEmbeddingProvider } from '../../embeddings/index.js';
 
 import {
   createStorageProvider,
   MemoryStore,
   PersistentVectorStore,
   ProjectScopedStorageProvider,
-} from "../../storage/index.js";
+} from '../../storage/index.js';
 
-import {
-  VectorPersistenceManager,
-  VectorStore,
-} from "./index.js";
+import { VectorPersistenceManager, VectorStore } from './index.js';
 
 async function main() {
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
-  const project =
-    new ProjectManager()
-      .detect();
+  const project = new ProjectManager().detect();
 
-  const memory =
-    new MemoryEngine();
+  const memory = new MemoryEngine();
 
-  const rawStorage =
-    createStorageProvider({
-      provider:
-        config.storage.provider,
+  const rawStorage = createStorageProvider({
+    provider: config.storage.provider,
 
-      huggingface:
-        config.storage.huggingface,
+    huggingface: config.storage.huggingface,
 
-      localRoot:
-        config.storage.localRoot,
-    });
+    localRoot: config.storage.localRoot,
+  });
 
-  const storage =
-    new ProjectScopedStorageProvider(
-      rawStorage,
-      project.id,
-      project.name,
-      project.remote ?? project.name,
-    );
-
-
-  const memoryStore =
-    new MemoryStore(
-      storage,
-    );
-
-  memory.importRecords(
-    await memoryStore.load(
-      project.id,
-    ),
+  const storage = new ProjectScopedStorageProvider(
+    rawStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
   );
 
-  const embeddings =
-    createEmbeddingProvider();
+  const memoryStore = new MemoryStore(storage);
 
-  const vectors =
-    new VectorStore();
+  memory.importRecords(await memoryStore.load(project.id));
 
-  const persistence =
-    new PersistentVectorStore(
-      storage,
-    );
+  const embeddings = createEmbeddingProvider();
 
-  const model =
-    process.env
-      .HF_EMBEDDING_MODEL ??
-    "sentence-transformers/all-MiniLM-L6-v2";
+  const vectors = new VectorStore();
 
-  const manager =
-    new VectorPersistenceManager(
-      project.id,
-      model,
-      embeddings,
-      vectors,
-      persistence,
-    );
+  const persistence = new PersistentVectorStore(storage);
 
-  const stats =
-    await manager.initialize(
-      memory.list(
-        project.id,
-      ),
-    );
+  const model = process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2';
+
+  const manager = new VectorPersistenceManager(project.id, model, embeddings, vectors, persistence);
+
+  const stats = await manager.initialize(memory.list(project.id));
 
   console.log({
     ok: true,
-    memories:
-      memory.list(
-        project.id,
-      ).length,
+    memories: memory.list(project.id).length,
 
     ...stats,
   });
 }
 
-main().catch(
-  (error) => {
-    console.error(error);
-    process.exit(1);
-  },
-);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

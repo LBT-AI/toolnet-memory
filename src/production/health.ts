@@ -1,109 +1,70 @@
-import {
-  randomUUID,
-} from "node:crypto";
+import { randomUUID } from 'node:crypto';
 
-import type {
-  StorageProvider,
-} from "../storage/types.js";
+import type { StorageProvider } from '../storage/types.js';
 
-import type {
-  EmbeddingProvider,
-} from "../embeddings/provider.js";
+import type { EmbeddingProvider } from '../embeddings/provider.js';
 
 export class ProductionHealth {
   constructor(
-    private readonly storage:
-      StorageProvider,
+    private readonly storage: StorageProvider,
 
-    private readonly embeddings?:
-      EmbeddingProvider,
+    private readonly embeddings?: EmbeddingProvider
   ) {}
 
   async run() {
-    const key =
-      `_health/production-${randomUUID()}.txt`;
+    const key = `_health/production-${randomUUID()}.txt`;
 
-    const payload =
-      `toolnet-memory:${Date.now()}`;
+    const payload = `toolnet-memory:${Date.now()}`;
 
-    let storageOk =
-      false;
+    let storageOk = false;
 
     try {
-      await this.storage.put(
-        key,
-        payload,
-        "text/plain",
-      );
+      await this.storage.put(key, payload, 'text/plain');
 
-      const value =
-        await this.storage.getText(
-          key,
-        );
+      const value = await this.storage.getText(key);
 
-      storageOk =
-        value === payload;
+      storageOk = value === payload;
     } finally {
       try {
-        await this.storage.delete(
-          key,
-        );
+        await this.storage.delete(key);
       } catch {
         // cleanup only
       }
     }
 
-    let embedding:
-      {
-        ok: boolean;
-        dimensions: number;
-        mode: string;
-      } | null = null;
+    let embedding: {
+      ok: boolean;
+      dimensions: number;
+      mode: string;
+    } | null = null;
 
-    if (
-      this.embeddings
-    ) {
+    if (this.embeddings) {
       try {
-        const vector =
-          await this.embeddings.embed(
-            "ToolNet Memory production health check",
-          );
+        const vector = await this.embeddings.embed('ToolNet Memory production health check');
 
         embedding = {
-          ok:
-            vector.length > 0,
+          ok: vector.length > 0,
 
-          dimensions:
-            vector.length,
+          dimensions: vector.length,
 
-          mode:
-            vector.length === 384
-              ? "huggingface"
-              : "fallback-or-custom",
+          mode: vector.length === 384 ? 'huggingface' : 'fallback-or-custom',
         };
       } catch {
         embedding = {
           ok: false,
           dimensions: 0,
-          mode: "failed",
+          mode: 'failed',
         };
       }
     }
 
     return {
-      ok:
-        storageOk &&
-        (
-          embedding === null ||
-          embedding.ok
-        ),
+      ok: storageOk && (embedding === null || embedding.ok),
 
       storage: {
-        ok:
-          storageOk,
+        ok: storageOk,
 
-        provider:
-          this.storage.name,
+        provider: this.storage.name,
       },
 
       embedding,

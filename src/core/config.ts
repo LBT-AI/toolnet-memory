@@ -1,5 +1,4 @@
-
-import "./global-env.js";
+import './global-env.js';
 
 export interface ToolNetMemoryConfig {
   memory: {
@@ -50,95 +49,48 @@ export interface ToolNetMemoryConfig {
   };
 }
 
-function envBool(
-  value: string | undefined,
-  fallback: boolean,
-): boolean {
+function envBool(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) {
     return fallback;
   }
 
-  return [
-    "1",
-    "true",
-    "yes",
-    "on",
-  ].includes(value.toLowerCase());
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 }
 
-function envNumber(
-  value: string | undefined,
-  fallback: number,
-): number {
+function envNumber(value: string | undefined, fallback: number): number {
   if (!value) {
     return fallback;
   }
 
   const parsed = Number(value);
 
-  return Number.isFinite(parsed)
-    ? parsed
-    : fallback;
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 export function loadConfig(): ToolNetMemoryConfig {
   return {
     memory: {
-      autoCapture:
-        envBool(
-          process.env.MEMORY_AUTO_CAPTURE,
-          true,
-        ),
+      autoCapture: envBool(process.env.MEMORY_AUTO_CAPTURE, true),
 
-      autoRetrieve:
-        envBool(
-          process.env.MEMORY_AUTO_RETRIEVE,
-          true,
-        ),
+      autoRetrieve: envBool(process.env.MEMORY_AUTO_RETRIEVE, true),
 
-      autoSummarize:
-        envBool(
-          process.env.MEMORY_AUTO_SUMMARIZE,
-          true,
-        ),
+      autoSummarize: envBool(process.env.MEMORY_AUTO_SUMMARIZE, true),
 
-      autoSync:
-        envBool(
-          process.env.MEMORY_AUTO_SYNC,
-          true,
-        ),
+      autoSync: envBool(process.env.MEMORY_AUTO_SYNC, true),
     },
 
     retrieval: {
-      maxCandidates:
-        envNumber(
-          process.env.MEMORY_MAX_CANDIDATES,
-          50,
-        ),
+      maxCandidates: envNumber(process.env.MEMORY_MAX_CANDIDATES, 50),
 
-      rerankTop:
-        envNumber(
-          process.env.MEMORY_RERANK_TOP,
-          10,
-        ),
+      rerankTop: envNumber(process.env.MEMORY_RERANK_TOP, 10),
 
-      finalContext:
-        envNumber(
-          process.env.MEMORY_FINAL_CONTEXT,
-          5,
-        ),
+      finalContext: envNumber(process.env.MEMORY_FINAL_CONTEXT, 5),
 
-      tokenBudget:
-        envNumber(
-          process.env.MEMORY_TOKEN_BUDGET,
-          2000,
-        ),
+      tokenBudget: envNumber(process.env.MEMORY_TOKEN_BUDGET, 2000),
     },
 
     storage: {
-      provider:
-        process.env.MEMORY_STORAGE_PROVIDER ??
-        "huggingface",
+      provider: process.env.MEMORY_STORAGE_PROVIDER ?? 'huggingface',
 
       r2: {
         accountId: process.env.R2_ACCOUNT_ID,
@@ -153,11 +105,7 @@ export function loadConfig(): ToolNetMemoryConfig {
         bucket: process.env.S3_BUCKET,
         accessKeyId: process.env.S3_ACCESS_KEY_ID,
         secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-        forcePathStyle:
-          envBool(
-            process.env.S3_FORCE_PATH_STYLE,
-            false,
-          ),
+        forcePathStyle: envBool(process.env.S3_FORCE_PATH_STYLE, false),
       },
 
       huggingface: {
@@ -167,16 +115,11 @@ export function loadConfig(): ToolNetMemoryConfig {
         secretAccessKey: process.env.HF_S3_SECRET_ACCESS_KEY,
       },
 
-      localRoot:
-        process.env.MEMORY_LOCAL_STORAGE_PATH,
+      localRoot: process.env.MEMORY_LOCAL_STORAGE_PATH,
     },
 
     cache: {
-      maxMb:
-        envNumber(
-          process.env.MEMORY_LOCAL_CACHE_MB,
-          200,
-        ),
+      maxMb: envNumber(process.env.MEMORY_LOCAL_CACHE_MB, 200),
     },
   };
 }

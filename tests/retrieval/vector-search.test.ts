@@ -1,92 +1,45 @@
-import {
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import {
-  MemoryEngine,
-} from "../../src/core/memory-engine.js";
+import { MemoryEngine } from '../../src/core/memory-engine.js';
 
-import {
-  HashEmbeddingProvider,
-} from "../../src/embeddings/local.js";
+import { HashEmbeddingProvider } from '../../src/embeddings/local.js';
 
-import {
-  VectorHybridEngine,
-} from "../../src/retrieval/vector-hybrid-engine.js";
+import { VectorHybridEngine } from '../../src/retrieval/vector-hybrid-engine.js';
 
-describe(
-  "Vector Hybrid Retrieval",
-  () => {
-    it(
-      "indexes and retrieves memory",
-      async () => {
-        const memory =
-          new MemoryEngine();
+describe('Vector Hybrid Retrieval', () => {
+  it('indexes and retrieves memory', async () => {
+    const memory = new MemoryEngine();
 
-        memory.remember({
-          projectId:
-            "test",
+    memory.remember({
+      projectId: 'test',
 
-          type:
-            "decision",
+      type: 'decision',
 
-          content:
-            "Use Hugging Face Bucket for remote memory storage",
+      content: 'Use Hugging Face Bucket for remote memory storage',
 
-          importance:
-            "high",
-        });
+      importance: 'high',
+    });
 
-        memory.remember({
-          projectId:
-            "test",
+    memory.remember({
+      projectId: 'test',
 
-          type:
-            "todo",
+      type: 'todo',
 
-          content:
-            "Implement authentication login screen",
+      content: 'Implement authentication login screen',
 
-          importance:
-            "normal",
-        });
+      importance: 'normal',
+    });
 
-        const engine =
-          new VectorHybridEngine(
-            memory,
-            new HashEmbeddingProvider(),
-          );
+    const engine = new VectorHybridEngine(memory, new HashEmbeddingProvider());
 
-        const indexed =
-          await engine.rebuild(
-            "test",
-          );
+    const indexed = await engine.rebuild('test');
 
-        expect(
-          indexed,
-        ).toBe(2);
+    expect(indexed).toBe(2);
 
-        const results =
-          await engine.search(
-            "test",
-            "remote memory storage",
-            1,
-          );
+    const results = await engine.search('test', 'remote memory storage', 1);
 
-        expect(
-          results.length,
-        ).toBe(1);
+    expect(results.length).toBe(1);
 
-        expect(
-          results[0]
-            .memory
-            .content,
-        ).toContain(
-          "Hugging Face",
-        );
-      },
-    );
-  },
-);
+    expect(results[0].memory.content).toContain('Hugging Face');
+  });
+});

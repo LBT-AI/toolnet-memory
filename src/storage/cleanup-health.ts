@@ -1,54 +1,33 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  loadConfig,
-} from "../core/index.js";
+import { loadConfig } from '../core/index.js';
 
-import {
-  createStorageProvider,
-  withStorageRetry,
-} from "./index.js";
+import { createStorageProvider, withStorageRetry } from './index.js';
 
-const config =
-  loadConfig();
+const config = loadConfig();
 
-const storage =
-  withStorageRetry(
-    createStorageProvider({
-      provider:
-        config.storage.provider,
+const storage = withStorageRetry(
+  createStorageProvider({
+    provider: config.storage.provider,
 
-      huggingface:
-        config.storage.huggingface,
+    huggingface: config.storage.huggingface,
 
-      localRoot:
-        config.storage.localRoot,
-    }),
-    {
-      attempts: 3,
-    },
-  );
+    localRoot: config.storage.localRoot,
+  }),
+  {
+    attempts: 3,
+  }
+);
 
-const objects =
-  await storage.list(
-    "_health/",
-  );
+const objects = await storage.list('_health/');
 
-for (
-  const object
-  of objects
-) {
-  await storage.delete(
-    object.key,
-  );
+for (const object of objects) {
+  await storage.delete(object.key);
 
-  console.log(
-    `deleted ${object.key}`,
-  );
+  console.log(`deleted ${object.key}`);
 }
 
 console.log({
   ok: true,
-  deleted:
-    objects.length,
+  deleted: objects.length,
 });

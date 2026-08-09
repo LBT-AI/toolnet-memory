@@ -1,39 +1,18 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 
-import {
-  dirname,
-  join,
-} from "node:path";
+import { dirname, join } from 'node:path';
 
-import type {
-  ProjectManifest,
-} from "../core/types.js";
+import type { ProjectManifest } from '../core/types.js';
 
-import type {
-  StorageProvider,
-} from "../storage/types.js";
+import type { StorageProvider } from '../storage/types.js';
 
-import {
-  sha256,
-} from "../session/utils.js";
+import { sha256 } from '../session/utils.js';
 
-import type {
-  ProjectManual,
-  ProjectManualRule,
-  ProjectRuleMode,
-} from "./types.js";
+import type { ProjectManual, ProjectManualRule, ProjectRuleMode } from './types.js';
 
-const MAX_MANUAL_BYTES =
-  64 * 1024;
+const MAX_MANUAL_BYTES = 64 * 1024;
 
-export const PROJECT_MANUAL_TEMPLATE =
-`# ToolNet Project Operating Manual
+export const PROJECT_MANUAL_TEMPLATE = `# ToolNet Project Operating Manual
 
 This file contains persistent instructions for AI agents working on this project.
 
@@ -78,308 +57,149 @@ Things an AI agent should always remember.
 -->
 `;
 
-export function projectManualPath(
-  project:
-    ProjectManifest,
-): string {
-  return join(
-    project.rootPath,
-    ".toolnet",
-    "PROJECT.md",
-  );
+export function projectManualPath(project: ProjectManifest): string {
+  return join(project.rootPath, '.toolnet', 'PROJECT.md');
 }
 
-function normalizeRuleText(
-  value: string,
-): string {
-  return value
-    .normalize(
-      "NFKC",
-    )
-    .replace(
-      /\s+/g,
-      " ",
-    )
-    .trim();
+function normalizeRuleText(value: string): string {
+  return value.normalize('NFKC').replace(/\s+/g, ' ').trim();
 }
 
-function parseRules(
-  content: string,
-): ProjectManualRule[] {
-  const rules:
-    ProjectManualRule[] =
-    [];
+function parseRules(content: string): ProjectManualRule[] {
+  const rules: ProjectManualRule[] = [];
 
-  const seen =
-    new Set<
-      string
-    >();
+  const seen = new Set<string>();
 
-  const pattern =
-    /^\s*[-*]\s+\[(enforce|advisory)\]\s+(.+?)\s*$/gimu;
+  const pattern = /^\s*[-*]\s+\[(enforce|advisory)\]\s+(.+?)\s*$/gimu;
 
-  let match:
-    RegExpExecArray |
-    null;
+  let match: RegExpExecArray | null;
 
-  while (
-    (
-      match =
-        pattern.exec(
-          content,
-        )
-    )
-  ) {
-    const mode =
-      match[1]
-        .toLowerCase() as
-        ProjectRuleMode;
+  while ((match = pattern.exec(content))) {
+    const mode = match[1].toLowerCase() as ProjectRuleMode;
 
-    const text =
-      normalizeRuleText(
-        match[2],
-      );
+    const text = normalizeRuleText(match[2]);
 
-    if (
-      !text
-    ) {
+    if (!text) {
       continue;
     }
 
-    const key =
-      `${mode}:${text.toLowerCase()}`;
+    const key = `${mode}:${text.toLowerCase()}`;
 
-    if (
-      seen.has(
-        key,
-      )
-    ) {
+    if (seen.has(key)) {
       continue;
     }
 
-    seen.add(
-      key,
-    );
+    seen.add(key);
 
     rules.push({
-      id:
-        sha256(
-          key,
-        ).slice(
-          0,
-          24,
-        ),
+      id: sha256(key).slice(0, 24),
 
       mode,
 
       text,
 
-      source:
-        "manual",
+      source: 'manual',
     });
   }
 
   return rules;
 }
 
-export function ensureProjectManual(
-  project:
-    ProjectManifest,
-): string {
-  const file =
-    projectManualPath(
-      project,
-    );
+export function ensureProjectManual(project: ProjectManifest): string {
+  const file = projectManualPath(project);
 
-  if (
-    existsSync(
-      file,
-    )
-  ) {
+  if (existsSync(file)) {
     return file;
   }
 
-  mkdirSync(
-    dirname(
-      file,
-    ),
-    {
-      recursive:
-        true,
-    },
-  );
+  mkdirSync(dirname(file), {
+    recursive: true,
+  });
 
-  writeFileSync(
-    file,
-    PROJECT_MANUAL_TEMPLATE,
-    {
-      encoding:
-        "utf8",
+  writeFileSync(file, PROJECT_MANUAL_TEMPLATE, {
+    encoding: 'utf8',
 
-      mode:
-        0o600,
-    },
-  );
+    mode: 0o600,
+  });
 
   return file;
 }
 
 export function loadProjectManual(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  createIfMissing =
-    false,
-): ProjectManual |
-null {
-  const file =
-    createIfMissing
-      ? ensureProjectManual(
-          project,
-        )
-      : projectManualPath(
-          project,
-        );
+  createIfMissing = false
+): ProjectManual | null {
+  const file = createIfMissing ? ensureProjectManual(project) : projectManualPath(project);
 
-  if (
-    !existsSync(
-      file,
-    )
-  ) {
+  if (!existsSync(file)) {
     return null;
   }
 
-  const size =
-    statSync(
-      file,
-    ).size;
+  const size = statSync(file).size;
 
-  if (
-    size >
-    MAX_MANUAL_BYTES
-  ) {
-    throw new Error(
-      `PROJECT.md exceeds ${MAX_MANUAL_BYTES} bytes`,
-    );
+  if (size > MAX_MANUAL_BYTES) {
+    throw new Error(`PROJECT.md exceeds ${MAX_MANUAL_BYTES} bytes`);
   }
 
-  const content =
-    readFileSync(
-      file,
-      "utf8",
-    );
+  const content = readFileSync(file, 'utf8');
 
   return {
-    path:
-      file,
+    path: file,
 
     content,
 
-    digest:
-      sha256(
-        content,
-      ),
+    digest: sha256(content),
 
-    rules:
-      parseRules(
-        content,
-      ),
+    rules: parseRules(content),
 
-    bytes:
-      Buffer.byteLength(
-        content,
-        "utf8",
-      ),
+    bytes: Buffer.byteLength(content, 'utf8'),
 
-    updatedAt:
-      new Date(
-        statSync(
-          file,
-        ).mtimeMs,
-      ).toISOString(),
+    updatedAt: new Date(statSync(file).mtimeMs).toISOString(),
   };
 }
 
 export async function syncProjectManual(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  storage:
-    StorageProvider,
-): Promise<
-  ProjectManual
-> {
-  const manual =
-    loadProjectManual(
-      project,
-      true,
-    );
+  storage: StorageProvider
+): Promise<ProjectManual> {
+  const manual = loadProjectManual(project, true);
 
-  if (
-    !manual
-  ) {
-    throw new Error(
-      "Project manual unavailable",
-    );
+  if (!manual) {
+    throw new Error('Project manual unavailable');
   }
 
-  const prefix =
-    `projects/${project.id}/project`;
+  const prefix = `projects/${project.id}/project`;
 
-  await storage.put(
-    `${prefix}/manual.md`,
-    manual.content,
-    "text/markdown",
-  );
+  await storage.put(`${prefix}/manual.md`, manual.content, 'text/markdown');
 
   await storage.put(
     `${prefix}/manual.json`,
     JSON.stringify(
       {
-        version:
-          1,
+        version: 1,
 
-        projectId:
-          project.id,
+        projectId: project.id,
 
-        projectName:
-          project.name,
+        projectName: project.name,
 
-        digest:
-          manual.digest,
+        digest: manual.digest,
 
-        bytes:
-          manual.bytes,
+        bytes: manual.bytes,
 
-        ruleCount:
-          manual.rules.length,
+        ruleCount: manual.rules.length,
 
-        enforceRules:
-          manual.rules
-            .filter(
-              rule =>
-                rule.mode ===
-                "enforce",
-            )
-            .length,
+        enforceRules: manual.rules.filter((rule) => rule.mode === 'enforce').length,
 
-        advisoryRules:
-          manual.rules
-            .filter(
-              rule =>
-                rule.mode ===
-                "advisory",
-            )
-            .length,
+        advisoryRules: manual.rules.filter((rule) => rule.mode === 'advisory').length,
 
-        updatedAt:
-          manual.updatedAt,
+        updatedAt: manual.updatedAt,
       },
       null,
-      2,
-    ) +
-      "\n",
-    "application/json",
+      2
+    ) + '\n',
+    'application/json'
   );
 
   return manual;

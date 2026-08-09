@@ -1,281 +1,150 @@
-import {
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import {
-  ProjectManager,
-  MemoryEngine,
-} from "../../src/core/index.js";
+import { ProjectManager, MemoryEngine } from '../../src/core/index.js';
 
-import {
-  RetrievalEngine,
-} from "../../src/retrieval/index.js";
+import { RetrievalEngine } from '../../src/retrieval/index.js';
 
-import {
-  CodeGraphStore,
-  ReferenceResolver,
-} from "../../src/code-intelligence/index.js";
+import { CodeGraphStore, ReferenceResolver } from '../../src/code-intelligence/index.js';
 
-import type {
-  MCPContext,
-} from "../../src/mcp/context.js";
+import type { MCPContext } from '../../src/mcp/context.js';
 
 import {
   traceCalls,
   analyzeImpact,
   findDependencies,
   getProjectArchitecture,
-} from "../../src/mcp/tools/index.js";
+} from '../../src/mcp/tools/index.js';
 
-describe(
-  "MCP Code Intelligence",
-  () => {
-    function setup() {
-      const project =
-        new ProjectManager()
-          .detect(
-            process.cwd(),
-          );
+describe('MCP Code Intelligence', () => {
+  function setup() {
+    const project = new ProjectManager().detect(process.cwd());
 
-      const memory =
-        new MemoryEngine();
+    const memory = new MemoryEngine();
 
-      const retrieval =
-        new RetrievalEngine(
-          memory,
-        );
+    const retrieval = new RetrievalEngine(memory);
 
-      const graph =
-        new CodeGraphStore();
+    const graph = new CodeGraphStore();
 
-      const fileA = {
-        id: "file-a",
-        projectId:
-          project.id,
-        name:
-          "src/a.ts",
-        qualifiedName:
-          "src/a.ts",
-        type:
-          "file" as const,
-        filePath:
-          "src/a.ts",
-      };
+    const fileA = {
+      id: 'file-a',
+      projectId: project.id,
+      name: 'src/a.ts',
+      qualifiedName: 'src/a.ts',
+      type: 'file' as const,
+      filePath: 'src/a.ts',
+    };
 
-      const fileB = {
-        id: "file-b",
-        projectId:
-          project.id,
-        name:
-          "src/b.ts",
-        qualifiedName:
-          "src/b.ts",
-        type:
-          "file" as const,
-        filePath:
-          "src/b.ts",
-      };
+    const fileB = {
+      id: 'file-b',
+      projectId: project.id,
+      name: 'src/b.ts',
+      qualifiedName: 'src/b.ts',
+      type: 'file' as const,
+      filePath: 'src/b.ts',
+    };
 
-      const fnA = {
-        id: "fn-a",
-        projectId:
-          project.id,
-        name:
-          "main",
-        qualifiedName:
-          "main",
-        type:
-          "function" as const,
-        filePath:
-          "src/a.ts",
-      };
+    const fnA = {
+      id: 'fn-a',
+      projectId: project.id,
+      name: 'main',
+      qualifiedName: 'main',
+      type: 'function' as const,
+      filePath: 'src/a.ts',
+    };
 
-      const fnB = {
-        id: "fn-b",
-        projectId:
-          project.id,
-        name:
-          "save",
-        qualifiedName:
-          "save",
-        type:
-          "function" as const,
-        filePath:
-          "src/b.ts",
-      };
+    const fnB = {
+      id: 'fn-b',
+      projectId: project.id,
+      name: 'save',
+      qualifiedName: 'save',
+      type: 'function' as const,
+      filePath: 'src/b.ts',
+    };
 
-      for (
-        const symbol
-        of [
-          fileA,
-          fileB,
-          fnA,
-          fnB,
-        ]
-      ) {
-        graph.addSymbol(
-          symbol,
-        );
-      }
-
-      graph.addEdge({
-        id:
-          "import",
-
-        projectId:
-          project.id,
-
-        from:
-          fileA.id,
-
-        to:
-          fileB.id,
-
-        type:
-          "IMPORTS",
-      });
-
-      graph.addEdge({
-        id:
-          "call",
-
-        projectId:
-          project.id,
-
-        from:
-          fnA.id,
-
-        to:
-          fnB.id,
-
-        type:
-          "CALLS",
-      });
-
-      const ctx:
-        MCPContext = {
-        project,
-        memory,
-        retrieval,
-        graph,
-
-        references:
-          new ReferenceResolver(
-            graph,
-          ),
-      };
-
-      return {
-        ctx,
-        fnB,
-      };
+    for (const symbol of [fileA, fileB, fnA, fnB]) {
+      graph.addSymbol(symbol);
     }
 
-    it(
-      "traces calls and impact",
-      async () => {
-        const {
-          ctx,
-          fnB,
-        } = setup();
+    graph.addEdge({
+      id: 'import',
 
-        const callers =
-          await traceCalls(
-            ctx,
-            {
-              symbolId:
-                fnB.id,
+      projectId: project.id,
 
-              direction:
-                "callers",
-            },
-          );
+      from: fileA.id,
 
-        expect(
-          callers.results
-            .some(
-              (item) =>
-                item.name ===
-                "main",
-            ),
-        ).toBe(true);
+      to: fileB.id,
 
-        const impact =
-          await analyzeImpact(
-            ctx,
-            {
-              symbolId:
-                fnB.id,
-            },
-          );
+      type: 'IMPORTS',
+    });
 
-        expect(
-          impact.found,
-        ).toBe(true);
+    graph.addEdge({
+      id: 'call',
 
-        expect(
-          impact.impacts.length,
-        ).toBeGreaterThan(0);
-      },
-    );
+      projectId: project.id,
 
-    it(
-      "finds file dependencies",
-      async () => {
-        const {
-          ctx,
-        } = setup();
+      from: fnA.id,
 
-        const result =
-          await findDependencies(
-            ctx,
-            {
-              filePath:
-                "src/a.ts",
-            },
-          );
+      to: fnB.id,
 
-        expect(
-          result.found,
-        ).toBe(true);
+      type: 'CALLS',
+    });
 
-        expect(
-          result.dependencies
-            .some(
-              (item) =>
-                item.filePath ===
-                "src/b.ts",
-            ),
-        ).toBe(true);
-      },
-    );
+    const ctx: MCPContext = {
+      project,
+      memory,
+      retrieval,
+      graph,
 
-    it(
-      "returns architecture",
-      async () => {
-        const {
-          ctx,
-        } = setup();
+      references: new ReferenceResolver(graph),
+    };
 
-        const result =
-          await getProjectArchitecture(
-            ctx,
-          );
+    return {
+      ctx,
+      fnB,
+    };
+  }
 
-        expect(
-          result.architecture.files,
-        ).toBe(2);
+  it('traces calls and impact', async () => {
+    const { ctx, fnB } = setup();
 
-        expect(
-          result.architecture.calls,
-        ).toBe(1);
+    const callers = await traceCalls(ctx, {
+      symbolId: fnB.id,
 
-        expect(
-          result.architecture.imports,
-        ).toBe(1);
-      },
-    );
-  },
-);
+      direction: 'callers',
+    });
+
+    expect(callers.results.some((item) => item.name === 'main')).toBe(true);
+
+    const impact = await analyzeImpact(ctx, {
+      symbolId: fnB.id,
+    });
+
+    expect(impact.found).toBe(true);
+
+    expect(impact.impacts.length).toBeGreaterThan(0);
+  });
+
+  it('finds file dependencies', async () => {
+    const { ctx } = setup();
+
+    const result = await findDependencies(ctx, {
+      filePath: 'src/a.ts',
+    });
+
+    expect(result.found).toBe(true);
+
+    expect(result.dependencies.some((item) => item.filePath === 'src/b.ts')).toBe(true);
+  });
+
+  it('returns architecture', async () => {
+    const { ctx } = setup();
+
+    const result = await getProjectArchitecture(ctx);
+
+    expect(result.architecture.files).toBe(2);
+
+    expect(result.architecture.calls).toBe(1);
+
+    expect(result.architecture.imports).toBe(1);
+  });
+});

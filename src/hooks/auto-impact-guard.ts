@@ -1,104 +1,69 @@
-import {
-  extractEditedFiles,
-} from "../code-intelligence/impact/edit-tool-detector.js";
+import { extractEditedFiles } from '../code-intelligence/impact/edit-tool-detector.js';
 
-import {
-  ImpactGuard,
-} from "../code-intelligence/impact/impact-guard.js";
+import { ImpactGuard } from '../code-intelligence/impact/impact-guard.js';
 
-import type {
-  RiskLevel,
-} from "../code-intelligence/impact/blast-radius.js";
+import type { RiskLevel } from '../code-intelligence/impact/blast-radius.js';
 
-const RISK_ORDER:
-  Record<RiskLevel, number> = {
-    LOW: 0,
-    MEDIUM: 1,
-    HIGH: 2,
-    CRITICAL: 3,
-  };
+const RISK_ORDER: Record<RiskLevel, number> = {
+  LOW: 0,
+  MEDIUM: 1,
+  HIGH: 2,
+  CRITICAL: 3,
+};
 
 export interface FileImpactGuardResult {
   filePath: string;
 
-  risk:
-    RiskLevel;
+  risk: RiskLevel;
 
-  riskScore:
-    number;
+  riskScore: number;
 
-  impactedFiles:
-    string[];
+  impactedFiles: string[];
 
-  suggestedTests:
-    string[];
+  suggestedTests: string[];
 
-  impactedCount:
-    number;
+  impactedCount: number;
 }
 
 export interface AutoImpactGuardResult {
-  triggered:
-    boolean;
+  triggered: boolean;
 
-  tool:
-    string;
+  tool: string;
 
-  highestRisk:
-    RiskLevel;
+  highestRisk: RiskLevel;
 
-  totalRiskScore:
-    number;
+  totalRiskScore: number;
 
-  files:
-    FileImpactGuardResult[];
+  files: FileImpactGuardResult[];
 
-  impactedFiles:
-    string[];
+  impactedFiles: string[];
 
-  suggestedTests:
-    string[];
+  suggestedTests: string[];
 
-  requiresVerification:
-    boolean;
+  requiresVerification: boolean;
 
-  context:
-    string;
+  context: string;
 }
 
 export class AutoImpactGuard {
   constructor(
-    private readonly guard:
-      ImpactGuard,
+    private readonly guard: ImpactGuard,
 
-    private readonly projectId:
-      string,
+    private readonly projectId: string
   ) {}
 
-  async beforeTool(
-    tool: string,
-    input?: unknown,
-  ): Promise<AutoImpactGuardResult> {
-    const paths =
-      extractEditedFiles(
-        tool,
-        input,
-      );
+  async beforeTool(tool: string, input?: unknown): Promise<AutoImpactGuardResult> {
+    const paths = extractEditedFiles(tool, input);
 
-    if (
-      paths.length === 0
-    ) {
+    if (paths.length === 0) {
       return {
-        triggered:
-          false,
+        triggered: false,
 
         tool,
 
-        highestRisk:
-          "LOW",
+        highestRisk: 'LOW',
 
-        totalRiskScore:
-          0,
+        totalRiskScore: 0,
 
         files: [],
 
@@ -106,149 +71,72 @@ export class AutoImpactGuard {
 
         suggestedTests: [],
 
-        requiresVerification:
-          false,
+        requiresVerification: false,
 
-        context: "",
+        context: '',
       };
     }
 
-    const files:
-      FileImpactGuardResult[] =
-      [];
+    const files: FileImpactGuardResult[] = [];
 
-    for (
-      const filePath
-      of paths
-    ) {
-      const result =
-        this.guard.analyzeFile(
-          this.projectId,
-          filePath,
-        );
+    for (const filePath of paths) {
+      const result = this.guard.analyzeFile(this.projectId, filePath);
 
       files.push({
         filePath,
 
-        risk:
-          result.risk,
+        risk: result.risk,
 
-        riskScore:
-          result.riskScore,
+        riskScore: result.riskScore,
 
-        impactedFiles:
-          result.impactedFiles,
+        impactedFiles: result.impactedFiles,
 
-        suggestedTests:
-          result.suggestedTests,
+        suggestedTests: result.suggestedTests,
 
-        impactedCount:
-          result.impacted.length,
+        impactedCount: result.impacted.length,
       });
     }
 
-    let highestRisk:
-      RiskLevel = "LOW";
+    let highestRisk: RiskLevel = 'LOW';
 
-    for (
-      const file
-      of files
-    ) {
-      if (
-        RISK_ORDER[
-          file.risk
-        ] >
-        RISK_ORDER[
-          highestRisk
-        ]
-      ) {
-        highestRisk =
-          file.risk;
+    for (const file of files) {
+      if (RISK_ORDER[file.risk] > RISK_ORDER[highestRisk]) {
+        highestRisk = file.risk;
       }
     }
 
-    const impactedFiles = [
-      ...new Set(
-        files.flatMap(
-          (file) =>
-            file.impactedFiles,
-        ),
-      ),
-    ];
+    const impactedFiles = [...new Set(files.flatMap((file) => file.impactedFiles))];
 
-    const suggestedTests = [
-      ...new Set(
-        files.flatMap(
-          (file) =>
-            file.suggestedTests,
-        ),
-      ),
-    ];
+    const suggestedTests = [...new Set(files.flatMap((file) => file.suggestedTests))];
 
-    const totalRiskScore =
-      files.reduce(
-        (
-          total,
-          file,
-        ) =>
-          total +
-          file.riskScore,
-        0,
-      );
+    const totalRiskScore = files.reduce((total, file) => total + file.riskScore, 0);
 
-    const requiresVerification =
-      highestRisk ===
-        "HIGH" ||
-      highestRisk ===
-        "CRITICAL";
+    const requiresVerification = highestRisk === 'HIGH' || highestRisk === 'CRITICAL';
 
     const lines = [
-      "[TOOLNET IMPACT GUARD]",
+      '[TOOLNET IMPACT GUARD]',
       `Risk: ${highestRisk}`,
       `Risk score: ${totalRiskScore}`,
-      `Files being changed: ${paths.join(", ")}`,
+      `Files being changed: ${paths.join(', ')}`,
       `Impacted files: ${impactedFiles.length}`,
     ];
 
-    if (
-      impactedFiles.length
-    ) {
-      lines.push(
-        "Blast radius:",
-        ...impactedFiles
-          .slice(0, 20)
-          .map(
-            (path) =>
-              `- ${path}`,
-          ),
-      );
+    if (impactedFiles.length) {
+      lines.push('Blast radius:', ...impactedFiles.slice(0, 20).map((path) => `- ${path}`));
     }
 
-    if (
-      suggestedTests.length
-    ) {
-      lines.push(
-        "Verify/tests:",
-        ...suggestedTests
-          .slice(0, 15)
-          .map(
-            (path) =>
-              `- ${path}`,
-          ),
-      );
+    if (suggestedTests.length) {
+      lines.push('Verify/tests:', ...suggestedTests.slice(0, 15).map((path) => `- ${path}`));
     }
 
-    if (
-      requiresVerification
-    ) {
+    if (requiresVerification) {
       lines.push(
-        "IMPORTANT: High blast radius. Inspect affected dependencies and run relevant tests after the edit.",
+        'IMPORTANT: High blast radius. Inspect affected dependencies and run relevant tests after the edit.'
       );
     }
 
     return {
-      triggered:
-        true,
+      triggered: true,
 
       tool,
 
@@ -264,8 +152,7 @@ export class AutoImpactGuard {
 
       requiresVerification,
 
-      context:
-        lines.join("\n"),
+      context: lines.join('\n'),
     };
   }
 }

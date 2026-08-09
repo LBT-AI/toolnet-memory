@@ -1,7 +1,4 @@
-import type {
-  MemoryRecord,
-  MemoryType,
-} from "../core/types.js";
+import type { MemoryRecord, MemoryType } from '../core/types.js';
 
 export interface RetrievalOptions {
   topK?: number;

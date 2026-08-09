@@ -1,37 +1,17 @@
-import {
-  z,
-} from "zod";
+import { z } from 'zod';
 
-import {
-  GraphQueryEngine,
-} from "../../code-intelligence/query/graph-query-engine.js";
+import { GraphQueryEngine } from '../../code-intelligence/query/graph-query-engine.js';
 
-import type {
-  MCPContext,
-} from "../context.js";
+import type { MCPContext } from '../context.js';
 
-import {
-  compactSymbol,
-  resolveGraphSymbol,
-} from "./graph-query-utils.js";
+import { compactSymbol, resolveGraphSymbol } from './graph-query-utils.js';
 
 export const graphNeighborhoodSchema = {
-  symbol:
-    z.string().min(1),
+  symbol: z.string().min(1),
 
-  depth:
-    z.number()
-      .int()
-      .min(1)
-      .max(5)
-      .optional(),
+  depth: z.number().int().min(1).max(5).optional(),
 
-  limit:
-    z.number()
-      .int()
-      .min(1)
-      .max(200)
-      .optional(),
+  limit: z.number().int().min(1).max(200).optional(),
 };
 
 export async function graphNeighborhood(
@@ -40,108 +20,55 @@ export async function graphNeighborhood(
     symbol: string;
     depth?: number;
     limit?: number;
-  },
+  }
 ) {
-  const symbol =
-    resolveGraphSymbol(
-      ctx,
-      input.symbol,
-    );
+  const symbol = resolveGraphSymbol(ctx, input.symbol);
 
   if (!symbol) {
     return {
-      found:
-        false,
+      found: false,
 
-      query:
-        input.symbol,
+      query: input.symbol,
     };
   }
 
-  const query =
-    new GraphQueryEngine(
-      ctx.graph,
-    );
+  const query = new GraphQueryEngine(ctx.graph);
 
-  const result =
-    query.neighborhood(
-      ctx.project.id,
-      symbol.id,
-      input.depth ??
-        1,
-    );
+  const result = query.neighborhood(ctx.project.id, symbol.id, input.depth ?? 1);
 
   if (!result) {
     return {
-      found:
-        false,
+      found: false,
 
-      query:
-        input.symbol,
+      query: input.symbol,
     };
   }
 
-  const limit =
-    input.limit ??
-    50;
+  const limit = input.limit ?? 50;
 
   return {
-    found:
-      true,
+    found: true,
 
-    center:
-      compactSymbol(
-        result.center,
-      ),
+    center: compactSymbol(result.center),
 
-    incomingCount:
-      result.incoming.length,
+    incomingCount: result.incoming.length,
 
-    outgoingCount:
-      result.outgoing.length,
+    outgoingCount: result.outgoing.length,
 
-    incoming:
-      result.incoming
-        .slice(
-          0,
-          limit,
-        )
-        .map(
-          (item) => ({
-            depth:
-              item.depth,
+    incoming: result.incoming.slice(0, limit).map((item) => ({
+      depth: item.depth,
 
-            via:
-              item.via
-                ?.type,
+      via: item.via?.type,
 
-            symbol:
-              compactSymbol(
-                item.symbol,
-              ),
-          }),
-        ),
+      symbol: compactSymbol(item.symbol),
+    })),
 
-    outgoing:
-      result.outgoing
-        .slice(
-          0,
-          limit,
-        )
-        .map(
-          (item) => ({
-            depth:
-              item.depth,
+    outgoing: result.outgoing.slice(0, limit).map((item) => ({
+      depth: item.depth,
 
-            via:
-              item.via
-                ?.type,
+      via: item.via?.type,
 
-            symbol:
-              compactSymbol(
-                item.symbol,
-              ),
-          }),
-        ),
+      symbol: compactSymbol(item.symbol),
+    })),
   };
 }

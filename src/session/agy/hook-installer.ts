@@ -1,165 +1,86 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
-import {
-  homedir,
-} from "node:os";
+import { homedir } from 'node:os';
 
-import {
-  dirname,
-  join,
-} from "node:path";
+import { dirname, join } from 'node:path';
 
 export interface InstallAgyHookOptions {
-  hooksFile?:
-    string;
+  hooksFile?: string;
 
-  binary?:
-    string;
+  binary?: string;
 }
 
-function quote(
-  value: string,
-): string {
-  return `'${value.replace(
-    /'/g,
-    `'\\''`,
-  )}'`;
+function quote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-export function installAgyHooks(
-  options:
-    InstallAgyHookOptions = {},
-): string {
-  const hooksFile =
-    options.hooksFile ??
-    join(
-      homedir(),
-      ".gemini",
-      "config",
-      "hooks.json",
-    );
+export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
+  const hooksFile = options.hooksFile ?? join(homedir(), '.gemini', 'config', 'hooks.json');
 
-  mkdirSync(
-    dirname(
-      hooksFile,
-    ),
-    {
-      recursive: true,
-    },
-  );
+  mkdirSync(dirname(hooksFile), {
+    recursive: true,
+  });
 
-  let root:
-    Record<
-      string,
-      unknown
-    > = {};
+  let root: Record<string, unknown> = {};
 
-  if (
-    existsSync(
-      hooksFile,
-    )
-  ) {
+  if (existsSync(hooksFile)) {
     try {
-      root =
-        JSON.parse(
-          readFileSync(
-            hooksFile,
-            "utf8",
-          ),
-        );
-    } catch (
-      error
-    ) {
+      root = JSON.parse(readFileSync(hooksFile, 'utf8'));
+    } catch (error) {
       throw new Error(
-        `Invalid existing Agy hooks.json: ${
-          error instanceof Error
-            ? error.message
-            : String(
-                error,
-              )
-        }`,
+        `Invalid existing Agy hooks.json: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
 
-  const binary =
-    options.binary ??
-    "toolnet-memory";
+  const binary = options.binary ?? 'toolnet-memory';
 
-  const command =
-    `${quote(binary)} session:agy-hook`;
+  const command = `${quote(binary)} session:agy-hook`;
 
   /*
    * Official Antigravity hook schema.
    * Stop = sync when one execution becomes idle.
    * It is intentionally NOT treated as permanent SessionEnd.
    */
-  root[
-    "toolnet-memory"
-  ] = {
-    enabled:
-      true,
+  root['toolnet-memory'] = {
+    enabled: true,
 
     PreInvocation: [
       {
-        type:
-          "command",
+        type: 'command',
 
-        command:
-          `${command} pre`,
+        command: `${command} pre`,
 
-        timeout:
-          15,
+        timeout: 15,
       },
     ],
 
     PostInvocation: [
       {
-        type:
-          "command",
+        type: 'command',
 
-        command:
-          `${command} post`,
+        command: `${command} post`,
 
-        timeout:
-          15,
+        timeout: 15,
       },
     ],
 
     Stop: [
       {
-        type:
-          "command",
+        type: 'command',
 
-        command:
-          `${command} stop`,
+        command: `${command} stop`,
 
-        timeout:
-          30,
+        timeout: 30,
       },
     ],
   };
 
-  writeFileSync(
-    hooksFile,
-    JSON.stringify(
-      root,
-      null,
-      2,
-    ) + "\n",
-    {
-      encoding:
-        "utf8",
+  writeFileSync(hooksFile, JSON.stringify(root, null, 2) + '\n', {
+    encoding: 'utf8',
 
-      mode:
-        0o600,
-    },
-  );
+    mode: 0o600,
+  });
 
   return hooksFile;
 }

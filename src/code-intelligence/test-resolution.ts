@@ -1,9 +1,6 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  loadConfig,
-  ProjectManager,
-} from "../core/index.js";
+import { loadConfig, ProjectManager } from '../core/index.js';
 
 import {
   createStorageProvider,
@@ -11,147 +8,86 @@ import {
   ProjectScopedStorageProvider,
   PersistentCodeGraphStore,
   PersistentTypeResolutionStore,
-} from "../storage/index.js";
+} from '../storage/index.js';
 
-import {
-  CodeGraphStore,
-  TypeScriptTypeResolver,
-} from "./index.js";
+import { CodeGraphStore, TypeScriptTypeResolver } from './index.js';
 
 async function main() {
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
-  const project =
-    new ProjectManager()
-      .detect();
+  const project = new ProjectManager().detect();
 
-  const rawStorage =
-    withStorageRetry(
-      createStorageProvider({
-        provider:
-          config.storage.provider,
+  const rawStorage = withStorageRetry(
+    createStorageProvider({
+      provider: config.storage.provider,
 
-        huggingface:
-          config.storage.huggingface,
+      huggingface: config.storage.huggingface,
 
-        localRoot:
-          config.storage.localRoot,
-      }),
-      {
-        attempts: 3,
-      },
-    );
+      localRoot: config.storage.localRoot,
+    }),
+    {
+      attempts: 3,
+    }
+  );
 
-  const storage =
-    new ProjectScopedStorageProvider(
-      rawStorage,
-      project.id,
-      project.name,
-      project.remote ?? project.name,
-    );
+  const storage = new ProjectScopedStorageProvider(
+    rawStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
 
-  const graphSnapshot =
-    await new PersistentCodeGraphStore(
-      storage,
-    ).load(
-      project.id,
-    );
+  const graphSnapshot = await new PersistentCodeGraphStore(storage).load(project.id);
 
   if (!graphSnapshot) {
-    throw new Error(
-      "Code graph missing. Run code:index:test first.",
-    );
+    throw new Error('Code graph missing. Run code:index:test first.');
   }
 
-  const graph =
-    new CodeGraphStore();
+  const graph = new CodeGraphStore();
 
-  graph.import(
-    graphSnapshot.symbols,
-    graphSnapshot.edges,
-  );
+  graph.import(graphSnapshot.symbols, graphSnapshot.edges);
 
-  const resolver =
-    new TypeScriptTypeResolver(
-      graph,
-    );
+  const resolver = new TypeScriptTypeResolver(graph);
 
-  const resolution =
-    await resolver.resolveProject(
-      project.id,
-      project.rootPath,
-    );
+  const resolution = await resolver.resolveProject(project.id, project.rootPath);
 
-  await new PersistentTypeResolutionStore(
-    storage,
-  ).save(
-    resolution,
-  );
+  await new PersistentTypeResolutionStore(storage).save(resolution);
 
   console.log({
     ok: true,
 
-    project:
-      project.name,
+    project: project.name,
 
-    total:
-      resolution.total,
+    total: resolution.total,
 
-    exact:
-      resolution.exact,
+    exact: resolution.exact,
 
-    high:
-      resolution.high,
+    high: resolution.high,
 
-    fallback:
-      resolution.fallback,
+    fallback: resolution.fallback,
 
-    exactRate:
-      resolution.total
-        ? Number(
-            (
-              (
-                resolution.exact /
-                resolution.total
-              ) *
-              100
-            ).toFixed(2),
-          )
-        : 0,
+    exactRate: resolution.total
+      ? Number(((resolution.exact / resolution.total) * 100).toFixed(2))
+      : 0,
 
-    samples:
-      resolution.resolutions
-        .filter(
-          (item) =>
-            item.targetFile,
-        )
-        .slice(0, 10)
-        .map(
-          (item) => ({
-            expression:
-              item.expression,
+    samples: resolution.resolutions
+      .filter((item) => item.targetFile)
+      .slice(0, 10)
+      .map((item) => ({
+        expression: item.expression,
 
-            from:
-              `${item.sourceFile}:${item.sourceLine}`,
+        from: `${item.sourceFile}:${item.sourceLine}`,
 
-            to:
-              `${item.targetFile}:${item.targetLine ?? "?"}`,
+        to: `${item.targetFile}:${item.targetLine ?? '?'}`,
 
-            target:
-              item.targetQualifiedName ??
-              item.targetName,
+        target: item.targetQualifiedName ?? item.targetName,
 
-            confidence:
-              item.confidence,
-          }),
-        ),
+        confidence: item.confidence,
+      })),
   });
 }
 
-main().catch(
-  (error) => {
-    console.error(error);
-    process.exit(1);
-  },
-);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

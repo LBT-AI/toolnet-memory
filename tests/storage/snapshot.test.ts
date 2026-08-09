@@ -1,183 +1,81 @@
-import {
-  mkdtemp,
-  rm,
-} from "node:fs/promises";
+import { mkdtemp, rm } from 'node:fs/promises';
 
-import {
-  tmpdir,
-} from "node:os";
+import { tmpdir } from 'node:os';
 
-import {
-  join,
-} from "node:path";
+import { join } from 'node:path';
 
-import {
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import {
-  LocalStorageProvider,
-} from "../../src/storage/local/client.js";
+import { LocalStorageProvider } from '../../src/storage/local/client.js';
 
-import {
-  SnapshotManager,
-} from "../../src/snapshot/manager.js";
+import { SnapshotManager } from '../../src/snapshot/manager.js';
 
-describe(
-  "Snapshot Manager",
-  () => {
-    it(
-      "creates and restores project state",
-      async () => {
-        const dir =
-          await mkdtemp(
-            join(
-              tmpdir(),
-              "toolnet-snapshot-",
-            ),
-          );
+describe('Snapshot Manager', () => {
+  it('creates and restores project state', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'toolnet-snapshot-'));
 
-        try {
-          const storage =
-            new LocalStorageProvider(
-              dir,
-            );
+    try {
+      const storage = new LocalStorageProvider(dir);
 
-          const key =
-            "projects/test/memories/current.json";
+      const key = 'projects/test/memories/current.json';
 
-          await storage.put(
-            key,
-            JSON.stringify({
-              value:
-                "before",
-            }),
-          );
+      await storage.put(
+        key,
+        JSON.stringify({
+          value: 'before',
+        })
+      );
 
-          const manager =
-            new SnapshotManager(
-              storage,
-            );
+      const manager = new SnapshotManager(storage);
 
-          const snapshot =
-            await manager.create(
-              "test",
-              "test",
-            );
+      const snapshot = await manager.create('test', 'test');
 
-          expect(
-            snapshot,
-          ).toBeTruthy();
+      expect(snapshot).toBeTruthy();
 
-          await storage.put(
-            key,
-            JSON.stringify({
-              value:
-                "after",
-            }),
-          );
+      await storage.put(
+        key,
+        JSON.stringify({
+          value: 'after',
+        })
+      );
 
-          await manager.restore(
-            "test",
-            snapshot!.id,
-          );
+      await manager.restore('test', snapshot!.id);
 
-          const restored =
-            JSON.parse(
-              (
-                await storage.getText(
-                  key,
-                )
-              )!,
-            );
+      const restored = JSON.parse((await storage.getText(key))!);
 
-          expect(
-            restored.value,
-          ).toBe(
-            "before",
-          );
-        } finally {
-          await rm(
-            dir,
-            {
-              recursive: true,
-              force: true,
-            },
-          );
-        }
-      },
-    );
+      expect(restored.value).toBe('before');
+    } finally {
+      await rm(dir, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
 
-    it(
-      "prunes old snapshots",
-      async () => {
-        const dir =
-          await mkdtemp(
-            join(
-              tmpdir(),
-              "toolnet-snapshot-",
-            ),
-          );
+  it('prunes old snapshots', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'toolnet-snapshot-'));
 
-        try {
-          const storage =
-            new LocalStorageProvider(
-              dir,
-            );
+    try {
+      const storage = new LocalStorageProvider(dir);
 
-          await storage.put(
-            "projects/test/memories/current.json",
-            "{}",
-          );
+      await storage.put('projects/test/memories/current.json', '{}');
 
-          const manager =
-            new SnapshotManager(
-              storage,
-            );
+      const manager = new SnapshotManager(storage);
 
-          for (
-            let i = 0;
-            i < 3;
-            i++
-          ) {
-            await new Promise(
-              (resolve) =>
-                setTimeout(
-                  resolve,
-                  5,
-                ),
-            );
+      for (let i = 0; i < 3; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
 
-            await manager.create(
-              "test",
-              `snapshot-${i}`,
-            );
-          }
+        await manager.create('test', `snapshot-${i}`);
+      }
 
-          await manager.prune(
-            "test",
-            2,
-          );
+      await manager.prune('test', 2);
 
-          expect(
-            (
-              await manager.list(
-                "test",
-              )
-            ).length,
-          ).toBe(2);
-        } finally {
-          await rm(
-            dir,
-            {
-              recursive: true,
-              force: true,
-            },
-          );
-        }
-      },
-    );
-  },
-);
+      expect((await manager.list('test')).length).toBe(2);
+    } finally {
+      await rm(dir, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+});

@@ -1,15 +1,7 @@
-import type {
-  SearchQuery,
-  SearchResult,
-} from "../core/types.js";
+import type { SearchQuery, SearchResult } from '../core/types.js';
 
-import {
-  MemoryEngine,
-} from "../core/memory-engine.js";
+import { MemoryEngine } from '../core/memory-engine.js';
 
-export function searchMemory(
-  engine: MemoryEngine,
-  query: SearchQuery,
-): SearchResult[] {
+export function searchMemory(engine: MemoryEngine, query: SearchQuery): SearchResult[] {
   return engine.search(query);
 }

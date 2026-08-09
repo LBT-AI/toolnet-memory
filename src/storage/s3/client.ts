@@ -5,14 +5,11 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
-} from "@aws-sdk/client-s3";
+} from '@aws-sdk/client-s3';
 
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-import type {
-  StorageObject,
-  StorageProvider,
-} from "../types.js";
+import type { StorageObject, StorageProvider } from '../types.js';
 
 export interface S3StorageOptions {
   name?: string;
@@ -24,24 +21,22 @@ export interface S3StorageOptions {
   secretAccessKey: string;
 }
 
-export class S3StorageProvider
-  implements StorageProvider
-{
+export class S3StorageProvider implements StorageProvider {
   readonly name: string;
 
   private readonly client: S3Client;
   private readonly bucket: string;
 
   constructor(options: S3StorageOptions) {
-    this.name = options.name ?? "s3";
+    this.name = options.name ?? 's3';
     this.bucket = options.bucket;
 
     this.client = new S3Client({
-      region: options.region ?? "us-east-1",
+      region: options.region ?? 'us-east-1',
       endpoint: options.endpoint || undefined,
       forcePathStyle: options.forcePathStyle ?? false,
-      requestChecksumCalculation: "WHEN_REQUIRED",
-      responseChecksumValidation: "WHEN_REQUIRED",
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
       credentials: {
         accessKeyId: options.accessKeyId,
         secretAccessKey: options.secretAccessKey,
@@ -52,12 +47,9 @@ export class S3StorageProvider
   async put(
     key: string,
     data: string | Uint8Array,
-    contentType = "application/octet-stream",
+    contentType = 'application/octet-stream'
   ): Promise<void> {
-    const body =
-      typeof data === "string"
-        ? Buffer.from(data, "utf8")
-        : data;
+    const body = typeof data === 'string' ? Buffer.from(data, 'utf8') : data;
 
     await this.client.send(
       new PutObjectCommand({
@@ -65,7 +57,7 @@ export class S3StorageProvider
         Key: key,
         Body: body,
         ContentType: contentType,
-      }),
+      })
     );
   }
 
@@ -76,11 +68,11 @@ export class S3StorageProvider
         Bucket: this.bucket,
         Key: key,
       }),
-      { expiresIn: 60 },
+      { expiresIn: 60 }
     );
 
     const response = await fetch(signedUrl, {
-      redirect: "follow",
+      redirect: 'follow',
     });
 
     if (response.status === 404) {
@@ -88,14 +80,10 @@ export class S3StorageProvider
     }
 
     if (!response.ok) {
-      throw new Error(
-        `${this.name} download failed: ${response.status} ${response.statusText}`,
-      );
+      throw new Error(`${this.name} download failed: ${response.status} ${response.statusText}`);
     }
 
-    return new Uint8Array(
-      await response.arrayBuffer(),
-    );
+    return new Uint8Array(await response.arrayBuffer());
   }
 
   async getText(key: string): Promise<string | null> {
@@ -105,7 +93,7 @@ export class S3StorageProvider
       return null;
     }
 
-    return Buffer.from(data).toString("utf8");
+    return Buffer.from(data).toString('utf8');
   }
 
   async exists(key: string): Promise<boolean> {
@@ -114,16 +102,12 @@ export class S3StorageProvider
         new HeadObjectCommand({
           Bucket: this.bucket,
           Key: key,
-        }),
+        })
       );
 
       return true;
     } catch (error: unknown) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "$metadata" in error
-      ) {
+      if (typeof error === 'object' && error !== null && '$metadata' in error) {
         const status = (
           error as {
             $metadata?: {
@@ -146,11 +130,11 @@ export class S3StorageProvider
       new DeleteObjectCommand({
         Bucket: this.bucket,
         Key: key,
-      }),
+      })
     );
   }
 
-  async list(prefix = ""): Promise<StorageObject[]> {
+  async list(prefix = ''): Promise<StorageObject[]> {
     const output: StorageObject[] = [];
     let continuationToken: string | undefined;
 
@@ -160,7 +144,7 @@ export class S3StorageProvider
           Bucket: this.bucket,
           Prefix: prefix || undefined,
           ContinuationToken: continuationToken,
-        }),
+        })
       );
 
       for (const item of response.Contents ?? []) {
@@ -175,9 +159,7 @@ export class S3StorageProvider
         });
       }
 
-      continuationToken = response.IsTruncated
-        ? response.NextContinuationToken
-        : undefined;
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
     } while (continuationToken);
 
     return output;

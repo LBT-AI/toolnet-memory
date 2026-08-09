@@ -1,24 +1,15 @@
-import type { StorageProvider } from "./types.js";
-import type { CodeManifest } from "../code-intelligence/incremental/manifest.js";
+import type { StorageProvider } from './types.js';
+import type { CodeManifest } from '../code-intelligence/incremental/manifest.js';
 
 export class PersistentCodeManifestStore {
-  constructor(
-    private readonly storage: StorageProvider,
-  ) {}
+  constructor(private readonly storage: StorageProvider) {}
 
   private key(projectId: string): string {
-    return [
-      "projects",
-      projectId,
-      "graph",
-      "manifest.json",
-    ].join("/");
+    return ['projects', projectId, 'graph', 'manifest.json'].join('/');
   }
 
   async load(projectId: string): Promise<CodeManifest | null> {
-    const text = await this.storage.getText(
-      this.key(projectId),
-    );
+    const text = await this.storage.getText(this.key(projectId));
 
     if (!text) {
       return null;
@@ -31,7 +22,7 @@ export class PersistentCodeManifestStore {
     await this.storage.put(
       this.key(manifest.projectId),
       JSON.stringify(manifest),
-      "application/json",
+      'application/json'
     );
   }
 }

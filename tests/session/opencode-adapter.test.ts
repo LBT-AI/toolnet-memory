@@ -1,214 +1,92 @@
-import {
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 
-import {
-  tmpdir,
-} from "node:os";
+import { tmpdir } from 'node:os';
 
-import {
-  join,
-} from "node:path";
+import { join } from 'node:path';
 
-import {
-  DatabaseSync,
-} from "node:sqlite";
+import { DatabaseSync } from 'node:sqlite';
 
-import {
-  afterEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterEach, describe, expect, it } from 'vitest';
 
-import type {
-  ProjectManifest,
-} from "../../src/core/types.js";
+import type { ProjectManifest } from '../../src/core/types.js';
 
-import type {
-  StorageObject,
-  StorageProvider,
-} from "../../src/storage/types.js";
+import type { StorageObject, StorageProvider } from '../../src/storage/types.js';
 
-import {
-  syncOpenCodeSession,
-} from "../../src/session/opencode/index.js";
+import { syncOpenCodeSession } from '../../src/session/opencode/index.js';
 
-class MemoryStorage
-  implements StorageProvider
-{
-  readonly name =
-    "memory";
+class MemoryStorage implements StorageProvider {
+  readonly name = 'memory';
 
-  readonly objects =
-    new Map<
-      string,
-      Uint8Array
-    >();
+  readonly objects = new Map<string, Uint8Array>();
 
-  async put(
-    key: string,
-    data:
-      string |
-      Uint8Array,
-  ) {
-    this.objects.set(
-      key,
-      typeof data ===
-        "string"
-        ? Buffer.from(
-            data,
-          )
-        : data,
-    );
+  async put(key: string, data: string | Uint8Array) {
+    this.objects.set(key, typeof data === 'string' ? Buffer.from(data) : data);
   }
 
-  async get(
-    key: string,
-  ) {
-    return (
-      this.objects.get(
+  async get(key: string) {
+    return this.objects.get(key) ?? null;
+  }
+
+  async getText(key: string) {
+    const data = await this.get(key);
+
+    return data ? Buffer.from(data).toString('utf8') : null;
+  }
+
+  async exists(key: string) {
+    return this.objects.has(key);
+  }
+
+  async delete(key: string) {
+    this.objects.delete(key);
+  }
+
+  async list(prefix = ''): Promise<StorageObject[]> {
+    return Array.from(this.objects.entries())
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, data]) => ({
         key,
-      ) ??
-      null
-    );
-  }
-
-  async getText(
-    key: string,
-  ) {
-    const data =
-      await this.get(
-        key,
-      );
-
-    return data
-      ? Buffer.from(
-          data,
-        ).toString(
-          "utf8",
-        )
-      : null;
-  }
-
-  async exists(
-    key: string,
-  ) {
-    return this.objects.has(
-      key,
-    );
-  }
-
-  async delete(
-    key: string,
-  ) {
-    this.objects.delete(
-      key,
-    );
-  }
-
-  async list(
-    prefix = "",
-  ): Promise<
-    StorageObject[]
-  > {
-    return Array.from(
-      this.objects.entries(),
-    )
-      .filter(
-        ([key]) =>
-          key.startsWith(
-            prefix,
-          ),
-      )
-      .map(
-        (
-          [key, data],
-        ) => ({
-          key,
-          size:
-            data.byteLength,
-        }),
-      );
+        size: data.byteLength,
+      }));
   }
 }
 
-const roots:
-  string[] = [];
+const roots: string[] = [];
 
-function createProject():
-  ProjectManifest {
-  const root =
-    mkdtempSync(
-      join(
-        tmpdir(),
-        "tn-opencode-project-",
-      ),
-    );
+function createProject(): ProjectManifest {
+  const root = mkdtempSync(join(tmpdir(), 'tn-opencode-project-'));
 
-  roots.push(
-    root,
-  );
+  roots.push(root);
 
-  const now =
-    new Date()
-      .toISOString();
+  const now = new Date().toISOString();
 
   return {
-    id:
-      "project-opencode-test",
+    id: 'project-opencode-test',
 
-    name:
-      "test-project",
+    name: 'test-project',
 
-    remote:
-      "test-project",
+    remote: 'test-project',
 
-    rootPath:
-      root,
+    rootPath: root,
 
-    createdAt:
-      now,
+    createdAt: now,
 
-    updatedAt:
-      now,
+    updatedAt: now,
 
-    graphVersion:
-      0,
+    graphVersion: 0,
 
-    memoryVersion:
-      0,
+    memoryVersion: 0,
   };
 }
 
-function createDatabase(
-  project:
-    ProjectManifest,
-) {
-  const directory =
-    mkdtempSync(
-      join(
-        tmpdir(),
-        "tn-opencode-db-",
-      ),
-    );
+function createDatabase(project: ProjectManifest) {
+  const directory = mkdtempSync(join(tmpdir(), 'tn-opencode-db-'));
 
-  roots.push(
-    directory,
-  );
+  roots.push(directory);
 
-  const path =
-    join(
-      directory,
-      "opencode.db",
-    );
+  const path = join(directory, 'opencode.db');
 
-  const db =
-    new DatabaseSync(
-      path,
-    );
+  const db = new DatabaseSync(path);
 
   db.exec(`
     CREATE TABLE project (
@@ -263,41 +141,29 @@ function createDatabase(
     `
     INSERT INTO project
     VALUES (?, ?, ?, ?, ?)
-    `,
-  ).run(
-    "oc-project",
-    project.rootPath,
-    "test",
-    1000,
-    1000,
-  );
+    `
+  ).run('oc-project', project.rootPath, 'test', 1000, 1000);
 
   db.prepare(
     `
     INSERT INTO project_directory
     VALUES (?, ?, ?, ?, ?)
-    `,
-  ).run(
-    "oc-project",
-    project.rootPath,
-    "worktree",
-    "default",
-    1000,
-  );
+    `
+  ).run('oc-project', project.rootPath, 'worktree', 'default', 1000);
 
   db.prepare(
     `
     INSERT INTO session
     VALUES (?, ?, ?, ?, ?, ?, ?)
-    `,
+    `
   ).run(
-    "ses_test",
-    "oc-project",
+    'ses_test',
+    'oc-project',
     project.rootPath,
     project.rootPath,
-    "Test conversation",
+    'Test conversation',
     1000,
-    2000,
+    2000
   );
 
   return {
@@ -306,344 +172,216 @@ function createDatabase(
   };
 }
 
-afterEach(
-  () => {
-    while (
-      roots.length
-    ) {
-      rmSync(
-        roots.pop()!,
-        {
-          recursive:
-            true,
+afterEach(() => {
+  while (roots.length) {
+    rmSync(roots.pop()!, {
+      recursive: true,
 
-          force:
-            true,
+      force: true,
+    });
+  }
+});
+
+describe('OpenCode adapter', () => {
+  it('imports message + part incrementally with native session ID', async () => {
+    const project = createProject();
+
+    const storage = new MemoryStorage();
+
+    const { db, path } = createDatabase(project);
+
+    db.prepare(
+      `
+          INSERT INTO message
+          VALUES (?, ?, ?, ?, ?)
+          `
+    ).run(
+      'msg_1',
+      'ses_test',
+      1100,
+      1100,
+      JSON.stringify({
+        role: 'user',
+
+        path: {
+          cwd: project.rootPath,
+
+          root: project.rootPath,
         },
-      );
-    }
-  },
-);
-
-describe(
-  "OpenCode adapter",
-  () => {
-    it(
-      "imports message + part incrementally with native session ID",
-      async () => {
-        const project =
-          createProject();
-
-        const storage =
-          new MemoryStorage();
-
-        const {
-          db,
-          path,
-        } =
-          createDatabase(
-            project,
-          );
-
-        db.prepare(
-          `
-          INSERT INTO message
-          VALUES (?, ?, ?, ?, ?)
-          `,
-        ).run(
-          "msg_1",
-          "ses_test",
-          1100,
-          1100,
-          JSON.stringify({
-            role:
-              "user",
-
-            path: {
-              cwd:
-                project.rootPath,
-
-              root:
-                project.rootPath,
-            },
-          }),
-        );
-
-        db.prepare(
-          `
-          INSERT INTO part
-          VALUES (?, ?, ?, ?, ?, ?)
-          `,
-        ).run(
-          "part_1",
-          "msg_1",
-          "ses_test",
-          1200,
-          1200,
-          JSON.stringify({
-            type:
-              "text",
-
-            text:
-              "hello",
-          }),
-        );
-
-        db.close();
-
-        const first =
-          await syncOpenCodeSession({
-            project,
-            storage,
-
-            nativeSessionId:
-              "ses_test",
-
-            dbPath:
-              path,
-
-            idle:
-              true,
-          });
-
-        expect(
-          first
-            .importedMessages,
-        ).toBe(
-          1,
-        );
-
-        expect(
-          first
-            .importedParts,
-        ).toBe(
-          1,
-        );
-
-        expect(
-          first.eventCount,
-        ).toBe(
-          4,
-        );
-
-        /*
-         * Same source state:
-         * nothing should be duplicated.
-         */
-        const second =
-          await syncOpenCodeSession({
-            project,
-            storage,
-
-            nativeSessionId:
-              "ses_test",
-
-            dbPath:
-              path,
-
-            idle:
-              true,
-          });
-
-        expect(
-          second
-            .importedMessages,
-        ).toBe(
-          0,
-        );
-
-        expect(
-          second
-            .importedParts,
-        ).toBe(
-          0,
-        );
-
-        expect(
-          second.eventCount,
-        ).toBe(
-          4,
-        );
-      },
+      })
     );
 
-    it(
-      "captures updated rows and redacts secrets",
-      async () => {
-        const project =
-          createProject();
-
-        const storage =
-          new MemoryStorage();
-
-        const {
-          db,
-          path,
-        } =
-          createDatabase(
-            project,
-          );
-
-        db.prepare(
-          `
-          INSERT INTO message
-          VALUES (?, ?, ?, ?, ?)
-          `,
-        ).run(
-          "msg_1",
-          "ses_test",
-          1100,
-          1100,
-          JSON.stringify({
-            role:
-              "assistant",
-          }),
-        );
-
-        db.prepare(
-          `
+    db.prepare(
+      `
           INSERT INTO part
           VALUES (?, ?, ?, ?, ?, ?)
-          `,
-        ).run(
-          "part_1",
-          "msg_1",
-          "ses_test",
-          1200,
-          1200,
-          JSON.stringify({
-            type:
-              "tool",
+          `
+    ).run(
+      'part_1',
+      'msg_1',
+      'ses_test',
+      1200,
+      1200,
+      JSON.stringify({
+        type: 'text',
 
-            tool:
-              "bash",
-
-            token:
-              "super-secret-token",
-
-            state: {
-              input: {
-                command:
-                  "echo hello",
-              },
-
-              output:
-                "done",
-            },
-          }),
-        );
-
-        db.close();
-
-        await syncOpenCodeSession({
-          project,
-          storage,
-
-          nativeSessionId:
-            "ses_test",
-
-          dbPath:
-            path,
-        });
-
-        const remoteText =
-          Array.from(
-            storage.objects
-              .values(),
-          )
-            .map(
-              value =>
-                Buffer.from(
-                  value,
-                ).toString(
-                  "utf8",
-                ),
-            )
-            .join(
-              "\n",
-            );
-
-        expect(
-          remoteText,
-        ).not.toContain(
-          "super-secret-token",
-        );
-
-        expect(
-          remoteText,
-        ).toContain(
-          "[REDACTED]",
-        );
-      },
+        text: 'hello',
+      })
     );
 
-    it(
-      "refuses cross-project session capture",
-      async () => {
-        const project =
-          createProject();
+    db.close();
 
-        const storage =
-          new MemoryStorage();
+    const first = await syncOpenCodeSession({
+      project,
+      storage,
 
-        const {
-          db,
-          path,
-        } =
-          createDatabase(
-            project,
-          );
+      nativeSessionId: 'ses_test',
 
-        db.prepare(
+      dbPath: path,
+
+      idle: true,
+    });
+
+    expect(first.importedMessages).toBe(1);
+
+    expect(first.importedParts).toBe(1);
+
+    expect(first.eventCount).toBe(4);
+
+    /*
+     * Same source state:
+     * nothing should be duplicated.
+     */
+    const second = await syncOpenCodeSession({
+      project,
+      storage,
+
+      nativeSessionId: 'ses_test',
+
+      dbPath: path,
+
+      idle: true,
+    });
+
+    expect(second.importedMessages).toBe(0);
+
+    expect(second.importedParts).toBe(0);
+
+    expect(second.eventCount).toBe(4);
+  });
+
+  it('captures updated rows and redacts secrets', async () => {
+    const project = createProject();
+
+    const storage = new MemoryStorage();
+
+    const { db, path } = createDatabase(project);
+
+    db.prepare(
+      `
+          INSERT INTO message
+          VALUES (?, ?, ?, ?, ?)
           `
+    ).run(
+      'msg_1',
+      'ses_test',
+      1100,
+      1100,
+      JSON.stringify({
+        role: 'assistant',
+      })
+    );
+
+    db.prepare(
+      `
+          INSERT INTO part
+          VALUES (?, ?, ?, ?, ?, ?)
+          `
+    ).run(
+      'part_1',
+      'msg_1',
+      'ses_test',
+      1200,
+      1200,
+      JSON.stringify({
+        type: 'tool',
+
+        tool: 'bash',
+
+        token: 'super-secret-token',
+
+        state: {
+          input: {
+            command: 'echo hello',
+          },
+
+          output: 'done',
+        },
+      })
+    );
+
+    db.close();
+
+    await syncOpenCodeSession({
+      project,
+      storage,
+
+      nativeSessionId: 'ses_test',
+
+      dbPath: path,
+    });
+
+    const remoteText = Array.from(storage.objects.values())
+      .map((value) => Buffer.from(value).toString('utf8'))
+      .join('\n');
+
+    expect(remoteText).not.toContain('super-secret-token');
+
+    expect(remoteText).toContain('[REDACTED]');
+  });
+
+  it('refuses cross-project session capture', async () => {
+    const project = createProject();
+
+    const storage = new MemoryStorage();
+
+    const { db, path } = createDatabase(project);
+
+    db.prepare(
+      `
           UPDATE session
           SET directory = ?
           WHERE id = ?
-          `,
-        ).run(
-          "/completely/different/project",
-          "ses_test",
-        );
-
-        db.prepare(
           `
+    ).run('/completely/different/project', 'ses_test');
+
+    db.prepare(
+      `
           UPDATE project
           SET worktree = ?
           WHERE id = ?
-          `,
-        ).run(
-          "/completely/different/project",
-          "oc-project",
-        );
-
-        db.prepare(
           `
+    ).run('/completely/different/project', 'oc-project');
+
+    db.prepare(
+      `
           UPDATE project_directory
           SET directory = ?
           WHERE project_id = ?
-          `,
-        ).run(
-          "/completely/different/project",
-          "oc-project",
-        );
+          `
+    ).run('/completely/different/project', 'oc-project');
 
-        db.close();
+    db.close();
 
-        await expect(
-          syncOpenCodeSession({
-            project,
-            storage,
+    await expect(
+      syncOpenCodeSession({
+        project,
+        storage,
 
-            nativeSessionId:
-              "ses_test",
+        nativeSessionId: 'ses_test',
 
-            dbPath:
-              path,
-          }),
-        ).rejects.toThrow(
-          "does not belong",
-        );
-      },
-    );
-  },
-);
+        dbPath: path,
+      })
+    ).rejects.toThrow('does not belong');
+  });
+});

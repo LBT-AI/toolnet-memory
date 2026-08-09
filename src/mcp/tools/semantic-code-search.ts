@@ -1,21 +1,11 @@
-import {
-  z,
-} from "zod";
+import { z } from 'zod';
 
-import type {
-  MCPContext,
-} from "../context.js";
+import type { MCPContext } from '../context.js';
 
 export const semanticCodeSearchSchema = {
-  query:
-    z.string().min(1),
+  query: z.string().min(1),
 
-  limit:
-    z.number()
-      .int()
-      .min(1)
-      .max(20)
-      .optional(),
+  limit: z.number().int().min(1).max(20).optional(),
 };
 
 export async function semanticCodeSearch(
@@ -23,59 +13,40 @@ export async function semanticCodeSearch(
   input: {
     query: string;
     limit?: number;
-  },
+  }
 ) {
-  if (
-    !ctx.codeSemantic
-  ) {
+  if (!ctx.codeSemantic) {
     return {
       available: false,
       results: [],
     };
   }
 
-  const results =
-    await ctx.codeSemantic.search(
-      input.query,
-      input.limit ?? 8,
-    );
+  const results = await ctx.codeSemantic.search(input.query, input.limit ?? 8);
 
   return {
     available: true,
 
-    results:
-      results.map(
-        (result) => ({
-          id:
-            result.chunk.id,
+    results: results.map((result) => ({
+      id: result.chunk.id,
 
-          filePath:
-            result.chunk.filePath,
+      filePath: result.chunk.filePath,
 
-          symbol:
-            result.chunk.symbolName,
+      symbol: result.chunk.symbolName,
 
-          symbolType:
-            result.chunk.symbolType,
+      symbolType: result.chunk.symbolType,
 
-          startLine:
-            result.chunk.startLine,
+      startLine: result.chunk.startLine,
 
-          endLine:
-            result.chunk.endLine,
+      endLine: result.chunk.endLine,
 
-          score:
-            result.score,
+      score: result.score,
 
-          vectorScore:
-            result.vectorScore,
+      vectorScore: result.vectorScore,
 
-          lexicalScore:
-            result.lexicalScore,
+      lexicalScore: result.lexicalScore,
 
-          content:
-            result.chunk.content,
-        }),
-      ),
+      content: result.chunk.content,
+    })),
   };
 }

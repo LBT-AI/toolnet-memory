@@ -1,42 +1,27 @@
-import {
-  randomUUID,
-} from "node:crypto";
+import { randomUUID } from 'node:crypto';
 
-import type {
-  ActivityEvent,
-} from "../core/types.js";
+import type { ActivityEvent } from '../core/types.js';
 
-import {
-  EventQueue,
-} from "./event-queue.js";
+import { EventQueue } from './event-queue.js';
 
-import { Sanitizer } from "../security/sanitizer.js";
+import { Sanitizer } from '../security/sanitizer.js';
 
 export class ActivityCapture {
-  private readonly sanitizer =
-    new Sanitizer();
+  private readonly sanitizer = new Sanitizer();
 
-  constructor(
-    private readonly queue:
-      EventQueue,
-  ) {}
+  constructor(private readonly queue: EventQueue) {}
 
   capture(
     projectId: string,
-    type: ActivityEvent["type"],
-    data: Record<string, unknown> = {},
+    type: ActivityEvent['type'],
+    data: Record<string, unknown> = {}
   ): ActivityEvent {
-    const event:
-      ActivityEvent = {
+    const event: ActivityEvent = {
       id: randomUUID(),
       projectId,
       type,
-      timestamp:
-        new Date().toISOString(),
-      data:
-        this.sanitizer
-          .sanitizeValue(data) as
-          Record<string, unknown>,
+      timestamp: new Date().toISOString(),
+      data: this.sanitizer.sanitizeValue(data) as Record<string, unknown>,
     };
 
     this.queue.push(event);

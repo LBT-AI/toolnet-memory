@@ -6,10 +6,19 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { buildFastProjectContext, syncAgentInstructionFiles, hashContext, findProjectRoot } from './fast-context.js';
+import {
+  buildFastProjectContext,
+  syncAgentInstructionFiles,
+  hashContext,
+  findProjectRoot,
+} from './fast-context.js';
 import { refreshStartupBriefCache } from './brief-cache.js';
 import { ProjectManager, loadConfig } from '../core/index.js';
-import { createStorageProvider, ProjectScopedStorageProvider, withStorageRetry } from '../storage/index.js';
+import {
+  createStorageProvider,
+  ProjectScopedStorageProvider,
+  withStorageRetry,
+} from '../storage/index.js';
 
 interface CliOptions {
   project?: string;
@@ -67,7 +76,7 @@ async function main() {
 
 async function handlePrint(options: CliOptions) {
   const context = buildFastProjectContext({ projectPath: options.project });
-  
+
   if (!context) {
     console.error('No ToolNet project found. Run toolnet-memory init first.');
     process.exit(1);
@@ -78,7 +87,7 @@ async function handlePrint(options: CliOptions) {
 
 async function handleSync(options: CliOptions) {
   const context = buildFastProjectContext({ projectPath: options.project });
-  
+
   if (!context) {
     console.error('No ToolNet project found.');
     process.exit(1);
@@ -91,10 +100,10 @@ async function handleSync(options: CliOptions) {
 
 async function handleRefresh(options: CliOptions) {
   console.log('Refreshing deep startup brief cache...');
-  
+
   const projectPath = options.project || process.cwd();
   const projectRoot = findProjectRoot(projectPath);
-  
+
   if (!projectRoot) {
     console.error('No ToolNet project found.');
     process.exit(1);
@@ -126,14 +135,14 @@ async function handleRefresh(options: CliOptions) {
 async function handleProfileShow(options: CliOptions) {
   const projectPath = options.project || process.cwd();
   const projectRoot = findProjectRoot(projectPath);
-  
+
   if (!projectRoot) {
     console.error('No ToolNet project found.');
     process.exit(1);
   }
 
   const profilePath = path.join(projectRoot, '.toolnet', 'profile.md');
-  
+
   if (!fs.existsSync(profilePath)) {
     console.error('No profile.md found in .toolnet directory.');
     process.exit(1);
@@ -145,7 +154,7 @@ async function handleProfileShow(options: CliOptions) {
 
 async function handleProfileSync(options: CliOptions) {
   const created = syncAgentInstructionFiles({ projectPath: options.project });
-  
+
   console.log('Created/updated:');
   for (const file of created) {
     console.log(`- ${file}`);

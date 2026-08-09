@@ -1,14 +1,8 @@
-import type {
-  ProjectManifest,
-} from "../core/types.js";
+import type { ProjectManifest } from '../core/types.js';
 
-import {
-  loadConfig,
-} from "../core/index.js";
+import { loadConfig } from '../core/index.js';
 
-import {
-  createEmbeddingProvider,
-} from "../embeddings/index.js";
+import { createEmbeddingProvider } from '../embeddings/index.js';
 
 import {
   ArchitectureEngine,
@@ -19,7 +13,7 @@ import {
   SemanticCodeEngine,
   TypeScriptTypeResolver,
   VisualizationBuilder,
-} from "../code-intelligence/index.js";
+} from '../code-intelligence/index.js';
 
 import {
   createStorageProvider,
@@ -30,35 +24,28 @@ import {
   PersistentVisualizationStore,
   ProjectScopedStorageProvider,
   withStorageRetry,
-} from "../storage/index.js";
+} from '../storage/index.js';
 
 export type IndexStageId =
-  | "source-index"
-  | "type-resolution"
-  | "rich-graph"
-  | "semantic-index"
-  | "architecture"
-  | "analysis"
-  | "visualization";
+  | 'source-index'
+  | 'type-resolution'
+  | 'rich-graph'
+  | 'semantic-index'
+  | 'architecture'
+  | 'analysis'
+  | 'visualization';
 
 export interface IndexStageEvent {
   id: IndexStageId;
   title: string;
 
-  state:
-    | "start"
-    | "complete";
+  state: 'start' | 'complete';
 
   durationMs?: number;
 }
 
 export interface ProductionIndexOptions {
-  onStage?:
-    (
-      event: IndexStageEvent,
-    ) =>
-      void |
-      Promise<void>;
+  onStage?: (event: IndexStageEvent) => void | Promise<void>;
 }
 
 export interface ProductionIndexResult {
@@ -92,368 +79,209 @@ export interface ProductionIndexResult {
 
 export async function runProductionIndex(
   project: ProjectManifest,
-  options: ProductionIndexOptions = {},
+  options: ProductionIndexOptions = {}
 ): Promise<ProductionIndexResult> {
-  const started =
-    Date.now();
+  const started = Date.now();
 
-  async function stage<T>(
-    id: IndexStageId,
-    title: string,
-    run: () => Promise<T> | T,
-  ): Promise<T> {
+  async function stage<T>(id: IndexStageId, title: string, run: () => Promise<T> | T): Promise<T> {
     await options.onStage?.({
       id,
       title,
-      state: "start",
+      state: 'start',
     });
 
-    const stageStarted =
-      Date.now();
+    const stageStarted = Date.now();
 
-    const result =
-      await run();
+    const result = await run();
 
     await options.onStage?.({
       id,
       title,
-      state: "complete",
-      durationMs:
-        Date.now() -
-        stageStarted,
+      state: 'complete',
+      durationMs: Date.now() - stageStarted,
     });
 
     return result;
   }
 
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
-  const rawStorage =
-    withStorageRetry(
-      createStorageProvider({
-        provider:
-          config.storage.provider,
+  const rawStorage = withStorageRetry(
+    createStorageProvider({
+      provider: config.storage.provider,
 
-        huggingface:
-          config.storage.huggingface,
+      huggingface: config.storage.huggingface,
 
-        localRoot:
-          config.storage.localRoot,
-      }),
-      {
-        attempts: 3,
-      },
-    );
+      localRoot: config.storage.localRoot,
+    }),
+    {
+      attempts: 3,
+    }
+  );
 
-  const storage =
-    new ProjectScopedStorageProvider(
-      rawStorage,
-      project.id,
-      project.name,
-      project.remote ??
-        project.name,
-    );
+  const storage = new ProjectScopedStorageProvider(
+    rawStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
 
-  const graphStore =
-    new PersistentCodeGraphStore(
-      storage,
-    );
+  const graphStore = new PersistentCodeGraphStore(storage);
 
   /*
    * 1. SOURCE INDEX
    */
-  const indexed =
-    await stage(
-      "source-index",
-      "Source Index",
-      async () => {
-        const result =
-          await new RepositoryIndexer()
-            .index(
-              project.id,
-              project.rootPath,
-            );
+  const indexed = await stage('source-index', 'Source Index', async () => {
+    const result = await new RepositoryIndexer().index(project.id, project.rootPath);
 
-        await graphStore.save({
-          version: 1,
+    await graphStore.save({
+      version: 1,
 
-          projectId:
-            project.id,
+      projectId: project.id,
 
-          updatedAt:
-            new Date()
-              .toISOString(),
+      updatedAt: new Date().toISOString(),
 
-          files:
-            result.files,
+      files: result.files,
 
-          symbols:
-            result.graph
-              .allSymbols(
-                project.id,
-              ),
+      symbols: result.graph.allSymbols(project.id),
 
-          edges:
-            result.graph
-              .allEdges(
-                project.id,
-              ),
-        });
+      edges: result.graph.allEdges(project.id),
+    });
 
-        return result;
-      },
-    );
+    return result;
+  });
 
-  const graph =
-    indexed.graph;
+  const graph = indexed.graph;
 
   /*
    * 2. TYPE RESOLUTION
    */
-  const resolution =
-    await stage(
-      "type-resolution",
-      "Type Resolution",
-      async () => {
-        const result =
-          await new TypeScriptTypeResolver(
-            graph,
-          ).resolveProject(
-            project.id,
-            project.rootPath,
-          );
-
-        await new PersistentTypeResolutionStore(
-          storage,
-        ).save(
-          result,
-        );
-
-        return result;
-      },
+  const resolution = await stage('type-resolution', 'Type Resolution', async () => {
+    const result = await new TypeScriptTypeResolver(graph).resolveProject(
+      project.id,
+      project.rootPath
     );
+
+    await new PersistentTypeResolutionStore(storage).save(result);
+
+    return result;
+  });
 
   /*
    * 3. RICH GRAPH
    */
-  await stage(
-    "rich-graph",
-    "Rich Graph",
-    async () => {
-      const stats =
-        new RichGraphEnricher(
-          graph,
-        ).enrich(
-          project.id,
-          project.rootPath,
-          resolution,
-        );
+  await stage('rich-graph', 'Rich Graph', async () => {
+    const stats = new RichGraphEnricher(graph).enrich(project.id, project.rootPath, resolution);
 
-      const symbols =
-        graph.allSymbols(
-          project.id,
-        );
+    const symbols = graph.allSymbols(project.id);
 
-      const edges =
-        graph.allEdges(
-          project.id,
-        );
+    const edges = graph.allEdges(project.id);
 
-      await graphStore.save({
-        version: 1,
+    await graphStore.save({
+      version: 1,
 
-        projectId:
-          project.id,
+      projectId: project.id,
 
-        updatedAt:
-          new Date()
-            .toISOString(),
+      updatedAt: new Date().toISOString(),
 
-        files:
-          symbols.filter(
-            item =>
-              item.type ===
-              "file",
-          ).length,
+      files: symbols.filter((item) => item.type === 'file').length,
 
-        symbols,
-        edges,
-      });
+      symbols,
+      edges,
+    });
 
-      return stats;
-    },
-  );
+    return stats;
+  });
 
   /*
    * 4. SEMANTIC INDEX
    */
-  const semantic =
-    await stage(
-      "semantic-index",
-      "Semantic Code Index",
-      async () => {
-        const engine =
-          new SemanticCodeEngine({
-            projectId:
-              project.id,
+  const semantic = await stage('semantic-index', 'Semantic Code Index', async () => {
+    const engine = new SemanticCodeEngine({
+      projectId: project.id,
 
-            rootPath:
-              project.rootPath,
+      rootPath: project.rootPath,
 
-            model:
-              process.env
-                .HF_EMBEDDING_MODEL ??
-              "sentence-transformers/all-MiniLM-L6-v2",
+      model: process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2',
 
-            storage,
+      storage,
 
-            embeddings:
-              createEmbeddingProvider(),
+      embeddings: createEmbeddingProvider(),
 
-            graph,
-          });
+      graph,
+    });
 
-        return engine.initialize();
-      },
-    );
+    return engine.initialize();
+  });
 
   /*
    * 5. ARCHITECTURE
    */
-  const architecture =
-    await stage(
-      "architecture",
-      "Architecture Intelligence",
-      async () => {
-        const result =
-          new ArchitectureEngine(
-            graph,
-          ).analyze(
-            project.id,
-          );
+  const architecture = await stage('architecture', 'Architecture Intelligence', async () => {
+    const result = new ArchitectureEngine(graph).analyze(project.id);
 
-        await new PersistentArchitectureStore(
-          storage,
-        ).save(
-          result,
-        );
+    await new PersistentArchitectureStore(storage).save(result);
 
-        return result;
-      },
-    );
+    return result;
+  });
 
   /*
    * 6. ANALYSIS
    */
-  const analysis =
-    await stage(
-      "analysis",
-      "Graph Analysis",
-      async () => {
-        const result =
-          new CodeAnalysisEngine(
-            graph,
-          ).analyze(
-            project.id,
-          );
+  const analysis = await stage('analysis', 'Graph Analysis', async () => {
+    const result = new CodeAnalysisEngine(graph).analyze(project.id);
 
-        await new PersistentCodeAnalysisStore(
-          storage,
-        ).save(
-          result,
-        );
+    await new PersistentCodeAnalysisStore(storage).save(result);
 
-        return result;
-      },
-    );
+    return result;
+  });
 
   /*
    * 7. VISUALIZATION
    */
-  const visualization =
-    await stage(
-      "visualization",
-      "3D Visualization Dataset",
-      async () => {
-        const result =
-          new VisualizationBuilder(
-            graph,
-          ).build(
-            project.id,
-            architecture,
-            analysis,
-          );
+  const visualization = await stage('visualization', '3D Visualization Dataset', async () => {
+    const result = new VisualizationBuilder(graph).build(project.id, architecture, analysis);
 
-        await new PersistentVisualizationStore(
-          storage,
-        ).save(
-          result,
-        );
+    await new PersistentVisualizationStore(storage).save(result);
 
-        return result;
-      },
-    );
+    return result;
+  });
 
   return {
     project: {
-      id:
-        project.id,
+      id: project.id,
 
-      name:
-        project.name,
+      name: project.name,
 
-      remote:
-        project.remote ??
-        project.name,
+      remote: project.remote ?? project.name,
     },
 
-    storage:
-      storage.name,
+    storage: storage.name,
 
-    durationMs:
-      Date.now() -
-      started,
+    durationMs: Date.now() - started,
 
     graph: {
-      symbols:
-        graph
-          .allSymbols(
-            project.id,
-          )
-          .length,
+      symbols: graph.allSymbols(project.id).length,
 
-      edges:
-        graph
-          .allEdges(
-            project.id,
-          )
-          .length,
+      edges: graph.allEdges(project.id).length,
     },
 
     resolution: {
-      total:
-        resolution.total,
+      total: resolution.total,
 
-      exact:
-        resolution.exact,
+      exact: resolution.exact,
 
-      high:
-        resolution.high,
+      high: resolution.high,
 
-      fallback:
-        resolution.fallback,
+      fallback: resolution.fallback,
     },
 
     semantic,
 
-    architecture:
-      architecture.summary,
+    architecture: architecture.summary,
 
-    analysis:
-      analysis.summary,
+    analysis: analysis.summary,
 
-    visualization:
-      visualization.summary,
+    visualization: visualization.summary,
   };
 }

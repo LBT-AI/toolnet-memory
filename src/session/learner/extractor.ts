@@ -1,25 +1,12 @@
-import type {
-  ImportanceLevel,
-  MemoryType,
-} from "../../core/types.js";
+import type { ImportanceLevel, MemoryType } from '../../core/types.js';
 
-import {
-  scoreImportance,
-} from "../../processor/importance-scorer.js";
+import { scoreImportance } from '../../processor/importance-scorer.js';
 
-import type {
-  NormalizedSessionEvent,
-  SessionIdentity,
-} from "../types.js";
+import type { NormalizedSessionEvent, SessionIdentity } from '../types.js';
 
-import type {
-  LearnedMemoryCandidate,
-  LearnedMemoryKind,
-} from "./types.js";
+import type { LearnedMemoryCandidate, LearnedMemoryKind } from './types.js';
 
-import {
-  sha256,
-} from "../utils.js";
+import { sha256 } from '../utils.js';
 
 const RULE_CRITICAL = [
   /không được/iu,
@@ -143,285 +130,128 @@ const CONTEXT_ASSIGNMENT = [
   /runs on/iu,
 ];
 
-const TEXT_KEYS =
-  new Set([
-    "content",
-    "text",
-    "message",
-    "prompt",
-    "summary",
-    "description",
-    "reason",
-    "title",
-    "last_assistant_message",
-    "lastAssistantMessage",
-    "input_messages",
-    "inputMessages",
-  ]);
+const TEXT_KEYS = new Set([
+  'content',
+  'text',
+  'message',
+  'prompt',
+  'summary',
+  'description',
+  'reason',
+  'title',
+  'last_assistant_message',
+  'lastAssistantMessage',
+  'input_messages',
+  'inputMessages',
+]);
 
-const CONTAINER_KEYS =
-  new Set([
-    "payload",
-    "data",
-    "content",
-    "message",
-    "messages",
-    "parts",
-    "summary",
-  ]);
+const CONTAINER_KEYS = new Set([
+  'payload',
+  'data',
+  'content',
+  'message',
+  'messages',
+  'parts',
+  'summary',
+]);
 
-function matches(
-  value: string,
-  patterns: RegExp[],
-): boolean {
-  return patterns.some(
-    pattern =>
-      pattern.test(
-        value,
-      ),
-  );
+function matches(value: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(value));
 }
 
-function normalizeText(
-  value: string,
-): string {
+function normalizeText(value: string): string {
   return value
-    .normalize(
-      "NFKC",
-    )
-    .replace(
-      /\r/g,
-      "",
-    )
-    .replace(
-      /^[\s>*#\-•]+/u,
-      "",
-    )
-    .replace(
-      /\s+/g,
-      " ",
-    )
+    .normalize('NFKC')
+    .replace(/\r/g, '')
+    .replace(/^[\s>*#\-•]+/u, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-function fingerprintText(
-  value: string,
-): string {
-  return normalizeText(
-    value,
-  )
+function fingerprintText(value: string): string {
+  return normalizeText(value)
     .toLowerCase()
-    .replace(
-      /[^\p{L}\p{N}:/._-]+/gu,
-      " ",
-    )
-    .replace(
-      /\s+/g,
-      " ",
-    )
+    .replace(/[^\p{L}\p{N}:/._-]+/gu, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-function useful(
-  value: string,
-): boolean {
-  if (
-    value.length <
-      12 ||
-    value.length >
-      1000
-  ) {
+function useful(value: string): boolean {
+  if (value.length < 12 || value.length > 1000) {
     return false;
   }
 
-  const letters =
-    (
-      value.match(
-        /\p{L}/gu,
-      ) ??
-      []
-    ).length;
+  const letters = (value.match(/\p{L}/gu) ?? []).length;
 
-  if (
-    letters <
-    6
-  ) {
+  if (letters < 6) {
     return false;
   }
 
-  if (
-    /^(?:https?:\/\/\S+|[A-Za-z0-9+/=]{80,})$/u
-      .test(
-        value,
-      )
-  ) {
+  if (/^(?:https?:\/\/\S+|[A-Za-z0-9+/=]{80,})$/u.test(value)) {
     return false;
   }
 
   return true;
 }
 
-function collectText(
-  value: unknown,
-  key:
-    string |
-    undefined,
-  output: string[],
-  depth = 0,
-): void {
-  if (
-    depth >
-    6
-  ) {
+function collectText(value: unknown, key: string | undefined, output: string[], depth = 0): void {
+  if (depth > 6) {
     return;
   }
 
-  if (
-    typeof value ===
-    "string"
-  ) {
-    if (
-      !key ||
-      TEXT_KEYS.has(
-        key,
-      )
-    ) {
-      output.push(
-        value,
-      );
+  if (typeof value === 'string') {
+    if (!key || TEXT_KEYS.has(key)) {
+      output.push(value);
     }
 
     return;
   }
 
-  if (
-    Array.isArray(
-      value,
-    )
-  ) {
-    for (
-      const item
-      of value.slice(
-        0,
-        50,
-      )
-    ) {
-      collectText(
-        item,
-        key,
-        output,
-        depth + 1,
-      );
+  if (Array.isArray(value)) {
+    for (const item of value.slice(0, 50)) {
+      collectText(item, key, output, depth + 1);
     }
 
     return;
   }
 
-  if (
-    !value ||
-    typeof value !==
-      "object"
-  ) {
+  if (!value || typeof value !== 'object') {
     return;
   }
 
-  for (
-    const [
-      childKey,
-      childValue,
-    ]
-    of Object.entries(
-      value as
-        Record<
-          string,
-          unknown
-        >,
-    )
-  ) {
-    if (
-      TEXT_KEYS.has(
-        childKey,
-      ) ||
-      CONTAINER_KEYS.has(
-        childKey,
-      )
-    ) {
-      collectText(
-        childValue,
-        childKey,
-        output,
-        depth + 1,
-      );
+  for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+    if (TEXT_KEYS.has(childKey) || CONTAINER_KEYS.has(childKey)) {
+      collectText(childValue, childKey, output, depth + 1);
     }
   }
 }
 
-function fragments(
-  event:
-    NormalizedSessionEvent,
-): string[] {
-  const raw:
-    string[] =
-    [];
+function fragments(event: NormalizedSessionEvent): string[] {
+  const raw: string[] = [];
 
-  collectText(
-    event.data,
-    undefined,
-    raw,
-  );
+  collectText(event.data, undefined, raw);
 
-  const result:
-    string[] =
-    [];
+  const result: string[] = [];
 
-  const seen =
-    new Set<
-      string
-    >();
+  const seen = new Set<string>();
 
-  for (
-    const block
-    of raw
-  ) {
-    for (
-      const piece
-      of block.split(
-        /\n+|(?<=[.!?])\s+/u,
-      )
-    ) {
-      const text =
-        normalizeText(
-          piece,
-        );
+  for (const block of raw) {
+    for (const piece of block.split(/\n+|(?<=[.!?])\s+/u)) {
+      const text = normalizeText(piece);
 
-      if (
-        !useful(
-          text,
-        )
-      ) {
+      if (!useful(text)) {
         continue;
       }
 
-      if (
-        seen.has(
-          text,
-        )
-      ) {
+      if (seen.has(text)) {
         continue;
       }
 
-      seen.add(
-        text,
-      );
+      seen.add(text);
 
-      result.push(
-        text,
-      );
+      result.push(text);
 
-      if (
-        result.length >=
-        50
-      ) {
+      if (result.length >= 50) {
         return result;
       }
     }
@@ -430,500 +260,232 @@ function fragments(
   return result;
 }
 
-function roleOf(
-  event:
-    NormalizedSessionEvent,
-): string {
-  return (
-    event.role ??
-    (
-      typeof event.data.role ===
-        "string"
-        ? event.data.role
-        : ""
-    )
-  )
-    .toLowerCase();
+function roleOf(event: NormalizedSessionEvent): string {
+  return (event.role ?? (typeof event.data.role === 'string' ? event.data.role : '')).toLowerCase();
 }
 
 function classify(
   text: string,
   role: string,
-  event:
-    NormalizedSessionEvent,
+  event: NormalizedSessionEvent
 ): {
-  kind:
-    LearnedMemoryKind;
+  kind: LearnedMemoryKind;
 
-  confidence:
-    number;
-} |
-null {
-  if (
-    event.type ===
-    "decision"
-  ) {
+  confidence: number;
+} | null {
+  if (event.type === 'decision') {
     return {
-      kind:
-        "decision",
+      kind: 'decision',
 
-      confidence:
-        1,
+      confidence: 1,
     };
   }
 
-  if (
-    event.type ===
-    "todo"
-  ) {
+  if (event.type === 'todo') {
     return {
-      kind:
-        "todo",
+      kind: 'todo',
 
-      confidence:
-        1,
+      confidence: 1,
     };
   }
 
-  const isUser =
-    role ===
-      "user" ||
-    event.type ===
-      "user_prompt";
+  const isUser = role === 'user' || event.type === 'user_prompt';
 
-  const isAssistant =
-    role ===
-      "assistant" ||
-    event.type ===
-      "assistant_message";
+  const isAssistant = role === 'assistant' || event.type === 'assistant_message';
 
-  if (
-    isUser &&
-    matches(
-      text,
-      RULE_CRITICAL,
-    )
-  ) {
+  if (isUser && matches(text, RULE_CRITICAL)) {
     return {
-      kind:
-        "rule",
+      kind: 'rule',
 
-      confidence:
-        0.98,
+      confidence: 0.98,
     };
   }
 
-  if (
-    isUser &&
-    matches(
-      text,
-      RULE_PERSISTENT,
-    )
-  ) {
+  if (isUser && matches(text, RULE_PERSISTENT)) {
     return {
-      kind:
-        "rule",
+      kind: 'rule',
 
-      confidence:
-        0.92,
+      confidence: 0.92,
     };
   }
 
-  if (
-    matches(
-      text,
-      DECISION,
-    )
-  ) {
+  if (matches(text, DECISION)) {
     return {
-      kind:
-        matches(
-          text,
-          ARCHITECTURE,
-        )
-          ? "architecture"
-          : "decision",
+      kind: matches(text, ARCHITECTURE) ? 'architecture' : 'decision',
 
-      confidence:
-        isUser
-          ? 0.93
-          : 0.86,
+      confidence: isUser ? 0.93 : 0.86,
     };
   }
 
-  if (
-    isUser &&
-    matches(
-      text,
-      TODO,
-    )
-  ) {
+  if (isUser && matches(text, TODO)) {
     return {
-      kind:
-        "todo",
+      kind: 'todo',
 
-      confidence:
-        0.87,
+      confidence: 0.87,
     };
   }
 
-  if (
-    matches(
-      text,
-      ARCHITECTURE,
-    ) &&
-    matches(
-      text,
-      ARCH_ACTION,
-    )
-  ) {
+  if (matches(text, ARCHITECTURE) && matches(text, ARCH_ACTION)) {
     return {
-      kind:
-        "architecture",
+      kind: 'architecture',
 
-      confidence:
-        isUser
-          ? 0.88
-          : 0.82,
+      confidence: isUser ? 0.88 : 0.82,
     };
   }
 
-  if (
-    isAssistant &&
-    matches(
-      text,
-      FIX,
-    )
-  ) {
+  if (isAssistant && matches(text, FIX)) {
     return {
-      kind:
-        "fix",
+      kind: 'fix',
 
-      confidence:
-        0.8,
+      confidence: 0.8,
     };
   }
 
-  if (
-    isUser &&
-    matches(
-      text,
-      CONTEXT,
-    ) &&
-    matches(
-      text,
-      CONTEXT_ASSIGNMENT,
-    )
-  ) {
+  if (isUser && matches(text, CONTEXT) && matches(text, CONTEXT_ASSIGNMENT)) {
     return {
-      kind:
-        "context",
+      kind: 'context',
 
-      confidence:
-        0.79,
+      confidence: 0.79,
     };
   }
 
   return null;
 }
 
-function memoryType(
-  kind:
-    LearnedMemoryKind,
-): MemoryType {
-  switch (
-    kind
-  ) {
-    case "rule":
-      return "rule";
+function memoryType(kind: LearnedMemoryKind): MemoryType {
+  switch (kind) {
+    case 'rule':
+      return 'rule';
 
-    case "decision":
-    case "architecture":
-      return "decision";
+    case 'decision':
+    case 'architecture':
+      return 'decision';
 
-    case "todo":
-      return "todo";
+    case 'todo':
+      return 'todo';
 
-    case "fix":
-    case "context":
-      return "code";
+    case 'fix':
+    case 'context':
+      return 'code';
   }
 }
 
-function importance(
-  kind:
-    LearnedMemoryKind,
-  type:
-    MemoryType,
-  content:
-    string,
-): ImportanceLevel {
-  if (
-    kind ===
-    "rule" &&
-    matches(
-      content,
-      RULE_CRITICAL,
-    )
-  ) {
-    return "critical";
+function importance(kind: LearnedMemoryKind, type: MemoryType, content: string): ImportanceLevel {
+  if (kind === 'rule' && matches(content, RULE_CRITICAL)) {
+    return 'critical';
   }
 
-  if (
-    kind ===
-      "architecture" ||
-    kind ===
-      "decision" ||
-    kind ===
-      "rule"
-  ) {
-    return "high";
+  if (kind === 'architecture' || kind === 'decision' || kind === 'rule') {
+    return 'high';
   }
 
-  if (
-    kind ===
-      "fix" ||
-    kind ===
-      "context"
-  ) {
-    return "normal";
+  if (kind === 'fix' || kind === 'context') {
+    return 'normal';
   }
 
-  return scoreImportance(
-    type,
-    content,
-  );
+  return scoreImportance(type, content);
 }
 
 export function extractLearnedMemories(
-  identity:
-    SessionIdentity,
-  events:
-    NormalizedSessionEvent[],
+  identity: SessionIdentity,
+  events: NormalizedSessionEvent[]
 ): LearnedMemoryCandidate[] {
-  const output:
-    LearnedMemoryCandidate[] =
-    [];
+  const output: LearnedMemoryCandidate[] = [];
 
-  const fingerprints =
-    new Set<
-      string
-    >();
+  const fingerprints = new Set<string>();
 
-  const messageRoles =
-    new Map<
-      string,
-      string
-    >();
+  const messageRoles = new Map<string, string>();
 
-  for (
-    const event
-    of events
-  ) {
-    const messageId =
-      typeof event.data
-        .messageId ===
-        "string"
-        ? event.data
-            .messageId
-        : undefined;
+  for (const event of events) {
+    const messageId = typeof event.data.messageId === 'string' ? event.data.messageId : undefined;
 
-    const role =
-      roleOf(
-        event,
-      );
+    const role = roleOf(event);
 
-    if (
-      messageId &&
-      role
-    ) {
-      messageRoles.set(
-        messageId,
-        role,
-      );
+    if (messageId && role) {
+      messageRoles.set(messageId, role);
     }
   }
 
-  for (
-    const event
-    of events
-  ) {
-    let role =
-      roleOf(
-        event,
-      );
+  for (const event of events) {
+    let role = roleOf(event);
 
-    const messageId =
-      typeof event.data
-        .messageId ===
-        "string"
-        ? event.data
-            .messageId
-        : undefined;
+    const messageId = typeof event.data.messageId === 'string' ? event.data.messageId : undefined;
 
-    if (
-      !role &&
-      messageId
-    ) {
-      role =
-        messageRoles.get(
-          messageId,
-        ) ??
-        "";
+    if (!role && messageId) {
+      role = messageRoles.get(messageId) ?? '';
     }
 
-    for (
-      const text
-      of fragments(
-        event,
-      )
-    ) {
-      const classified =
-        classify(
-          text,
-          role,
-          event,
-        );
+    for (const text of fragments(event)) {
+      const classified = classify(text, role, event);
 
-      if (
-        !classified ||
-        classified
-          .confidence <
-        0.75
-      ) {
+      if (!classified || classified.confidence < 0.75) {
         continue;
       }
 
-      const type =
-        memoryType(
-          classified.kind,
-        );
+      const type = memoryType(classified.kind);
 
-      const normalized =
-        fingerprintText(
-          text,
-        );
+      const normalized = fingerprintText(text);
 
-      const fingerprint =
-        sha256(
-          [
-            identity
-              .projectId,
+      const fingerprint = sha256([identity.projectId, classified.kind, normalized].join('|'));
 
-            classified
-              .kind,
-
-            normalized,
-          ].join(
-            "|",
-          ),
-        );
-
-      if (
-        fingerprints.has(
-          fingerprint,
-        )
-      ) {
+      if (fingerprints.has(fingerprint)) {
         continue;
       }
 
-      fingerprints.add(
-        fingerprint,
-      );
+      fingerprints.add(fingerprint);
 
-      const sourcePaths =
-        event.provenance
-          .sourcePath
-          ? [
-              event.provenance
-                .sourcePath,
-            ]
-          : [];
+      const sourcePaths = event.provenance.sourcePath ? [event.provenance.sourcePath] : [];
 
-      const sourceEventIds =
-        event.sourceEventId
-          ? [
-              event.sourceEventId,
-            ]
-          : [];
+      const sourceEventIds = event.sourceEventId ? [event.sourceEventId] : [];
 
       output.push({
-        version:
-          1,
+        version: 1,
 
         fingerprint,
 
-        projectId:
-          identity
-            .projectId,
+        projectId: identity.projectId,
 
-        agent:
-          identity.agent,
+        agent: identity.agent,
 
-        nativeSessionId:
-          identity
-            .nativeSessionId,
+        nativeSessionId: identity.nativeSessionId,
 
-        sessionKey:
-          identity
-            .sessionKey,
+        sessionKey: identity.sessionKey,
 
-        kind:
-          classified.kind,
+        kind: classified.kind,
 
         type,
 
-        content:
-          text,
+        content: text,
 
-        confidence:
-          classified
-            .confidence,
+        confidence: classified.confidence,
 
-        importance:
-          importance(
-            classified.kind,
-            type,
-            text,
-          ),
+        importance: importance(classified.kind, type, text),
 
         /*
          * Keep decision/rule tags generic.
          * ConflictDetector uses non-generic tags as topic hints.
          */
-        tags: [
-          type,
-        ],
+        tags: [type],
 
         provenance: {
-          agent:
-            identity.agent,
+          agent: identity.agent,
 
-          nativeSessionId:
-            identity
-              .nativeSessionId,
+          nativeSessionId: identity.nativeSessionId,
 
-          sessionKey:
-            identity
-              .sessionKey,
+          sessionKey: identity.sessionKey,
 
-          eventIds: [
-            event.id,
-          ],
+          eventIds: [event.id],
 
           sourceEventIds,
 
           sourcePaths,
 
-          firstSequence:
-            event.sequence,
+          firstSequence: event.sequence,
 
-          lastSequence:
-            event.sequence,
+          lastSequence: event.sequence,
         },
 
-        createdAt:
-          event.timestamp,
+        createdAt: event.timestamp,
       });
     }
   }

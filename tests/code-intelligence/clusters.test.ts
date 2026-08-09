@@ -1,148 +1,67 @@
-import {
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import {
-  ClusterDetector,
-  CodeGraphStore,
-} from "../../src/code-intelligence/index.js";
+import { ClusterDetector, CodeGraphStore } from '../../src/code-intelligence/index.js';
 
-describe(
-  "Cluster Detector",
-  () => {
-    it(
-      "creates meaningful subsystem clusters",
-      () => {
-        const graph =
-          new CodeGraphStore();
+describe('Cluster Detector', () => {
+  it('creates meaningful subsystem clusters', () => {
+    const graph = new CodeGraphStore();
 
-        const projectId =
-          "test";
+    const projectId = 'test';
 
-        const values =
-          [
-            [
-              "memory-a",
-              "src/memory/a.ts",
-            ],
-            [
-              "memory-b",
-              "src/memory/b.ts",
-            ],
-            [
-              "storage",
-              "src/storage/store.ts",
-            ],
-            [
-              "mcp",
-              "src/mcp/server.ts",
-            ],
-          ] as const;
+    const values = [
+      ['memory-a', 'src/memory/a.ts'],
+      ['memory-b', 'src/memory/b.ts'],
+      ['storage', 'src/storage/store.ts'],
+      ['mcp', 'src/mcp/server.ts'],
+    ] as const;
 
-        for (
-          const [
-            id,
-            filePath,
-          ]
-          of values
-        ) {
-          graph.addSymbol({
-            id,
-            projectId,
+    for (const [id, filePath] of values) {
+      graph.addSymbol({
+        id,
+        projectId,
 
-            name:
-              id,
+        name: id,
 
-            qualifiedName:
-              id,
+        qualifiedName: id,
 
-            type:
-              "function",
+        type: 'function',
 
-            filePath,
+        filePath,
 
-            startLine:
-              1,
+        startLine: 1,
 
-            endLine:
-              5,
-          });
-        }
+        endLine: 5,
+      });
+    }
 
-        graph.addEdge({
-          id:
-            "memory-link",
+    graph.addEdge({
+      id: 'memory-link',
 
-          projectId,
+      projectId,
 
-          from:
-            "memory-a",
+      from: 'memory-a',
 
-          to:
-            "memory-b",
+      to: 'memory-b',
 
-          type:
-            "CALL_REFERENCE",
-        });
+      type: 'CALL_REFERENCE',
+    });
 
-        const clusters =
-          new ClusterDetector(
-            graph,
-          ).detect(
-            projectId,
-          );
+    const clusters = new ClusterDetector(graph).detect(projectId);
 
-        const memory =
-          clusters.find(
-            (cluster) =>
-              cluster.subsystem ===
-              "src/memory",
-          );
+    const memory = clusters.find((cluster) => cluster.subsystem === 'src/memory');
 
-        const storage =
-          clusters.find(
-            (cluster) =>
-              cluster.subsystem ===
-              "src/storage",
-          );
+    const storage = clusters.find((cluster) => cluster.subsystem === 'src/storage');
 
-        const mcp =
-          clusters.find(
-            (cluster) =>
-              cluster.subsystem ===
-              "src/mcp",
-          );
+    const mcp = clusters.find((cluster) => cluster.subsystem === 'src/mcp');
 
-        expect(
-          memory,
-        ).toBeTruthy();
+    expect(memory).toBeTruthy();
 
-        expect(
-          memory?.files,
-        ).toContain(
-          "src/memory/a.ts",
-        );
+    expect(memory?.files).toContain('src/memory/a.ts');
 
-        expect(
-          memory?.files,
-        ).toContain(
-          "src/memory/b.ts",
-        );
+    expect(memory?.files).toContain('src/memory/b.ts');
 
-        expect(
-          storage?.label,
-        ).toBe(
-          "Storage",
-        );
+    expect(storage?.label).toBe('Storage');
 
-        expect(
-          mcp?.label,
-        ).toBe(
-          "MCP",
-        );
-      },
-    );
-  },
-);
+    expect(mcp?.label).toBe('MCP');
+  });
+});

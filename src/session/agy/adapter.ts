@@ -1,332 +1,194 @@
-import {
-  existsSync,
-} from "node:fs";
+import { existsSync } from 'node:fs';
 
-import {
-  homedir,
-} from "node:os";
+import { homedir } from 'node:os';
 
-import {
-  join,
-  resolve,
-} from "node:path";
+import { join, resolve } from 'node:path';
 
-import type {
-  ProjectManifest,
-} from "../../core/types.js";
+import type { ProjectManifest } from '../../core/types.js';
 
-import type {
-  StorageProvider,
-} from "../../storage/types.js";
+import type { StorageProvider } from '../../storage/types.js';
 
-import {
-  SessionCore,
-} from "../core.js";
+import { SessionCore } from '../core.js';
 
-import {
-  readAgyTranscript,
-} from "./transcript.js";
+import { readAgyTranscript } from './transcript.js';
 
-import {
-  shouldFilterEvent,
-  filterEventData,
-} from "../transcript-filter.js";
+import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 
 export interface AgySyncOptions {
-  project:
-    ProjectManifest;
+  project: ProjectManifest;
 
-  storage:
-    StorageProvider;
+  storage: StorageProvider;
 
-  conversationId:
-    string;
+  conversationId: string;
 
-  transcriptPath:
-    string;
+  transcriptPath: string;
 
-  workspacePaths?:
-    string[];
+  workspacePaths?: string[];
 
-  artifactDirectoryPath?:
-    string;
+  artifactDirectoryPath?: string;
 
-  modelName?:
-    string;
+  modelName?: string;
 
-  phase?:
-    "pre"
-    | "post"
-    | "stop"
-    | "recover";
+  phase?: 'pre' | 'post' | 'stop' | 'recover';
 
-  fullyIdle?:
-    boolean;
+  fullyIdle?: boolean;
 
-  terminationReason?:
-    string;
+  terminationReason?: string;
 
-  error?:
-    string;
+  error?: string;
 }
 
 export interface AgySyncResult {
-  conversationId:
-    string;
+  conversationId: string;
 
-  imported:
-    number;
+  imported: number;
 
-  eventCount:
-    number;
+  eventCount: number;
 
-  chunkCount:
-    number;
+  chunkCount: number;
 
-  status:
-    string;
+  status: string;
 
-  transcriptOffset:
-    number;
+  transcriptOffset: number;
 
-  reset:
-    boolean;
+  reset: boolean;
 }
 
-function expandHome(
-  value: string,
-): string {
-  if (
-    value === "~"
-  ) {
+function expandHome(value: string): string {
+  if (value === '~') {
     return homedir();
   }
 
-  if (
-    value.startsWith(
-      "~/",
-    )
-  ) {
-    return join(
-      homedir(),
-      value.slice(
-        2,
-      ),
-    );
+  if (value.startsWith('~/')) {
+    return join(homedir(), value.slice(2));
   }
 
   return value;
 }
 
-export async function syncAgySession(
-  options:
-    AgySyncOptions,
-): Promise<
-  AgySyncResult
-> {
-  const conversationId =
-    options
-      .conversationId
-      .trim();
+export async function syncAgySession(options: AgySyncOptions): Promise<AgySyncResult> {
+  const conversationId = options.conversationId.trim();
 
-  if (
-    !conversationId
-  ) {
-    throw new Error(
-      "Agy conversationId is required",
-    );
+  if (!conversationId) {
+    throw new Error('Agy conversationId is required');
   }
 
-  const transcriptPath =
-    resolve(
-      expandHome(
-        options
-          .transcriptPath,
-      ),
-    );
+  const transcriptPath = resolve(expandHome(options.transcriptPath));
 
-  const core =
-    new SessionCore({
-      project:
-        options.project,
+  const core = new SessionCore({
+    project: options.project,
 
-      storage:
-        options.storage,
+    storage: options.storage,
 
-      agent:
-        "agy",
+    agent: 'agy',
 
-      nativeSessionId:
-        conversationId,
+    nativeSessionId: conversationId,
 
-      metadata: {
-        source:
-          "antigravity-hook",
+    metadata: {
+      source: 'antigravity-hook',
 
-        transcriptPath,
-
-        workspacePaths:
-          options
-            .workspacePaths ??
-          [],
-
-        artifactDirectoryPath:
-          options
-            .artifactDirectoryPath,
-
-        modelName:
-          options.modelName,
-      },
-    });
-
-  const state =
-    core.status();
-
-  const rawCursor =
-    state
-      .sourceCursors[
-        "agy.transcript.offset"
-      ];
-
-  const offset =
-    rawCursor
-      ? Number(
-          rawCursor,
-        )
-      : 0;
-
-  const transcript =
-    readAgyTranscript(
       transcriptPath,
-      {
-        offset:
-          Number.isFinite(
-            offset,
-          )
-            ? offset
-            : 0,
-      },
-    );
 
-  const events =
-    [];
+      workspacePaths: options.workspacePaths ?? [],
 
-  if (
-    state.lastSequence ===
-    0
-  ) {
+      artifactDirectoryPath: options.artifactDirectoryPath,
+
+      modelName: options.modelName,
+    },
+  });
+
+  const state = core.status();
+
+  const rawCursor = state.sourceCursors['agy.transcript.offset'];
+
+  const offset = rawCursor ? Number(rawCursor) : 0;
+
+  const transcript = readAgyTranscript(transcriptPath, {
+    offset: Number.isFinite(offset) ? offset : 0,
+  });
+
+  const events = [];
+
+  if (state.lastSequence === 0) {
     events.push({
-      type:
-        "session_start" as const,
+      type: 'session_start' as const,
 
-      sourceEventId:
-        `agy:${conversationId}:start`,
+      sourceEventId: `agy:${conversationId}:start`,
 
       data: {
-        workspacePaths:
-          options
-            .workspacePaths ??
-          [],
+        workspacePaths: options.workspacePaths ?? [],
 
         transcriptPath,
 
-        modelName:
-          options.modelName,
+        modelName: options.modelName,
       },
 
       provenance: {
-        source:
-          "antigravity-hook",
+        source: 'antigravity-hook',
 
-        sourcePath:
-          transcriptPath,
+        sourcePath: transcriptPath,
       },
     });
   }
 
-  if (
-    transcript.reset
-  ) {
+  if (transcript.reset) {
     events.push({
-      type:
-        "custom" as const,
+      type: 'custom' as const,
 
-      sourceEventId:
-        `agy:${conversationId}:transcript-reset:${transcript.nextOffset}`,
+      sourceEventId: `agy:${conversationId}:transcript-reset:${transcript.nextOffset}`,
 
       data: {
-        event:
-          "transcript_reset",
+        event: 'transcript_reset',
 
         transcriptPath,
       },
 
       provenance: {
-        source:
-          "agy-transcript",
+        source: 'agy-transcript',
 
-        sourcePath:
-          transcriptPath,
+        sourcePath: transcriptPath,
       },
     });
   }
 
   // Filter noisy events before recording
-  const filteredEvents = transcript.events.filter(event => {
-    if (shouldFilterEvent(event.data as Record<string, unknown>)) {
-      return false;
-    }
-    return true;
-  }).map(event => ({
-    ...event,
-    data: filterEventData(event.data as Record<string, unknown>),
-  }));
+  const filteredEvents = transcript.events
+    .filter((event) => {
+      if (shouldFilterEvent(event.data as Record<string, unknown>)) {
+        return false;
+      }
+      return true;
+    })
+    .map((event) => ({
+      ...event,
+      data: filterEventData(event.data as Record<string, unknown>),
+    }));
 
-  events.push(
-    ...filteredEvents,
-  );
+  events.push(...filteredEvents);
 
-  if (
-    options.phase ===
-      "stop"
-  ) {
-    if (
-      options.error
-    ) {
+  if (options.phase === 'stop') {
+    if (options.error) {
       events.push({
-        type:
-          "error" as const,
+        type: 'error' as const,
 
-        sourceEventId:
-          [
-            "agy",
-            conversationId,
-            "stop-error",
-            options
-              .terminationReason ??
-              "",
-            transcript
-              .nextOffset,
-          ].join(
-            ":",
-          ),
+        sourceEventId: [
+          'agy',
+          conversationId,
+          'stop-error',
+          options.terminationReason ?? '',
+          transcript.nextOffset,
+        ].join(':'),
 
         data: {
-          error:
-            options.error,
+          error: options.error,
 
-          terminationReason:
-            options
-              .terminationReason,
+          terminationReason: options.terminationReason,
 
-          fullyIdle:
-            options
-              .fullyIdle,
+          fullyIdle: options.fullyIdle,
         },
 
         provenance: {
-          source:
-            "antigravity-stop-hook",
+          source: 'antigravity-stop-hook',
         },
       });
     }
@@ -335,110 +197,65 @@ export async function syncAgySession(
      * Stop is NOT permanent SessionEnd.
      * The same conversation UUID may be resumed later.
      */
-    if (
-      options.fullyIdle
-    ) {
+    if (options.fullyIdle) {
       events.push({
-        type:
-          "session_idle" as const,
+        type: 'session_idle' as const,
 
-        sourceEventId:
-          [
-            "agy",
-            conversationId,
-            "idle",
-            transcript
-              .nextOffset,
-          ].join(
-            ":",
-          ),
+        sourceEventId: ['agy', conversationId, 'idle', transcript.nextOffset].join(':'),
 
         data: {
-          terminationReason:
-            options
-              .terminationReason,
+          terminationReason: options.terminationReason,
 
-          fullyIdle:
-            true,
+          fullyIdle: true,
         },
 
         provenance: {
-          source:
-            "antigravity-stop-hook",
+          source: 'antigravity-stop-hook',
         },
       });
     }
   }
 
-  const recorded =
-    core.recordMany(
-      events,
-    );
+  const recorded = core.recordMany(events);
 
-  core.setSourceCursor(
-    "agy.transcript.offset",
-    transcript.nextOffset,
-  );
+  core.setSourceCursor('agy.transcript.offset', transcript.nextOffset);
 
-  if (
-    options.phase
-  ) {
-    core.setSourceCursor(
-      "agy.last.phase",
-      options.phase,
-    );
+  if (options.phase) {
+    core.setSourceCursor('agy.last.phase', options.phase);
   }
 
-  const flushed =
-    await core.flush();
+  const flushed = await core.flush();
 
   return {
     conversationId,
 
-    imported:
-      recorded.length,
+    imported: recorded.length,
 
-    eventCount:
-      flushed.eventCount,
+    eventCount: flushed.eventCount,
 
-    chunkCount:
-      flushed.chunkCount,
+    chunkCount: flushed.chunkCount,
 
-    status:
-      flushed.status,
+    status: flushed.status,
 
-    transcriptOffset:
-      transcript
-        .nextOffset,
+    transcriptOffset: transcript.nextOffset,
 
-    reset:
-      transcript.reset,
+    reset: transcript.reset,
   };
 }
 
-export function defaultAgyTranscript(
-  conversationId:
-    string,
-): string {
+export function defaultAgyTranscript(conversationId: string): string {
   return join(
     homedir(),
-    ".gemini",
-    "antigravity-cli",
-    "brain",
+    '.gemini',
+    'antigravity-cli',
+    'brain',
     conversationId,
-    ".system_generated",
-    "logs",
-    "transcript.jsonl",
+    '.system_generated',
+    'logs',
+    'transcript.jsonl'
   );
 }
 
-export function agyTranscriptExists(
-  conversationId:
-    string,
-): boolean {
-  return existsSync(
-    defaultAgyTranscript(
-      conversationId,
-    ),
-  );
+export function agyTranscriptExists(conversationId: string): boolean {
+  return existsSync(defaultAgyTranscript(conversationId));
 }

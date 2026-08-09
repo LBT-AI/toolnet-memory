@@ -1,4 +1,4 @@
-import type { ActivityEvent } from "../core/types.js";
+import type { ActivityEvent } from '../core/types.js';
 
 export class EventQueue {
   private readonly events: ActivityEvent[] = [];

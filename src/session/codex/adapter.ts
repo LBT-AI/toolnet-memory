@@ -1,41 +1,23 @@
-import type {
-  ProjectManifest,
-} from "../../core/types.js";
+import type { ProjectManifest } from '../../core/types.js';
 
-import type {
-  StorageProvider,
-} from "../../storage/types.js";
+import type { StorageProvider } from '../../storage/types.js';
 
-import {
-  SessionCore,
-} from "../core.js";
+import { SessionCore } from '../core.js';
 
-import {
-  inspectCodexRollout,
-  pathBelongsToProject,
-} from "./discovery.js";
+import { inspectCodexRollout, pathBelongsToProject } from './discovery.js';
 
-import {
-  readCodexRollout,
-} from "./rollout.js";
+import { readCodexRollout } from './rollout.js';
 
-import {
-  shouldFilterEvent,
-  filterEventData,
-} from "../transcript-filter.js";
+import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 
 export interface CodexSyncOptions {
-  project:
-    ProjectManifest;
+  project: ProjectManifest;
 
-  storage:
-    StorageProvider;
+  storage: StorageProvider;
 
-  threadId:
-    string;
+  threadId: string;
 
-  rolloutPath:
-    string;
+  rolloutPath: string;
 
   cwd?: string;
 
@@ -46,310 +28,191 @@ export interface CodexSyncOptions {
   idle?: boolean;
 }
 
-export async function syncCodexSession(
-  options:
-    CodexSyncOptions,
-) {
-  const threadId =
-    options.threadId
-      .trim();
+export async function syncCodexSession(options: CodexSyncOptions) {
+  const threadId = options.threadId.trim();
 
-  if (
-    !threadId
-  ) {
-    throw new Error(
-      "Codex thread ID is required",
-    );
+  if (!threadId) {
+    throw new Error('Codex thread ID is required');
   }
 
-  const meta =
-    inspectCodexRollout(
-      options.rolloutPath,
-    );
+  const meta = inspectCodexRollout(options.rolloutPath);
 
-  const cwd =
-    options.cwd ??
-    meta.cwd;
+  const cwd = options.cwd ?? meta.cwd;
 
-  if (
-    cwd &&
-    !pathBelongsToProject(
-      options.project
-        .rootPath,
+  if (cwd && !pathBelongsToProject(options.project.rootPath, cwd)) {
+    throw new Error(`Codex thread does not belong to project: ${cwd}`);
+  }
+
+  if (meta.threadId && meta.threadId !== threadId) {
+    throw new Error(`Codex rollout thread mismatch: expected ${threadId}, got ${meta.threadId}`);
+  }
+
+  const core = new SessionCore({
+    project: options.project,
+
+    storage: options.storage,
+
+    agent: 'codex',
+
+    nativeSessionId: threadId,
+
+    metadata: {
+      source: 'codex-rollout',
+
+      rolloutPath: options.rolloutPath,
+
       cwd,
-    )
-  ) {
-    throw new Error(
-      `Codex thread does not belong to project: ${cwd}`,
-    );
-  }
 
-  if (
-    meta.threadId &&
-    meta.threadId !==
-      threadId
-  ) {
-    throw new Error(
-      `Codex rollout thread mismatch: expected ${threadId}, got ${meta.threadId}`,
-    );
-  }
+      client: options.client,
+    },
+  });
 
-  const core =
-    new SessionCore({
-      project:
-        options.project,
+  const state = core.status();
 
-      storage:
-        options.storage,
+  const previousPath = state.sourceCursors['codex.rollout.path'];
 
-      agent:
-        "codex",
-
-      nativeSessionId:
-        threadId,
-
-      metadata: {
-        source:
-          "codex-rollout",
-
-        rolloutPath:
-          options.rolloutPath,
-
-        cwd,
-
-        client:
-          options.client,
-      },
-    });
-
-  const state =
-    core.status();
-
-  const previousPath =
-    state.sourceCursors[
-      "codex.rollout.path"
-    ];
-
-  let offset =
-    Number(
-      state.sourceCursors[
-        "codex.rollout.offset"
-      ] ??
-      0,
-    );
+  let offset = Number(state.sourceCursors['codex.rollout.offset'] ?? 0);
 
   /*
    * Future Codex may rotate a resumed thread into another rollout.
    */
-  if (
-    previousPath &&
-    previousPath !==
-      options.rolloutPath
-  ) {
-    offset =
-      0;
+  if (previousPath && previousPath !== options.rolloutPath) {
+    offset = 0;
   }
 
-  if (
-    !Number.isFinite(
-      offset,
-    ) ||
-    offset < 0
-  ) {
-    offset =
-      0;
+  if (!Number.isFinite(offset) || offset < 0) {
+    offset = 0;
   }
 
-  const rollout =
-    readCodexRollout(
-      options.rolloutPath,
-      offset,
-    );
+  const rollout = readCodexRollout(options.rolloutPath, offset);
 
-  const events =
-    [];
+  const events = [];
 
-  if (
-    state.lastSequence ===
-    0
-  ) {
+  if (state.lastSequence === 0) {
     events.push({
-      type:
-        "session_start" as const,
+      type: 'session_start' as const,
 
-      sourceEventId:
-        `codex:${threadId}:start`,
+      sourceEventId: `codex:${threadId}:start`,
 
       data: {
         threadId,
         cwd,
 
-        rolloutPath:
-          options.rolloutPath,
+        rolloutPath: options.rolloutPath,
 
-        sessionMeta:
-          meta.raw,
+        sessionMeta: meta.raw,
       },
 
       provenance: {
-        source:
-          "codex-rollout",
+        source: 'codex-rollout',
 
-        sourcePath:
-          options.rolloutPath,
+        sourcePath: options.rolloutPath,
       },
     });
   }
 
-  if (
-    previousPath &&
-    previousPath !==
-      options.rolloutPath
-  ) {
+  if (previousPath && previousPath !== options.rolloutPath) {
     events.push({
-      type:
-        "custom" as const,
+      type: 'custom' as const,
 
-      sourceEventId:
-        `codex:${threadId}:rollout-rotation:${options.rolloutPath}`,
+      sourceEventId: `codex:${threadId}:rollout-rotation:${options.rolloutPath}`,
 
       data: {
-        event:
-          "rollout_rotation",
+        event: 'rollout_rotation',
 
         previousPath,
 
-        rolloutPath:
-          options.rolloutPath,
+        rolloutPath: options.rolloutPath,
       },
 
       provenance: {
-        source:
-          "codex-rollout",
+        source: 'codex-rollout',
       },
     });
   }
 
-  if (
-    rollout.reset
-  ) {
+  if (rollout.reset) {
     events.push({
-      type:
-        "custom" as const,
+      type: 'custom' as const,
 
-      sourceEventId:
-        `codex:${threadId}:rollout-reset:${rollout.nextOffset}`,
+      sourceEventId: `codex:${threadId}:rollout-reset:${rollout.nextOffset}`,
 
       data: {
-        event:
-          "rollout_reset",
+        event: 'rollout_reset',
       },
 
       provenance: {
-        source:
-          "codex-rollout",
+        source: 'codex-rollout',
 
-        sourcePath:
-          options.rolloutPath,
+        sourcePath: options.rolloutPath,
       },
     });
   }
 
   // Filter noisy events before recording
-  const filteredEvents = rollout.events.filter(event => {
-    if (shouldFilterEvent(event.data as Record<string, unknown>)) {
-      return false;
-    }
-    return true;
-  }).map(event => ({
-    ...event,
-    data: filterEventData(event.data as Record<string, unknown>),
-  }));
+  const filteredEvents = rollout.events
+    .filter((event) => {
+      if (shouldFilterEvent(event.data as Record<string, unknown>)) {
+        return false;
+      }
+      return true;
+    })
+    .map((event) => ({
+      ...event,
+      data: filterEventData(event.data as Record<string, unknown>),
+    }));
 
-  events.push(
-    ...filteredEvents,
-  );
+  events.push(...filteredEvents);
 
   /*
    * AfterAgent/agent-turn-complete means this TURN is done.
    * The Codex thread may be resumed later.
    */
-  if (
-    options.idle &&
-    options.turnId
-  ) {
+  if (options.idle && options.turnId) {
     events.push({
-      type:
-        "session_idle" as const,
+      type: 'session_idle' as const,
 
-      sourceEventId:
-        `codex:${threadId}:turn:${options.turnId}:idle`,
+      sourceEventId: `codex:${threadId}:turn:${options.turnId}:idle`,
 
       data: {
-        turnId:
-          options.turnId,
+        turnId: options.turnId,
 
-        client:
-          options.client,
+        client: options.client,
       },
 
       provenance: {
-        source:
-          "codex-notify",
+        source: 'codex-notify',
       },
     });
   }
 
-  const recorded =
-    core.recordMany(
-      events,
-    );
+  const recorded = core.recordMany(events);
 
-  core.setSourceCursor(
-    "codex.rollout.path",
-    options.rolloutPath,
-  );
+  core.setSourceCursor('codex.rollout.path', options.rolloutPath);
 
-  core.setSourceCursor(
-    "codex.rollout.offset",
-    rollout.nextOffset,
-  );
+  core.setSourceCursor('codex.rollout.offset', rollout.nextOffset);
 
-  if (
-    options.turnId
-  ) {
-    core.setSourceCursor(
-      "codex.last.turn",
-      options.turnId,
-    );
+  if (options.turnId) {
+    core.setSourceCursor('codex.last.turn', options.turnId);
   }
 
-  const flushed =
-    await core.flush();
+  const flushed = await core.flush();
 
   return {
     threadId,
 
-    imported:
-      recorded.length,
+    imported: recorded.length,
 
-    rolloutEvents:
-      rollout.events
-        .length,
+    rolloutEvents: rollout.events.length,
 
-    eventCount:
-      flushed.eventCount,
+    eventCount: flushed.eventCount,
 
-    chunkCount:
-      flushed.chunkCount,
+    chunkCount: flushed.chunkCount,
 
-    status:
-      flushed.status,
+    status: flushed.status,
 
-    rolloutOffset:
-      rollout.nextOffset,
+    rolloutOffset: rollout.nextOffset,
 
-    reset:
-      rollout.reset,
+    reset: rollout.reset,
   };
 }

@@ -1,98 +1,52 @@
-import type {
-  ActivityEvent,
-  MemoryType,
-} from "../core/types.js";
+import type { ActivityEvent, MemoryType } from '../core/types.js';
 
-import {
-  MemoryEngine,
-} from "../core/memory-engine.js";
+import { MemoryEngine } from '../core/memory-engine.js';
 
-import {
-  MemoryExtractor,
-} from "./memory-extractor.js";
+import { MemoryExtractor } from './memory-extractor.js';
 
-import {
-  looksLikeRule,
-} from "./rule-extractor.js";
+import { looksLikeRule } from './rule-extractor.js';
 
-import {
-  looksLikeDecision,
-} from "./decision-extractor.js";
+import { looksLikeDecision } from './decision-extractor.js';
 
-import {
-  looksLikeTodo,
-} from "./todo-extractor.js";
+import { looksLikeTodo } from './todo-extractor.js';
 
-import {
-  scoreImportance,
-} from "./importance-scorer.js";
+import { scoreImportance } from './importance-scorer.js';
 
-import {
-  Summarizer,
-} from "./summarizer.js";
+import { Summarizer } from './summarizer.js';
 
 export class MemoryProcessor {
-  private readonly extractor =
-    new MemoryExtractor();
+  private readonly extractor = new MemoryExtractor();
 
-  private readonly summarizer =
-    new Summarizer();
+  private readonly summarizer = new Summarizer();
 
-  constructor(
-    private readonly memory:
-      MemoryEngine,
-  ) {}
+  constructor(private readonly memory: MemoryEngine) {}
 
-  process(
-    events: ActivityEvent[],
-  ): number {
+  process(events: ActivityEvent[]): number {
     let created = 0;
 
-    for (
-      const event
-      of events
-    ) {
-      const extracted =
-        this.extractor.extract(
-          event,
-        );
+    for (const event of events) {
+      const extracted = this.extractor.extract(event);
 
-      if (
-        extracted
-      ) {
-        const type =
-          this.refineType(
-            extracted.type,
-            extracted.content,
-          );
+      if (extracted) {
+        const type = this.refineType(extracted.type, extracted.content);
 
         this.memory.remember({
-          projectId:
-            event.projectId,
+          projectId: event.projectId,
 
           type,
 
-          content:
-            extracted.content,
+          content: extracted.content,
 
-          importance:
-            scoreImportance(
-              type,
-              extracted.content,
-            ),
+          importance: scoreImportance(type, extracted.content),
 
-          tags:
-            extracted.tags,
+          tags: extracted.tags,
 
-          source:
-            extracted.source,
+          source: extracted.source,
 
           metadata: {
-            eventId:
-              event.id,
+            eventId: event.id,
 
-            timestamp:
-              event.timestamp,
+            timestamp: event.timestamp,
 
             ...extracted.metadata,
           },
@@ -101,52 +55,29 @@ export class MemoryProcessor {
         created++;
       }
 
-      if (
-        event.type ===
-        "user_prompt"
-      ) {
-        const content =
-          String(
-            event.data.content ??
-              "",
-          );
+      if (event.type === 'user_prompt') {
+        const content = String(event.data.content ?? '');
 
-        const type =
-          this.detectPromptMemoryType(
-            content,
-          );
+        const type = this.detectPromptMemoryType(content);
 
-        if (
-          type
-        ) {
+        if (type) {
           this.memory.remember({
-            projectId:
-              event.projectId,
+            projectId: event.projectId,
 
             type,
 
             content,
 
-            importance:
-              scoreImportance(
-                type,
-                content,
-              ),
+            importance: scoreImportance(type, content),
 
-            tags: [
-              "user",
-              type,
-            ],
+            tags: ['user', type],
 
-            source:
-              "auto-prompt-extractor",
+            source: 'auto-prompt-extractor',
 
             metadata: {
-              eventId:
-                event.id,
+              eventId: event.id,
 
-              timestamp:
-                event.timestamp,
+              timestamp: event.timestamp,
             },
           });
 
@@ -155,42 +86,27 @@ export class MemoryProcessor {
       }
     }
 
-    const summary =
-      this.summarizer
-        .summarize(
-          events,
-        );
+    const summary = this.summarizer.summarize(events);
 
-    if (
-      summary
-    ) {
-      const projectId =
-        events[0]?.projectId;
+    if (summary) {
+      const projectId = events[0]?.projectId;
 
-      if (
-        projectId
-      ) {
+      if (projectId) {
         this.memory.remember({
           projectId,
 
-          type:
-            "summary",
+          type: 'summary',
 
-          content:
-            summary,
+          content: summary,
 
-          importance:
-            "temporary",
+          importance: 'temporary',
 
-          tags:
-            ["summary"],
+          tags: ['summary'],
 
-          source:
-            "auto-summary",
+          source: 'auto-summary',
 
           metadata: {
-            eventCount:
-              events.length,
+            eventCount: events.length,
           },
         });
 
@@ -201,64 +117,33 @@ export class MemoryProcessor {
     return created;
   }
 
-  private refineType(
-    initial:
-      MemoryType,
-    content:
-      string,
-  ): MemoryType {
-    if (
-      looksLikeRule(
-        content,
-      )
-    ) {
-      return "rule";
+  private refineType(initial: MemoryType, content: string): MemoryType {
+    if (looksLikeRule(content)) {
+      return 'rule';
     }
 
-    if (
-      looksLikeTodo(
-        content,
-      )
-    ) {
-      return "todo";
+    if (looksLikeTodo(content)) {
+      return 'todo';
     }
 
-    if (
-      looksLikeDecision(
-        content,
-      )
-    ) {
-      return "decision";
+    if (looksLikeDecision(content)) {
+      return 'decision';
     }
 
     return initial;
   }
 
-  private detectPromptMemoryType(
-    content: string,
-  ): MemoryType | null {
-    if (
-      looksLikeRule(
-        content,
-      )
-    ) {
-      return "rule";
+  private detectPromptMemoryType(content: string): MemoryType | null {
+    if (looksLikeRule(content)) {
+      return 'rule';
     }
 
-    if (
-      looksLikeTodo(
-        content,
-      )
-    ) {
-      return "todo";
+    if (looksLikeTodo(content)) {
+      return 'todo';
     }
 
-    if (
-      looksLikeDecision(
-        content,
-      )
-    ) {
-      return "decision";
+    if (looksLikeDecision(content)) {
+      return 'decision';
     }
 
     return null;

@@ -17,10 +17,7 @@ export interface ManifestDiff {
   unchanged: string[];
 }
 
-export function diffManifest(
-  previous: CodeManifest | null,
-  current: CodeManifest,
-): ManifestDiff {
+export function diffManifest(previous: CodeManifest | null, current: CodeManifest): ManifestDiff {
   const oldFiles = previous?.files ?? {};
   const newFiles = current.files;
 

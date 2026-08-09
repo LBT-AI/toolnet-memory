@@ -1,193 +1,103 @@
-import {
-  existsSync,
-} from "node:fs";
+import { existsSync } from 'node:fs';
 
-import {
-  homedir,
-} from "node:os";
+import { homedir } from 'node:os';
 
-import {
-  join,
-} from "node:path";
+import { join } from 'node:path';
 
-import {
-  spawnSync,
-} from "node:child_process";
+import { spawnSync } from 'node:child_process';
 
-import {
-  installAgyHooks,
-} from "../session/agy/hook-installer.js";
+import { installAgyHooks } from '../session/agy/hook-installer.js';
 
-import {
-  installOpenCodePlugin,
-} from "../session/opencode/plugin-installer.js";
+import { installOpenCodePlugin } from '../session/opencode/plugin-installer.js';
 
-import {
-  installCodexNotify,
-} from "../session/codex/notify-installer.js";
+import { installCodexNotify } from '../session/codex/notify-installer.js';
 
-import {
-  installCodexContextHook,
-} from "../session/codex/context-hook-installer.js";
+import { installCodexContextHook } from '../session/codex/context-hook-installer.js';
 
 export interface AutoIntegrationResult {
-  agent:
-    "agy" |
-    "opencode" |
-    "codex";
+  agent: 'agy' | 'opencode' | 'codex';
 
-  detected:
-    boolean;
+  detected: boolean;
 
-  installed:
-    boolean;
+  installed: boolean;
 
-  targets:
-    string[];
+  targets: string[];
 
-  error?:
-    string;
+  error?: string;
 }
 
-function commandExists(
-  command: string,
-): boolean {
-  const result =
-    spawnSync(
-      "sh",
-      [
-        "-lc",
-        `command -v ${JSON.stringify(command)} >/dev/null 2>&1`,
-      ],
-      {
-        stdio:
-          "ignore",
-      },
-    );
+function commandExists(command: string): boolean {
+  const result = spawnSync('sh', ['-lc', `command -v ${JSON.stringify(command)} >/dev/null 2>&1`], {
+    stdio: 'ignore',
+  });
 
   return result.status === 0;
 }
 
 function detectAgy(): boolean {
-  return (
-    commandExists(
-      "agy",
-    ) ||
-    existsSync(
-      join(
-        homedir(),
-        ".gemini",
-      ),
-    )
-  );
+  return commandExists('agy') || existsSync(join(homedir(), '.gemini'));
 }
 
 function detectOpenCode(): boolean {
-  return (
-    commandExists(
-      "opencode",
-    ) ||
-    existsSync(
-      join(
-        homedir(),
-        ".config",
-        "opencode",
-      ),
-    )
-  );
+  return commandExists('opencode') || existsSync(join(homedir(), '.config', 'opencode'));
 }
 
 function detectCodex(): boolean {
-  return (
-    commandExists(
-      "codex",
-    ) ||
-    existsSync(
-      process.env.CODEX_HOME ??
-      join(
-        homedir(),
-        ".codex",
-      ),
-    )
-  );
+  return commandExists('codex') || existsSync(process.env.CODEX_HOME ?? join(homedir(), '.codex'));
 }
 
 export function installAutoIntegrations(
   options: {
     binary?: string;
     force?: boolean;
-  } = {},
+  } = {}
 ): AutoIntegrationResult[] {
-  const binary =
-    options.binary ??
-    process.env.TOOLNET_MEMORY_BIN ??
-    "toolnet-memory";
+  const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
 
-  const results:
-    AutoIntegrationResult[] =
-    [];
+  const results: AutoIntegrationResult[] = [];
 
   /*
    * Agy / Antigravity
    */
   {
-    const detected =
-      options.force === true ||
-      detectAgy();
+    const detected = options.force === true || detectAgy();
 
     if (!detected) {
       results.push({
-        agent:
-          "agy",
+        agent: 'agy',
 
-        detected:
-          false,
+        detected: false,
 
-        installed:
-          false,
+        installed: false,
 
-        targets:
-          [],
+        targets: [],
       });
     } else {
       try {
-        const file =
-          installAgyHooks({
-            binary,
-          });
+        const file = installAgyHooks({
+          binary,
+        });
 
         results.push({
-          agent:
-            "agy",
+          agent: 'agy',
 
-          detected:
-            true,
+          detected: true,
 
-          installed:
-            true,
+          installed: true,
 
-          targets: [
-            file,
-          ],
+          targets: [file],
         });
       } catch (error) {
         results.push({
-          agent:
-            "agy",
+          agent: 'agy',
 
-          detected:
-            true,
+          detected: true,
 
-          installed:
-            false,
+          installed: false,
 
-          targets:
-            [],
+          targets: [],
 
-          error:
-            error instanceof Error
-              ? error.message
-              : String(error),
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -197,63 +107,44 @@ export function installAutoIntegrations(
    * OpenCode
    */
   {
-    const detected =
-      options.force === true ||
-      detectOpenCode();
+    const detected = options.force === true || detectOpenCode();
 
     if (!detected) {
       results.push({
-        agent:
-          "opencode",
+        agent: 'opencode',
 
-        detected:
-          false,
+        detected: false,
 
-        installed:
-          false,
+        installed: false,
 
-        targets:
-          [],
+        targets: [],
       });
     } else {
       try {
-        const file =
-          installOpenCodePlugin({
-            binary,
-          });
+        const file = installOpenCodePlugin({
+          binary,
+        });
 
         results.push({
-          agent:
-            "opencode",
+          agent: 'opencode',
 
-          detected:
-            true,
+          detected: true,
 
-          installed:
-            true,
+          installed: true,
 
-          targets: [
-            file,
-          ],
+          targets: [file],
         });
       } catch (error) {
         results.push({
-          agent:
-            "opencode",
+          agent: 'opencode',
 
-          detected:
-            true,
+          detected: true,
 
-          installed:
-            false,
+          installed: false,
 
-          targets:
-            [],
+          targets: [],
 
-          error:
-            error instanceof Error
-              ? error.message
-              : String(error),
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -263,79 +154,54 @@ export function installAutoIntegrations(
    * Codex
    */
   {
-    const detected =
-      options.force === true ||
-      detectCodex();
+    const detected = options.force === true || detectCodex();
 
     if (!detected) {
       results.push({
-        agent:
-          "codex",
+        agent: 'codex',
 
-        detected:
-          false,
+        detected: false,
 
-        installed:
-          false,
+        installed: false,
 
-        targets:
-          [],
+        targets: [],
       });
     } else {
       try {
-        const notify =
-          installCodexNotify({
-            binary,
-          });
+        const notify = installCodexNotify({
+          binary,
+        });
 
-        const context =
-          installCodexContextHook({
-            binary,
-          });
+        const context = installCodexContextHook({
+          binary,
+        });
 
-        const targets = [
-          notify.configFile,
-          context,
-        ];
+        const targets = [notify.configFile, context];
 
-        if (
-          notify.preservedPrevious
-        ) {
-          targets.push(
-            notify.previousFile,
-          );
+        if (notify.preservedPrevious) {
+          targets.push(notify.previousFile);
         }
 
         results.push({
-          agent:
-            "codex",
+          agent: 'codex',
 
-          detected:
-            true,
+          detected: true,
 
-          installed:
-            true,
+          installed: true,
 
           targets,
         });
       } catch (error) {
         results.push({
-          agent:
-            "codex",
+          agent: 'codex',
 
-          detected:
-            true,
+          detected: true,
 
-          installed:
-            false,
+          installed: false,
 
-          targets:
-            [],
+          targets: [],
 
-          error:
-            error instanceof Error
-              ? error.message
-              : String(error),
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -344,130 +210,70 @@ export function installAutoIntegrations(
   return results;
 }
 
-function printResults(
-  results:
-    AutoIntegrationResult[],
-): void {
-  console.log("");
-  console.log(
-    "ToolNet Memory AI Integrations",
-  );
-  console.log(
-    "==============================",
-  );
-  console.log("");
+function printResults(results: AutoIntegrationResult[]): void {
+  console.log('');
+  console.log('ToolNet Memory AI Integrations');
+  console.log('==============================');
+  console.log('');
 
-  for (
-    const result
-    of results
-  ) {
+  for (const result of results) {
     const name =
-      result.agent ===
-        "agy"
-        ? "Agy / Antigravity"
-        : result.agent ===
-            "opencode"
-          ? "OpenCode"
-          : "Codex";
+      result.agent === 'agy'
+        ? 'Agy / Antigravity'
+        : result.agent === 'opencode'
+          ? 'OpenCode'
+          : 'Codex';
 
-    if (
-      !result.detected
-    ) {
-      console.log(
-        `- ${name}: not detected`,
-      );
+    if (!result.detected) {
+      console.log(`- ${name}: not detected`);
 
       continue;
     }
 
-    if (
-      result.installed
-    ) {
-      console.log(
-        `✓ ${name}: automatic memory enabled`,
-      );
+    if (result.installed) {
+      console.log(`✓ ${name}: automatic memory enabled`);
 
       continue;
     }
 
-    console.log(
-      `✗ ${name}: integration failed`,
-    );
+    console.log(`✗ ${name}: integration failed`);
 
-    if (
-      result.error
-    ) {
-      console.log(
-        `  ${result.error}`,
-      );
+    if (result.error) {
+      console.log(`  ${result.error}`);
     }
   }
 
-  console.log("");
+  console.log('');
 }
 
 async function main() {
-  const args =
-    process.argv.slice(
-      2,
-    );
+  const args = process.argv.slice(2);
 
-  const force =
-    args.includes(
-      "--all",
-    );
+  const force = args.includes('--all');
 
-  const json =
-    args.includes(
-      "--json",
-    );
+  const json = args.includes('--json');
 
-  const results =
-    installAutoIntegrations({
-      force,
-    });
+  const results = installAutoIntegrations({
+    force,
+  });
 
   if (json) {
-    console.log(
-      JSON.stringify(
-        results,
-        null,
-        2,
-      ),
-    );
+    console.log(JSON.stringify(results, null, 2));
 
     return;
   }
 
-  printResults(
-    results,
-  );
+  printResults(results);
 }
 
 const isCli =
   process.argv[1] &&
-  (
-    process.argv[1]
-      .endsWith(
-        "auto-integrate.js",
-      ) ||
-    process.argv[1]
-      .endsWith(
-        "auto-integrate.ts",
-      )
-  );
+  (process.argv[1].endsWith('auto-integrate.js') || process.argv[1].endsWith('auto-integrate.ts'));
 
 if (isCli) {
-  main().catch(
-    error => {
-      console.error(
-        error instanceof Error
-          ? error.message
-          : String(error),
-      );
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
 
-      process.exitCode =
-        1;
-    },
-  );
+    process.exitCode = 1;
+  });
 }

@@ -1,9 +1,6 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  loadConfig,
-  ProjectManager,
-} from "../core/index.js";
+import { loadConfig, ProjectManager } from '../core/index.js';
 
 import {
   createStorageProvider,
@@ -13,23 +10,15 @@ import {
   PersistentVectorStore,
   PersistentCodeChunkStore,
   PersistentCodeVectorStore,
-} from "../storage/index.js";
+} from '../storage/index.js';
 
-import {
-  createEmbeddingProvider,
-} from "../embeddings/index.js";
+import { createEmbeddingProvider } from '../embeddings/index.js';
 
-import {
-  SnapshotManager,
-} from "../snapshot/index.js";
+import { SnapshotManager } from '../snapshot/index.js';
 
-import {
-  checkProductionConfig,
-} from "./config-check.js";
+import { checkProductionConfig } from './config-check.js';
 
-import {
-  ProductionHealth,
-} from "./health.js";
+import { ProductionHealth } from './health.js';
 
 type DoctorResult = {
   ok: boolean;
@@ -64,30 +53,28 @@ type DoctorResult = {
 };
 
 function wantsJson(): boolean {
-  return process.argv.includes("--json");
+  return process.argv.includes('--json');
 }
 
 function printHuman(result: DoctorResult): void {
-  console.log("");
-  console.log("ToolNet Memory Doctor");
-  console.log("=====================");
-  console.log("");
+  console.log('');
+  console.log('ToolNet Memory Doctor');
+  console.log('=====================');
+  console.log('');
 
   if (result.project) {
     console.log(`Project: ${result.project}`);
-    console.log("");
+    console.log('');
   }
 
   if (result.storage) {
     if (result.storage.ok) {
       const provider =
-        typeof result.storage.provider === "string"
-          ? ` (${result.storage.provider})`
-          : "";
+        typeof result.storage.provider === 'string' ? ` (${result.storage.provider})` : '';
 
       console.log(`✓ Storage${provider}`);
     } else {
-      console.log("✗ Storage");
+      console.log('✗ Storage');
     }
   }
 
@@ -95,23 +82,17 @@ function printHuman(result: DoctorResult): void {
     if (result.embedding.ok) {
       const details: string[] = [];
 
-      if (typeof result.embedding.mode === "string") {
+      if (typeof result.embedding.mode === 'string') {
         details.push(result.embedding.mode);
       }
 
-      if (typeof result.embedding.dimensions === "number") {
+      if (typeof result.embedding.dimensions === 'number') {
         details.push(`${result.embedding.dimensions} dimensions`);
       }
 
-      console.log(
-        `✓ Embedding${
-          details.length
-            ? ` (${details.join(", ")})`
-            : ""
-        }`,
-      );
+      console.log(`✓ Embedding${details.length ? ` (${details.join(', ')})` : ''}`);
     } else {
-      console.log("✗ Embedding");
+      console.log('✗ Embedding');
     }
   }
 
@@ -120,8 +101,8 @@ function printHuman(result: DoctorResult): void {
     result.graphSymbols !== undefined ||
     result.codeChunks !== undefined
   ) {
-    console.log("");
-    console.log("Project data:");
+    console.log('');
+    console.log('Project data:');
 
     if (result.memory !== undefined) {
       console.log(`  Memories       ${result.memory}`);
@@ -155,56 +136,47 @@ function printHuman(result: DoctorResult): void {
   const errors = result.config?.errors ?? [];
 
   if (errors.length > 0) {
-    console.log("");
-    console.log("Configuration required:");
+    console.log('');
+    console.log('Configuration required:');
 
     for (const error of errors) {
       console.log(`  - ${error}`);
     }
   }
 
-  const warnings = [
-    ...(result.config?.warnings ?? []),
-    ...(result.warnings ?? []),
-  ];
+  const warnings = [...(result.config?.warnings ?? []), ...(result.warnings ?? [])];
 
   const uniqueWarnings = [...new Set(warnings)];
 
   if (uniqueWarnings.length > 0) {
-    console.log("");
-    console.log("Warnings:");
+    console.log('');
+    console.log('Warnings:');
 
     for (const warning of uniqueWarnings) {
       console.log(`  - ${warning}`);
     }
   }
 
-  console.log("");
+  console.log('');
 
   if (result.ok) {
-    console.log("✓ ToolNet Memory is ready");
+    console.log('✓ ToolNet Memory is ready');
   } else {
-    console.log("✗ ToolNet Memory requires attention");
+    console.log('✗ ToolNet Memory requires attention');
 
     if (errors.length > 0) {
-      console.log("");
-      console.log("Run:");
-      console.log("  toolnet-memory setup");
+      console.log('');
+      console.log('Run:');
+      console.log('  toolnet-memory setup');
     }
   }
 
-  console.log("");
+  console.log('');
 }
 
 function output(result: DoctorResult): void {
   if (wantsJson()) {
-    console.log(
-      JSON.stringify(
-        result,
-        null,
-        2,
-      ),
-    );
+    console.log(JSON.stringify(result, null, 2));
   } else {
     printHuman(result);
   }
@@ -228,73 +200,36 @@ async function main(): Promise<void> {
 
   const config = loadConfig();
 
-  const project =
-    new ProjectManager()
-      .detect();
+  const project = new ProjectManager().detect();
 
-  const storage =
-    withStorageRetry(
-      createStorageProvider({
-        provider: config.storage.provider,
-        r2: config.storage.r2,
-        s3: config.storage.s3,
-        huggingface: config.storage.huggingface,
-        localRoot: config.storage.localRoot,
-      }),
-      {
-        attempts: 3,
-      },
-    );
+  const storage = withStorageRetry(
+    createStorageProvider({
+      provider: config.storage.provider,
+      r2: config.storage.r2,
+      s3: config.storage.s3,
+      huggingface: config.storage.huggingface,
+      localRoot: config.storage.localRoot,
+    }),
+    {
+      attempts: 3,
+    }
+  );
 
   const embeddings = createEmbeddingProvider();
 
-  const health =
-    await new ProductionHealth(
-      storage,
-      embeddings,
-    ).run();
+  const health = await new ProductionHealth(storage, embeddings).run();
 
-  const memories =
-    await new MemoryStore(
-      storage,
-    ).load(
-      project.id,
-    );
+  const memories = await new MemoryStore(storage).load(project.id);
 
-  const graph =
-    await new PersistentCodeGraphStore(
-      storage,
-    ).load(
-      project.id,
-    );
+  const graph = await new PersistentCodeGraphStore(storage).load(project.id);
 
-  const vectors =
-    await new PersistentVectorStore(
-      storage,
-    ).load(
-      project.id,
-    );
+  const vectors = await new PersistentVectorStore(storage).load(project.id);
 
-  const chunks =
-    await new PersistentCodeChunkStore(
-      storage,
-    ).load(
-      project.id,
-    );
+  const chunks = await new PersistentCodeChunkStore(storage).load(project.id);
 
-  const codeVectors =
-    await new PersistentCodeVectorStore(
-      storage,
-    ).load(
-      project.id,
-    );
+  const codeVectors = await new PersistentCodeVectorStore(storage).load(project.id);
 
-  const snapshots =
-    await new SnapshotManager(
-      storage,
-    ).list(
-      project.id,
-    );
+  const snapshots = await new SnapshotManager(storage).list(project.id);
 
   const result: DoctorResult = {
     ok: health.ok,
@@ -316,33 +251,28 @@ async function main(): Promise<void> {
   process.exitCode = result.ok ? 0 : 1;
 }
 
-main().catch(
-  (error) => {
-    const message =
-      error instanceof Error
-        ? error.message
-        : String(error);
+main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
 
-    if (wantsJson()) {
-      console.log(
-        JSON.stringify(
-          {
-            ok: false,
-            error: message,
-          },
-          null,
-          2,
-        ),
-      );
-    } else {
-      console.error("");
-      console.error("ToolNet Memory Doctor");
-      console.error("=====================");
-      console.error("");
-      console.error(`✗ ${message}`);
-      console.error("");
-    }
+  if (wantsJson()) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: false,
+          error: message,
+        },
+        null,
+        2
+      )
+    );
+  } else {
+    console.error('');
+    console.error('ToolNet Memory Doctor');
+    console.error('=====================');
+    console.error('');
+    console.error(`✗ ${message}`);
+    console.error('');
+  }
 
-    process.exitCode = 1;
-  },
-);
+  process.exitCode = 1;
+});

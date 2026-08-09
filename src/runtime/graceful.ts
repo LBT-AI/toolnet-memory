@@ -1,34 +1,23 @@
-import type {
-  ToolNetMemoryRuntime,
-} from "./toolnet-memory-runtime.js";
+import type { ToolNetMemoryRuntime } from './toolnet-memory-runtime.js';
 
-export function registerGracefulShutdown(
-  runtime: ToolNetMemoryRuntime,
-): void {
+export function registerGracefulShutdown(runtime: ToolNetMemoryRuntime): void {
   let stopping = false;
 
-  const stop =
-    async () => {
-      if (stopping) {
-        return;
-      }
+  const stop = async () => {
+    if (stopping) {
+      return;
+    }
 
-      stopping = true;
+    stopping = true;
 
-      try {
-        await runtime.stop();
-      } finally {
-        process.exit(0);
-      }
-    };
+    try {
+      await runtime.stop();
+    } finally {
+      process.exit(0);
+    }
+  };
 
-  process.once(
-    "SIGINT",
-    stop,
-  );
+  process.once('SIGINT', stop);
 
-  process.once(
-    "SIGTERM",
-    stop,
-  );
+  process.once('SIGTERM', stop);
 }

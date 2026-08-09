@@ -1,48 +1,22 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  createReadStream,
-} from "node:fs";
+import { createReadStream } from 'node:fs';
 
-import {
-  createServer,
-} from "node:http";
+import { createServer } from 'node:http';
 
-import {
-  dirname,
-  resolve,
-} from "node:path";
+import { dirname, resolve } from 'node:path';
 
-import {
-  fileURLToPath,
-} from "node:url";
+import { fileURLToPath } from 'node:url';
 
-import {
-  loadConfig,
-  ProjectManager,
-} from "../core/index.js";
+import { loadConfig, ProjectManager } from '../core/index.js';
 
-import {
-  CodeGraphStore,
-  VisualizationBuilder,
-} from "../code-intelligence/index.js";
+import { CodeGraphStore, VisualizationBuilder } from '../code-intelligence/index.js';
 
-import {
-  createStorageProvider,
-  withStorageRetry,
-} from "../storage/index.js";
+import { createStorageProvider, withStorageRetry } from '../storage/index.js';
 
-const PORT =
-  Number(
-    process.env
-      .TOOLNET_GRAPH_PORT ??
-    9749,
-  );
+const PORT = Number(process.env.TOOLNET_GRAPH_PORT ?? 9749);
 
-const HOST =
-  process.env
-    .TOOLNET_GRAPH_HOST ??
-  "127.0.0.1";
+const HOST = process.env.TOOLNET_GRAPH_HOST ?? '127.0.0.1';
 
 interface DashboardProject {
   id: string;
@@ -55,45 +29,20 @@ interface DashboardProject {
   hasVisualization: boolean;
 }
 
-function extractKey(
-  item: unknown,
-): string | null {
-  if (
-    typeof item ===
-    "string"
-  ) {
+function extractKey(item: unknown): string | null {
+  if (typeof item === 'string') {
     return item;
   }
 
-  if (
-    !item ||
-    typeof item !==
-      "object"
-  ) {
+  if (!item || typeof item !== 'object') {
     return null;
   }
 
-  const value =
-    item as Record<
-      string,
-      unknown
-    >;
+  const value = item as Record<string, unknown>;
 
-  for (
-    const field
-    of [
-      "key",
-      "Key",
-      "path",
-      "name",
-    ]
-  ) {
-    if (
-      typeof value[field] ===
-      "string"
-    ) {
-      return value[field] as
-        string;
+  for (const field of ['key', 'Key', 'path', 'name']) {
+    if (typeof value[field] === 'string') {
+      return value[field] as string;
     }
   }
 
@@ -102,74 +51,38 @@ function extractKey(
 
 async function listKeys(
   storage: {
-    list:
-      (
-        prefix: string,
-      ) => Promise<unknown[]>;
+    list: (prefix: string) => Promise<unknown[]>;
   },
 
-  prefix: string,
+  prefix: string
 ): Promise<string[]> {
-  const items =
-    await storage.list(
-      prefix,
-    );
+  const items = await storage.list(prefix);
 
-  return items
-    .map(
-      extractKey,
-    )
-    .filter(
-      (
-        value,
-      ): value is string =>
-        Boolean(
-          value,
-        ),
-    );
+  return items.map(extractKey).filter((value): value is string => Boolean(value));
 }
 
 async function readJson(
   storage: {
-    getText:
-      (
-        key: string,
-      ) => Promise<
-        string |
-        null
-      >;
+    getText: (key: string) => Promise<string | null>;
   },
 
-  key: string,
+  key: string
 ): Promise<any | null> {
-  const text =
-    await storage.getText(
-      key,
-    );
+  const text = await storage.getText(key);
 
   if (!text) {
     return null;
   }
 
   try {
-    return JSON.parse(
-      text,
-    );
+    return JSON.parse(text);
   } catch {
     return null;
   }
 }
 
-async function discoverProjects(
-  storage: any,
-): Promise<
-  DashboardProject[]
-> {
-  const keys =
-    await listKeys(
-      storage,
-      "projects/",
-    );
+async function discoverProjects(storage: any): Promise<DashboardProject[]> {
+  const keys = await listKeys(storage, 'projects/');
 
   /*
    * Registry rule:
@@ -178,242 +91,113 @@ async function discoverProjects(
    *
    * Backups / random directories never enter dashboard.
    */
-  const remotes =
-    [
-      ...new Set(
-        keys
-          .filter(
-            key =>
-              /^projects\/[^/]+\/project\.json$/
-                .test(
-                  key,
-                ),
-          )
-          .map(
-            key =>
-              key.split(
-                "/",
-              )[1],
-          ),
-      ),
-    ];
+  const remotes = [
+    ...new Set(
+      keys
+        .filter((key) => /^projects\/[^/]+\/project\.json$/.test(key))
+        .map((key) => key.split('/')[1])
+    ),
+  ];
 
-  const keySet =
-    new Set(
-      keys,
-    );
+  const keySet = new Set(keys);
 
-  const projects:
-    DashboardProject[] =
-    [];
+  const projects: DashboardProject[] = [];
 
-  for (
-    const remote
-    of remotes
-  ) {
-    const manifest =
-      await readJson(
-        storage,
-        `projects/${remote}/project.json`,
-      );
+  for (const remote of remotes) {
+    const manifest = await readJson(storage, `projects/${remote}/project.json`);
 
-    if (
-      !manifest ||
-      typeof manifest.id !==
-        "string"
-    ) {
+    if (!manifest || typeof manifest.id !== 'string') {
       continue;
     }
 
     projects.push({
-      id:
-        manifest.id,
+      id: manifest.id,
 
-      name:
-        typeof manifest.name ===
-          "string"
-          ? manifest.name
-          : remote,
+      name: typeof manifest.name === 'string' ? manifest.name : remote,
 
       remote,
 
-      hasGraph:
-        keySet.has(
-          `projects/${remote}/code/graph/current.json`,
-        ),
+      hasGraph: keySet.has(`projects/${remote}/code/graph/current.json`),
 
-      hasArchitecture:
-        keySet.has(
-          `projects/${remote}/code/architecture/current.json`,
-        ),
+      hasArchitecture: keySet.has(`projects/${remote}/code/architecture/current.json`),
 
-      hasAnalysis:
-        keySet.has(
-          `projects/${remote}/code/analysis/current.json`,
-        ),
+      hasAnalysis: keySet.has(`projects/${remote}/code/analysis/current.json`),
 
-      hasVisualization:
-        keySet.has(
-          `projects/${remote}/code/visualization/graph.json`,
-        ),
+      hasVisualization: keySet.has(`projects/${remote}/code/visualization/graph.json`),
     });
   }
 
-  return projects.sort(
-    (
-      a,
-      b,
-    ) =>
-      a.name.localeCompare(
-        b.name,
-      ),
-  );
+  return projects.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function main() {
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
-  const currentProject =
-    new ProjectManager()
-      .detect();
+  const currentProject = new ProjectManager().detect();
 
-  const rawStorage =
-    withStorageRetry(
-      createStorageProvider({
-        provider:
-          config.storage.provider,
+  const rawStorage = withStorageRetry(
+    createStorageProvider({
+      provider: config.storage.provider,
 
-        huggingface:
-          config.storage.huggingface,
+      huggingface: config.storage.huggingface,
 
-        localRoot:
-          config.storage.localRoot,
-      }),
-      {
-        attempts:
-          3,
-      },
-    );
+      localRoot: config.storage.localRoot,
+    }),
+    {
+      attempts: 3,
+    }
+  );
 
-  if (
-    rawStorage.name !==
-    "huggingface"
-  ) {
-    console.warn(
-      "[graph-ui] Remote Hugging Face storage is not active.",
-    );
+  if (rawStorage.name !== 'huggingface') {
+    console.warn('[graph-ui] Remote Hugging Face storage is not active.');
   }
 
-  const moduleDir =
-    dirname(
-      fileURLToPath(
-        import.meta.url,
-      ),
-    );
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-  const publicDir =
-    resolve(
-      moduleDir,
-      "public",
-    );
+  const publicDir = resolve(moduleDir, 'public');
 
-  const vendorFile =
-    resolve(
-      publicDir,
-      "vendor",
-      "3d-force-graph.min.js",
-    );
+  const vendorFile = resolve(publicDir, 'vendor', '3d-force-graph.min.js');
 
   async function getCatalog() {
-    const projects =
-      await discoverProjects(
-        rawStorage,
-      );
+    const projects = await discoverProjects(rawStorage);
 
-    const currentRemote =
-      currentProject.remote ??
-      currentProject.name;
+    const currentRemote = currentProject.remote ?? currentProject.name;
 
-    const current =
-      projects.find(
-        project =>
-          project.remote ===
-            currentRemote &&
-          project.hasGraph,
-      );
+    const current = projects.find(
+      (project) => project.remote === currentRemote && project.hasGraph
+    );
 
-    const firstGraph =
-      projects.find(
-        project =>
-          project.hasGraph,
-      );
+    const firstGraph = projects.find((project) => project.hasGraph);
 
     return {
       projects,
 
-      defaultProject:
-        current?.remote ??
-        firstGraph?.remote ??
-        null,
+      defaultProject: current?.remote ?? firstGraph?.remote ?? null,
     };
   }
 
-  async function buildProjectVisualization(
-    project:
-      DashboardProject,
-  ) {
-    const prefix =
-      `projects/${project.remote}`;
+  async function buildProjectVisualization(project: DashboardProject) {
+    const prefix = `projects/${project.remote}`;
 
-    const graphSnapshot =
-      await readJson(
-        rawStorage,
-        `${prefix}/code/graph/current.json`,
-      );
+    const graphSnapshot = await readJson(rawStorage, `${prefix}/code/graph/current.json`);
 
     if (
       !graphSnapshot ||
-      !Array.isArray(
-        graphSnapshot.symbols,
-      ) ||
-      !Array.isArray(
-        graphSnapshot.edges,
-      )
+      !Array.isArray(graphSnapshot.symbols) ||
+      !Array.isArray(graphSnapshot.edges)
     ) {
-      throw new Error(
-        `Code graph missing for project ${project.name}`,
-      );
+      throw new Error(`Code graph missing for project ${project.name}`);
     }
 
-    const architecture =
-      await readJson(
-        rawStorage,
-        `${prefix}/code/architecture/current.json`,
-      );
+    const architecture = await readJson(rawStorage, `${prefix}/code/architecture/current.json`);
 
-    const analysis =
-      await readJson(
-        rawStorage,
-        `${prefix}/code/analysis/current.json`,
-      );
+    const analysis = await readJson(rawStorage, `${prefix}/code/analysis/current.json`);
 
-    const graph =
-      new CodeGraphStore();
+    const graph = new CodeGraphStore();
 
-    graph.import(
-      graphSnapshot.symbols,
-      graphSnapshot.edges,
-    );
+    graph.import(graphSnapshot.symbols, graphSnapshot.edges);
 
-    const visualization =
-      new VisualizationBuilder(
-        graph,
-      ).build(
-        project.id,
-        architecture,
-        analysis,
-      );
+    const visualization = new VisualizationBuilder(graph).build(project.id, architecture, analysis);
 
     /*
      * Keep a cached visualization in that project's own
@@ -422,340 +206,181 @@ async function main() {
     await rawStorage.put(
       `${prefix}/code/visualization/graph.json`,
 
-      JSON.stringify(
-        visualization,
-        null,
-        2,
-      ),
+      JSON.stringify(visualization, null, 2),
 
-      "application/json",
+      'application/json'
     );
 
     return {
       ...visualization,
 
       dashboard: {
-        id:
-          project.id,
+        id: project.id,
 
-        name:
-          project.name,
+        name: project.name,
 
-        remote:
-          project.remote,
+        remote: project.remote,
 
-        hasArchitecture:
-          Boolean(
-            architecture,
-          ),
+        hasArchitecture: Boolean(architecture),
 
-        hasAnalysis:
-          Boolean(
-            analysis,
-          ),
+        hasAnalysis: Boolean(analysis),
       },
     };
   }
 
-  const server =
-    createServer(
-      async (
-        req,
-        res,
-      ) => {
-        try {
-          const url =
-            new URL(
-              req.url ??
-                "/",
+  const server = createServer(async (req, res) => {
+    try {
+      const url = new URL(
+        req.url ?? '/',
 
-              `http://${
-                req.headers.host ??
-                "localhost"
-              }`,
-            );
+        `http://${req.headers.host ?? 'localhost'}`
+      );
 
-          if (
-            url.pathname ===
-            "/api/health"
-          ) {
-            const catalog =
-              await getCatalog();
+      if (url.pathname === '/api/health') {
+        const catalog = await getCatalog();
 
-            res.setHeader(
-              "content-type",
-              "application/json; charset=utf-8",
-            );
+        res.setHeader('content-type', 'application/json; charset=utf-8');
 
-            res.setHeader(
-              "cache-control",
-              "no-store",
-            );
+        res.setHeader('cache-control', 'no-store');
 
-            res.end(
-              JSON.stringify({
-                ok: true,
+        res.end(
+          JSON.stringify({
+            ok: true,
 
-                mode:
-                  "multi-project",
+            mode: 'multi-project',
 
-                projects:
-                  catalog.projects
-                    .length,
+            projects: catalog.projects.length,
 
-                indexedProjects:
-                  catalog.projects
-                    .filter(
-                      item =>
-                        item.hasGraph,
-                    )
-                    .length,
+            indexedProjects: catalog.projects.filter((item) => item.hasGraph).length,
 
-                defaultProject:
-                  catalog.defaultProject,
-              }),
-            );
+            defaultProject: catalog.defaultProject,
+          })
+        );
 
-            return;
-          }
+        return;
+      }
 
-          if (
-            url.pathname ===
-            "/api/projects"
-          ) {
-            const catalog =
-              await getCatalog();
+      if (url.pathname === '/api/projects') {
+        const catalog = await getCatalog();
 
-            res.setHeader(
-              "content-type",
-              "application/json; charset=utf-8",
-            );
+        res.setHeader('content-type', 'application/json; charset=utf-8');
 
-            res.setHeader(
-              "cache-control",
-              "no-store",
-            );
+        res.setHeader('cache-control', 'no-store');
 
-            res.end(
-              JSON.stringify(
-                catalog,
-              ),
-            );
+        res.end(JSON.stringify(catalog));
 
-            return;
-          }
+        return;
+      }
 
-          if (
-            url.pathname ===
-            "/api/graph"
-          ) {
-            const catalog =
-              await getCatalog();
+      if (url.pathname === '/api/graph') {
+        const catalog = await getCatalog();
 
-            const requested =
-              url.searchParams.get(
-                "project",
-              ) ??
-              catalog.defaultProject;
+        const requested = url.searchParams.get('project') ?? catalog.defaultProject;
 
-            if (!requested) {
-              res.statusCode =
-                404;
+        if (!requested) {
+          res.statusCode = 404;
 
-              res.setHeader(
-                "content-type",
-                "application/json; charset=utf-8",
-              );
-
-              res.end(
-                JSON.stringify({
-                  error:
-                    "No indexed ToolNet project found.",
-                }),
-              );
-
-              return;
-            }
-
-            const project =
-              catalog.projects
-                .find(
-                  item =>
-                    item.remote ===
-                    requested,
-                );
-
-            if (!project) {
-              res.statusCode =
-                404;
-
-              res.setHeader(
-                "content-type",
-                "application/json; charset=utf-8",
-              );
-
-              res.end(
-                JSON.stringify({
-                  error:
-                    "Project not found.",
-
-                  project:
-                    requested,
-                }),
-              );
-
-              return;
-            }
-
-            if (
-              !project.hasGraph
-            ) {
-              res.statusCode =
-                409;
-
-              res.setHeader(
-                "content-type",
-                "application/json; charset=utf-8",
-              );
-
-              res.end(
-                JSON.stringify({
-                  error:
-                    "Project is registered but has not been indexed yet.",
-
-                  project,
-                }),
-              );
-
-              return;
-            }
-
-            const visualization =
-              await buildProjectVisualization(
-                project,
-              );
-
-            res.setHeader(
-              "content-type",
-              "application/json; charset=utf-8",
-            );
-
-            res.setHeader(
-              "cache-control",
-              "no-store",
-            );
-
-            res.end(
-              JSON.stringify(
-                visualization,
-              ),
-            );
-
-            return;
-          }
-
-          if (
-            url.pathname ===
-            "/vendor/3d-force-graph.min.js"
-          ) {
-            res.setHeader(
-              "content-type",
-              "application/javascript; charset=utf-8",
-            );
-
-            createReadStream(
-              vendorFile,
-            ).pipe(
-              res,
-            );
-
-            return;
-          }
-
-          if (
-            url.pathname ===
-              "/" ||
-            url.pathname ===
-              "/index.html"
-          ) {
-            res.setHeader(
-              "content-type",
-              "text/html; charset=utf-8",
-            );
-
-            res.setHeader(
-              "cache-control",
-              "no-store",
-            );
-
-            createReadStream(
-              resolve(
-                publicDir,
-                "index.html",
-              ),
-            ).pipe(
-              res,
-            );
-
-            return;
-          }
-
-          res.statusCode =
-            404;
-
-          res.end(
-            "Not found",
-          );
-        } catch (
-          error
-        ) {
-          console.error(
-            error,
-          );
-
-          res.statusCode =
-            500;
-
-          res.setHeader(
-            "content-type",
-            "application/json; charset=utf-8",
-          );
+          res.setHeader('content-type', 'application/json; charset=utf-8');
 
           res.end(
             JSON.stringify({
-              error:
-                error instanceof Error
-                  ? error.message
-                  : String(
-                      error,
-                    ),
-            }),
+              error: 'No indexed ToolNet project found.',
+            })
           );
+
+          return;
         }
-      },
-    );
 
-  server.listen(
-    PORT,
-    HOST,
-    () => {
-      console.log(
-        "ToolNet Multi-Project 3D Graph",
-      );
+        const project = catalog.projects.find((item) => item.remote === requested);
 
-      console.log(
-        `Listening: http://${HOST}:${PORT}`,
+        if (!project) {
+          res.statusCode = 404;
+
+          res.setHeader('content-type', 'application/json; charset=utf-8');
+
+          res.end(
+            JSON.stringify({
+              error: 'Project not found.',
+
+              project: requested,
+            })
+          );
+
+          return;
+        }
+
+        if (!project.hasGraph) {
+          res.statusCode = 409;
+
+          res.setHeader('content-type', 'application/json; charset=utf-8');
+
+          res.end(
+            JSON.stringify({
+              error: 'Project is registered but has not been indexed yet.',
+
+              project,
+            })
+          );
+
+          return;
+        }
+
+        const visualization = await buildProjectVisualization(project);
+
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+
+        res.setHeader('cache-control', 'no-store');
+
+        res.end(JSON.stringify(visualization));
+
+        return;
+      }
+
+      if (url.pathname === '/vendor/3d-force-graph.min.js') {
+        res.setHeader('content-type', 'application/javascript; charset=utf-8');
+
+        createReadStream(vendorFile).pipe(res);
+
+        return;
+      }
+
+      if (url.pathname === '/' || url.pathname === '/index.html') {
+        res.setHeader('content-type', 'text/html; charset=utf-8');
+
+        res.setHeader('cache-control', 'no-store');
+
+        createReadStream(resolve(publicDir, 'index.html')).pipe(res);
+
+        return;
+      }
+
+      res.statusCode = 404;
+
+      res.end('Not found');
+    } catch (error) {
+      console.error(error);
+
+      res.statusCode = 500;
+
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+
+      res.end(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : String(error),
+        })
       );
-    },
-  );
+    }
+  });
+
+  server.listen(PORT, HOST, () => {
+    console.log('ToolNet Multi-Project 3D Graph');
+
+    console.log(`Listening: http://${HOST}:${PORT}`);
+  });
 }
 
-main().catch(
-  error => {
-    console.error(
-      error,
-    );
+main().catch((error) => {
+  console.error(error);
 
-    process.exit(1);
-  },
-);
+  process.exit(1);
+});

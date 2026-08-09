@@ -3,68 +3,39 @@ export interface VectorRecord {
   projectId: string;
   vector: number[];
 
-  metadata?: Record<
-    string,
-    unknown
-  >;
+  metadata?: Record<string, unknown>;
 }
 
 export interface VectorSearchResult {
   id: string;
   score: number;
-  metadata?: Record<
-    string,
-    unknown
-  >;
+  metadata?: Record<string, unknown>;
 }
 
 export class VectorStore {
-  private readonly records =
-    new Map<
-      string,
-      VectorRecord
-    >();
+  private readonly records = new Map<string, VectorRecord>();
 
-  upsert(
-    record: VectorRecord,
-  ): void {
-    this.records.set(
-      record.id,
-      record,
-    );
+  upsert(record: VectorRecord): void {
+    this.records.set(record.id, record);
   }
 
-  get(
-    id: string,
-  ): VectorRecord | undefined {
+  get(id: string): VectorRecord | undefined {
     return this.records.get(id);
   }
 
-  has(
-    id: string,
-  ): boolean {
+  has(id: string): boolean {
     return this.records.has(id);
   }
 
-  remove(
-    id: string,
-  ): boolean {
+  remove(id: string): boolean {
     return this.records.delete(id);
   }
 
-  clearProject(
-    projectId: string,
-  ): number {
+  clearProject(projectId: string): number {
     let deleted = 0;
 
-    for (
-      const [id, record]
-      of this.records
-    ) {
-      if (
-        record.projectId ===
-        projectId
-      ) {
+    for (const [id, record] of this.records) {
+      if (record.projectId === projectId) {
         this.records.delete(id);
         deleted++;
       }
@@ -73,38 +44,19 @@ export class VectorStore {
     return deleted;
   }
 
-  exportProject(
-    projectId: string,
-  ): VectorRecord[] {
-    return [...this.records.values()]
-      .filter(
-        (record) =>
-          record.projectId ===
-          projectId,
-      );
+  exportProject(projectId: string): VectorRecord[] {
+    return [...this.records.values()].filter((record) => record.projectId === projectId);
   }
 
-  importRecords(
-    records: VectorRecord[],
-  ): number {
+  importRecords(records: VectorRecord[]): number {
     let imported = 0;
 
-    for (
-      const record
-      of records
-    ) {
-      if (
-        !record?.id ||
-        !record?.projectId ||
-        !Array.isArray(record.vector)
-      ) {
+    for (const record of records) {
+      if (!record?.id || !record?.projectId || !Array.isArray(record.vector)) {
         continue;
       }
 
-      this.records.set(
-        record.id,
-        record,
-      );
+      this.records.set(record.id, record);
 
       imported++;
     }
@@ -112,49 +64,24 @@ export class VectorStore {
     return imported;
   }
 
-  search(
-    projectId: string,
-    queryVector: number[],
-    limit = 10,
-  ): VectorSearchResult[] {
-    const results:
-      VectorSearchResult[] = [];
+  search(projectId: string, queryVector: number[], limit = 10): VectorSearchResult[] {
+    const results: VectorSearchResult[] = [];
 
-    for (
-      const record
-      of this.records.values()
-    ) {
-      if (
-        record.projectId !==
-        projectId
-      ) {
+    for (const record of this.records.values()) {
+      if (record.projectId !== projectId) {
         continue;
       }
 
-      const score =
-        cosineSimilarity(
-          queryVector,
-          record.vector,
-        );
+      const score = cosineSimilarity(queryVector, record.vector);
 
       results.push({
-        id:
-          record.id,
+        id: record.id,
         score,
-        metadata:
-          record.metadata,
+        metadata: record.metadata,
       });
     }
 
-    return results
-      .sort(
-        (a, b) =>
-          b.score - a.score,
-      )
-      .slice(
-        0,
-        limit,
-      );
+    return results.sort((a, b) => b.score - a.score).slice(0, limit);
   }
 
   size(): number {
@@ -162,15 +89,8 @@ export class VectorStore {
   }
 }
 
-export function cosineSimilarity(
-  a: number[],
-  b: number[],
-): number {
-  if (
-    a.length === 0 ||
-    b.length === 0 ||
-    a.length !== b.length
-  ) {
+export function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length === 0 || b.length === 0 || a.length !== b.length) {
     return 0;
   }
 
@@ -178,11 +98,7 @@ export function cosineSimilarity(
   let normA = 0;
   let normB = 0;
 
-  for (
-    let i = 0;
-    i < a.length;
-    i++
-  ) {
+  for (let i = 0; i < a.length; i++) {
     const av = a[i] ?? 0;
     const bv = b[i] ?? 0;
 
@@ -191,18 +107,9 @@ export function cosineSimilarity(
     normB += bv * bv;
   }
 
-  if (
-    normA === 0 ||
-    normB === 0
-  ) {
+  if (normA === 0 || normB === 0) {
     return 0;
   }
 
-  return (
-    dot /
-    (
-      Math.sqrt(normA) *
-      Math.sqrt(normB)
-    )
-  );
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }

@@ -1,7 +1,4 @@
-import type {
-  CodeSymbol,
-  GraphEdge,
-} from "../../core/types.js";
+import type { CodeSymbol, GraphEdge } from '../../core/types.js';
 
 export interface GraphQueryNode {
   symbol: CodeSymbol;

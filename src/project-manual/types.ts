@@ -1,17 +1,13 @@
-export type ProjectRuleMode =
-  | "enforce"
-  | "advisory";
+export type ProjectRuleMode = 'enforce' | 'advisory';
 
 export interface ProjectManualRule {
   id: string;
 
-  mode:
-    ProjectRuleMode;
+  mode: ProjectRuleMode;
 
   text: string;
 
-  source:
-    "manual";
+  source: 'manual';
 }
 
 export interface ProjectManual {
@@ -21,8 +17,7 @@ export interface ProjectManual {
 
   digest: string;
 
-  rules:
-    ProjectManualRule[];
+  rules: ProjectManualRule[];
 
   bytes: number;
 

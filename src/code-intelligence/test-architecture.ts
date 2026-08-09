@@ -1,9 +1,6 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  loadConfig,
-  ProjectManager,
-} from "../core/index.js";
+import { loadConfig, ProjectManager } from '../core/index.js';
 
 import {
   createStorageProvider,
@@ -11,202 +8,102 @@ import {
   ProjectScopedStorageProvider,
   PersistentArchitectureStore,
   PersistentCodeGraphStore,
-} from "../storage/index.js";
+} from '../storage/index.js';
 
-import {
-  ArchitectureEngine,
-  CodeGraphStore,
-} from "./index.js";
+import { ArchitectureEngine, CodeGraphStore } from './index.js';
 
 async function main() {
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
-  const project =
-    new ProjectManager()
-      .detect();
+  const project = new ProjectManager().detect();
 
-  const rawStorage =
-    withStorageRetry(
-      createStorageProvider({
-        provider:
-          config.storage.provider,
+  const rawStorage = withStorageRetry(
+    createStorageProvider({
+      provider: config.storage.provider,
 
-        huggingface:
-          config.storage.huggingface,
+      huggingface: config.storage.huggingface,
 
-        localRoot:
-          config.storage.localRoot,
-      }),
-      {
-        attempts:
-          3,
-      },
-    );
+      localRoot: config.storage.localRoot,
+    }),
+    {
+      attempts: 3,
+    }
+  );
 
-  const storage =
-    new ProjectScopedStorageProvider(
-      rawStorage,
-      project.id,
-      project.name,
-      project.remote ?? project.name,
-    );
+  const storage = new ProjectScopedStorageProvider(
+    rawStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
 
-  const graphSnapshot =
-    await new PersistentCodeGraphStore(
-      storage,
-    ).load(
-      project.id,
-    );
+  const graphSnapshot = await new PersistentCodeGraphStore(storage).load(project.id);
 
   if (!graphSnapshot) {
-    throw new Error(
-      "Code graph missing",
-    );
+    throw new Error('Code graph missing');
   }
 
-  const graph =
-    new CodeGraphStore();
+  const graph = new CodeGraphStore();
 
-  graph.import(
-    graphSnapshot.symbols,
-    graphSnapshot.edges,
-  );
+  graph.import(graphSnapshot.symbols, graphSnapshot.edges);
 
-  const architecture =
-    new ArchitectureEngine(
-      graph,
-    ).analyze(
-      project.id,
-    );
+  const architecture = new ArchitectureEngine(graph).analyze(project.id);
 
-  await new PersistentArchitectureStore(
-    storage,
-  ).save(
-    architecture,
-  );
+  await new PersistentArchitectureStore(storage).save(architecture);
 
-  const layerCounts =
-    architecture.layers
-      .reduce<
-        Record<
-          string,
-          number
-        >
-      >(
-        (
-          result,
-          item,
-        ) => {
-          result[
-            item.layer
-          ] =
-            (
-              result[
-                item.layer
-              ] ?? 0
-            ) + 1;
+  const layerCounts = architecture.layers.reduce<Record<string, number>>((result, item) => {
+    result[item.layer] = (result[item.layer] ?? 0) + 1;
 
-          return result;
-        },
-        {},
-      );
+    return result;
+  }, {});
 
   console.log({
     ok: true,
 
-    project:
-      project.name,
+    project: project.name,
 
-    summary:
-      architecture.summary,
+    summary: architecture.summary,
 
-    layers:
-      layerCounts,
+    layers: layerCounts,
 
-    topEntryPoints:
-      architecture.entryPoints
-        .slice(
-          0,
-          10,
-        )
-        .map(
-          (item) => ({
-            kind:
-              item.kind,
+    topEntryPoints: architecture.entryPoints.slice(0, 10).map((item) => ({
+      kind: item.kind,
 
-            file:
-              item.filePath,
+      file: item.filePath,
 
-            name:
-              item.name,
+      name: item.name,
 
-            score:
-              item.score,
-          }),
-        ),
+      score: item.score,
+    })),
 
-    topHotspots:
-      architecture.hotspots
-        .slice(
-          0,
-          10,
-        )
-        .map(
-          (item) => ({
-            file:
-              item.filePath,
+    topHotspots: architecture.hotspots.slice(0, 10).map((item) => ({
+      file: item.filePath,
 
-            score:
-              item.score,
+      score: item.score,
 
-            incoming:
-              item.incoming,
+      incoming: item.incoming,
 
-            outgoing:
-              item.outgoing,
-          }),
-        ),
+      outgoing: item.outgoing,
+    })),
 
-    largestClusters:
-      architecture.clusters
-        .slice(
-          0,
-          10,
-        )
-        .map(
-          (item) => ({
-            id:
-              item.id,
+    largestClusters: architecture.clusters.slice(0, 10).map((item) => ({
+      id: item.id,
 
-            label:
-              item.label,
+      label: item.label,
 
-            subsystem:
-              item.subsystem,
+      subsystem: item.subsystem,
 
-            size:
-              item.size,
+      size: item.size,
 
-            cohesion:
-              item.cohesion,
+      cohesion: item.cohesion,
 
-            sample:
-              item.files.slice(
-                0,
-                5,
-              ),
-          }),
-        ),
+      sample: item.files.slice(0, 5),
+    })),
   });
 }
 
-main().catch(
-  (error) => {
-    console.error(
-      error,
-    );
+main().catch((error) => {
+  console.error(error);
 
-    process.exit(1);
-  },
-);
+  process.exit(1);
+});

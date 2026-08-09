@@ -60,7 +60,7 @@ function truncateContent(content: string, maxChars: number): string {
  */
 function filterSensitiveContent(content: string): string {
   const lines = content.split('\n');
-  const filtered = lines.filter(line => {
+  const filtered = lines.filter((line) => {
     const upper = line.toUpperCase();
     return !(
       upper.includes('SECRET') ||
@@ -79,11 +79,11 @@ function filterSensitiveContent(content: string): string {
  */
 export function buildFastProjectContext(options: FastContextOptions = {}): string | null {
   const maxChars = options.maxChars || 50000;
-  
+
   // Find project root
   const startPath = options.projectPath || process.cwd();
   const projectRoot = findProjectRoot(startPath);
-  
+
   if (!projectRoot) {
     return null;
   }
@@ -170,7 +170,7 @@ export function buildFastProjectContext(options: FastContextOptions = {}): strin
 export function syncAgentInstructionFiles(options: FastContextOptions = {}): string[] {
   const startPath = options.projectPath || process.cwd();
   const projectRoot = findProjectRoot(startPath);
-  
+
   if (!projectRoot) {
     throw new Error('Not in a ToolNet project (no .toolnet directory found)');
   }

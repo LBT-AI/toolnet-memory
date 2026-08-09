@@ -1,150 +1,80 @@
-import type {
-  CodeSymbol,
-} from "../../core/types.js";
+import type { CodeSymbol } from '../../core/types.js';
 
-import type {
-  CodeGraphStore,
-} from "../graph/graph-store.js";
+import type { CodeGraphStore } from '../graph/graph-store.js';
 
-import type {
-  ChangedFile,
-} from "../git/git-diff.js";
+import type { ChangedFile } from '../git/git-diff.js';
 
 export interface ChangedSymbol {
-  symbol:
-    CodeSymbol;
+  symbol: CodeSymbol;
 
-  fileStatus:
-    ChangedFile["status"];
+  fileStatus: ChangedFile['status'];
 
-  direct:
-    boolean;
+  direct: boolean;
 }
 
 function intersects(
-  symbol:
-    CodeSymbol,
+  symbol: CodeSymbol,
 
-  file:
-    ChangedFile,
+  file: ChangedFile
 ): boolean {
   /*
    * Nếu không lấy được line diff:
    * coi toàn file bị thay đổi.
    */
-  if (
-    file.ranges.length === 0
-  ) {
+  if (file.ranges.length === 0) {
     return true;
   }
 
-  if (
-    typeof symbol.startLine !==
-      "number" ||
-    typeof symbol.endLine !==
-      "number"
-  ) {
+  if (typeof symbol.startLine !== 'number' || typeof symbol.endLine !== 'number') {
     return false;
   }
 
   return file.ranges.some(
-    (range) =>
-      symbol.startLine! <=
-        range.endLine &&
-      symbol.endLine! >=
-        range.startLine,
+    (range) => symbol.startLine! <= range.endLine && symbol.endLine! >= range.startLine
   );
 }
 
 export class ChangeMapper {
-  constructor(
-    private readonly graph:
-      CodeGraphStore,
-  ) {}
+  constructor(private readonly graph: CodeGraphStore) {}
 
-  map(
-    projectId: string,
-    changes:
-      ChangedFile[],
-  ): ChangedSymbol[] {
-    const symbols =
-      this.graph.allSymbols(
-        projectId,
-      );
+  map(projectId: string, changes: ChangedFile[]): ChangedSymbol[] {
+    const symbols = this.graph.allSymbols(projectId);
 
-    const output:
-      ChangedSymbol[] = [];
+    const output: ChangedSymbol[] = [];
 
-    for (
-      const file
-      of changes
-    ) {
-      const fileSymbols =
-        symbols.filter(
-          (symbol) =>
-            symbol.filePath ===
-            file.filePath,
-        );
+    for (const file of changes) {
+      const fileSymbols = symbols.filter((symbol) => symbol.filePath === file.filePath);
 
-      const semanticSymbols =
-        fileSymbols.filter(
-          (symbol) =>
-            symbol.type !==
-            "file",
-        );
+      const semanticSymbols = fileSymbols.filter((symbol) => symbol.type !== 'file');
 
-      const direct =
-        semanticSymbols.filter(
-          (symbol) =>
-            intersects(
-              symbol,
-              file,
-            ),
-        );
+      const direct = semanticSymbols.filter((symbol) => intersects(symbol, file));
 
       /*
        * Nếu diff nằm ngoài function/class,
        * vẫn đưa file node vào blast radius.
        */
-      if (
-        direct.length === 0
-      ) {
-        const fileNode =
-          fileSymbols.find(
-            (symbol) =>
-              symbol.type ===
-              "file",
-          );
+      if (direct.length === 0) {
+        const fileNode = fileSymbols.find((symbol) => symbol.type === 'file');
 
-        if (
-          fileNode
-        ) {
+        if (fileNode) {
           output.push({
-            symbol:
-              fileNode,
+            symbol: fileNode,
 
-            fileStatus:
-              file.status,
+            fileStatus: file.status,
 
-            direct:
-              true,
+            direct: true,
           });
         }
 
         continue;
       }
 
-      for (
-        const symbol
-        of direct
-      ) {
+      for (const symbol of direct) {
         output.push({
           symbol,
-          fileStatus:
-            file.status,
+          fileStatus: file.status,
 
-          direct:
-            true,
+          direct: true,
         });
       }
     }
@@ -152,20 +82,13 @@ export class ChangeMapper {
     return output;
   }
 
-  mapFile(
-    projectId: string,
-    filePath: string,
-  ): ChangedSymbol[] {
-    return this.map(
-      projectId,
-      [
-        {
-          filePath,
-          status:
-            "modified",
-          ranges: [],
-        },
-      ],
-    );
+  mapFile(projectId: string, filePath: string): ChangedSymbol[] {
+    return this.map(projectId, [
+      {
+        filePath,
+        status: 'modified',
+        ranges: [],
+      },
+    ]);
   }
 }

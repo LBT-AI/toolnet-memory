@@ -1,19 +1,19 @@
-import { createHash } from "node:crypto";
-import type { ActivityEvent } from "../core/types.js";
+import { createHash } from 'node:crypto';
+import type { ActivityEvent } from '../core/types.js';
 
 export class EventDeduplicator {
   private readonly seen = new Set<string>();
 
   private fingerprint(event: ActivityEvent): string {
-    return createHash("sha256")
+    return createHash('sha256')
       .update(
         JSON.stringify({
           projectId: event.projectId,
           type: event.type,
           data: event.data,
-        }),
+        })
       )
-      .digest("hex");
+      .digest('hex');
   }
 
   filter(events: ActivityEvent[]): ActivityEvent[] {

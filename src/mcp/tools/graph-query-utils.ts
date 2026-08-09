@@ -1,87 +1,43 @@
-import type {
-  CodeSymbol,
-} from "../../core/types.js";
+import type { CodeSymbol } from '../../core/types.js';
 
-import {
-  GraphQueryEngine,
-} from "../../code-intelligence/query/graph-query-engine.js";
+import { GraphQueryEngine } from '../../code-intelligence/query/graph-query-engine.js';
 
-import type {
-  MCPContext,
-} from "../context.js";
+import type { MCPContext } from '../context.js';
 
-export function resolveGraphSymbol(
-  ctx: MCPContext,
-  value: string,
-): CodeSymbol | null {
-  const direct =
-    ctx.graph.getSymbol(
-      value,
-    );
+export function resolveGraphSymbol(ctx: MCPContext, value: string): CodeSymbol | null {
+  const direct = ctx.graph.getSymbol(value);
 
-  if (
-    direct &&
-    direct.projectId ===
-      ctx.project.id
-  ) {
+  if (direct && direct.projectId === ctx.project.id) {
     return direct;
   }
 
-  const query =
-    new GraphQueryEngine(
-      ctx.graph,
-    );
+  const query = new GraphQueryEngine(ctx.graph);
 
-  const exact =
-    query
-      .findSymbols(
-        ctx.project.id,
-        value,
-      )
-      .find(
-        (symbol) =>
-          symbol.name ===
-            value ||
-          symbol.qualifiedName ===
-            value,
-      );
+  const exact = query
+    .findSymbols(ctx.project.id, value)
+    .find((symbol) => symbol.name === value || symbol.qualifiedName === value);
 
   if (exact) {
     return exact;
   }
 
-  return (
-    query.findSymbols(
-      ctx.project.id,
-      value,
-    )[0] ??
-    null
-  );
+  return query.findSymbols(ctx.project.id, value)[0] ?? null;
 }
 
-export function compactSymbol(
-  symbol: CodeSymbol,
-) {
+export function compactSymbol(symbol: CodeSymbol) {
   return {
-    id:
-      symbol.id,
+    id: symbol.id,
 
-    name:
-      symbol.name,
+    name: symbol.name,
 
-    qualifiedName:
-      symbol.qualifiedName,
+    qualifiedName: symbol.qualifiedName,
 
-    type:
-      symbol.type,
+    type: symbol.type,
 
-    filePath:
-      symbol.filePath,
+    filePath: symbol.filePath,
 
-    startLine:
-      symbol.startLine,
+    startLine: symbol.startLine,
 
-    endLine:
-      symbol.endLine,
+    endLine: symbol.endLine,
   };
 }

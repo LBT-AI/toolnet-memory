@@ -1,24 +1,16 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  loadConfig,
-  MemoryEngine,
-  ProjectManager,
-} from "../core/index.js";
+import { loadConfig, MemoryEngine, ProjectManager } from '../core/index.js';
 
-import {
-  RetrievalEngine,
-} from "../retrieval/retrieval-engine.js";
+import { RetrievalEngine } from '../retrieval/retrieval-engine.js';
 
-import {
-  createEmbeddingProvider,
-} from "../embeddings/index.js";
+import { createEmbeddingProvider } from '../embeddings/index.js';
 
 import {
   CodeGraphStore,
   ReferenceResolver,
   SemanticCodeEngine,
-} from "../code-intelligence/index.js";
+} from '../code-intelligence/index.js';
 
 import {
   createStorageProvider,
@@ -26,147 +18,79 @@ import {
   ProjectScopedStorageProvider,
   MemoryStore,
   PersistentCodeGraphStore,
-} from "../storage/index.js";
+} from '../storage/index.js';
 
-import {
-  startMCPServer,
-} from "./server.js";
+import { startMCPServer } from './server.js';
 
-import {
-  ProjectLock,
-} from "../production/project-lock.js";
+import { ProjectLock } from '../production/project-lock.js';
 
 async function main() {
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
-  const project =
-    new ProjectManager()
-      .detect();
+  const project = new ProjectManager().detect();
 
-  const rawStorage =
-    createStorageProvider({
-      provider:
-        config.storage.provider,
+  const rawStorage = createStorageProvider({
+    provider: config.storage.provider,
 
-      huggingface:
-        config.storage.huggingface,
+    huggingface: config.storage.huggingface,
 
-      localRoot:
-        config.storage.localRoot,
-    });
+    localRoot: config.storage.localRoot,
+  });
 
-  const retryStorage =
-    withStorageRetry(
-      rawStorage,
-      {
-        attempts:
-          Number(
-            process.env
-              .TOOLNET_STORAGE_RETRIES ??
-            3,
-          ),
-      },
-    );
+  const retryStorage = withStorageRetry(rawStorage, {
+    attempts: Number(process.env.TOOLNET_STORAGE_RETRIES ?? 3),
+  });
 
-  const storage =
-    new ProjectScopedStorageProvider(
-      retryStorage,
-      project.id,
-      project.name,
-      project.remote ?? project.name,
-    );
+  const storage = new ProjectScopedStorageProvider(
+    retryStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
 
-  const processLock =
-    new ProjectLock(
-      project.id,
-    );
+  const processLock = new ProjectLock(project.id);
 
   await processLock.acquire();
 
-  const stop =
-    () => {
-      void processLock
-        .release()
-        .finally(
-          () =>
-            process.exit(0),
-        );
-    };
+  const stop = () => {
+    void processLock.release().finally(() => process.exit(0));
+  };
 
-  process.once(
-    "SIGINT",
-    stop,
-  );
+  process.once('SIGINT', stop);
 
-  process.once(
-    "SIGTERM",
-    stop,
-  );
+  process.once('SIGTERM', stop);
 
-  const memory =
-    new MemoryEngine();
+  const memory = new MemoryEngine();
 
-  const memoryStore =
-    new MemoryStore(
-      storage,
-    );
+  const memoryStore = new MemoryStore(storage);
 
-  memory.importRecords(
-    await memoryStore.load(
-      project.id,
-    ),
-  );
+  memory.importRecords(await memoryStore.load(project.id));
 
-  const retrieval =
-    new RetrievalEngine(
-      memory,
-    );
+  const retrieval = new RetrievalEngine(memory);
 
-  const graph =
-    new CodeGraphStore();
+  const graph = new CodeGraphStore();
 
-  const graphSnapshot =
-    await new PersistentCodeGraphStore(
-      storage,
-    ).load(
-      project.id,
-    );
+  const graphSnapshot = await new PersistentCodeGraphStore(storage).load(project.id);
 
-  if (
-    graphSnapshot
-  ) {
-    graph.import(
-      graphSnapshot.symbols,
-      graphSnapshot.edges,
-    );
+  if (graphSnapshot) {
+    graph.import(graphSnapshot.symbols, graphSnapshot.edges);
   }
 
-  const references =
-    new ReferenceResolver(
-      graph,
-    );
+  const references = new ReferenceResolver(graph);
 
-  const codeSemantic =
-    new SemanticCodeEngine({
-      projectId:
-        project.id,
+  const codeSemantic = new SemanticCodeEngine({
+    projectId: project.id,
 
-      rootPath:
-        project.rootPath,
+    rootPath: project.rootPath,
 
-      model:
-        process.env
-          .HF_EMBEDDING_MODEL ??
-        "sentence-transformers/all-MiniLM-L6-v2",
+    model: process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2',
 
-      storage,
+    storage,
 
-      embeddings:
-        createEmbeddingProvider(),
+    embeddings: createEmbeddingProvider(),
 
-      graph,
-    });
+    graph,
+  });
 
   await codeSemantic.initialize();
 
@@ -182,9 +106,7 @@ async function main() {
   });
 }
 
-main().catch(
-  (error) => {
-    console.error(error);
-    process.exit(1);
-  },
-);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

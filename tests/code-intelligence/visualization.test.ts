@@ -1,131 +1,69 @@
-import {
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import {
-  CodeGraphStore,
-  VisualizationBuilder,
-} from "../../src/code-intelligence/index.js";
+import { CodeGraphStore, VisualizationBuilder } from '../../src/code-intelligence/index.js';
 
-describe(
-  "Visualization Builder",
-  () => {
-    it(
-      "creates graph nodes and links",
-      () => {
-        const graph =
-          new CodeGraphStore();
+describe('Visualization Builder', () => {
+  it('creates graph nodes and links', () => {
+    const graph = new CodeGraphStore();
 
-        const projectId =
-          "test";
+    const projectId = 'test';
 
-        graph.addSymbol({
-          id:
-            "a",
+    graph.addSymbol({
+      id: 'a',
 
-          projectId,
+      projectId,
 
-          name:
-            "a",
+      name: 'a',
 
-          qualifiedName:
-            "a",
+      qualifiedName: 'a',
 
-          type:
-            "function",
+      type: 'function',
 
-          filePath:
-            "src/a.ts",
+      filePath: 'src/a.ts',
 
-          startLine:
-            1,
+      startLine: 1,
 
-          endLine:
-            5,
-        });
+      endLine: 5,
+    });
 
-        graph.addSymbol({
-          id:
-            "b",
+    graph.addSymbol({
+      id: 'b',
 
-          projectId,
+      projectId,
 
-          name:
-            "b",
+      name: 'b',
 
-          qualifiedName:
-            "b",
+      qualifiedName: 'b',
 
-          type:
-            "function",
+      type: 'function',
 
-          filePath:
-            "src/b.ts",
+      filePath: 'src/b.ts',
 
-          startLine:
-            1,
+      startLine: 1,
 
-          endLine:
-            5,
-        });
+      endLine: 5,
+    });
 
-        graph.addEdge({
-          id:
-            "ab",
+    graph.addEdge({
+      id: 'ab',
 
-          projectId,
+      projectId,
 
-          from:
-            "a",
+      from: 'a',
 
-          to:
-            "b",
+      to: 'b',
 
-          type:
-            "CALL_REFERENCE",
-        });
+      type: 'CALL_REFERENCE',
+    });
 
-        const result =
-          new VisualizationBuilder(
-            graph,
-          ).build(
-            projectId,
-          );
+    const result = new VisualizationBuilder(graph).build(projectId);
 
-        expect(
-          result.summary.nodes,
-        ).toBe(
-          2,
-        );
+    expect(result.summary.nodes).toBe(2);
 
-        expect(
-          result.summary.links,
-        ).toBe(
-          1,
-        );
+    expect(result.summary.links).toBe(1);
 
-        expect(
-          result.nodes.find(
-            node =>
-              node.id ===
-              "a",
-          )?.outgoing,
-        ).toBe(
-          1,
-        );
+    expect(result.nodes.find((node) => node.id === 'a')?.outgoing).toBe(1);
 
-        expect(
-          result.nodes.find(
-            node =>
-              node.id ===
-              "b",
-          )?.incoming,
-        ).toBe(
-          1,
-        );
-      },
-    );
-  },
-);
+    expect(result.nodes.find((node) => node.id === 'b')?.incoming).toBe(1);
+  });
+});

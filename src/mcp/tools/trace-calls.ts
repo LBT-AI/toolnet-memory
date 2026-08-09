@@ -1,32 +1,15 @@
-import {
-  z,
-} from "zod";
+import { z } from 'zod';
 
-import type {
-  MCPContext,
-} from "../context.js";
+import type { MCPContext } from '../context.js';
 
-import {
-  CallGraphTracer,
-} from "../../code-intelligence/graph/trace.js";
+import { CallGraphTracer } from '../../code-intelligence/graph/trace.js';
 
 export const traceCallsSchema = {
-  symbolId:
-    z.string().min(1),
+  symbolId: z.string().min(1),
 
-  direction:
-    z.enum([
-      "callers",
-      "callees",
-    ])
-      .optional(),
+  direction: z.enum(['callers', 'callees']).optional(),
 
-  depth:
-    z.number()
-      .int()
-      .min(1)
-      .max(10)
-      .optional(),
+  depth: z.number().int().min(1).max(10).optional(),
 };
 
 export async function traceCalls(
@@ -34,64 +17,38 @@ export async function traceCalls(
   input: {
     symbolId: string;
 
-    direction?:
-      | "callers"
-      | "callees";
+    direction?: 'callers' | 'callees';
 
     depth?: number;
-  },
+  }
 ) {
-  const tracer =
-    new CallGraphTracer(
-      ctx.graph,
-    );
+  const tracer = new CallGraphTracer(ctx.graph);
 
-  const direction =
-    input.direction ??
-    "callees";
+  const direction = input.direction ?? 'callees';
 
-  const depth =
-    input.depth ?? 3;
+  const depth = input.depth ?? 3;
 
   const results =
-    direction === "callers"
-      ? tracer.callers(
-          ctx.project.id,
-          input.symbolId,
-          depth,
-        )
-      : tracer.callees(
-          ctx.project.id,
-          input.symbolId,
-          depth,
-        );
+    direction === 'callers'
+      ? tracer.callers(ctx.project.id, input.symbolId, depth)
+      : tracer.callees(ctx.project.id, input.symbolId, depth);
 
   return {
     direction,
     depth,
 
-    results:
-      results.map(
-        (item) => ({
-          id:
-            item.symbol.id,
+    results: results.map((item) => ({
+      id: item.symbol.id,
 
-          name:
-            item.symbol.name,
+      name: item.symbol.name,
 
-          qualifiedName:
-            item.symbol
-              .qualifiedName,
+      qualifiedName: item.symbol.qualifiedName,
 
-          type:
-            item.symbol.type,
+      type: item.symbol.type,
 
-          filePath:
-            item.symbol.filePath,
+      filePath: item.symbol.filePath,
 
-          depth:
-            item.depth,
-        }),
-      ),
+      depth: item.depth,
+    })),
   };
 }

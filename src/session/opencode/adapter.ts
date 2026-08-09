@@ -1,72 +1,41 @@
-import {
-  existsSync,
-} from "node:fs";
+import { existsSync } from 'node:fs';
 
-import {
-  homedir,
-} from "node:os";
+import { homedir } from 'node:os';
 
-import {
-  isAbsolute,
-  join,
-  relative,
-  resolve,
-} from "node:path";
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
-import {
-  DatabaseSync,
-} from "node:sqlite";
+import { DatabaseSync } from 'node:sqlite';
 
-import type {
-  ProjectManifest,
-} from "../../core/types.js";
+import type { ProjectManifest } from '../../core/types.js';
 
-import type {
-  StorageProvider,
-} from "../../storage/types.js";
+import type { StorageProvider } from '../../storage/types.js';
 
-import type {
-  SessionEventInput,
-} from "../types.js";
+import type { SessionEventInput } from '../types.js';
 
-import {
-  SessionCore,
-} from "../core.js";
+import { SessionCore } from '../core.js';
 
-import {
-  shouldFilterEvent,
-  filterEventData,
-} from "../transcript-filter.js";
+import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 
 interface OpenCodeRow {
-  [key: string]:
-    unknown;
+  [key: string]: unknown;
 
   id?: unknown;
 
-  session_id?:
-    unknown;
+  session_id?: unknown;
 
-  project_id?:
-    unknown;
+  project_id?: unknown;
 
-  directory?:
-    unknown;
+  directory?: unknown;
 
-  title?:
-    unknown;
+  title?: unknown;
 
-  time_created?:
-    unknown;
+  time_created?: unknown;
 
-  time_updated?:
-    unknown;
+  time_updated?: unknown;
 
-  data?:
-    unknown;
+  data?: unknown;
 
-  __clock?:
-    unknown;
+  __clock?: unknown;
 }
 
 interface CursorValue {
@@ -75,14 +44,11 @@ interface CursorValue {
 }
 
 export interface OpenCodeSyncOptions {
-  project:
-    ProjectManifest;
+  project: ProjectManifest;
 
-  storage:
-    StorageProvider;
+  storage: StorageProvider;
 
-  nativeSessionId:
-    string;
+  nativeSessionId: string;
 
   dbPath?: string;
 
@@ -92,100 +58,54 @@ export interface OpenCodeSyncOptions {
 }
 
 export interface OpenCodeSyncResult {
-  nativeSessionId:
-    string;
+  nativeSessionId: string;
 
-  importedMessages:
-    number;
+  importedMessages: number;
 
-  importedParts:
-    number;
+  importedParts: number;
 
-  recordedEvents:
-    number;
+  recordedEvents: number;
 
-  eventCount:
-    number;
+  eventCount: number;
 
-  chunkCount:
-    number;
+  chunkCount: number;
 
-  status:
-    string;
+  status: string;
 }
 
 export interface OpenCodeRecoveryOptions {
-  project:
-    ProjectManifest;
+  project: ProjectManifest;
 
-  storage:
-    StorageProvider;
+  storage: StorageProvider;
 
   dbPath?: string;
 
   limit?: number;
 }
 
-export function defaultOpenCodeDbPath():
-  string {
+export function defaultOpenCodeDbPath(): string {
   return (
-    process.env
-      .OPENCODE_DB_PATH ??
-    join(
-      homedir(),
-      ".local",
-      "share",
-      "opencode",
-      "opencode.db",
-    )
+    process.env.OPENCODE_DB_PATH ?? join(homedir(), '.local', 'share', 'opencode', 'opencode.db')
   );
 }
 
-function valueString(
-  value: unknown,
-): string {
-  return typeof value ===
-    "string"
-    ? value
-    : "";
+function valueString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
 }
 
-function valueNumber(
-  value: unknown,
-): number {
-  if (
-    typeof value ===
-      "number" &&
-    Number.isFinite(
-      value,
-    )
-  ) {
+function valueNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }
 
-  if (
-    typeof value ===
-      "bigint"
-  ) {
-    return Number(
-      value,
-    );
+  if (typeof value === 'bigint') {
+    return Number(value);
   }
 
-  if (
-    typeof value ===
-      "string"
-  ) {
-    const parsed =
-      Number(
-        value,
-      );
+  if (typeof value === 'string') {
+    const parsed = Number(value);
 
-    if (
-      Number.isFinite(
-        parsed,
-      )
-    ) {
+    if (Number.isFinite(parsed)) {
       return parsed;
     }
   }
@@ -193,48 +113,19 @@ function valueNumber(
   return 0;
 }
 
-function jsonObject(
-  value: unknown,
-): Record<
-  string,
-  unknown
-> {
-  if (
-    value &&
-    typeof value ===
-      "object" &&
-    !Buffer.isBuffer(
-      value,
-    )
-  ) {
-    return value as
-      Record<
-        string,
-        unknown
-      >;
+function jsonObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Buffer.isBuffer(value)) {
+    return value as Record<string, unknown>;
   }
 
-  if (
-    typeof value !==
-      "string"
-  ) {
+  if (typeof value !== 'string') {
     return {};
   }
 
   try {
-    const parsed =
-      JSON.parse(
-        value,
-      );
+    const parsed = JSON.parse(value);
 
-    if (
-      parsed &&
-      typeof parsed ===
-        "object" &&
-      !Array.isArray(
-        parsed,
-      )
-    ) {
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       return parsed;
     }
   } catch {
@@ -244,294 +135,152 @@ function jsonObject(
   return {};
 }
 
-function toIso(
-  value: unknown,
-): string {
-  let time =
-    valueNumber(
-      value,
-    );
+function toIso(value: unknown): string {
+  let time = valueNumber(value);
 
-  if (
-    time <=
-    0
-  ) {
-    return new Date()
-      .toISOString();
+  if (time <= 0) {
+    return new Date().toISOString();
   }
 
   /*
    * Seconds → milliseconds.
    */
-  if (
-    time <
-    100_000_000_000
-  ) {
-    time *=
-      1000;
+  if (time < 100_000_000_000) {
+    time *= 1000;
   }
 
-  const date =
-    new Date(
-      time,
-    );
+  const date = new Date(time);
 
-  return Number.isNaN(
-    date.getTime(),
-  )
-    ? new Date()
-        .toISOString()
-    : date.toISOString();
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
 }
 
 function isInsideProject(
-  projectRoot:
-    string,
+  projectRoot: string,
 
-  candidate:
-    string,
+  candidate: string
 ): boolean {
-  if (
-    !candidate
-  ) {
+  if (!candidate) {
     return false;
   }
 
-  const root =
-    resolve(
-      projectRoot,
-    );
+  const root = resolve(projectRoot);
 
-  const target =
-    resolve(
-      candidate,
-    );
+  const target = resolve(candidate);
 
-  if (
-    root ===
-    target
-  ) {
+  if (root === target) {
     return true;
   }
 
-  const rel =
-    relative(
-      root,
-      target,
-    );
+  const rel = relative(root, target);
 
   return (
-    rel !==
-      "" &&
-    rel !==
-      ".." &&
-    !rel.startsWith(
-      `..${process.platform ===
-        "win32"
-        ? "\\"
-        : "/"}`
-    ) &&
-    !isAbsolute(
-      rel,
-    )
+    rel !== '' &&
+    rel !== '..' &&
+    !rel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) &&
+    !isAbsolute(rel)
   );
 }
 
-function decodeCursor(
-  value:
-    string |
-    undefined,
-): CursorValue {
-  if (
-    !value
-  ) {
+function decodeCursor(value: string | undefined): CursorValue {
+  if (!value) {
     return {
       time: -1,
-      id: "",
+      id: '',
     };
   }
 
   try {
-    const parsed =
-      JSON.parse(
-        value,
-      ) as
-        Partial<
-          CursorValue
-        >;
+    const parsed = JSON.parse(value) as Partial<CursorValue>;
 
     return {
-      time:
-        typeof parsed.time ===
-          "number"
-          ? parsed.time
-          : -1,
+      time: typeof parsed.time === 'number' ? parsed.time : -1,
 
-      id:
-        typeof parsed.id ===
-          "string"
-          ? parsed.id
-          : "",
+      id: typeof parsed.id === 'string' ? parsed.id : '',
     };
   } catch {
     return {
       time: -1,
-      id: "",
+      id: '',
     };
   }
 }
 
-function encodeCursor(
-  value:
-    CursorValue,
-): string {
-  return JSON.stringify(
-    value,
-  );
+function encodeCursor(value: CursorValue): string {
+  return JSON.stringify(value);
 }
 
-function openDatabase(
-  dbPath:
-    string,
-): DatabaseSync {
-  if (
-    !existsSync(
-      dbPath,
-    )
-  ) {
-    throw new Error(
-      `OpenCode database not found: ${dbPath}`,
-    );
+function openDatabase(dbPath: string): DatabaseSync {
+  if (!existsSync(dbPath)) {
+    throw new Error(`OpenCode database not found: ${dbPath}`);
   }
 
-  const db =
-    new DatabaseSync(
-      dbPath,
-      {
-        readOnly:
-          true,
-      },
-    );
+  const db = new DatabaseSync(dbPath, {
+    readOnly: true,
+  });
 
-  db.exec(
-    "PRAGMA query_only = ON",
-  );
+  db.exec('PRAGMA query_only = ON');
 
-  db.exec(
-    "PRAGMA busy_timeout = 3000",
-  );
+  db.exec('PRAGMA busy_timeout = 3000');
 
   return db;
 }
 
 function sessionRow(
-  db:
-    DatabaseSync,
+  db: DatabaseSync,
 
-  nativeSessionId:
-    string,
+  nativeSessionId: string
 ): OpenCodeRow {
-  const row =
-    db.prepare(
+  const row = db
+    .prepare(
       `
       SELECT *
       FROM "session"
       WHERE id = ?
       LIMIT 1
-      `,
-    ).get(
-      nativeSessionId,
-    ) as
-      OpenCodeRow |
-      undefined;
+      `
+    )
+    .get(nativeSessionId) as OpenCodeRow | undefined;
 
-  if (
-    !row
-  ) {
-    throw new Error(
-      `OpenCode session not found: ${nativeSessionId}`,
-    );
+  if (!row) {
+    throw new Error(`OpenCode session not found: ${nativeSessionId}`);
   }
 
   return row;
 }
 
 function sessionBelongsToProject(
-  db:
-    DatabaseSync,
+  db: DatabaseSync,
 
-  row:
-    OpenCodeRow,
+  row: OpenCodeRow,
 
-  project:
-    ProjectManifest,
+  project: ProjectManifest
 ): boolean {
-  const directDirectory =
-    valueString(
-      row.directory,
-    );
+  const directDirectory = valueString(row.directory);
 
-  if (
-    directDirectory &&
-    isInsideProject(
-      project.rootPath,
-      directDirectory,
-    )
-  ) {
+  if (directDirectory && isInsideProject(project.rootPath, directDirectory)) {
     return true;
   }
 
-  const projectId =
-    valueString(
-      row.project_id,
-    );
+  const projectId = valueString(row.project_id);
 
-  if (
-    projectId
-  ) {
+  if (projectId) {
     try {
-      const projectRow =
-        db.prepare(
+      const projectRow = db
+        .prepare(
           `
           SELECT *
           FROM "project"
           WHERE id = ?
           LIMIT 1
-          `,
-        ).get(
-          projectId,
-        ) as
-          Record<
-            string,
-            unknown
-          > |
-          undefined;
+          `
+        )
+        .get(projectId) as Record<string, unknown> | undefined;
 
-      if (
-        projectRow
-      ) {
-        for (
-          const field
-          of [
-            "worktree",
-            "directory",
-            "path",
-          ]
-        ) {
-          const candidate =
-            valueString(
-              projectRow[
-                field
-              ],
-            );
+      if (projectRow) {
+        for (const field of ['worktree', 'directory', 'path']) {
+          const candidate = valueString(projectRow[field]);
 
-          if (
-            candidate &&
-            isInsideProject(
-              project.rootPath,
-              candidate,
-            )
-          ) {
+          if (candidate && isInsideProject(project.rootPath, candidate)) {
             return true;
           }
         }
@@ -541,31 +290,18 @@ function sessionBelongsToProject(
     }
 
     try {
-      const directories =
-        db.prepare(
+      const directories = db
+        .prepare(
           `
           SELECT directory
           FROM "project_directory"
           WHERE project_id = ?
-          `,
-        ).all(
-          projectId,
-        ) as
-          Record<
-            string,
-            unknown
-          >[];
+          `
+        )
+        .all(projectId) as Record<string, unknown>[];
 
       if (
-        directories.some(
-          item =>
-            isInsideProject(
-              project.rootPath,
-              valueString(
-                item.directory,
-              ),
-            ),
-        )
+        directories.some((item) => isInsideProject(project.rootPath, valueString(item.directory)))
       ) {
         return true;
       }
@@ -580,60 +316,26 @@ function sessionBelongsToProject(
    * but not text content.
    */
   try {
-    const rows =
-      db.prepare(
+    const rows = db
+      .prepare(
         `
         SELECT data
         FROM "message"
         WHERE session_id = ?
         ORDER BY time_created DESC
         LIMIT 20
-        `,
-      ).all(
-        valueString(
-          row.id,
-        ),
-      ) as
-        OpenCodeRow[];
+        `
+      )
+      .all(valueString(row.id)) as OpenCodeRow[];
 
-    for (
-      const message
-      of rows
-    ) {
-      const data =
-        jsonObject(
-          message.data,
-        );
+    for (const message of rows) {
+      const data = jsonObject(message.data);
 
       const path =
-        data.path &&
-        typeof data.path ===
-          "object"
-          ? data.path as
-              Record<
-                string,
-                unknown
-              >
-          : {};
+        data.path && typeof data.path === 'object' ? (data.path as Record<string, unknown>) : {};
 
-      for (
-        const candidate
-        of [
-          valueString(
-            path.cwd,
-          ),
-          valueString(
-            path.root,
-          ),
-        ]
-      ) {
-        if (
-          candidate &&
-          isInsideProject(
-            project.rootPath,
-            candidate,
-          )
-        ) {
+      for (const candidate of [valueString(path.cwd), valueString(path.root)]) {
+        if (candidate && isInsideProject(project.rootPath, candidate)) {
           return true;
         }
       }
@@ -646,21 +348,15 @@ function sessionBelongsToProject(
 }
 
 function fetchRowsAfter(
-  db:
-    DatabaseSync,
+  db: DatabaseSync,
 
-  table:
-    "message" |
-    "part",
+  table: 'message' | 'part',
 
-  nativeSessionId:
-    string,
+  nativeSessionId: string,
 
-  cursor:
-    CursorValue,
+  cursor: CursorValue
 ): OpenCodeRow[] {
-  const sql =
-    `
+  const sql = `
     SELECT *,
       COALESCE(
         time_updated,
@@ -693,46 +389,24 @@ function fetchRowsAfter(
       id ASC
     `;
 
-  return db.prepare(
-    sql,
-  ).all(
-    nativeSessionId,
-    cursor.time,
-    cursor.time,
-    cursor.id,
-  ) as
-    OpenCodeRow[];
+  return db.prepare(sql).all(nativeSessionId, cursor.time, cursor.time, cursor.id) as OpenCodeRow[];
 }
 
 function cursorFromRows(
-  rows:
-    OpenCodeRow[],
+  rows: OpenCodeRow[],
 
-  fallback:
-    CursorValue,
+  fallback: CursorValue
 ): CursorValue {
-  const last =
-    rows[
-      rows.length -
-      1
-    ];
+  const last = rows[rows.length - 1];
 
-  if (
-    !last
-  ) {
+  if (!last) {
     return fallback;
   }
 
   return {
-    time:
-      valueNumber(
-        last.__clock,
-      ),
+    time: valueNumber(last.__clock),
 
-    id:
-      valueString(
-        last.id,
-      ),
+    id: valueString(last.id),
   };
 }
 
@@ -740,55 +414,28 @@ interface TimedEvent {
   clock: number;
   order: number;
 
-  event:
-    SessionEventInput;
+  event: SessionEventInput;
 }
 
 function messageEvent(
-  dbPath:
-    string,
+  dbPath: string,
 
-  row:
-    OpenCodeRow,
+  row: OpenCodeRow
 ): TimedEvent {
-  const data =
-    jsonObject(
-      row.data,
-    );
+  const data = jsonObject(row.data);
 
-  const role =
-    valueString(
-      data.role,
-    );
+  const role = valueString(data.role);
 
-  const clock =
-    valueNumber(
-      row.__clock,
-    );
+  const clock = valueNumber(row.__clock);
 
-  const id =
-    valueString(
-      row.id,
-    );
+  const id = valueString(row.id);
 
-  let type:
-    SessionEventInput[
-      "type"
-    ] =
-      "message";
+  let type: SessionEventInput['type'] = 'message';
 
-  if (
-    role ===
-    "user"
-  ) {
-    type =
-      "user_prompt";
-  } else if (
-    role ===
-    "assistant"
-  ) {
-    type =
-      "assistant_message";
+  if (role === 'user') {
+    type = 'user_prompt';
+  } else if (role === 'assistant') {
+    type = 'assistant_message';
   }
 
   return {
@@ -798,98 +445,56 @@ function messageEvent(
     event: {
       type,
 
-      timestamp:
-        toIso(
-          clock,
-        ),
+      timestamp: toIso(clock),
 
-      role:
-        role ||
-        undefined,
+      role: role || undefined,
 
-      sourceEventId:
-        `message:${id}:${clock}`,
+      sourceEventId: `message:${id}:${clock}`,
 
-      sourceSequence:
-        `${clock}:${id}`,
+      sourceSequence: `${clock}:${id}`,
 
       data: {
-        messageId:
-          id,
+        messageId: id,
 
         ...data,
       },
 
       provenance: {
-        source:
-          "opencode",
+        source: 'opencode',
 
-        sourcePath:
-          dbPath,
+        sourcePath: dbPath,
 
-        sourceTable:
-          "message",
+        sourceTable: 'message',
 
-        sourceRowId:
-          id,
+        sourceRowId: id,
 
-        sourceOffset:
-          `${clock}:${id}`,
+        sourceOffset: `${clock}:${id}`,
       },
     },
   };
 }
 
 function partEvent(
-  dbPath:
-    string,
+  dbPath: string,
 
-  row:
-    OpenCodeRow,
+  row: OpenCodeRow
 ): TimedEvent {
-  const data =
-    jsonObject(
-      row.data,
-    );
+  const data = jsonObject(row.data);
 
-  const partType =
-    valueString(
-      data.type,
-    );
+  const partType = valueString(data.type);
 
-  const clock =
-    valueNumber(
-      row.__clock,
-    );
+  const clock = valueNumber(row.__clock);
 
-  const id =
-    valueString(
-      row.id,
-    );
+  const id = valueString(row.id);
 
-  const messageId =
-    valueString(
-      row.message_id,
-    );
+  const messageId = valueString(row.message_id);
 
-  let type:
-    SessionEventInput[
-      "type"
-    ] =
-      "message_part";
+  let type: SessionEventInput['type'] = 'message_part';
 
-  if (
-    partType ===
-    "tool"
-  ) {
-    type =
-      "tool_call";
-  } else if (
-    partType ===
-    "snapshot"
-  ) {
-    type =
-      "artifact";
+  if (partType === 'tool') {
+    type = 'tool_call';
+  } else if (partType === 'snapshot') {
+    type = 'artifact';
   }
 
   return {
@@ -899,20 +504,14 @@ function partEvent(
     event: {
       type,
 
-      timestamp:
-        toIso(
-          clock,
-        ),
+      timestamp: toIso(clock),
 
-      sourceEventId:
-        `part:${id}:${clock}`,
+      sourceEventId: `part:${id}:${clock}`,
 
-      sourceSequence:
-        `${clock}:${id}`,
+      sourceSequence: `${clock}:${id}`,
 
       data: {
-        partId:
-          id,
+        partId: id,
 
         messageId,
 
@@ -920,425 +519,225 @@ function partEvent(
       },
 
       provenance: {
-        source:
-          "opencode",
+        source: 'opencode',
 
-        sourcePath:
-          dbPath,
+        sourcePath: dbPath,
 
-        sourceTable:
-          "part",
+        sourceTable: 'part',
 
-        sourceRowId:
-          id,
+        sourceRowId: id,
 
-        sourceOffset:
-          `${clock}:${id}`,
+        sourceOffset: `${clock}:${id}`,
       },
     },
   };
 }
 
 export async function syncOpenCodeSession(
-  options:
-    OpenCodeSyncOptions,
-): Promise<
-  OpenCodeSyncResult
-> {
-  const dbPath =
-    options.dbPath ??
-    defaultOpenCodeDbPath();
+  options: OpenCodeSyncOptions
+): Promise<OpenCodeSyncResult> {
+  const dbPath = options.dbPath ?? defaultOpenCodeDbPath();
 
-  const db =
-    openDatabase(
-      dbPath,
-    );
+  const db = openDatabase(dbPath);
 
   try {
-    const session =
-      sessionRow(
-        db,
-        options
-          .nativeSessionId,
-      );
+    const session = sessionRow(db, options.nativeSessionId);
 
-    if (
-      !sessionBelongsToProject(
-        db,
-        session,
-        options.project,
-      )
-    ) {
+    if (!sessionBelongsToProject(db, session, options.project)) {
       throw new Error(
         [
-          "OpenCode session does not belong to current ToolNet project.",
+          'OpenCode session does not belong to current ToolNet project.',
           `Session: ${options.nativeSessionId}`,
           `Project: ${options.project.rootPath}`,
-          `Session directory: ${valueString(session.directory) || "unknown"}`,
-        ].join(
-          " ",
-        ),
+          `Session directory: ${valueString(session.directory) || 'unknown'}`,
+        ].join(' ')
       );
     }
 
-    const core =
-      new SessionCore({
-        project:
-          options.project,
+    const core = new SessionCore({
+      project: options.project,
 
-        storage:
-          options.storage,
+      storage: options.storage,
 
-        agent:
-          "opencode",
+      agent: 'opencode',
 
-        nativeSessionId:
-          options.nativeSessionId,
+      nativeSessionId: options.nativeSessionId,
 
-        title:
-          valueString(
-            session.title,
-          ) ||
-          undefined,
+      title: valueString(session.title) || undefined,
 
-        metadata: {
-          source:
-            "opencode.db",
+      metadata: {
+        source: 'opencode.db',
 
-          openCodeProjectId:
-            valueString(
-              session.project_id,
-            ) ||
-            undefined,
+        openCodeProjectId: valueString(session.project_id) || undefined,
 
-          directory:
-            valueString(
-              session.directory,
-            ) ||
-            undefined,
-        },
-      });
+        directory: valueString(session.directory) || undefined,
+      },
+    });
 
-    const state =
-      core.status();
+    const state = core.status();
 
-    const messageCursor =
-      decodeCursor(
-        state.sourceCursors[
-          "opencode.message"
-        ],
-      );
+    const messageCursor = decodeCursor(state.sourceCursors['opencode.message']);
 
-    const partCursor =
-      decodeCursor(
-        state.sourceCursors[
-          "opencode.part"
-        ],
-      );
+    const partCursor = decodeCursor(state.sourceCursors['opencode.part']);
 
-    const messages =
-      fetchRowsAfter(
-        db,
-        "message",
-        options
-          .nativeSessionId,
-        messageCursor,
-      );
+    const messages = fetchRowsAfter(db, 'message', options.nativeSessionId, messageCursor);
 
-    const parts =
-      fetchRowsAfter(
-        db,
-        "part",
-        options
-          .nativeSessionId,
-        partCursor,
-      );
+    const parts = fetchRowsAfter(db, 'part', options.nativeSessionId, partCursor);
 
-    const timed:
-      TimedEvent[] = [];
+    const timed: TimedEvent[] = [];
 
-    if (
-      state.lastSequence ===
-      0
-    ) {
-      const created =
-        valueNumber(
-          session
-            .time_created,
-        );
+    if (state.lastSequence === 0) {
+      const created = valueNumber(session.time_created);
 
       timed.push({
-        clock:
-          created,
+        clock: created,
 
-        order:
-          -1,
+        order: -1,
 
         event: {
-          type:
-            "session_start",
+          type: 'session_start',
 
-          timestamp:
-            toIso(
-              created,
-            ),
+          timestamp: toIso(created),
 
-          sourceEventId:
-            `session:${options.nativeSessionId}:created:${created}`,
+          sourceEventId: `session:${options.nativeSessionId}:created:${created}`,
 
           data: {
-            title:
-              valueString(
-                session.title,
-              ) ||
-              undefined,
+            title: valueString(session.title) || undefined,
 
-            directory:
-              valueString(
-                session.directory,
-              ) ||
-              undefined,
+            directory: valueString(session.directory) || undefined,
 
-            openCodeProjectId:
-              valueString(
-                session.project_id,
-              ) ||
-              undefined,
+            openCodeProjectId: valueString(session.project_id) || undefined,
           },
 
           provenance: {
-            source:
-              "opencode",
+            source: 'opencode',
 
-            sourcePath:
-              dbPath,
+            sourcePath: dbPath,
 
-            sourceTable:
-              "session",
+            sourceTable: 'session',
 
-            sourceRowId:
-              options
-                .nativeSessionId,
+            sourceRowId: options.nativeSessionId,
           },
         },
       });
     }
 
-    timed.push(
-      ...messages.map(
-        row =>
-          messageEvent(
-            dbPath,
-            row,
-          ),
-      ),
-    );
+    timed.push(...messages.map((row) => messageEvent(dbPath, row)));
 
-    timed.push(
-      ...parts.map(
-        row =>
-          partEvent(
-            dbPath,
-            row,
-          ),
-      ),
-    );
+    timed.push(...parts.map((row) => partEvent(dbPath, row)));
 
-    const updated =
-      valueNumber(
-        session
-          .time_updated,
-      ) ||
-      valueNumber(
-        session
-          .time_created,
-      );
+    const updated = valueNumber(session.time_updated) || valueNumber(session.time_created);
 
-    if (
-      options.compacted
-    ) {
+    if (options.compacted) {
       timed.push({
-        clock:
-          updated,
+        clock: updated,
 
-        order:
-          98,
+        order: 98,
 
         event: {
-          type:
-            "session_compact",
+          type: 'session_compact',
 
-          timestamp:
-            toIso(
-              updated,
-            ),
+          timestamp: toIso(updated),
 
-          sourceEventId:
-            `session:${options.nativeSessionId}:compact:${updated}`,
+          sourceEventId: `session:${options.nativeSessionId}:compact:${updated}`,
 
           data: {},
 
           provenance: {
-            source:
-              "opencode",
+            source: 'opencode',
           },
         },
       });
     }
 
-    if (
-      options.error
-    ) {
+    if (options.error) {
       timed.push({
-        clock:
-          updated,
+        clock: updated,
 
-        order:
-          99,
+        order: 99,
 
         event: {
-          type:
-            "error",
+          type: 'error',
 
-          timestamp:
-            toIso(
-              updated,
-            ),
+          timestamp: toIso(updated),
 
-          sourceEventId:
-            `session:${options.nativeSessionId}:error:${updated}`,
+          sourceEventId: `session:${options.nativeSessionId}:error:${updated}`,
 
           data: {
-            source:
-              "session.error",
+            source: 'session.error',
           },
 
           provenance: {
-            source:
-              "opencode",
+            source: 'opencode',
           },
         },
       });
-    } else if (
-      options.idle
-    ) {
+    } else if (options.idle) {
       timed.push({
-        clock:
-          updated,
+        clock: updated,
 
-        order:
-          100,
+        order: 100,
 
         event: {
-          type:
-            "session_idle",
+          type: 'session_idle',
 
-          timestamp:
-            toIso(
-              updated,
-            ),
+          timestamp: toIso(updated),
 
-          sourceEventId:
-            `session:${options.nativeSessionId}:idle:${updated}`,
+          sourceEventId: `session:${options.nativeSessionId}:idle:${updated}`,
 
           data: {},
 
           provenance: {
-            source:
-              "opencode",
+            source: 'opencode',
           },
         },
       });
     }
 
-    timed.sort(
-      (
-        left,
-        right,
-      ) =>
-        (
-          left.clock -
-          right.clock
-        ) ||
-        (
-          left.order -
-          right.order
-        ),
-    );
+    timed.sort((left, right) => left.clock - right.clock || left.order - right.order);
 
     // Filter noisy events before recording
-    const filteredTimed = timed.filter(item => {
-      if (shouldFilterEvent(item.event.data as Record<string, unknown>)) {
-        return false;
-      }
-      return true;
-    }).map(item => ({
-      ...item,
-      event: {
-        ...item.event,
-        data: filterEventData(item.event.data as Record<string, unknown>),
-      },
-    }));
+    const filteredTimed = timed
+      .filter((item) => {
+        if (shouldFilterEvent(item.event.data as Record<string, unknown>)) {
+          return false;
+        }
+        return true;
+      })
+      .map((item) => ({
+        ...item,
+        event: {
+          ...item.event,
+          data: filterEventData(item.event.data as Record<string, unknown>),
+        },
+      }));
 
-    const recorded =
-      core.recordMany(
-        filteredTimed.map(
-          item =>
-            item.event,
-        ),
-      );
+    const recorded = core.recordMany(filteredTimed.map((item) => item.event));
 
-    const nextMessageCursor =
-      cursorFromRows(
-        messages,
-        messageCursor,
-      );
+    const nextMessageCursor = cursorFromRows(messages, messageCursor);
 
-    const nextPartCursor =
-      cursorFromRows(
-        parts,
-        partCursor,
-      );
+    const nextPartCursor = cursorFromRows(parts, partCursor);
 
-    core.setSourceCursor(
-      "opencode.message",
-      encodeCursor(
-        nextMessageCursor,
-      ),
-    );
+    core.setSourceCursor('opencode.message', encodeCursor(nextMessageCursor));
 
-    core.setSourceCursor(
-      "opencode.part",
-      encodeCursor(
-        nextPartCursor,
-      ),
-    );
+    core.setSourceCursor('opencode.part', encodeCursor(nextPartCursor));
 
-    const flushed =
-      await core.flush();
+    const flushed = await core.flush();
 
     return {
-      nativeSessionId:
-        options
-          .nativeSessionId,
+      nativeSessionId: options.nativeSessionId,
 
-      importedMessages:
-        messages.length,
+      importedMessages: messages.length,
 
-      importedParts:
-        parts.length,
+      importedParts: parts.length,
 
-      recordedEvents:
-        recorded.length,
+      recordedEvents: recorded.length,
 
-      eventCount:
-        flushed.eventCount,
+      eventCount: flushed.eventCount,
 
-      chunkCount:
-        flushed.chunkCount,
+      chunkCount: flushed.chunkCount,
 
-      status:
-        flushed.status,
+      status: flushed.status,
     };
   } finally {
     db.close();
@@ -1346,26 +745,17 @@ export async function syncOpenCodeSession(
 }
 
 export async function recoverOpenCodeProject(
-  options:
-    OpenCodeRecoveryOptions,
-): Promise<
-  OpenCodeSyncResult[]
-> {
-  const dbPath =
-    options.dbPath ??
-    defaultOpenCodeDbPath();
+  options: OpenCodeRecoveryOptions
+): Promise<OpenCodeSyncResult[]> {
+  const dbPath = options.dbPath ?? defaultOpenCodeDbPath();
 
-  const db =
-    openDatabase(
-      dbPath,
-    );
+  const db = openDatabase(dbPath);
 
-  const sessionIds:
-    string[] = [];
+  const sessionIds: string[] = [];
 
   try {
-    const rows =
-      db.prepare(
+    const rows = db
+      .prepare(
         `
         SELECT *
         FROM "session"
@@ -1375,44 +765,22 @@ export async function recoverOpenCodeProject(
             time_created,
             0
           ) DESC
-        `,
-      ).all() as
-        OpenCodeRow[];
+        `
+      )
+      .all() as OpenCodeRow[];
 
-    for (
-      const row
-      of rows
-    ) {
-      if (
-        !sessionBelongsToProject(
-          db,
-          row,
-          options.project,
-        )
-      ) {
+    for (const row of rows) {
+      if (!sessionBelongsToProject(db, row, options.project)) {
         continue;
       }
 
-      const id =
-        valueString(
-          row.id,
-        );
+      const id = valueString(row.id);
 
-      if (
-        id
-      ) {
-        sessionIds.push(
-          id,
-        );
+      if (id) {
+        sessionIds.push(id);
       }
 
-      if (
-        sessionIds.length >=
-        (
-          options.limit ??
-          100
-        )
-      ) {
+      if (sessionIds.length >= (options.limit ?? 100)) {
         break;
       }
     }
@@ -1420,26 +788,19 @@ export async function recoverOpenCodeProject(
     db.close();
   }
 
-  const results:
-    OpenCodeSyncResult[] =
-    [];
+  const results: OpenCodeSyncResult[] = [];
 
-  for (
-    const nativeSessionId
-    of sessionIds
-  ) {
+  for (const nativeSessionId of sessionIds) {
     results.push(
       await syncOpenCodeSession({
-        project:
-          options.project,
+        project: options.project,
 
-        storage:
-          options.storage,
+        storage: options.storage,
 
         nativeSessionId,
 
         dbPath,
-      }),
+      })
     );
   }
 

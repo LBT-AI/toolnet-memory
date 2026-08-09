@@ -1,26 +1,19 @@
-import type {
-  SessionAgent,
-} from "../session/types.js";
+import type { SessionAgent } from '../session/types.js';
 
-export type WorkItemStatus =
-  | "pending"
-  | "in_progress"
-  | "blocked"
-  | "completed"
-  | "cancelled";
+export type WorkItemStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
 
 export type WorkObservationKind =
-  | "session"
-  | "goal"
-  | "plan"
-  | "phase"
-  | "task"
-  | "decision"
-  | "blocker"
-  | "warning"
-  | "next_action"
-  | "file"
-  | "test";
+  | 'session'
+  | 'goal'
+  | 'plan'
+  | 'phase'
+  | 'task'
+  | 'decision'
+  | 'blocker'
+  | 'warning'
+  | 'next_action'
+  | 'file'
+  | 'test';
 
 export interface WorkObservation {
   version: 1;
@@ -29,42 +22,31 @@ export interface WorkObservation {
 
   projectId: string;
 
-  kind:
-    WorkObservationKind;
+  kind: WorkObservationKind;
 
   key: string;
 
   text: string;
 
-  status?:
-    WorkItemStatus;
+  status?: WorkItemStatus;
 
-  order?:
-    number;
+  order?: number;
 
-  confidence:
-    number;
+  confidence: number;
 
-  occurredAt:
-    string;
+  occurredAt: string;
 
-  sequence:
-    number;
+  sequence: number;
 
-  agent:
-    SessionAgent;
+  agent: SessionAgent;
 
-  nativeSessionId:
-    string;
+  nativeSessionId: string;
 
-  sessionKey:
-    string;
+  sessionKey: string;
 
-  eventId:
-    string;
+  eventId: string;
 
-  sourceEventId?:
-    string;
+  sourceEventId?: string;
 }
 
 export interface WorkObservationBatch {
@@ -72,26 +54,19 @@ export interface WorkObservationBatch {
 
   projectId: string;
 
-  agent:
-    SessionAgent;
+  agent: SessionAgent;
 
-  nativeSessionId:
-    string;
+  nativeSessionId: string;
 
-  sessionKey:
-    string;
+  sessionKey: string;
 
-  createdAt:
-    string;
+  createdAt: string;
 
-  firstSequence:
-    number;
+  firstSequence: number;
 
-  lastSequence:
-    number;
+  lastSequence: number;
 
-  observations:
-    WorkObservation[];
+  observations: WorkObservation[];
 }
 
 export interface WorkItem {
@@ -99,27 +74,20 @@ export interface WorkItem {
 
   title: string;
 
-  status:
-    WorkItemStatus;
+  status: WorkItemStatus;
 
-  order?:
-    number;
+  order?: number;
 
-  confidence:
-    number;
+  confidence: number;
 
-  updatedAt:
-    string;
+  updatedAt: string;
 
   updatedBy: {
-    agent:
-      SessionAgent;
+    agent: SessionAgent;
 
-    nativeSessionId:
-      string;
+    nativeSessionId: string;
 
-    eventId:
-      string;
+    eventId: string;
   };
 }
 
@@ -133,84 +101,59 @@ export interface WorkState {
 
   plan?: string;
 
-  phases:
-    WorkItem[];
+  phases: WorkItem[];
 
-  tasks:
-    WorkItem[];
+  tasks: WorkItem[];
 
-  decisions:
-    string[];
+  decisions: string[];
 
-  blockers:
-    string[];
+  blockers: string[];
 
-  warnings:
-    string[];
+  warnings: string[];
 
-  nextActions:
-    string[];
+  nextActions: string[];
 
-  filesTouched:
-    string[];
+  filesTouched: string[];
 
-  tests:
-    string[];
+  tests: string[];
 
-  currentPhase?:
-    WorkItem;
+  currentPhase?: WorkItem;
 
-  currentTask?:
-    WorkItem;
+  currentTask?: WorkItem;
 
   progress: {
-    phasesTotal:
-      number;
+    phasesTotal: number;
 
-    phasesCompleted:
-      number;
+    phasesCompleted: number;
 
-    tasksTotal:
-      number;
+    tasksTotal: number;
 
-    tasksCompleted:
-      number;
+    tasksCompleted: number;
 
-    blocked:
-      number;
+    blocked: number;
   };
 
   lastSession?: {
-    agent:
-      SessionAgent;
+    agent: SessionAgent;
 
-    nativeSessionId:
-      string;
+    nativeSessionId: string;
 
-    sessionKey:
-      string;
+    sessionKey: string;
 
-    updatedAt:
-      string;
+    updatedAt: string;
   };
 
-  updatedAt:
-    string;
+  updatedAt: string;
 }
 
 export interface WorkContinuityResult {
-  scannedEvents:
-    number;
+  scannedEvents: number;
 
-  observations:
-    number;
+  observations: number;
 
-  journalWritten:
-    boolean;
+  journalWritten: boolean;
 
-  reconciled:
-    boolean;
+  reconciled: boolean;
 
-  nextOffset:
-    number;
+  nextOffset: number;
 }

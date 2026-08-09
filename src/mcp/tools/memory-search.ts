@@ -1,6 +1,6 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-import type { MCPContext } from "../context.js";
+import type { MCPContext } from '../context.js';
 
 export const memorySearchSchema = {
   query: z.string(),
@@ -12,37 +12,23 @@ export async function memorySearch(
   input: {
     query: string;
     limit?: number;
-  },
+  }
 ) {
-  const results =
-    ctx.retrieval.search(
-      ctx.project.id,
-      input.query,
-      {
-        topK:
-          input.limit ?? 8,
-      },
-    );
+  const results = ctx.retrieval.search(ctx.project.id, input.query, {
+    topK: input.limit ?? 8,
+  });
 
-  return results.map(
-    (result) => ({
-      id:
-        result.memory.id,
+  return results.map((result) => ({
+    id: result.memory.id,
 
-      type:
-        result.memory.type,
+    type: result.memory.type,
 
-      content:
-        result.memory.content,
+    content: result.memory.content,
 
-      importance:
-        result.memory.importance,
+    importance: result.memory.importance,
 
-      score:
-        result.score,
+    score: result.score,
 
-      tags:
-        result.memory.tags,
-    }),
-  );
+    tags: result.memory.tags,
+  }));
 }

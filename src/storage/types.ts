@@ -7,29 +7,15 @@ export interface StorageObject {
 export interface StorageProvider {
   readonly name: string;
 
-  put(
-    key: string,
-    data: string | Uint8Array,
-    contentType?: string,
-  ): Promise<void>;
+  put(key: string, data: string | Uint8Array, contentType?: string): Promise<void>;
 
-  get(
-    key: string,
-  ): Promise<Uint8Array | null>;
+  get(key: string): Promise<Uint8Array | null>;
 
-  getText(
-    key: string,
-  ): Promise<string | null>;
+  getText(key: string): Promise<string | null>;
 
-  exists(
-    key: string,
-  ): Promise<boolean>;
+  exists(key: string): Promise<boolean>;
 
-  delete(
-    key: string,
-  ): Promise<void>;
+  delete(key: string): Promise<void>;
 
-  list(
-    prefix?: string,
-  ): Promise<StorageObject[]>;
+  list(prefix?: string): Promise<StorageObject[]>;
 }

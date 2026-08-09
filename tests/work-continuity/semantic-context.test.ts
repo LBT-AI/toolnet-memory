@@ -1,248 +1,117 @@
-import {
-  mkdtempSync,
-  rmSync,
-} from "node:fs";
+import { mkdtempSync, rmSync } from 'node:fs';
 
-import {
-  tmpdir,
-} from "node:os";
+import { tmpdir } from 'node:os';
 
-import {
-  join,
-} from "node:path";
+import { join } from 'node:path';
 
-import {
-  afterEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterEach, describe, expect, it } from 'vitest';
 
-import type {
-  ProjectManifest,
-} from "../../src/core/types.js";
+import type { ProjectManifest } from '../../src/core/types.js';
 
-import type {
-  StorageObject,
-  StorageProvider,
-} from "../../src/storage/types.js";
+import type { StorageObject, StorageProvider } from '../../src/storage/types.js';
 
-import {
-  SessionCore,
-} from "../../src/session/core.js";
+import { SessionCore } from '../../src/session/core.js';
 
-import {
-  buildStartupBrief,
-  loadSemanticWorkState,
-} from "../../src/work-continuity/index.js";
+import { buildStartupBrief, loadSemanticWorkState } from '../../src/work-continuity/index.js';
 
+class MemoryStorage implements StorageProvider {
+  readonly name = 'memory';
 
-class MemoryStorage
-  implements StorageProvider
-{
-  readonly name =
-    "memory";
+  readonly objects = new Map<string, Uint8Array>();
 
-  readonly objects =
-    new Map<
-      string,
-      Uint8Array
-    >();
-
-  async put(
-    key: string,
-    data:
-      string |
-      Uint8Array,
-  ) {
-    this.objects.set(
-      key,
-      typeof data ===
-        "string"
-        ? Buffer.from(
-            data,
-          )
-        : data,
-    );
+  async put(key: string, data: string | Uint8Array) {
+    this.objects.set(key, typeof data === 'string' ? Buffer.from(data) : data);
   }
 
-  async get(
-    key: string,
-  ) {
-    return this.objects.get(
-      key,
-    ) ??
-    null;
+  async get(key: string) {
+    return this.objects.get(key) ?? null;
   }
 
-  async getText(
-    key: string,
-  ) {
-    const value =
-      await this.get(
+  async getText(key: string) {
+    const value = await this.get(key);
+
+    return value ? Buffer.from(value).toString('utf8') : null;
+  }
+
+  async exists(key: string) {
+    return this.objects.has(key);
+  }
+
+  async delete(key: string) {
+    this.objects.delete(key);
+  }
+
+  async list(prefix = ''): Promise<StorageObject[]> {
+    return Array.from(this.objects.entries())
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, value]) => ({
         key,
-      );
-
-    return value
-      ? Buffer.from(
-          value,
-        ).toString(
-          "utf8",
-        )
-      : null;
-  }
-
-  async exists(
-    key: string,
-  ) {
-    return this.objects.has(
-      key,
-    );
-  }
-
-  async delete(
-    key: string,
-  ) {
-    this.objects.delete(
-      key,
-    );
-  }
-
-  async list(
-    prefix =
-      "",
-  ): Promise<
-    StorageObject[]
-  > {
-    return Array.from(
-      this.objects.entries(),
-    )
-      .filter(
-        ([key]) =>
-          key.startsWith(
-            prefix,
-          ),
-      )
-      .map(
-        (
-          [key, value],
-        ) => ({
-          key,
-          size:
-            value.byteLength,
-        }),
-      );
+        size: value.byteLength,
+      }));
   }
 }
 
+const roots: string[] = [];
 
-const roots:
-  string[] =
-  [];
+function project(): ProjectManifest {
+  const root = mkdtempSync(join(tmpdir(), 'toolnet-semantic-'));
 
+  roots.push(root);
 
-function project():
-  ProjectManifest {
-  const root =
-    mkdtempSync(
-      join(
-        tmpdir(),
-        "toolnet-semantic-",
-      ),
-    );
-
-  roots.push(
-    root,
-  );
-
-  const now =
-    new Date()
-      .toISOString();
+  const now = new Date().toISOString();
 
   return {
-    id:
-      "semantic-project",
+    id: 'semantic-project',
 
-    name:
-      "ProjectA",
+    name: 'ProjectA',
 
-    remote:
-      "ProjectA",
+    remote: 'ProjectA',
 
-    rootPath:
-      root,
+    rootPath: root,
 
-    createdAt:
-      now,
+    createdAt: now,
 
-    updatedAt:
-      now,
+    updatedAt: now,
 
-    graphVersion:
-      0,
+    graphVersion: 0,
 
-    memoryVersion:
-      0,
+    memoryVersion: 0,
   };
 }
 
+afterEach(() => {
+  while (roots.length) {
+    rmSync(roots.pop()!, {
+      recursive: true,
 
-afterEach(
-  () => {
-    while (
-      roots.length
-    ) {
-      rmSync(
-        roots.pop()!,
-        {
-          recursive:
-            true,
+      force: true,
+    });
+  }
+});
 
-          force:
-            true,
-        },
-      );
-    }
-  },
-);
+describe('Semantic Work Context', () => {
+  it('captures mission, objective, rationale and phase meaning', async () => {
+    const p = project();
 
+    const storage = new MemoryStorage();
 
-describe(
-  "Semantic Work Context",
-  () => {
-    it(
-      "captures mission, objective, rationale and phase meaning",
-      async () => {
-        const p =
-          project();
+    const core = new SessionCore({
+      project: p,
 
-        const storage =
-          new MemoryStorage();
+      storage,
 
-        const core =
-          new SessionCore({
-            project:
-              p,
+      agent: 'opencode',
 
-            storage,
+      nativeSessionId: 'ses-semantic',
+    });
 
-            agent:
-              "opencode",
+    core.record({
+      type: 'assistant_message',
 
-            nativeSessionId:
-              "ses-semantic",
-          });
+      role: 'assistant',
 
-        core.record({
-          type:
-            "assistant_message",
-
-          role:
-            "assistant",
-
-          data: {
-            content:
-`Mission: Cho phép nhiều coding agent tiếp tục cùng một project mà không mất mạch công việc.
+      data: {
+        content: `Mission: Cho phép nhiều coding agent tiếp tục cùng một project mà không mất mạch công việc.
 Mục tiêu hiện tại: Xây continuity layer dùng chung cho OpenCode, Agy và Codex.
 Tại sao chọn hướng này: Session history thô quá dài nên cần trạng thái project có cấu trúc.
 Kết quả mong muốn: Agent mới hiểu mục tiêu, tiến độ và lý do của công việc trước khi sửa code.
@@ -268,126 +137,54 @@ Tiêu chí hoàn thành:
 
 Phase 1 hoàn thành
 Phase 2 đang làm`,
-          },
-        });
-
-        await core.flush();
-
-        const semantic =
-          await loadSemanticWorkState(
-            p,
-            storage,
-          );
-
-        expect(
-          semantic
-            ?.mission
-            ?.value,
-        ).toContain(
-          "không mất mạch",
-        );
-
-        expect(
-          semantic
-            ?.activeObjective
-            ?.value,
-        ).toContain(
-          "continuity layer",
-        );
-
-        expect(
-          semantic
-            ?.planRationale
-            ?.value,
-        ).toContain(
-          "Session history",
-        );
-
-        const phase2 =
-          semantic
-            ?.phases
-            .find(
-              item =>
-                item.order ===
-                2,
-            );
-
-        expect(
-          phase2
-            ?.objective
-            ?.value,
-        ).toContain(
-          "ý nghĩa",
-        );
-
-        expect(
-          phase2
-            ?.why
-            ?.value,
-        ).toContain(
-          "mù loà",
-        );
-
-        expect(
-          phase2
-            ?.deliverable
-            ?.value,
-        ).toContain(
-          "Semantic work state",
-        );
-
-        expect(
-          phase2
-            ?.acceptanceCriteria
-            .length,
-        ).toBeGreaterThanOrEqual(
-          3,
-        );
-
-        expect(
-          phase2
-            ?.dependencies[0]
-            ?.value,
-        ).toContain(
-          "Phase 1",
-        );
       },
-    );
+    });
 
+    await core.flush();
 
-    it(
-      "preserves semantic project intent across agents",
-      async () => {
-        const p =
-          project();
+    const semantic = await loadSemanticWorkState(p, storage);
 
-        const storage =
-          new MemoryStorage();
+    expect(semantic?.mission?.value).toContain('không mất mạch');
 
-        const opencode =
-          new SessionCore({
-            project:
-              p,
+    expect(semantic?.activeObjective?.value).toContain('continuity layer');
 
-            storage,
+    expect(semantic?.planRationale?.value).toContain('Session history');
 
-            agent:
-              "opencode",
+    const phase2 = semantic?.phases.find((item) => item.order === 2);
 
-            nativeSessionId:
-              "ses-A",
-          });
+    expect(phase2?.objective?.value).toContain('ý nghĩa');
 
-        opencode.record({
-          type:
-            "assistant_message",
+    expect(phase2?.why?.value).toContain('mù loà');
 
-          role:
-            "assistant",
+    expect(phase2?.deliverable?.value).toContain('Semantic work state');
 
-          data: {
-            content:
-`Mission: Xây project continuity layer cho mọi coding agent.
+    expect(phase2?.acceptanceCriteria.length).toBeGreaterThanOrEqual(3);
+
+    expect(phase2?.dependencies[0]?.value).toContain('Phase 1');
+  });
+
+  it('preserves semantic project intent across agents', async () => {
+    const p = project();
+
+    const storage = new MemoryStorage();
+
+    const opencode = new SessionCore({
+      project: p,
+
+      storage,
+
+      agent: 'opencode',
+
+      nativeSessionId: 'ses-A',
+    });
+
+    opencode.record({
+      type: 'assistant_message',
+
+      role: 'assistant',
+
+      data: {
+        content: `Mission: Xây project continuity layer cho mọi coding agent.
 Mục tiêu hiện tại: Hoàn thiện kiến trúc handoff.
 Phase 1 - Capture
 Mục đích: Lưu session.
@@ -396,189 +193,109 @@ Phase 1 hoàn thành
 Phase 2 - Handoff
 Mục đích: Chuyển trạng thái giữa agent.
 Phase 2 đang làm`,
-          },
-        });
+      },
+    });
 
-        await opencode.flush();
+    await opencode.flush();
 
-        const agy =
-          new SessionCore({
-            project:
-              p,
+    const agy = new SessionCore({
+      project: p,
 
-            storage,
+      storage,
 
-            agent:
-              "agy",
+      agent: 'agy',
 
-            nativeSessionId:
-              "agy-B",
-          });
+      nativeSessionId: 'agy-B',
+    });
 
-        agy.record({
-          type:
-            "assistant_message",
+    agy.record({
+      type: 'assistant_message',
 
-          role:
-            "assistant",
+      role: 'assistant',
 
-          data: {
-            content:
-`Phase 2 - Handoff
+      data: {
+        content: `Phase 2 - Handoff
 Deliverable: Startup brief và handoff state có cấu trúc.
 Done khi:
 - Agent mới hiểu được việc đang làm.
 - Agent mới biết việc tiếp theo.`,
-          },
-        });
-
-        await agy.flush();
-
-        const semantic =
-          await loadSemanticWorkState(
-            p,
-            storage,
-          );
-
-        expect(
-          semantic
-            ?.mission
-            ?.value,
-        ).toContain(
-          "mọi coding agent",
-        );
-
-        const phase2 =
-          semantic
-            ?.phases.find(
-              item =>
-                item.order ===
-                2,
-            );
-
-        expect(
-          phase2
-            ?.deliverable
-            ?.value,
-        ).toContain(
-          "Startup brief",
-        );
-
-        expect(
-          phase2
-            ?.objective
-            ?.value,
-        ).toContain(
-          "Chuyển trạng thái",
-        );
       },
-    );
+    });
 
+    await agy.flush();
 
-    it(
-      "does not invent rationale when previous session never recorded it",
-      async () => {
-        const p =
-          project();
+    const semantic = await loadSemanticWorkState(p, storage);
 
-        const storage =
-          new MemoryStorage();
+    expect(semantic?.mission?.value).toContain('mọi coding agent');
 
-        const core =
-          new SessionCore({
-            project:
-              p,
+    const phase2 = semantic?.phases.find((item) => item.order === 2);
 
-            storage,
+    expect(phase2?.deliverable?.value).toContain('Startup brief');
 
-            agent:
-              "codex",
+    expect(phase2?.objective?.value).toContain('Chuyển trạng thái');
+  });
 
-            nativeSessionId:
-              "thread-no-why",
-          });
+  it('does not invent rationale when previous session never recorded it', async () => {
+    const p = project();
 
-        core.record({
-          type:
-            "assistant_message",
+    const storage = new MemoryStorage();
 
-          role:
-            "assistant",
+    const core = new SessionCore({
+      project: p,
 
-          data: {
-            content:
-`Mission: Hoàn thiện project.
+      storage,
+
+      agent: 'codex',
+
+      nativeSessionId: 'thread-no-why',
+    });
+
+    core.record({
+      type: 'assistant_message',
+
+      role: 'assistant',
+
+      data: {
+        content: `Mission: Hoàn thiện project.
 Phase 1 - Refactor
 Mục đích: Tách runtime thành module riêng.
 Phase 1 đang làm`,
-          },
-        });
-
-        await core.flush();
-
-        const semantic =
-          await loadSemanticWorkState(
-            p,
-            storage,
-          );
-
-        const phase1 =
-          semantic
-            ?.phases.find(
-              item =>
-                item.order ===
-                1,
-            );
-
-        expect(
-          phase1
-            ?.objective
-            ?.value,
-        ).toContain(
-          "Tách runtime",
-        );
-
-        expect(
-          phase1
-            ?.why,
-        ).toBeUndefined();
       },
-    );
+    });
 
+    await core.flush();
 
-    it(
-      "places meaning before blind next-step execution in startup brief",
-      async () => {
-        const p =
-          project();
+    const semantic = await loadSemanticWorkState(p, storage);
 
-        const storage =
-          new MemoryStorage();
+    const phase1 = semantic?.phases.find((item) => item.order === 1);
 
-        const core =
-          new SessionCore({
-            project:
-              p,
+    expect(phase1?.objective?.value).toContain('Tách runtime');
 
-            storage,
+    expect(phase1?.why).toBeUndefined();
+  });
 
-            agent:
-              "opencode",
+  it('places meaning before blind next-step execution in startup brief', async () => {
+    const p = project();
 
-            nativeSessionId:
-              "ses-old",
-          });
+    const storage = new MemoryStorage();
 
-        core.record({
-          type:
-            "assistant_message",
+    const core = new SessionCore({
+      project: p,
 
-          role:
-            "assistant",
+      storage,
 
-          data: {
-            content:
-`Mission: Xây một thư ký kỹ thuật giúp coding agent tiếp tục công việc xuyên phiên.
+      agent: 'opencode',
+
+      nativeSessionId: 'ses-old',
+    });
+
+    core.record({
+      type: 'assistant_message',
+
+      role: 'assistant',
+
+      data: {
+        content: `Mission: Xây một thư ký kỹ thuật giúp coding agent tiếp tục công việc xuyên phiên.
 Mục tiêu hiện tại: Hoàn thiện semantic continuity.
 Tại sao: Agent mới phải hiểu ý nghĩa công việc chứ không chỉ số phase.
 
@@ -596,74 +313,33 @@ Done khi:
 - Startup brief nói rõ why.
 Phase 2 đang làm
 Bước tiếp theo: hoàn thiện Semantic Context`,
-          },
-        });
-
-        await core.idle();
-
-        const brief =
-          await buildStartupBrief({
-            project:
-              p,
-
-            storage,
-
-            maxTokens:
-              1000,
-          });
-
-        expect(
-          brief.text,
-        ).toContain(
-          "MISSION",
-        );
-
-        expect(
-          brief.text,
-        ).toContain(
-          "CURRENT OBJECTIVE",
-        );
-
-        expect(
-          brief.text,
-        ).toContain(
-          "WHY THIS WORK MATTERS",
-        );
-
-        expect(
-          brief.text,
-        ).toContain(
-          "Phase objective:",
-        );
-
-        expect(
-          brief.text,
-        ).toContain(
-          "Why this phase:",
-        );
-
-        expect(
-          brief.text,
-        ).toContain(
-          "DEFINITION OF DONE",
-        );
-
-        expect(
-          brief.estimatedTokens,
-        ).toBeLessThanOrEqual(
-          1000,
-        );
-
-        expect(
-          brief.text.indexOf(
-            "MISSION",
-          ),
-        ).toBeLessThan(
-          brief.text.indexOf(
-            "NEXT ACTIONS",
-          ),
-        );
       },
-    );
-  },
-);
+    });
+
+    await core.idle();
+
+    const brief = await buildStartupBrief({
+      project: p,
+
+      storage,
+
+      maxTokens: 1000,
+    });
+
+    expect(brief.text).toContain('MISSION');
+
+    expect(brief.text).toContain('CURRENT OBJECTIVE');
+
+    expect(brief.text).toContain('WHY THIS WORK MATTERS');
+
+    expect(brief.text).toContain('Phase objective:');
+
+    expect(brief.text).toContain('Why this phase:');
+
+    expect(brief.text).toContain('DEFINITION OF DONE');
+
+    expect(brief.estimatedTokens).toBeLessThanOrEqual(1000);
+
+    expect(brief.text.indexOf('MISSION')).toBeLessThan(brief.text.indexOf('NEXT ACTIONS'));
+  });
+});

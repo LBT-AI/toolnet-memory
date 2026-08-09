@@ -1,133 +1,81 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  loadConfig,
-  ProjectManager,
-} from "../core/index.js";
+import { loadConfig, ProjectManager } from '../core/index.js';
 
 import {
   createStorageProvider,
   withStorageRetry,
   ProjectScopedStorageProvider,
   PersistentCodeGraphStore,
-} from "../storage/index.js";
+} from '../storage/index.js';
 
-import {
-  CodeGraphStore,
-  ImpactGuard,
-} from "./index.js";
+import { CodeGraphStore, ImpactGuard } from './index.js';
 
 async function main() {
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
-  const project =
-    new ProjectManager()
-      .detect();
+  const project = new ProjectManager().detect();
 
-  const raw =
-    withStorageRetry(
-      createStorageProvider({
-        provider:
-          config.storage.provider,
+  const raw = withStorageRetry(
+    createStorageProvider({
+      provider: config.storage.provider,
 
-        huggingface:
-          config.storage.huggingface,
+      huggingface: config.storage.huggingface,
 
-        localRoot:
-          config.storage.localRoot,
-      }),
-      {
-        attempts: 3,
-      },
-    );
-
-  const storage =
-    new ProjectScopedStorageProvider(
-      raw,
-      project.id,
-      project.name,
-      project.remote ?? project.name,
-    );
-
-  const snapshot =
-    await new PersistentCodeGraphStore(
-      storage,
-    ).load(
-      project.id,
-    );
-
-  if (!snapshot) {
-    throw new Error(
-      "Code graph missing",
-    );
-  }
-
-  const graph =
-    new CodeGraphStore();
-
-  graph.import(
-    snapshot.symbols,
-    snapshot.edges,
+      localRoot: config.storage.localRoot,
+    }),
+    {
+      attempts: 3,
+    }
   );
 
-  const guard =
-    new ImpactGuard(
-      graph,
-    );
+  const storage = new ProjectScopedStorageProvider(
+    raw,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
 
-  const filePath =
-    process.argv[2];
+  const snapshot = await new PersistentCodeGraphStore(storage).load(project.id);
 
-  const result =
-    filePath
-      ? guard.analyzeFile(
-          project.id,
-          filePath,
-        )
-      : await guard.analyzeGitDiff(
-          project.id,
-          project.rootPath,
-        );
+  if (!snapshot) {
+    throw new Error('Code graph missing');
+  }
+
+  const graph = new CodeGraphStore();
+
+  graph.import(snapshot.symbols, snapshot.edges);
+
+  const guard = new ImpactGuard(graph);
+
+  const filePath = process.argv[2];
+
+  const result = filePath
+    ? guard.analyzeFile(project.id, filePath)
+    : await guard.analyzeGitDiff(project.id, project.rootPath);
 
   console.log({
-    risk:
-      result.risk,
+    risk: result.risk,
 
-    riskScore:
-      result.riskScore,
+    riskScore: result.riskScore,
 
-    changedSymbols:
-      result.changedSymbols.map(
-        (item) => ({
-          symbol:
-            item.symbol
-              .qualifiedName,
+    changedSymbols: result.changedSymbols.map((item) => ({
+      symbol: item.symbol.qualifiedName,
 
-          file:
-            item.symbol
-              .filePath,
+      file: item.symbol.filePath,
 
-          type:
-            item.symbol
-              .type,
-        }),
-      ),
+      type: item.symbol.type,
+    })),
 
-    impactedFiles:
-      result.impactedFiles,
+    impactedFiles: result.impactedFiles,
 
-    suggestedTests:
-      result.suggestedTests,
+    suggestedTests: result.suggestedTests,
 
-    impactedCount:
-      result.impacted.length,
+    impactedCount: result.impacted.length,
   });
 }
 
-main().catch(
-  (error) => {
-    console.error(error);
-    process.exit(1);
-  },
-);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -1,92 +1,45 @@
-import {
-  z,
-} from "zod";
+import { z } from 'zod';
 
-import type {
-  MCPContext,
-} from "../context.js";
+import type { MCPContext } from '../context.js';
 
 export const memoryRememberSchema = {
-  type:
-    z.enum([
-      "activity",
-      "decision",
-      "rule",
-      "todo",
-      "summary",
-    ]),
+  type: z.enum(['activity', 'decision', 'rule', 'todo', 'summary']),
 
-  content:
-    z.string()
-      .min(1),
+  content: z.string().min(1),
 
-  tags:
-    z.array(
-      z.string(),
-    ).optional(),
+  tags: z.array(z.string()).optional(),
 
-  importance:
-    z.enum([
-      "critical",
-      "high",
-      "normal",
-      "temporary",
-    ]).optional(),
+  importance: z.enum(['critical', 'high', 'normal', 'temporary']).optional(),
 };
 
 export async function memoryRemember(
   ctx: MCPContext,
   input: {
-    type:
-      | "activity"
-      | "decision"
-      | "rule"
-      | "todo"
-      | "summary";
+    type: 'activity' | 'decision' | 'rule' | 'todo' | 'summary';
 
-    content:
-      string;
+    content: string;
 
-    tags?:
-      string[];
+    tags?: string[];
 
-    importance?:
-      | "critical"
-      | "high"
-      | "normal"
-      | "temporary";
-  },
+    importance?: 'critical' | 'high' | 'normal' | 'temporary';
+  }
 ) {
-  const record =
-    ctx.memory.remember({
-      projectId:
-        ctx.project.id,
+  const record = ctx.memory.remember({
+    projectId: ctx.project.id,
 
-      type:
-        input.type,
+    type: input.type,
 
-      content:
-        input.content,
+    content: input.content,
 
-      tags:
-        input.tags,
+    tags: input.tags,
 
-      importance:
-        input.importance,
+    importance: input.importance,
 
-      source:
-        "mcp",
-    });
+    source: 'mcp',
+  });
 
-  if (
-    ctx.memoryStore
-  ) {
-    await ctx.memoryStore.save(
-      ctx.project.id,
-      ctx.memory.exportProject(
-        ctx.project.id,
-      ),
-    );
+  if (ctx.memoryStore) {
+    await ctx.memoryStore.save(ctx.project.id, ctx.memory.exportProject(ctx.project.id));
   }
 
   return record;

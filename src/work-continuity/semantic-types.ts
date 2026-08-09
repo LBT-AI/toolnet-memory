@@ -1,43 +1,34 @@
-import type {
-  SessionAgent,
-} from "../session/types.js";
+import type { SessionAgent } from '../session/types.js';
 
 export type SemanticFieldKind =
-  | "mission"
-  | "objective"
-  | "why"
-  | "desired_outcome"
-  | "plan_rationale"
-  | "phase_objective"
-  | "phase_why"
-  | "phase_deliverable"
-  | "acceptance_criterion"
-  | "dependency"
-  | "open_question"
-  | "constraint"
-  | "note";
+  | 'mission'
+  | 'objective'
+  | 'why'
+  | 'desired_outcome'
+  | 'plan_rationale'
+  | 'phase_objective'
+  | 'phase_why'
+  | 'phase_deliverable'
+  | 'acceptance_criterion'
+  | 'dependency'
+  | 'open_question'
+  | 'constraint'
+  | 'note';
 
 export interface SemanticEvidence {
-  agent:
-    SessionAgent;
+  agent: SessionAgent;
 
-  nativeSessionId:
-    string;
+  nativeSessionId: string;
 
-  sessionKey:
-    string;
+  sessionKey: string;
 
-  eventId:
-    string;
+  eventId: string;
 
-  sourceEventId?:
-    string;
+  sourceEventId?: string;
 
-  sequence:
-    number;
+  sequence: number;
 
-  occurredAt:
-    string;
+  occurredAt: string;
 }
 
 export interface SemanticObservation {
@@ -45,160 +36,111 @@ export interface SemanticObservation {
 
   id: string;
 
-  projectId:
-    string;
+  projectId: string;
 
-  kind:
-    SemanticFieldKind;
+  kind: SemanticFieldKind;
 
-  value:
-    string;
+  value: string;
 
-  scope:
-    "project" |
-    "phase" |
-    "task";
+  scope: 'project' | 'phase' | 'task';
 
-  scopeKey?:
-    string;
+  scopeKey?: string;
 
-  scopeOrder?:
-    number;
+  scopeOrder?: number;
 
-  confidence:
-    number;
+  confidence: number;
 
-  evidence:
-    SemanticEvidence;
+  evidence: SemanticEvidence;
 }
 
 export interface SemanticObservationBatch {
   version: 1;
 
-  projectId:
-    string;
+  projectId: string;
 
-  agent:
-    SessionAgent;
+  agent: SessionAgent;
 
-  nativeSessionId:
-    string;
+  nativeSessionId: string;
 
-  sessionKey:
-    string;
+  sessionKey: string;
 
-  firstSequence:
-    number;
+  firstSequence: number;
 
-  lastSequence:
-    number;
+  lastSequence: number;
 
-  createdAt:
-    string;
+  createdAt: string;
 
-  observations:
-    SemanticObservation[];
+  observations: SemanticObservation[];
 }
 
 export interface SemanticValue {
-  value:
-    string;
+  value: string;
 
-  confidence:
-    number;
+  confidence: number;
 
-  evidence:
-    SemanticEvidence;
+  evidence: SemanticEvidence;
 }
 
 export interface SemanticPhaseContext {
-  key:
-    string;
+  key: string;
 
-  order:
-    number;
+  order: number;
 
-  title?:
-    string;
+  title?: string;
 
-  objective?:
-    SemanticValue;
+  objective?: SemanticValue;
 
-  why?:
-    SemanticValue;
+  why?: SemanticValue;
 
-  deliverable?:
-    SemanticValue;
+  deliverable?: SemanticValue;
 
-  acceptanceCriteria:
-    SemanticValue[];
+  acceptanceCriteria: SemanticValue[];
 
-  dependencies:
-    SemanticValue[];
+  dependencies: SemanticValue[];
 
-  openQuestions:
-    SemanticValue[];
+  openQuestions: SemanticValue[];
 
-  constraints:
-    SemanticValue[];
+  constraints: SemanticValue[];
 
-  notes:
-    SemanticValue[];
+  notes: SemanticValue[];
 }
 
 export interface SemanticWorkState {
   version: 1;
 
-  projectId:
-    string;
+  projectId: string;
 
-  projectName:
-    string;
+  projectName: string;
 
-  mission?:
-    SemanticValue;
+  mission?: SemanticValue;
 
-  activeObjective?:
-    SemanticValue;
+  activeObjective?: SemanticValue;
 
-  why?:
-    SemanticValue;
+  why?: SemanticValue;
 
-  desiredOutcome?:
-    SemanticValue;
+  desiredOutcome?: SemanticValue;
 
-  planRationale?:
-    SemanticValue;
+  planRationale?: SemanticValue;
 
-  phases:
-    SemanticPhaseContext[];
+  phases: SemanticPhaseContext[];
 
-  openQuestions:
-    SemanticValue[];
+  openQuestions: SemanticValue[];
 
-  constraints:
-    SemanticValue[];
+  constraints: SemanticValue[];
 
-  notes:
-    SemanticValue[];
+  notes: SemanticValue[];
 
-  updatedAt:
-    string;
+  updatedAt: string;
 }
 
 export interface SemanticLearningResult {
-  scannedEvents:
-    number;
+  scannedEvents: number;
 
-  observations:
-    number;
+  observations: number;
 
-  journalWritten:
-    boolean;
+  journalWritten: boolean;
 
-  reconciled:
-    boolean;
+  reconciled: boolean;
 
-  nextOffset:
-    number;
+  nextOffset: number;
 }

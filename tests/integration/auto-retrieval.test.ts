@@ -1,189 +1,94 @@
-import {
-  mkdtemp,
-  rm,
-} from "node:fs/promises";
+import { mkdtemp, rm } from 'node:fs/promises';
 
-import {
-  tmpdir,
-} from "node:os";
+import { tmpdir } from 'node:os';
 
-import {
-  join,
-} from "node:path";
+import { join } from 'node:path';
 
-import {
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import {
-  MemoryEngine,
-} from "../../src/core/memory-engine.js";
+import { MemoryEngine } from '../../src/core/memory-engine.js';
 
-import {
-  RetrievalEngine,
-} from "../../src/retrieval/retrieval-engine.js";
+import { RetrievalEngine } from '../../src/retrieval/retrieval-engine.js';
 
-import {
-  CodeGraphStore,
-} from "../../src/code-intelligence/graph/graph-store.js";
+import { CodeGraphStore } from '../../src/code-intelligence/graph/graph-store.js';
 
-import {
-  LocalStorageProvider,
-} from "../../src/storage/local/client.js";
+import { LocalStorageProvider } from '../../src/storage/local/client.js';
 
-import {
-  MemoryStore,
-} from "../../src/storage/memory-store.js";
+import { MemoryStore } from '../../src/storage/memory-store.js';
 
-import {
-  HookRuntime,
-  AutoContextBuilder,
-  AutoRetrieval,
-} from "../../src/hooks/index.js";
+import { HookRuntime, AutoContextBuilder, AutoRetrieval } from '../../src/hooks/index.js';
 
-describe(
-  "Auto Retrieval",
-  () => {
-    it(
-      "injects compact project memory into agent prompt",
-      async () => {
-        const dir =
-          await mkdtemp(
-            join(
-              tmpdir(),
-              "toolnet-auto-",
-            ),
-          );
+describe('Auto Retrieval', () => {
+  it('injects compact project memory into agent prompt', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'toolnet-auto-'));
 
-        try {
-          const memory =
-            new MemoryEngine();
+    try {
+      const memory = new MemoryEngine();
 
-          memory.remember({
-            projectId:
-              "test",
+      memory.remember({
+        projectId: 'test',
 
-            type:
-              "rule",
+        type: 'rule',
 
-            content:
-              "Không được sửa production trực tiếp",
+        content: 'Không được sửa production trực tiếp',
 
-            importance:
-              "critical",
-          });
+        importance: 'critical',
+      });
 
-          memory.remember({
-            projectId:
-              "test",
+      memory.remember({
+        projectId: 'test',
 
-            type:
-              "decision",
+        type: 'decision',
 
-            content:
-              "Dùng Hugging Face làm remote storage",
+        content: 'Dùng Hugging Face làm remote storage',
 
-            importance:
-              "high",
-          });
+        importance: 'high',
+      });
 
-          memory.remember({
-            projectId:
-              "test",
+      memory.remember({
+        projectId: 'test',
 
-            type:
-              "todo",
+        type: 'todo',
 
-            content:
-              "TODO thêm MCP integration",
+        content: 'TODO thêm MCP integration',
 
-            importance:
-              "normal",
-          });
+        importance: 'normal',
+      });
 
-          const retrieval =
-            new RetrievalEngine(
-              memory,
-            );
+      const retrieval = new RetrievalEngine(memory);
 
-          const graph =
-            new CodeGraphStore();
+      const graph = new CodeGraphStore();
 
-          const storage =
-            new LocalStorageProvider(
-              dir,
-            );
+      const storage = new LocalStorageProvider(dir);
 
-          const store =
-            new MemoryStore(
-              storage,
-            );
+      const store = new MemoryStore(storage);
 
-          const runtime =
-            new HookRuntime({
-              projectId:
-                "test",
+      const runtime = new HookRuntime({
+        projectId: 'test',
 
-              memory,
+        memory,
 
-              memoryStore:
-                store,
-            });
+        memoryStore: store,
+      });
 
-          const builder =
-            new AutoContextBuilder(
-              memory,
-              retrieval,
-              graph,
-            );
+      const builder = new AutoContextBuilder(memory, retrieval, graph);
 
-          const auto =
-            new AutoRetrieval(
-              runtime,
-              builder,
-              "test",
-            );
+      const auto = new AutoRetrieval(runtime, builder, 'test');
 
-          const result =
-            await auto.prepare(
-              "Tiếp tục phần storage",
-            );
+      const result = await auto.prepare('Tiếp tục phần storage');
 
-          expect(
-            result.context,
-          ).toContain(
-            "Hugging Face",
-          );
+      expect(result.context).toContain('Hugging Face');
 
-          expect(
-            result.context,
-          ).toContain(
-            "production",
-          );
+      expect(result.context).toContain('production');
 
-          expect(
-            result.augmentedPrompt,
-          ).toContain(
-            "<toolnet_memory>",
-          );
+      expect(result.augmentedPrompt).toContain('<toolnet_memory>');
 
-          expect(
-            result.augmentedPrompt,
-          ).toContain(
-            "Tiếp tục phần storage",
-          );
-        } finally {
-          await rm(
-            dir,
-            {
-              recursive: true,
-              force: true,
-            },
-          );
-        }
-      },
-    );
-  },
-);
+      expect(result.augmentedPrompt).toContain('Tiếp tục phần storage');
+    } finally {
+      await rm(dir, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+});

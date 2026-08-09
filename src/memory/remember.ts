@@ -1,12 +1,6 @@
-import type {
-  MemoryRecord,
-  MemoryType,
-  ImportanceLevel,
-} from "../core/types.js";
+import type { MemoryRecord, MemoryType, ImportanceLevel } from '../core/types.js';
 
-import {
-  MemoryEngine,
-} from "../core/memory-engine.js";
+import { MemoryEngine } from '../core/memory-engine.js';
 
 export interface RememberMemoryInput {
   projectId: string;
@@ -20,9 +14,6 @@ export interface RememberMemoryInput {
   metadata?: Record<string, unknown>;
 }
 
-export function rememberMemory(
-  engine: MemoryEngine,
-  input: RememberMemoryInput,
-): MemoryRecord {
+export function rememberMemory(engine: MemoryEngine, input: RememberMemoryInput): MemoryRecord {
   return engine.remember(input);
 }

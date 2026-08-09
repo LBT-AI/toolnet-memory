@@ -1,21 +1,12 @@
-import {
-  createHash,
-} from "node:crypto";
+import { createHash } from 'node:crypto';
 
-import type {
-  GraphEdge,
-} from "../../core/types.js";
+import type { GraphEdge } from '../../core/types.js';
 
-import type {
-  CodeGraphStore,
-} from "../graph/graph-store.js";
+import type { CodeGraphStore } from '../graph/graph-store.js';
 
-import type {
-  ArchitectureCluster,
-} from "./types.js";
+import type { ArchitectureCluster } from './types.js';
 
-const EDGE_WEIGHT:
-  Partial<Record<GraphEdge["type"], number>> = {
+const EDGE_WEIGHT: Partial<Record<GraphEdge['type'], number>> = {
   CALL_REFERENCE: 7,
   CALLS: 3,
   IMPORTS: 4,
@@ -27,126 +18,78 @@ const EDGE_WEIGHT:
   TESTS: 1,
 };
 
-function hash(
-  value: string,
-): string {
-  return createHash("sha256")
-    .update(value)
-    .digest("hex")
-    .slice(0, 12);
+function hash(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 12);
 }
 
-function normalize(
-  value: string,
-): string {
-  return value.replaceAll("\\", "/");
+function normalize(value: string): string {
+  return value.replaceAll('\\', '/');
 }
 
-function subsystemOf(
-  filePath: string,
-): string {
-  const path =
-    normalize(filePath);
+function subsystemOf(filePath: string): string {
+  const path = normalize(filePath);
 
-  const parts =
-    path.split("/")
-      .filter(Boolean);
+  const parts = path.split('/').filter(Boolean);
 
-  if (
-    parts[0] === "src" &&
-    parts[1]
-  ) {
+  if (parts[0] === 'src' && parts[1]) {
     return `src/${parts[1]}`;
   }
 
-  if (
-    parts[0] === "packages" &&
-    parts[1]
-  ) {
+  if (parts[0] === 'packages' && parts[1]) {
     return `packages/${parts[1]}`;
   }
 
-  if (
-    parts[0] === "tests"
-  ) {
-    return "tests";
+  if (parts[0] === 'tests') {
+    return 'tests';
   }
 
-  if (
-    parts[0] === "bin"
-  ) {
-    return "bin";
+  if (parts[0] === 'bin') {
+    return 'bin';
   }
 
-  return parts[0] ?? "root";
+  return parts[0] ?? 'root';
 }
 
-function clusterLabel(
-  subsystem: string,
-): string {
-  const value =
-    subsystem
-      .replace(/^src\//, "")
-      .replace(/^packages\//, "");
+function clusterLabel(subsystem: string): string {
+  const value = subsystem.replace(/^src\//, '').replace(/^packages\//, '');
 
-  const map:
-    Record<string, string> = {
-      "code-intelligence":
-        "Code Intelligence",
+  const map: Record<string, string> = {
+    'code-intelligence': 'Code Intelligence',
 
-      memory:
-        "Memory",
+    memory: 'Memory',
 
-      storage:
-        "Storage",
+    storage: 'Storage',
 
-      retrieval:
-        "Retrieval",
+    retrieval: 'Retrieval',
 
-      runtime:
-        "Runtime",
+    runtime: 'Runtime',
 
-      mcp:
-        "MCP",
+    mcp: 'MCP',
 
-      hooks:
-        "Hooks",
+    hooks: 'Hooks',
 
-      security:
-        "Security",
+    security: 'Security',
 
-      snapshot:
-        "Snapshots",
+    snapshot: 'Snapshots',
 
-      production:
-        "Production",
+    production: 'Production',
 
-      capture:
-        "Capture",
+    capture: 'Capture',
 
-      processor:
-        "Processor",
+    processor: 'Processor',
 
-      core:
-        "Core",
+    core: 'Core',
 
-      tests:
-        "Tests",
+    tests: 'Tests',
 
-      bin:
-        "CLI",
+    bin: 'CLI',
 
-      sdk:
-        "SDK",
+    sdk: 'SDK',
 
-      cli:
-        "CLI",
-    };
+    cli: 'CLI',
+  };
 
-  return (
-    map[value] ??
-    value
-  );
+  return map[value] ?? value;
 }
 
 interface Pair {
@@ -156,170 +99,78 @@ interface Pair {
 }
 
 export class ClusterDetector {
-  constructor(
-    private readonly graph:
-      CodeGraphStore,
-  ) {}
+  constructor(private readonly graph: CodeGraphStore) {}
 
-  detect(
-    projectId: string,
-  ): ArchitectureCluster[] {
-    const symbols =
-      this.graph.allSymbols(
-        projectId,
-      );
+  detect(projectId: string): ArchitectureCluster[] {
+    const symbols = this.graph.allSymbols(projectId);
 
-    const edges =
-      this.graph.allEdges(
-        projectId,
-      );
+    const edges = this.graph.allEdges(projectId);
 
-    const symbolById =
-      new Map(
-        symbols.map(
-          (symbol) => [
-            symbol.id,
-            symbol,
-          ],
-        ),
-      );
+    const symbolById = new Map(symbols.map((symbol) => [symbol.id, symbol]));
 
-    const files =
-      [
-        ...new Set(
-          symbols.map(
-            (symbol) =>
-              normalize(
-                symbol.filePath,
-              ),
-          ),
-        ),
-      ].sort();
+    const files = [...new Set(symbols.map((symbol) => normalize(symbol.filePath)))].sort();
 
-    const pairMap =
-      new Map<
-        string,
-        Pair
-      >();
+    const pairMap = new Map<string, Pair>();
 
-    const makeKey =
-      (
-        a: string,
-        b: string,
-      ) => {
-        const sorted =
-          [a, b].sort();
+    const makeKey = (a: string, b: string) => {
+      const sorted = [a, b].sort();
 
-        return `${sorted[0]}\u0000${sorted[1]}`;
-      };
+      return `${sorted[0]}\u0000${sorted[1]}`;
+    };
 
-    for (
-      const edge
-      of edges
-    ) {
-      const from =
-        symbolById.get(
-          edge.from,
-        );
+    for (const edge of edges) {
+      const from = symbolById.get(edge.from);
 
-      const to =
-        symbolById.get(
-          edge.to,
-        );
+      const to = symbolById.get(edge.to);
 
-      if (
-        !from ||
-        !to
-      ) {
+      if (!from || !to) {
         continue;
       }
 
-      const a =
-        normalize(
-          from.filePath,
-        );
+      const a = normalize(from.filePath);
 
-      const b =
-        normalize(
-          to.filePath,
-        );
+      const b = normalize(to.filePath);
 
       if (a === b) {
         continue;
       }
 
-      const weight =
-        EDGE_WEIGHT[
-          edge.type
-        ] ?? 0;
+      const weight = EDGE_WEIGHT[edge.type] ?? 0;
 
-      if (
-        weight <= 0
-      ) {
+      if (weight <= 0) {
         continue;
       }
 
-      const key =
-        makeKey(
-          a,
-          b,
-        );
+      const key = makeKey(a, b);
 
-      const existing =
-        pairMap.get(
-          key,
-        );
+      const existing = pairMap.get(key);
 
       if (existing) {
-        existing.weight +=
-          weight;
+        existing.weight += weight;
       } else {
-        pairMap.set(
-          key,
-          {
-            a:
-              [a, b].sort()[0]!,
+        pairMap.set(key, {
+          a: [a, b].sort()[0]!,
 
-            b:
-              [a, b].sort()[1]!,
+          b: [a, b].sort()[1]!,
 
-            weight,
-          },
-        );
+          weight,
+        });
       }
     }
 
     /*
      * 1. Base grouping = architectural subsystem.
      */
-    const subsystemFiles =
-      new Map<
-        string,
-        string[]
-      >();
+    const subsystemFiles = new Map<string, string[]>();
 
-    for (
-      const file
-      of files
-    ) {
-      const subsystem =
-        subsystemOf(
-          file,
-        );
+    for (const file of files) {
+      const subsystem = subsystemOf(file);
 
-      const group =
-        subsystemFiles.get(
-          subsystem,
-        ) ?? [];
+      const group = subsystemFiles.get(subsystem) ?? [];
 
-      group.push(
-        file,
-      );
+      group.push(file);
 
-      subsystemFiles.set(
-        subsystem,
-        group,
-      );
+      subsystemFiles.set(subsystem, group);
     }
 
     /*
@@ -327,200 +178,102 @@ export class ClusterDetector {
      *
      * Không để code-intelligence 70+ files trở thành một khối mù.
      */
-    const groups:
-      {
-        subsystem: string;
-        files: string[];
-      }[] =
-      [];
+    const groups: {
+      subsystem: string;
+      files: string[];
+    }[] = [];
 
-    for (
-      const [
-        subsystem,
-        subsystemGroup,
-      ]
-      of subsystemFiles
-    ) {
+    for (const [subsystem, subsystemGroup] of subsystemFiles) {
       subsystemGroup.sort();
 
-      if (
-        subsystemGroup.length <=
-        30
-      ) {
+      if (subsystemGroup.length <= 30) {
         groups.push({
           subsystem,
-          files:
-            subsystemGroup,
+          files: subsystemGroup,
         });
 
         continue;
       }
 
-      const fileSet =
-        new Set(
-          subsystemGroup,
-        );
+      const fileSet = new Set(subsystemGroup);
 
-      const adjacency =
-        new Map<
-          string,
-          Set<string>
-        >();
+      const adjacency = new Map<string, Set<string>>();
 
-      for (
-        const file
-        of subsystemGroup
-      ) {
-        adjacency.set(
-          file,
-          new Set(),
-        );
+      for (const file of subsystemGroup) {
+        adjacency.set(file, new Set());
       }
 
-      for (
-        const pair
-        of pairMap.values()
-      ) {
-        if (
-          !fileSet.has(
-            pair.a,
-          ) ||
-          !fileSet.has(
-            pair.b,
-          )
-        ) {
+      for (const pair of pairMap.values()) {
+        if (!fileSet.has(pair.a) || !fileSet.has(pair.b)) {
           continue;
         }
 
         /*
          * Strong internal relationship only.
          */
-        if (
-          pair.weight >=
-          8
-        ) {
-          adjacency.get(
-            pair.a,
-          )?.add(
-            pair.b,
-          );
+        if (pair.weight >= 8) {
+          adjacency.get(pair.a)?.add(pair.b);
 
-          adjacency.get(
-            pair.b,
-          )?.add(
-            pair.a,
-          );
+          adjacency.get(pair.b)?.add(pair.a);
         }
       }
 
-      const visited =
-        new Set<string>();
+      const visited = new Set<string>();
 
-      const components:
-        string[][] =
-        [];
+      const components: string[][] = [];
 
-      for (
-        const start
-        of subsystemGroup
-      ) {
-        if (
-          visited.has(
-            start,
-          )
-        ) {
+      for (const start of subsystemGroup) {
+        if (visited.has(start)) {
           continue;
         }
 
-        const queue =
-          [start];
+        const queue = [start];
 
-        const component:
-          string[] =
-          [];
+        const component: string[] = [];
 
-        visited.add(
-          start,
-        );
+        visited.add(start);
 
-        while (
-          queue.length >
-          0
-        ) {
-          const current =
-            queue.shift()!;
+        while (queue.length > 0) {
+          const current = queue.shift()!;
 
-          component.push(
-            current,
-          );
+          component.push(current);
 
-          for (
-            const neighbor
-            of adjacency.get(
-              current,
-            ) ?? []
-          ) {
-            if (
-              visited.has(
-                neighbor,
-              )
-            ) {
+          for (const neighbor of adjacency.get(current) ?? []) {
+            if (visited.has(neighbor)) {
               continue;
             }
 
-            visited.add(
-              neighbor,
-            );
+            visited.add(neighbor);
 
-            queue.push(
-              neighbor,
-            );
+            queue.push(neighbor);
           }
         }
 
-        components.push(
-          component.sort(),
-        );
+        components.push(component.sort());
       }
 
       /*
        * Strong components >=2 become own clusters.
        * Singleton files remain one residual subsystem cluster.
        */
-      const residual:
-        string[] =
-        [];
+      const residual: string[] = [];
 
-      for (
-        const component
-        of components
-      ) {
-        if (
-          component.length >=
-          2
-        ) {
+      for (const component of components) {
+        if (component.length >= 2) {
           groups.push({
             subsystem,
-            files:
-              component,
+            files: component,
           });
         } else {
-          residual.push(
-            ...component,
-          );
+          residual.push(...component);
         }
       }
 
-      if (
-        residual.length >
-        0
-      ) {
+      if (residual.length > 0) {
         groups.push({
-          subsystem:
-            `${subsystem}/residual`,
+          subsystem: `${subsystem}/residual`,
 
-          files:
-            residual.sort(),
+          files: residual.sort(),
         });
       }
     }
@@ -529,124 +282,54 @@ export class ClusterDetector {
      * 3. Merge tiny cross-subsystem groups only
      * when coupling is extremely strong.
      */
-    let working =
-      groups.map(
-        (group) => ({
-          subsystem:
-            group.subsystem,
+    let working = groups.map((group) => ({
+      subsystem: group.subsystem,
 
-          files:
-            [...group.files],
-        }),
-      );
+      files: [...group.files],
+    }));
 
-    for (
-      let pass = 0;
-      pass < 3;
-      pass++
-    ) {
-      let merged =
-        false;
+    for (let pass = 0; pass < 3; pass++) {
+      let merged = false;
 
-      outer:
-      for (
-        let i = 0;
-        i <
-        working.length;
-        i++
-      ) {
-        const a =
-          working[i];
+      outer: for (let i = 0; i < working.length; i++) {
+        const a = working[i];
 
-        if (
-          !a ||
-          a.files.length >
-          3
-        ) {
+        if (!a || a.files.length > 3) {
           continue;
         }
 
-        for (
-          let j = 0;
-          j <
-          working.length;
-          j++
-        ) {
-          if (
-            i === j
-          ) {
+        for (let j = 0; j < working.length; j++) {
+          if (i === j) {
             continue;
           }
 
-          const b =
-            working[j];
+          const b = working[j];
 
           if (!b) {
             continue;
           }
 
-          let connection =
-            0;
+          let connection = 0;
 
-          const setA =
-            new Set(
-              a.files,
-            );
+          const setA = new Set(a.files);
 
-          const setB =
-            new Set(
-              b.files,
-            );
+          const setB = new Set(b.files);
 
-          for (
-            const pair
-            of pairMap.values()
-          ) {
+          for (const pair of pairMap.values()) {
             const crosses =
-              (
-                setA.has(
-                  pair.a,
-                ) &&
-                setB.has(
-                  pair.b,
-                )
-              ) ||
-              (
-                setA.has(
-                  pair.b,
-                ) &&
-                setB.has(
-                  pair.a,
-                )
-              );
+              (setA.has(pair.a) && setB.has(pair.b)) || (setA.has(pair.b) && setB.has(pair.a));
 
-            if (
-              crosses
-            ) {
-              connection +=
-                pair.weight;
+            if (crosses) {
+              connection += pair.weight;
             }
           }
 
-          if (
-            connection >=
-            20
-          ) {
-            b.files =
-              [
-                ...new Set([
-                  ...b.files,
-                  ...a.files,
-                ]),
-              ].sort();
+          if (connection >= 20) {
+            b.files = [...new Set([...b.files, ...a.files])].sort();
 
-            working.splice(
-              i,
-              1,
-            );
+            working.splice(i, 1);
 
-            merged =
-              true;
+            merged = true;
 
             break outer;
           }
@@ -661,124 +344,56 @@ export class ClusterDetector {
     /*
      * 4. Compute metrics.
      */
-    const result:
-      ArchitectureCluster[] =
-      [];
+    const result: ArchitectureCluster[] = [];
 
-    for (
-      const group
-      of working
-    ) {
-      const set =
-        new Set(
-          group.files,
-        );
+    for (const group of working) {
+      const set = new Set(group.files);
 
-      let internalWeight =
-        0;
+      let internalWeight = 0;
 
-      let externalWeight =
-        0;
+      let externalWeight = 0;
 
-      for (
-        const pair
-        of pairMap.values()
-      ) {
-        const inA =
-          set.has(
-            pair.a,
-          );
+      for (const pair of pairMap.values()) {
+        const inA = set.has(pair.a);
 
-        const inB =
-          set.has(
-            pair.b,
-          );
+        const inB = set.has(pair.b);
 
-        if (
-          inA &&
-          inB
-        ) {
-          internalWeight +=
-            pair.weight;
-        }
-
-        else if (
-          inA ||
-          inB
-        ) {
-          externalWeight +=
-            pair.weight;
+        if (inA && inB) {
+          internalWeight += pair.weight;
+        } else if (inA || inB) {
+          externalWeight += pair.weight;
         }
       }
 
-      const total =
-        internalWeight +
-        externalWeight;
+      const total = internalWeight + externalWeight;
 
-      const baseSubsystem =
-        group.subsystem
-          .replace(
-            /\/residual$/,
-            "",
-          );
+      const baseSubsystem = group.subsystem.replace(/\/residual$/, '');
 
-      const labelBase =
-        clusterLabel(
-          baseSubsystem,
-        );
+      const labelBase = clusterLabel(baseSubsystem);
 
-      const label =
-        group.subsystem.endsWith(
-          "/residual",
-        )
-          ? `${labelBase} Misc`
-          : labelBase;
+      const label = group.subsystem.endsWith('/residual') ? `${labelBase} Misc` : labelBase;
 
       result.push({
-        id:
-          `cluster-${hash(
-            `${group.subsystem}:${group.files.join("|")}`,
-          )}`,
+        id: `cluster-${hash(`${group.subsystem}:${group.files.join('|')}`)}`,
 
         label,
 
-        subsystem:
-          baseSubsystem,
+        subsystem: baseSubsystem,
 
-        files:
-          group.files,
+        files: group.files,
 
-        size:
-          group.files.length,
+        size: group.files.length,
 
         internalWeight,
 
         externalWeight,
 
-        cohesion:
-          total > 0
-            ? Number(
-                (
-                  internalWeight /
-                  total
-                ).toFixed(
-                  4,
-                ),
-              )
-            : 0,
+        cohesion: total > 0 ? Number((internalWeight / total).toFixed(4)) : 0,
       });
     }
 
-    return result
-      .sort(
-        (a, b) =>
-          b.size -
-            a.size ||
-          b.cohesion -
-            a.cohesion ||
-          a.label.localeCompare(
-            b.label,
-          ),
-      );
+    return result.sort(
+      (a, b) => b.size - a.size || b.cohesion - a.cohesion || a.label.localeCompare(b.label)
+    );
   }
 }

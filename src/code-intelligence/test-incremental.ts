@@ -1,18 +1,10 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  loadConfig,
-  ProjectManager,
-} from "../core/index.js";
+import { loadConfig, ProjectManager } from '../core/index.js';
 
-import {
-  createStorageProvider,
-  ProjectScopedStorageProvider,
-} from "../storage/index.js";
+import { createStorageProvider, ProjectScopedStorageProvider } from '../storage/index.js';
 
-import {
-  IncrementalRepositoryIndexer,
-} from "./incremental/incremental-indexer.js";
+import { IncrementalRepositoryIndexer } from './incremental/incremental-indexer.js';
 
 async function main() {
   const config = loadConfig();
@@ -24,22 +16,17 @@ async function main() {
     localRoot: config.storage.localRoot,
   });
 
-  const storage =
-    new ProjectScopedStorageProvider(
-      rawStorage,
-      project.id,
-      project.name,
-      project.remote ?? project.name,
-    );
+  const storage = new ProjectScopedStorageProvider(
+    rawStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
 
-
-  const result =
-    await new IncrementalRepositoryIndexer(
-      storage,
-    ).index(
-      project.id,
-      project.rootPath,
-    );
+  const result = await new IncrementalRepositoryIndexer(storage).index(
+    project.id,
+    project.rootPath
+  );
 
   console.log({
     ok: true,

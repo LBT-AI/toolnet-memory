@@ -1,33 +1,17 @@
-import {
-  z,
-} from "zod";
+import { z } from 'zod';
 
-import {
-  GraphQueryEngine,
-} from "../../code-intelligence/query/graph-query-engine.js";
+import { GraphQueryEngine } from '../../code-intelligence/query/graph-query-engine.js';
 
-import type {
-  MCPContext,
-} from "../context.js";
+import type { MCPContext } from '../context.js';
 
-import {
-  compactSymbol,
-  resolveGraphSymbol,
-} from "./graph-query-utils.js";
+import { compactSymbol, resolveGraphSymbol } from './graph-query-utils.js';
 
 export const graphPathSchema = {
-  from:
-    z.string().min(1),
+  from: z.string().min(1),
 
-  to:
-    z.string().min(1),
+  to: z.string().min(1),
 
-  maxDepth:
-    z.number()
-      .int()
-      .min(1)
-      .max(30)
-      .optional(),
+  maxDepth: z.number().int().min(1).max(30).optional(),
 };
 
 export async function graphPath(
@@ -36,97 +20,50 @@ export async function graphPath(
     from: string;
     to: string;
     maxDepth?: number;
-  },
+  }
 ) {
-  const from =
-    resolveGraphSymbol(
-      ctx,
-      input.from,
-    );
+  const from = resolveGraphSymbol(ctx, input.from);
 
-  const to =
-    resolveGraphSymbol(
-      ctx,
-      input.to,
-    );
+  const to = resolveGraphSymbol(ctx, input.to);
 
-  if (
-    !from ||
-    !to
-  ) {
+  if (!from || !to) {
     return {
-      found:
-        false,
+      found: false,
 
-      fromFound:
-        Boolean(
-          from,
-        ),
+      fromFound: Boolean(from),
 
-      toFound:
-        Boolean(
-          to,
-        ),
+      toFound: Boolean(to),
 
       path: [],
       edges: [],
     };
   }
 
-  const query =
-    new GraphQueryEngine(
-      ctx.graph,
-    );
+  const query = new GraphQueryEngine(ctx.graph);
 
-  const result =
-    query.shortestPath(
-      ctx.project.id,
-      from.id,
-      to.id,
-      input.maxDepth ??
-        12,
-    );
+  const result = query.shortestPath(ctx.project.id, from.id, to.id, input.maxDepth ?? 12);
 
   return {
-    found:
-      result.found,
+    found: result.found,
 
-    distance:
-      result.distance,
+    distance: result.distance,
 
-    from:
-      compactSymbol(
-        from,
-      ),
+    from: compactSymbol(from),
 
-    to:
-      compactSymbol(
-        to,
-      ),
+    to: compactSymbol(to),
 
-    path:
-      result.symbols.map(
-        compactSymbol,
-      ),
+    path: result.symbols.map(compactSymbol),
 
-    edges:
-      result.edges.map(
-        (edge) => ({
-          id:
-            edge.id,
+    edges: result.edges.map((edge) => ({
+      id: edge.id,
 
-          type:
-            edge.type,
+      type: edge.type,
 
-          from:
-            edge.from,
+      from: edge.from,
 
-          to:
-            edge.to,
+      to: edge.to,
 
-          metadata:
-            edge.metadata,
-        }),
-      ),
+      metadata: edge.metadata,
+    })),
   };
 }

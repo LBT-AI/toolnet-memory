@@ -1,7 +1,4 @@
-import type {
-  ImportanceLevel,
-  MemoryType,
-} from "./types.js";
+import type { ImportanceLevel, MemoryType } from './types.js';
 
 const BASE_SCORES: Record<ImportanceLevel, number> = {
   critical: 100,
@@ -10,44 +7,33 @@ const BASE_SCORES: Record<ImportanceLevel, number> = {
   temporary: 20,
 };
 
-export function getImportanceScore(
-  level: ImportanceLevel,
-): number {
+export function getImportanceScore(level: ImportanceLevel): number {
   return BASE_SCORES[level];
 }
 
-export function inferImportance(
-  type: MemoryType,
-  content: string,
-): ImportanceLevel {
+export function inferImportance(type: MemoryType, content: string): ImportanceLevel {
   const text = content.toLowerCase();
 
   if (
-    text.includes("không được") ||
-    text.includes("bắt buộc") ||
-    text.includes("must not") ||
-    text.includes("critical")
+    text.includes('không được') ||
+    text.includes('bắt buộc') ||
+    text.includes('must not') ||
+    text.includes('critical')
   ) {
-    return "critical";
+    return 'critical';
   }
 
-  if (
-    type === "rule" ||
-    type === "decision"
-  ) {
-    return "high";
+  if (type === 'rule' || type === 'decision') {
+    return 'high';
   }
 
-  if (type === "todo") {
-    return "normal";
+  if (type === 'todo') {
+    return 'normal';
   }
 
-  if (
-    type === "activity" ||
-    type === "summary"
-  ) {
-    return "temporary";
+  if (type === 'activity' || type === 'summary') {
+    return 'temporary';
   }
 
-  return "normal";
+  return 'normal';
 }

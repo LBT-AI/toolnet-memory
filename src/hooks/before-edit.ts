@@ -1,66 +1,45 @@
-import type {
-  ImpactGuard,
-} from "../code-intelligence/impact/impact-guard.js";
+import type { ImpactGuard } from '../code-intelligence/impact/impact-guard.js';
 
 export interface BeforeEditResult {
   allowed: boolean;
 
-  risk:
-    string;
+  risk: string;
 
-  riskScore:
-    number;
+  riskScore: number;
 
-  impactedFiles:
-    string[];
+  impactedFiles: string[];
 
-  suggestedTests:
-    string[];
+  suggestedTests: string[];
 
   warning?: string;
 }
 
 export async function beforeEdit(
-  impactGuard:
-    ImpactGuard,
+  impactGuard: ImpactGuard,
 
-  projectId:
-    string,
+  projectId: string,
 
-  filePath:
-    string,
+  filePath: string
 ): Promise<BeforeEditResult> {
-  const result =
-    impactGuard.analyzeFile(
-      projectId,
-      filePath,
-    );
+  const result = impactGuard.analyzeFile(projectId, filePath);
 
   /*
    * Không block cứng AI.
    * Guard cảnh báo và yêu cầu verify.
    */
   return {
-    allowed:
-      true,
+    allowed: true,
 
-    risk:
-      result.risk,
+    risk: result.risk,
 
-    riskScore:
-      result.riskScore,
+    riskScore: result.riskScore,
 
-    impactedFiles:
-      result.impactedFiles,
+    impactedFiles: result.impactedFiles,
 
-    suggestedTests:
-      result.suggestedTests,
+    suggestedTests: result.suggestedTests,
 
     warning:
-      result.risk ===
-        "CRITICAL" ||
-      result.risk ===
-        "HIGH"
+      result.risk === 'CRITICAL' || result.risk === 'HIGH'
         ? `High blast radius: verify ${result.impactedFiles.length} impacted files before finalizing edit.`
         : undefined,
   };

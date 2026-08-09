@@ -1,81 +1,39 @@
-import {
-  access,
-  mkdir,
-  readFile,
-  readdir,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 
-import {
-  dirname,
-  join,
-  relative,
-  resolve,
-} from "node:path";
+import { dirname, join, relative, resolve } from 'node:path';
 
-import type {
-  StorageObject,
-  StorageProvider,
-} from "../types.js";
+import type { StorageObject, StorageProvider } from '../types.js';
 
-export class LocalStorageProvider
-  implements StorageProvider
-{
-  readonly name = "local";
+export class LocalStorageProvider implements StorageProvider {
+  readonly name = 'local';
 
-  constructor(
-    private readonly root: string,
-  ) {}
+  constructor(private readonly root: string) {}
 
-  private path(
-    key: string,
-  ): string {
-    const safeKey =
-      key.replace(/^\/+/, "");
+  private path(key: string): string {
+    const safeKey = key.replace(/^\/+/, '');
 
-    return resolve(
-      this.root,
-      safeKey,
-    );
+    return resolve(this.root, safeKey);
   }
 
-  async put(
-    key: string,
-    data: string | Uint8Array,
-  ): Promise<void> {
-    const path =
-      this.path(key);
+  async put(key: string, data: string | Uint8Array): Promise<void> {
+    const path = this.path(key);
 
-    await mkdir(
-      dirname(path),
-      {
-        recursive: true,
-      },
-    );
+    await mkdir(dirname(path), {
+      recursive: true,
+    });
 
-    await writeFile(
-      path,
-      data,
-    );
+    await writeFile(path, data);
   }
 
-  async get(
-    key: string,
-  ): Promise<Uint8Array | null> {
+  async get(key: string): Promise<Uint8Array | null> {
     try {
-      return await readFile(
-        this.path(key),
-      );
-    } catch (
-      error: unknown
-    ) {
+      return await readFile(this.path(key));
+    } catch (error: unknown) {
       if (
-        typeof error === "object" &&
+        typeof error === 'object' &&
         error !== null &&
-        "code" in error &&
-        error.code === "ENOENT"
+        'code' in error &&
+        error.code === 'ENOENT'
       ) {
         return null;
       }
@@ -84,28 +42,19 @@ export class LocalStorageProvider
     }
   }
 
-  async getText(
-    key: string,
-  ): Promise<string | null> {
-    const data =
-      await this.get(key);
+  async getText(key: string): Promise<string | null> {
+    const data = await this.get(key);
 
     if (!data) {
       return null;
     }
 
-    return Buffer
-      .from(data)
-      .toString("utf8");
+    return Buffer.from(data).toString('utf8');
   }
 
-  async exists(
-    key: string,
-  ): Promise<boolean> {
+  async exists(key: string): Promise<boolean> {
     try {
-      await access(
-        this.path(key),
-      );
+      await access(this.path(key));
 
       return true;
     } catch {
@@ -113,25 +62,16 @@ export class LocalStorageProvider
     }
   }
 
-  async delete(
-    key: string,
-  ): Promise<void> {
-    await rm(
-      this.path(key),
-      {
-        force: true,
-      },
-    );
+  async delete(key: string): Promise<void> {
+    await rm(this.path(key), {
+      force: true,
+    });
   }
 
-  async list(
-    prefix = "",
-  ): Promise<StorageObject[]> {
-    const start =
-      this.path(prefix);
+  async list(prefix = ''): Promise<StorageObject[]> {
+    const start = this.path(prefix);
 
-    const output:
-      StorageObject[] = [];
+    const output: StorageObject[] = [];
 
     try {
       await access(start);
@@ -139,81 +79,43 @@ export class LocalStorageProvider
       return output;
     }
 
-    const walk =
-      async (
-        directory: string,
-      ): Promise<void> => {
-        const entries =
-          await readdir(
-            directory,
-            {
-              withFileTypes: true,
-            },
-          );
+    const walk = async (directory: string): Promise<void> => {
+      const entries = await readdir(directory, {
+        withFileTypes: true,
+      });
 
-        for (
-          const entry
-          of entries
-        ) {
-          const fullPath =
-            join(
-              directory,
-              entry.name,
-            );
+      for (const entry of entries) {
+        const fullPath = join(directory, entry.name);
 
-          if (
-            entry.isDirectory()
-          ) {
-            await walk(
-              fullPath,
-            );
+        if (entry.isDirectory()) {
+          await walk(fullPath);
 
-            continue;
-          }
-
-          const info =
-            await stat(
-              fullPath,
-            );
-
-          output.push({
-            key:
-              relative(
-                this.root,
-                fullPath,
-              ),
-
-            size:
-              info.size,
-
-            updatedAt:
-              info.mtime
-                .toISOString(),
-          });
+          continue;
         }
-      };
 
-    const info =
-      await stat(start);
+        const info = await stat(fullPath);
 
-    if (
-      info.isDirectory()
-    ) {
+        output.push({
+          key: relative(this.root, fullPath),
+
+          size: info.size,
+
+          updatedAt: info.mtime.toISOString(),
+        });
+      }
+    };
+
+    const info = await stat(start);
+
+    if (info.isDirectory()) {
       await walk(start);
     } else {
       output.push({
-        key:
-          relative(
-            this.root,
-            start,
-          ),
+        key: relative(this.root, start),
 
-        size:
-          info.size,
+        size: info.size,
 
-        updatedAt:
-          info.mtime
-            .toISOString(),
+        updatedAt: info.mtime.toISOString(),
       });
     }
 

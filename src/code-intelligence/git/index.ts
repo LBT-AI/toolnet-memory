@@ -1,1 +1,1 @@
-export * from "./git-diff.js";
+export * from './git-diff.js';

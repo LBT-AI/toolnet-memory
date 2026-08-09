@@ -1,6 +1,4 @@
-import type {
-  StorageProvider,
-} from "../storage/types.js";
+import type { StorageProvider } from '../storage/types.js';
 
 import type {
   NormalizedSessionEvent,
@@ -9,11 +7,9 @@ import type {
   SessionIdentity,
   SessionManifest,
   SessionStatus,
-} from "./types.js";
+} from './types.js';
 
-import {
-  sha256,
-} from "./utils.js";
+import { sha256 } from './utils.js';
 
 interface ChunkInfo {
   key: string;
@@ -22,166 +18,81 @@ interface ChunkInfo {
 }
 
 interface RemoteScan {
-  chunks:
-    ChunkInfo[];
+  chunks: ChunkInfo[];
 
-  maxSequence:
-    number;
+  maxSequence: number;
 }
 
-function padSequence(
-  value: number,
-): string {
-  return String(
-    value,
-  ).padStart(
-    12,
-    "0",
-  );
+function padSequence(value: number): string {
+  return String(value).padStart(12, '0');
 }
 
 export class RemoteSessionStore {
   constructor(
-    private readonly storage:
-      StorageProvider,
+    private readonly storage: StorageProvider,
 
-    private readonly maxEventsPerChunk:
-      number = 100,
+    private readonly maxEventsPerChunk: number = 100,
 
-    private readonly maxChunkBytes:
-      number = 512 * 1024,
+    private readonly maxChunkBytes: number = 512 * 1024
   ) {
-    if (
-      maxEventsPerChunk <
-      1
-    ) {
-      throw new Error(
-        "maxEventsPerChunk must be positive",
-      );
+    if (maxEventsPerChunk < 1) {
+      throw new Error('maxEventsPerChunk must be positive');
     }
 
-    if (
-      maxChunkBytes <
-      1_024
-    ) {
-      throw new Error(
-        "maxChunkBytes is too small",
-      );
+    if (maxChunkBytes < 1_024) {
+      throw new Error('maxChunkBytes is too small');
     }
   }
 
-  private async getJson<T>(
-    key: string,
-  ): Promise<T | null> {
-    const text =
-      await this.storage
-        .getText(
-          key,
-        );
+  private async getJson<T>(key: string): Promise<T | null> {
+    const text = await this.storage.getText(key);
 
-    if (
-      !text
-    ) {
+    if (!text) {
       return null;
     }
 
-    return JSON.parse(
-      text,
-    ) as T;
+    return JSON.parse(text) as T;
   }
 
-  private async putJson(
-    key: string,
-    value: unknown,
-  ): Promise<void> {
-    await this.storage.put(
-      key,
-      JSON.stringify(
-        value,
-        null,
-        2,
-      ) + "\n",
-      "application/json",
-    );
+  private async putJson(key: string, value: unknown): Promise<void> {
+    await this.storage.put(key, JSON.stringify(value, null, 2) + '\n', 'application/json');
   }
 
-  private async scan(
-    identity:
-      SessionIdentity,
-  ): Promise<RemoteScan> {
-    const prefix =
-      `${identity.remotePrefix}/events/`;
+  private async scan(identity: SessionIdentity): Promise<RemoteScan> {
+    const prefix = `${identity.remotePrefix}/events/`;
 
-    const objects =
-      await this.storage.list(
-        prefix,
-      );
+    const objects = await this.storage.list(prefix);
 
-    const chunks:
-      ChunkInfo[] = [];
+    const chunks: ChunkInfo[] = [];
 
-    let maxSequence =
-      0;
+    let maxSequence = 0;
 
-    for (
-      const object
-      of objects
-    ) {
-      const match =
-        object.key.match(
-          /\/events\/(\d+)-(\d+)-[a-f0-9]+\.jsonl$/,
-        );
+    for (const object of objects) {
+      const match = object.key.match(/\/events\/(\d+)-(\d+)-[a-f0-9]+\.jsonl$/);
 
-      if (
-        !match
-      ) {
+      if (!match) {
         continue;
       }
 
-      const start =
-        Number(
-          match[1],
-        );
+      const start = Number(match[1]);
 
-      const end =
-        Number(
-          match[2],
-        );
+      const end = Number(match[2]);
 
-      if (
-        !Number.isFinite(
-          start,
-        ) ||
-        !Number.isFinite(
-          end,
-        )
-      ) {
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
         continue;
       }
 
       chunks.push({
-        key:
-          object.key,
+        key: object.key,
 
         start,
         end,
       });
 
-      maxSequence =
-        Math.max(
-          maxSequence,
-          end,
-        );
+      maxSequence = Math.max(maxSequence, end);
     }
 
-    chunks.sort(
-      (
-        left,
-        right,
-      ) =>
-        left.start -
-        right.start,
-    );
+    chunks.sort((left, right) => left.start - right.start);
 
     return {
       chunks,
@@ -189,431 +100,200 @@ export class RemoteSessionStore {
     };
   }
 
-  private split(
-    events:
-      NormalizedSessionEvent[],
-  ): NormalizedSessionEvent[][] {
-    const result:
-      NormalizedSessionEvent[][] =
-      [];
+  private split(events: NormalizedSessionEvent[]): NormalizedSessionEvent[][] {
+    const result: NormalizedSessionEvent[][] = [];
 
-    let current:
-      NormalizedSessionEvent[] =
-      [];
+    let current: NormalizedSessionEvent[] = [];
 
-    let bytes =
-      0;
+    let bytes = 0;
 
-    for (
-      const event
-      of events
-    ) {
-      const lineBytes =
-        Buffer.byteLength(
-          JSON.stringify(
-            event,
-          ) + "\n",
-          "utf8",
-        );
+    for (const event of events) {
+      const lineBytes = Buffer.byteLength(JSON.stringify(event) + '\n', 'utf8');
 
       if (
-        current.length >
-          0 &&
-        (
-          current.length >=
-            this
-              .maxEventsPerChunk ||
-          bytes +
-            lineBytes >
-            this
-              .maxChunkBytes
-        )
+        current.length > 0 &&
+        (current.length >= this.maxEventsPerChunk || bytes + lineBytes > this.maxChunkBytes)
       ) {
-        result.push(
-          current,
-        );
+        result.push(current);
 
-        current =
-          [];
+        current = [];
 
-        bytes =
-          0;
+        bytes = 0;
       }
 
-      current.push(
-        event,
-      );
+      current.push(event);
 
-      bytes +=
-        lineBytes;
+      bytes += lineBytes;
     }
 
-    if (
-      current.length >
-      0
-    ) {
-      result.push(
-        current,
-      );
+    if (current.length > 0) {
+      result.push(current);
     }
 
     return result;
   }
 
-  async loadManifest(
-    identity:
-      SessionIdentity,
-  ): Promise<
-    SessionManifest |
-    null
-  > {
-    return this.getJson<
-      SessionManifest
-    >(
-      `${identity.remotePrefix}/session.json`,
-    );
+  async loadManifest(identity: SessionIdentity): Promise<SessionManifest | null> {
+    return this.getJson<SessionManifest>(`${identity.remotePrefix}/session.json`);
   }
 
-  async loadCursor(
-    identity:
-      SessionIdentity,
-  ): Promise<
-    SessionCursor |
-    null
-  > {
-    return this.getJson<
-      SessionCursor
-    >(
-      `${identity.remotePrefix}/cursor.json`,
-    );
+  async loadCursor(identity: SessionIdentity): Promise<SessionCursor | null> {
+    return this.getJson<SessionCursor>(`${identity.remotePrefix}/cursor.json`);
   }
 
-  async recover(
-    identity:
-      SessionIdentity,
-  ): Promise<{
+  async recover(identity: SessionIdentity): Promise<{
     maxSequence: number;
     chunkCount: number;
   }> {
-    const scan =
-      await this.scan(
-        identity,
-      );
+    const scan = await this.scan(identity);
 
     return {
-      maxSequence:
-        scan.maxSequence,
+      maxSequence: scan.maxSequence,
 
-      chunkCount:
-        scan.chunks.length,
+      chunkCount: scan.chunks.length,
     };
   }
 
   async append(
-    identity:
-      SessionIdentity,
+    identity: SessionIdentity,
 
-    events:
-      NormalizedSessionEvent[],
+    events: NormalizedSessionEvent[],
 
-    sourceCursors:
-      Record<
-        string,
-        string
-      >,
+    sourceCursors: Record<string, string>,
 
     options: {
       title?: string;
 
-      metadata?: Record<
-        string,
-        unknown
-      >;
-    } = {},
-  ): Promise<
-    SessionFlushResult
-  > {
-    const previousManifest =
-      await this.loadManifest(
-        identity,
-      );
+      metadata?: Record<string, unknown>;
+    } = {}
+  ): Promise<SessionFlushResult> {
+    const previousManifest = await this.loadManifest(identity);
 
-    const before =
-      await this.scan(
-        identity,
-      );
+    const before = await this.scan(identity);
 
     /*
      * Crash recovery:
      * chunks may already exist even when cursor/session.json
      * was not successfully updated.
      */
-    const pending =
-      events.filter(
-        event =>
-          event.sequence >
-          before.maxSequence,
-      );
+    const pending = events.filter((event) => event.sequence > before.maxSequence);
 
-    let uploadedEvents =
-      0;
+    let uploadedEvents = 0;
 
-    for (
-      const chunk
-      of this.split(
-        pending,
-      )
-    ) {
-      const first =
-        chunk[0];
+    for (const chunk of this.split(pending)) {
+      const first = chunk[0];
 
-      const last =
-        chunk[
-          chunk.length -
-          1
-        ];
+      const last = chunk[chunk.length - 1];
 
-      const content =
-        chunk
-          .map(
-            event =>
-              JSON.stringify(
-                event,
-              ),
-          )
-          .join(
-            "\n",
-          ) +
-        "\n";
+      const content = chunk.map((event) => JSON.stringify(event)).join('\n') + '\n';
 
-      const digest =
-        sha256(
-          content,
-        ).slice(
-          0,
-          16,
-        );
+      const digest = sha256(content).slice(0, 16);
 
-      const key =
-        [
-          identity
-            .remotePrefix,
+      const key = [
+        identity.remotePrefix,
 
-          "events",
+        'events',
 
-          `${
-            padSequence(
-              first.sequence,
-            )
-          }-${
-            padSequence(
-              last.sequence,
-            )
-          }-${digest}.jsonl`,
-        ].join(
-          "/",
-        );
+        `${padSequence(first.sequence)}-${padSequence(last.sequence)}-${digest}.jsonl`,
+      ].join('/');
 
-      if (
-        !await this.storage
-          .exists(
-            key,
-          )
-      ) {
-        await this.storage.put(
-          key,
-          content,
-          "application/x-ndjson",
-        );
+      if (!(await this.storage.exists(key))) {
+        await this.storage.put(key, content, 'application/x-ndjson');
       }
 
-      uploadedEvents +=
-        chunk.length;
+      uploadedEvents += chunk.length;
     }
 
-    const after =
-      await this.scan(
-        identity,
-      );
+    const after = await this.scan(identity);
 
-    const lastInput =
-      events[
-        events.length -
-        1
-      ];
+    const lastInput = events[events.length - 1];
 
-    let status:
-      SessionStatus =
-      previousManifest
-        ?.status ??
-      "active";
+    let status: SessionStatus = previousManifest?.status ?? 'active';
 
-    if (
-      (
-        lastInput
-          ?.type ===
-        "session_end" ||
-        lastInput
-          ?.type ===
-        "session_idle"
-      )
-    ) {
-      status =
-        "idle";
-    } else if (
-      lastInput
-        ?.type ===
-      "error"
-    ) {
-      status =
-        "error";
-    } else if (
-      events.length >
-      0
-    ) {
-      status =
-        "active";
+    if (lastInput?.type === 'session_end' || lastInput?.type === 'session_idle') {
+      status = 'idle';
+    } else if (lastInput?.type === 'error') {
+      status = 'error';
+    } else if (events.length > 0) {
+      status = 'active';
     }
 
-    const now =
-      new Date()
-        .toISOString();
+    const now = new Date().toISOString();
 
-    const firstInput =
-      events[0];
+    const firstInput = events[0];
 
-    const manifest:
-      SessionManifest =
-    {
+    const manifest: SessionManifest = {
       version: 1,
 
-      projectId:
-        identity.projectId,
+      projectId: identity.projectId,
 
-      projectName:
-        identity
-          .projectName,
+      projectName: identity.projectName,
 
-      agent:
-        identity.agent,
+      agent: identity.agent,
 
-      nativeSessionId:
-        identity
-          .nativeSessionId,
+      nativeSessionId: identity.nativeSessionId,
 
-      sessionKey:
-        identity.sessionKey,
+      sessionKey: identity.sessionKey,
 
       status,
 
-      createdAt:
-        previousManifest
-          ?.createdAt ??
-        firstInput
-          ?.timestamp ??
-        now,
+      createdAt: previousManifest?.createdAt ?? firstInput?.timestamp ?? now,
 
-      updatedAt:
-        lastInput
-          ?.timestamp ??
-        now,
+      updatedAt: lastInput?.timestamp ?? now,
 
-      firstEventAt:
-        previousManifest
-          ?.firstEventAt ??
-        firstInput
-          ?.timestamp,
+      firstEventAt: previousManifest?.firstEventAt ?? firstInput?.timestamp,
 
-      lastEventAt:
-        lastInput
-          ?.timestamp ??
-        previousManifest
-          ?.lastEventAt,
+      lastEventAt: lastInput?.timestamp ?? previousManifest?.lastEventAt,
 
-      eventCount:
-        after.maxSequence,
+      eventCount: after.maxSequence,
 
-      chunkCount:
-        after.chunks.length,
+      chunkCount: after.chunks.length,
 
       metadata: {
-        ...previousManifest
-          ?.metadata,
+        ...previousManifest?.metadata,
 
         ...options.metadata,
       },
     };
 
-    if (
-      options.title ??
-      previousManifest
-        ?.title
-    ) {
-      manifest.title =
-        options.title ??
-        previousManifest
-          ?.title;
+    if (options.title ?? previousManifest?.title) {
+      manifest.title = options.title ?? previousManifest?.title;
     }
 
-    const cursor:
-      SessionCursor =
-    {
+    const cursor: SessionCursor = {
       version: 1,
 
-      projectId:
-        identity.projectId,
+      projectId: identity.projectId,
 
-      agent:
-        identity.agent,
+      agent: identity.agent,
 
-      nativeSessionId:
-        identity
-          .nativeSessionId,
+      nativeSessionId: identity.nativeSessionId,
 
-      lastLocalSequence:
-        events.length >
-        0
-          ? events[
-              events.length -
-              1
-            ].sequence
-          : after
-              .maxSequence,
+      lastLocalSequence: events.length > 0 ? events[events.length - 1].sequence : after.maxSequence,
 
-      lastRemoteSequence:
-        after.maxSequence,
+      lastRemoteSequence: after.maxSequence,
 
       sourceCursors,
 
-      updatedAt:
-        now,
+      updatedAt: now,
     };
 
     /*
      * Chunk first, then cursor, then manifest.
      * Immutable chunks are the source of truth.
      */
-    await this.putJson(
-      `${identity.remotePrefix}/cursor.json`,
-      cursor,
-    );
+    await this.putJson(`${identity.remotePrefix}/cursor.json`, cursor);
 
-    await this.putJson(
-      `${identity.remotePrefix}/session.json`,
-      manifest,
-    );
+    await this.putJson(`${identity.remotePrefix}/session.json`, manifest);
 
     return {
       uploadedEvents,
 
-      lastRemoteSequence:
-        after.maxSequence,
+      lastRemoteSequence: after.maxSequence,
 
-      eventCount:
-        manifest.eventCount,
+      eventCount: manifest.eventCount,
 
-      chunkCount:
-        manifest.chunkCount,
+      chunkCount: manifest.chunkCount,
 
       status,
     };

@@ -1,46 +1,25 @@
-import type {
-  RetrievalResult,
-} from "./types.js";
+import type { RetrievalResult } from './types.js';
 
 export class ContextBuilder {
-  build(
-    results: RetrievalResult[],
-    maxCharacters = 6000,
-  ): string {
+  build(results: RetrievalResult[], maxCharacters = 6000): string {
     const blocks: string[] = [];
 
     let used = 0;
 
-    for (
-      const result
-      of results
-    ) {
-      const memory =
-        result.memory;
+    for (const result of results) {
+      const memory = result.memory;
 
-      const block = [
-        `[${memory.type.toUpperCase()}]`,
-        memory.content,
-      ].join(" ");
+      const block = [`[${memory.type.toUpperCase()}]`, memory.content].join(' ');
 
-      if (
-        used +
-          block.length >
-        maxCharacters
-      ) {
+      if (used + block.length > maxCharacters) {
         break;
       }
 
-      blocks.push(
-        block,
-      );
+      blocks.push(block);
 
-      used +=
-        block.length;
+      used += block.length;
     }
 
-    return blocks.join(
-      "\n",
-    );
+    return blocks.join('\n');
   }
 }

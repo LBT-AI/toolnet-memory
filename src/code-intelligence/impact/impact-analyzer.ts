@@ -1,67 +1,37 @@
-import type {
-  CodeSymbol,
-} from "../../core/types.js";
+import type { CodeSymbol } from '../../core/types.js';
 
-import {
-  CodeGraphStore,
-} from "../graph/graph-store.js";
+import { CodeGraphStore } from '../graph/graph-store.js';
 
 export interface ImpactResult {
-  symbol:
-    CodeSymbol;
+  symbol: CodeSymbol;
 
-  depth:
-    number;
+  depth: number;
 
-  relation:
-    string;
+  relation: string;
 }
 
 export class ImpactAnalyzer {
-  constructor(
-    private readonly graph:
-      CodeGraphStore,
-  ) {}
+  constructor(private readonly graph: CodeGraphStore) {}
 
-  analyze(
-    projectId: string,
-    symbolId: string,
-    maxDepth = 4,
-  ): ImpactResult[] {
-    const edges =
-      this.graph
-        .allEdges(
-          projectId,
-        );
+  analyze(projectId: string, symbolId: string, maxDepth = 4): ImpactResult[] {
+    const edges = this.graph.allEdges(projectId);
 
-    const visited =
-      new Set<string>([
-        symbolId,
-      ]);
+    const visited = new Set<string>([symbolId]);
 
     const queue = [
       {
-        id:
-          symbolId,
+        id: symbolId,
 
-        depth:
-          0,
+        depth: 0,
       },
     ];
 
-    const result:
-      ImpactResult[] = [];
+    const result: ImpactResult[] = [];
 
-    while (
-      queue.length
-    ) {
-      const current =
-        queue.shift()!;
+    while (queue.length) {
+      const current = queue.shift()!;
 
-      if (
-        current.depth >=
-        maxDepth
-      ) {
+      if (current.depth >= maxDepth) {
         continue;
       }
 
@@ -69,59 +39,35 @@ export class ImpactAnalyzer {
        * Reverse relationships:
        * "Ai phụ thuộc vào symbol này?"
        */
-      const incoming =
-        edges.filter(
-          (edge) =>
-            edge.to ===
-              current.id &&
-            [
-              "CALLS",
-              "IMPORTS",
-              "INHERITS",
-              "IMPLEMENTS",
-            ].includes(
-              edge.type,
-            ),
-        );
+      const incoming = edges.filter(
+        (edge) =>
+          edge.to === current.id &&
+          ['CALLS', 'IMPORTS', 'INHERITS', 'IMPLEMENTS'].includes(edge.type)
+      );
 
-      for (
-        const edge
-        of incoming
-      ) {
-        if (
-          visited.has(
-            edge.from,
-          )
-        ) {
+      for (const edge of incoming) {
+        if (visited.has(edge.from)) {
           continue;
         }
 
-        visited.add(
-          edge.from,
-        );
+        visited.add(edge.from);
 
-        const symbol =
-          this.graph.getSymbol(
-            edge.from,
-          );
+        const symbol = this.graph.getSymbol(edge.from);
 
         if (!symbol) {
           continue;
         }
 
-        const depth =
-          current.depth + 1;
+        const depth = current.depth + 1;
 
         result.push({
           symbol,
           depth,
-          relation:
-            edge.type,
+          relation: edge.type,
         });
 
         queue.push({
-          id:
-            edge.from,
+          id: edge.from,
           depth,
         });
       }

@@ -1,278 +1,127 @@
-import type {
-  CodeSymbol,
-  GraphEdge,
-} from "../../core/types.js";
+import type { CodeSymbol, GraphEdge } from '../../core/types.js';
 
-import {
-  EntryPointDetector,
-} from "../architecture/entry-points.js";
+import { EntryPointDetector } from '../architecture/entry-points.js';
 
-import type {
-  CodeGraphStore,
-} from "../graph/graph-store.js";
+import type { CodeGraphStore } from '../graph/graph-store.js';
 
-import type {
-  DeadCodeCandidate,
-  DeadCodeConfidence,
-} from "./types.js";
+import type { DeadCodeCandidate, DeadCodeConfidence } from './types.js';
 
-const USAGE_EDGES =
-  new Set<
-    GraphEdge["type"]
-  >([
-    "CALLS",
-    "CALL_REFERENCE",
-    "IMPORTS",
-    "USES_TYPE",
-    "WRITES",
-    "INHERITS",
-    "IMPLEMENTS",
-    "ROUTE",
-    "TESTS",
-  ]);
+const USAGE_EDGES = new Set<GraphEdge['type']>([
+  'CALLS',
+  'CALL_REFERENCE',
+  'IMPORTS',
+  'USES_TYPE',
+  'WRITES',
+  'INHERITS',
+  'IMPLEMENTS',
+  'ROUTE',
+  'TESTS',
+]);
 
-function normalize(
-  value: string,
-): string {
-  return value
-    .replaceAll("\\", "/")
-    .toLowerCase();
+function normalize(value: string): string {
+  return value.replaceAll('\\', '/').toLowerCase();
 }
 
-function isTestFile(
-  filePath: string,
-): boolean {
-  const path =
-    normalize(
-      filePath,
-    );
+function isTestFile(filePath: string): boolean {
+  const path = normalize(filePath);
 
   return (
-    path.startsWith(
-      "tests/",
-    ) ||
-    path.includes(
-      "/tests/",
-    ) ||
-    path.includes(
-      "__tests__",
-    ) ||
-    /\.(test|spec)\.[^.]+$/
-      .test(path)
+    path.startsWith('tests/') ||
+    path.includes('/tests/') ||
+    path.includes('__tests__') ||
+    /\.(test|spec)\.[^.]+$/.test(path)
   );
 }
 
-function looksPublicApi(
-  symbol: CodeSymbol,
-): boolean {
-  const path =
-    normalize(
-      symbol.filePath,
-    );
+function looksPublicApi(symbol: CodeSymbol): boolean {
+  const path = normalize(symbol.filePath);
 
   return (
-    path.startsWith(
-      "bin/",
-    ) ||
-    /(^|\/)index\.[^.]+$/
-      .test(path) ||
-    /(^|\/)(main|server|cli)\.[^.]+$/
-      .test(path)
+    path.startsWith('bin/') ||
+    /(^|\/)index\.[^.]+$/.test(path) ||
+    /(^|\/)(main|server|cli)\.[^.]+$/.test(path)
   );
 }
 
 export class DeadCodeAnalyzer {
-  constructor(
-    private readonly graph:
-      CodeGraphStore,
-  ) {}
+  constructor(private readonly graph: CodeGraphStore) {}
 
-  analyze(
-    projectId: string,
-  ): DeadCodeCandidate[] {
-    const symbols =
-      this.graph.allSymbols(
-        projectId,
-      );
+  analyze(projectId: string): DeadCodeCandidate[] {
+    const symbols = this.graph.allSymbols(projectId);
 
-    const edges =
-      this.graph.allEdges(
-        projectId,
-      );
+    const edges = this.graph.allEdges(projectId);
 
-    const entrySymbols =
-      new Set(
-        new EntryPointDetector(
-          this.graph,
-        )
-          .detect(
-            projectId,
-          )
-          .map(
-            (entry) =>
-              entry.symbolId,
-          ),
-      );
+    const entrySymbols = new Set(
+      new EntryPointDetector(this.graph).detect(projectId).map((entry) => entry.symbolId)
+    );
 
-    const candidates:
-      DeadCodeCandidate[] =
-      [];
+    const candidates: DeadCodeCandidate[] = [];
 
-    for (
-      const symbol
-      of symbols
-    ) {
-      if (
-        ![
-          "function",
-          "method",
-          "class",
-          "interface",
-          "property",
-        ].includes(
-          symbol.type,
-        )
-      ) {
+    for (const symbol of symbols) {
+      if (!['function', 'method', 'class', 'interface', 'property'].includes(symbol.type)) {
         continue;
       }
 
-      if (
-        isTestFile(
-          symbol.filePath,
-        ) ||
-        entrySymbols.has(
-          symbol.id,
-        ) ||
-        looksPublicApi(
-          symbol,
-        )
-      ) {
+      if (isTestFile(symbol.filePath) || entrySymbols.has(symbol.id) || looksPublicApi(symbol)) {
         continue;
       }
 
-      const incoming =
-        edges.filter(
-          (edge) =>
-            edge.to ===
-              symbol.id &&
-            USAGE_EDGES.has(
-              edge.type,
-            ),
-        );
+      const incoming = edges.filter((edge) => edge.to === symbol.id && USAGE_EDGES.has(edge.type));
 
-      if (
-        incoming.length >
-        0
-      ) {
+      if (incoming.length > 0) {
         continue;
       }
 
-      const outgoing =
-        edges.filter(
-          (edge) =>
-            edge.from ===
-              symbol.id &&
-            USAGE_EDGES.has(
-              edge.type,
-            ),
-        );
+      const outgoing = edges.filter(
+        (edge) => edge.from === symbol.id && USAGE_EDGES.has(edge.type)
+      );
 
-      const reasons:
-        string[] = [
-        "no incoming usage edge",
-      ];
+      const reasons: string[] = ['no incoming usage edge'];
 
-      let score =
-        50;
+      let score = 50;
 
-      if (
-        symbol.type ===
-        "function" ||
-        symbol.type ===
-        "method"
-      ) {
-        score +=
-          20;
+      if (symbol.type === 'function' || symbol.type === 'method') {
+        score += 20;
 
-        reasons.push(
-          "callable symbol",
-        );
+        reasons.push('callable symbol');
       }
 
-      if (
-        symbol.type ===
-        "property"
-      ) {
-        score -=
-          15;
+      if (symbol.type === 'property') {
+        score -= 15;
       }
 
-      if (
-        outgoing.length ===
-        0
-      ) {
-        score +=
-          10;
+      if (outgoing.length === 0) {
+        score += 10;
 
-        reasons.push(
-          "no outgoing dependency",
-        );
+        reasons.push('no outgoing dependency');
       }
 
-      const path =
-        normalize(
-          symbol.filePath,
-        );
+      const path = normalize(symbol.filePath);
 
-      if (
-        path.includes(
-          "/internal/",
-        )
-      ) {
-        score +=
-          10;
+      if (path.includes('/internal/')) {
+        score += 10;
 
-        reasons.push(
-          "internal implementation",
-        );
+        reasons.push('internal implementation');
       }
 
-      if (
-        symbol.name
-          .startsWith(
-            "_",
-          )
-      ) {
-        score +=
-          5;
+      if (symbol.name.startsWith('_')) {
+        score += 5;
       }
 
-      const confidence:
-        DeadCodeConfidence =
-        score >= 75
-          ? "high"
-          : score >= 55
-            ? "medium"
-            : "low";
+      const confidence: DeadCodeConfidence = score >= 75 ? 'high' : score >= 55 ? 'medium' : 'low';
 
       candidates.push({
-        symbolId:
-          symbol.id,
+        symbolId: symbol.id,
 
-        name:
-          symbol.name,
+        name: symbol.name,
 
-        qualifiedName:
-          symbol.qualifiedName,
+        qualifiedName: symbol.qualifiedName,
 
-        type:
-          symbol.type,
+        type: symbol.type,
 
-        filePath:
-          symbol.filePath,
+        filePath: symbol.filePath,
 
-        startLine:
-          symbol.startLine,
+        startLine: symbol.startLine,
 
         confidence,
 
@@ -284,14 +133,7 @@ export class DeadCodeAnalyzer {
 
     return candidates.sort(
       (a, b) =>
-        b.score -
-          a.score ||
-        a.filePath.localeCompare(
-          b.filePath,
-        ) ||
-        a.name.localeCompare(
-          b.name,
-        ),
+        b.score - a.score || a.filePath.localeCompare(b.filePath) || a.name.localeCompare(b.name)
     );
   }
 }

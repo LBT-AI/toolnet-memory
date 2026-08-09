@@ -1,248 +1,125 @@
-import {
-  loadConfig,
-  ProjectManager,
-} from "../../core/index.js";
+import { loadConfig, ProjectManager } from '../../core/index.js';
 
 import {
   createStorageProvider,
   ProjectScopedStorageProvider,
   withStorageRetry,
-} from "../../storage/index.js";
+} from '../../storage/index.js';
 
-import {
-  syncAgySession,
-} from "./adapter.js";
+import { syncAgySession } from './adapter.js';
 
-import {
-  installAgyHooks,
-} from "./hook-installer.js";
+import { installAgyHooks } from './hook-installer.js';
 
-import {
-  recoverAgyProject,
-} from "./recovery.js";
+import { recoverAgyProject } from './recovery.js';
 
-function after(
-  args: string[],
-  flag: string,
-) {
-  const index =
-    args.indexOf(
-      flag,
-    );
+function after(args: string[], flag: string) {
+  const index = args.indexOf(flag);
 
-  return index >= 0
-    ? args[
-        index + 1
-      ]
-    : undefined;
+  return index >= 0 ? args[index + 1] : undefined;
 }
 
-function storageFor(
-  project:
-    ReturnType<
-      ProjectManager[
-        "detect"
-      ]
-    >,
-) {
-  const config =
-    loadConfig();
+function storageFor(project: ReturnType<ProjectManager['detect']>) {
+  const config = loadConfig();
 
-  const raw =
-    withStorageRetry(
-      createStorageProvider({
-        provider:
-          config.storage.provider,
+  const raw = withStorageRetry(
+    createStorageProvider({
+      provider: config.storage.provider,
 
-        huggingface:
-          config.storage
-            .huggingface,
+      huggingface: config.storage.huggingface,
 
-        localRoot:
-          config.storage
-            .localRoot,
-      }),
-      {
-        attempts:
-          3,
-      },
-    );
+      localRoot: config.storage.localRoot,
+    }),
+    {
+      attempts: 3,
+    }
+  );
 
   return new ProjectScopedStorageProvider(
     raw,
     project.id,
     project.name,
-    project.remote ??
-      project.name,
+    project.remote ?? project.name
   );
 }
 
 async function main() {
-  const [
-    command =
-      "help",
-    ...args
-  ] =
-    process.argv.slice(
-      2,
-    );
+  const [command = 'help', ...args] = process.argv.slice(2);
 
-  if (
-    command ===
-    "install-hooks"
-  ) {
-    const file =
-      installAgyHooks({
-        binary:
-          after(
-            args,
-            "--bin",
-          ),
-      });
+  if (command === 'install-hooks') {
+    const file = installAgyHooks({
+      binary: after(args, '--bin'),
+    });
 
-    console.log(
-      `✅ Agy hooks installed: ${file}`,
-    );
+    console.log(`✅ Agy hooks installed: ${file}`);
 
     return;
   }
 
-  const projectPath =
-    after(
-      args,
-      "--project",
-    ) ??
-    process.cwd();
+  const projectPath = after(args, '--project') ?? process.cwd();
 
-  const project =
-    new ProjectManager()
-      .detect(
-        projectPath,
-      );
+  const project = new ProjectManager().detect(projectPath);
 
-  const storage =
-    storageFor(
-      project,
-    );
+  const storage = storageFor(project);
 
-  if (
-    command ===
-    "sync"
-  ) {
-    const conversationId =
-      args[0];
+  if (command === 'sync') {
+    const conversationId = args[0];
 
-    const transcriptPath =
-      after(
-        args,
-        "--transcript",
-      );
+    const transcriptPath = after(args, '--transcript');
 
-    if (
-      !conversationId ||
-      !transcriptPath
-    ) {
-      throw new Error(
-        "Usage: sync <conversation-id> --transcript <path>",
-      );
+    if (!conversationId || !transcriptPath) {
+      throw new Error('Usage: sync <conversation-id> --transcript <path>');
     }
 
-    const result =
-      await syncAgySession({
-        project,
-        storage,
+    const result = await syncAgySession({
+      project,
+      storage,
 
-        conversationId,
-        transcriptPath,
+      conversationId,
+      transcriptPath,
 
-        phase:
-          "recover",
-      });
+      phase: 'recover',
+    });
 
-    console.log(
-      JSON.stringify(
-        result,
-        null,
-        2,
-      ),
-    );
+    console.log(JSON.stringify(result, null, 2));
 
     return;
   }
 
-  if (
-    command ===
-    "recover"
-  ) {
-    const limit =
-      Number(
-        after(
-          args,
-          "--limit",
-        ) ??
-        100,
-      );
+  if (command === 'recover') {
+    const limit = Number(after(args, '--limit') ?? 100);
 
-    const results =
-      await recoverAgyProject(
-        project,
-        storage,
-        Number.isFinite(
-          limit,
-        )
-          ? limit
-          : 100,
-      );
+    const results = await recoverAgyProject(project, storage, Number.isFinite(limit) ? limit : 100);
 
     console.log(
       JSON.stringify(
         {
-          project:
-            project.name,
+          project: project.name,
 
-          sessions:
-            results.length,
+          sessions: results.length,
 
-          imported:
-            results.reduce(
-              (
-                total,
-                item,
-              ) =>
-                total +
-                item.imported,
-              0,
-            ),
+          imported: results.reduce((total, item) => total + item.imported, 0),
         },
         null,
-        2,
-      ),
+        2
+      )
     );
 
     return;
   }
 
   console.log(
-`Agy Session Adapter
+    `Agy Session Adapter
 
 Commands:
   install-hooks
   sync <conversation-id> --transcript <path>
   recover [--project PATH] [--limit N]
-`,
+`
   );
 }
 
-main().catch(
-  error => {
-    console.error(
-      error instanceof Error
-        ? error.message
-        : error,
-    );
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
 
-    process.exit(
-      1,
-    );
-  },
-);
+  process.exit(1);
+});

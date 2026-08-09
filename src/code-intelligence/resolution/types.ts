@@ -1,8 +1,4 @@
-export type ResolutionKind =
-  | "CALL"
-  | "REFERENCE"
-  | "EXTENDS"
-  | "IMPLEMENTS";
+export type ResolutionKind = 'CALL' | 'REFERENCE' | 'EXTENDS' | 'IMPLEMENTS';
 
 export interface TypeResolution {
   id: string;
@@ -23,14 +19,9 @@ export interface TypeResolution {
 
   targetSymbolId?: string;
 
-  confidence:
-    | "exact"
-    | "high"
-    | "fallback";
+  confidence: 'exact' | 'high' | 'fallback';
 
-  resolver:
-    | "typescript-checker"
-    | "graph-fallback";
+  resolver: 'typescript-checker' | 'graph-fallback';
 }
 
 export interface TypeResolutionSnapshot {
@@ -45,6 +36,5 @@ export interface TypeResolutionSnapshot {
   high: number;
   fallback: number;
 
-  resolutions:
-    TypeResolution[];
+  resolutions: TypeResolution[];
 }

@@ -1,6 +1,6 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-import type { MCPContext } from "../context.js";
+import type { MCPContext } from '../context.js';
 
 export const searchCodeSchema = {
   query: z.string().min(1),
@@ -12,32 +12,19 @@ export async function searchCode(
   input: {
     query: string;
     limit?: number;
-  },
+  }
 ) {
-  const q =
-    input.query.toLowerCase();
+  const q = input.query.toLowerCase();
 
-  const limit =
-    input.limit ?? 20;
+  const limit = input.limit ?? 20;
 
   return ctx.graph
-    .allSymbols(
-      ctx.project.id,
-    )
+    .allSymbols(ctx.project.id)
     .filter(
       (symbol) =>
-        symbol.name
-          .toLowerCase()
-          .includes(q) ||
-        symbol.qualifiedName
-          ?.toLowerCase()
-          .includes(q) ||
-        symbol.filePath
-          .toLowerCase()
-          .includes(q),
+        symbol.name.toLowerCase().includes(q) ||
+        symbol.qualifiedName?.toLowerCase().includes(q) ||
+        symbol.filePath.toLowerCase().includes(q)
     )
-    .slice(
-      0,
-      limit,
-    );
+    .slice(0, limit);
 }

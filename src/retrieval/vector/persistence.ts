@@ -1,22 +1,12 @@
-import type {
-  MemoryRecord,
-} from "../../core/types.js";
+import type { MemoryRecord } from '../../core/types.js';
 
-import type {
-  EmbeddingProvider,
-} from "../../embeddings/provider.js";
+import type { EmbeddingProvider } from '../../embeddings/provider.js';
 
-import {
-  PersistentVectorStore,
-} from "../../storage/vector-store.js";
+import { PersistentVectorStore } from '../../storage/vector-store.js';
 
-import {
-  VectorIndexer,
-} from "./upsert.js";
+import { VectorIndexer } from './upsert.js';
 
-import {
-  VectorStore,
-} from "./vector-store.js";
+import { VectorStore } from './vector-store.js';
 
 export interface VectorPersistenceStats {
   loaded: number;
@@ -28,122 +18,62 @@ export interface VectorPersistenceStats {
 
 export class VectorPersistenceManager {
   constructor(
-    private readonly projectId:
-      string,
+    private readonly projectId: string,
 
-    private readonly model:
-      string,
+    private readonly model: string,
 
-    private readonly embeddings:
-      EmbeddingProvider,
+    private readonly embeddings: EmbeddingProvider,
 
-    private readonly store:
-      VectorStore,
+    private readonly store: VectorStore,
 
-    private readonly persistence:
-      PersistentVectorStore,
+    private readonly persistence: PersistentVectorStore
   ) {}
 
-  async initialize(
-    memories:
-      MemoryRecord[],
-  ): Promise<VectorPersistenceStats> {
+  async initialize(memories: MemoryRecord[]): Promise<VectorPersistenceStats> {
     let loaded = 0;
 
-    const snapshot =
-      await this.persistence.load(
-        this.projectId,
-      );
+    const snapshot = await this.persistence.load(this.projectId);
 
-    if (
-      snapshot &&
-      snapshot.model ===
-        this.model
-    ) {
-      loaded =
-        this.store.importRecords(
-          snapshot.records,
-        );
+    if (snapshot && snapshot.model === this.model) {
+      loaded = this.store.importRecords(snapshot.records);
     }
 
     /*
      * Xóa vector không còn memory tương ứng.
      */
-    const validIds =
-      new Set(
-        memories.map(
-          (memory) =>
-            memory.id,
-        ),
-      );
+    const validIds = new Set(memories.map((memory) => memory.id));
 
     let removed = 0;
 
-    for (
-      const record
-      of this.store.exportProject(
-        this.projectId,
-      )
-    ) {
-      if (
-        !validIds.has(
-          record.id,
-        )
-      ) {
-        if (
-          this.store.remove(
-            record.id,
-          )
-        ) {
+    for (const record of this.store.exportProject(this.projectId)) {
+      if (!validIds.has(record.id)) {
+        if (this.store.remove(record.id)) {
           removed++;
         }
       }
     }
 
-    const indexer =
-      new VectorIndexer(
-        this.embeddings,
-        this.store,
-      );
+    const indexer = new VectorIndexer(this.embeddings, this.store);
 
-    const indexed =
-      await indexer.index(
-        memories,
-      );
+    const indexed = await indexer.index(memories);
 
-    const records =
-      this.store.exportProject(
-        this.projectId,
-      );
+    const records = this.store.exportProject(this.projectId);
 
-    const dimensions =
-      records[0]
-        ?.vector.length ??
-      this.embeddings
-        .dimensions ??
-      0;
+    const dimensions = records[0]?.vector.length ?? this.embeddings.dimensions ?? 0;
 
     let saved = false;
 
-    if (
-      indexed > 0 ||
-      removed > 0 ||
-      !snapshot
-    ) {
+    if (indexed > 0 || removed > 0 || !snapshot) {
       await this.persistence.save({
         version: 1,
 
-        projectId:
-          this.projectId,
+        projectId: this.projectId,
 
-        model:
-          this.model,
+        model: this.model,
 
         dimensions,
 
-        updatedAt:
-          new Date()
-            .toISOString(),
+        updatedAt: new Date().toISOString(),
 
         records,
       });
@@ -155,8 +85,7 @@ export class VectorPersistenceManager {
       loaded,
       indexed,
       removed,
-      total:
-        records.length,
+      total: records.length,
       saved,
     };
   }

@@ -1,49 +1,28 @@
-import type {
-  StorageProvider,
-} from "../storage/types.js";
+import type { StorageProvider } from '../storage/types.js';
 
-import {
-  SnapshotManager,
-} from "../snapshot/index.js";
+import { SnapshotManager } from '../snapshot/index.js';
 
 export async function restoreLatestSnapshot(
-  storage:
-    StorageProvider,
+  storage: StorageProvider,
 
-  projectId:
-    string,
+  projectId: string
 ) {
-  const manager =
-    new SnapshotManager(
-      storage,
-    );
+  const manager = new SnapshotManager(storage);
 
-  const snapshots =
-    await manager.list(
-      projectId,
-    );
+  const snapshots = await manager.list(projectId);
 
-  const latest =
-    snapshots[0];
+  const latest = snapshots[0];
 
   if (!latest) {
-    throw new Error(
-      "No snapshot available",
-    );
+    throw new Error('No snapshot available');
   }
 
-  const result =
-    await manager.restore(
-      projectId,
-      latest.id,
-    );
+  const result = await manager.restore(projectId, latest.id);
 
   return {
-    snapshot:
-      latest.id,
+    snapshot: latest.id,
 
-    createdAt:
-      latest.createdAt,
+    createdAt: latest.createdAt,
 
     ...result,
   };

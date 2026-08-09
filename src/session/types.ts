@@ -1,43 +1,34 @@
-import type {
-  ProjectManifest,
-} from "../core/types.js";
+import type { ProjectManifest } from '../core/types.js';
 
-export type SessionAgent =
-  | "opencode"
-  | "agy"
-  | "codex"
-  | string;
+export type SessionAgent = 'opencode' | 'agy' | 'codex' | string;
 
-export type SessionStatus =
-  | "active"
-  | "idle"
-  | "error";
+export type SessionStatus = 'active' | 'idle' | 'error';
 
 export type SessionEventType =
-  | "session_start"
-  | "session_resume"
-  | "session_idle"
-  | "session_end"
-  | "session_compact"
-  | "user_prompt"
-  | "assistant_message"
-  | "message"
-  | "message_part"
-  | "tool_call"
-  | "tool_result"
-  | "file_read"
-  | "file_write"
-  | "file_edit"
-  | "command"
-  | "test"
-  | "todo"
-  | "decision"
-  | "commit"
-  | "deploy"
-  | "error"
-  | "artifact"
-  | "summary"
-  | "custom";
+  | 'session_start'
+  | 'session_resume'
+  | 'session_idle'
+  | 'session_end'
+  | 'session_compact'
+  | 'user_prompt'
+  | 'assistant_message'
+  | 'message'
+  | 'message_part'
+  | 'tool_call'
+  | 'tool_result'
+  | 'file_read'
+  | 'file_write'
+  | 'file_edit'
+  | 'command'
+  | 'test'
+  | 'todo'
+  | 'decision'
+  | 'commit'
+  | 'deploy'
+  | 'error'
+  | 'artifact'
+  | 'summary'
+  | 'custom';
 
 export interface SessionIdentity {
   projectId: string;
@@ -84,10 +75,7 @@ export interface SessionProvenance {
    */
   rawDigest?: string;
 
-  metadata?: Record<
-    string,
-    unknown
-  >;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SessionEventInput {
@@ -107,17 +95,11 @@ export interface SessionEventInput {
   /**
    * Optional sequence supplied by the native source.
    */
-  sourceSequence?:
-    | string
-    | number;
+  sourceSequence?: string | number;
 
-  data?: Record<
-    string,
-    unknown
-  >;
+  data?: Record<string, unknown>;
 
-  provenance?:
-    SessionProvenance;
+  provenance?: SessionProvenance;
 }
 
 export interface NormalizedSessionEvent {
@@ -139,17 +121,11 @@ export interface NormalizedSessionEvent {
 
   sourceEventId?: string;
 
-  sourceSequence?:
-    | string
-    | number;
+  sourceSequence?: string | number;
 
-  data: Record<
-    string,
-    unknown
-  >;
+  data: Record<string, unknown>;
 
-  provenance:
-    SessionProvenance;
+  provenance: SessionProvenance;
 }
 
 export interface SessionCursor {
@@ -171,11 +147,7 @@ export interface SessionCursor {
    * agy.step         = step index
    * codex.jsonl      = byte offset / event index
    */
-  sourceCursors:
-    Record<
-      string,
-      string
-    >;
+  sourceCursors: Record<string, string>;
 
   updatedAt: string;
 }
@@ -191,8 +163,7 @@ export interface SessionManifest {
 
   sessionKey: string;
 
-  status:
-    SessionStatus;
+  status: SessionStatus;
 
   title?: string;
 
@@ -205,11 +176,7 @@ export interface SessionManifest {
   eventCount: number;
   chunkCount: number;
 
-  metadata:
-    Record<
-      string,
-      unknown
-    >;
+  metadata: Record<string, unknown>;
 }
 
 export interface LocalSessionState {
@@ -220,39 +187,30 @@ export interface LocalSessionState {
   agent: SessionAgent;
   nativeSessionId: string;
 
-  status:
-    SessionStatus;
+  status: SessionStatus;
 
   createdAt: string;
   updatedAt: string;
 
   lastSequence: number;
 
-  lastRemoteSequence:
-    number;
+  lastRemoteSequence: number;
 
   /**
    * Byte offset inside events.jsonl which is already remote.
    */
-  remoteByteOffset:
-    number;
+  remoteByteOffset: number;
 
-  sourceCursors:
-    Record<
-      string,
-      string
-    >;
+  sourceCursors: Record<string, string>;
 
   /**
    * Bounded local dedup cache.
    */
-  recentEventIds:
-    string[];
+  recentEventIds: string[];
 }
 
 export interface PendingSessionEvents {
-  events:
-    NormalizedSessionEvent[];
+  events: NormalizedSessionEvent[];
 
   startOffset: number;
   endOffset: number;
@@ -261,41 +219,28 @@ export interface PendingSessionEvents {
 export interface SessionFlushResult {
   uploadedEvents: number;
 
-  lastRemoteSequence:
-    number;
+  lastRemoteSequence: number;
 
   eventCount: number;
   chunkCount: number;
 
-  status:
-    SessionStatus;
+  status: SessionStatus;
 }
 
 export interface SessionCoreOptions {
-  project:
-    ProjectManifest;
+  project: ProjectManifest;
 
-  storage:
-    import(
-      "../storage/types.js"
-    ).StorageProvider;
+  storage: import('../storage/types.js').StorageProvider;
 
-  agent:
-    SessionAgent;
+  agent: SessionAgent;
 
-  nativeSessionId:
-    string;
+  nativeSessionId: string;
 
   title?: string;
 
-  metadata?: Record<
-    string,
-    unknown
-  >;
+  metadata?: Record<string, unknown>;
 
-  maxEventsPerChunk?:
-    number;
+  maxEventsPerChunk?: number;
 
-  maxChunkBytes?:
-    number;
+  maxChunkBytes?: number;
 }

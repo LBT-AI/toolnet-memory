@@ -1,9 +1,4 @@
-export type EntryPointKind =
-  | "cli"
-  | "route"
-  | "main"
-  | "package"
-  | "runtime";
+export type EntryPointKind = 'cli' | 'route' | 'main' | 'package' | 'runtime';
 
 export interface ArchitectureEntryPoint {
   symbolId: string;
@@ -24,12 +19,7 @@ export interface ArchitectureHotspot {
 }
 
 export type ArchitectureLayerName =
-  | "interface"
-  | "application"
-  | "domain"
-  | "infrastructure"
-  | "tests"
-  | "unknown";
+  'interface' | 'application' | 'domain' | 'infrastructure' | 'tests' | 'unknown';
 
 export interface ArchitectureLayer {
   filePath: string;

@@ -36,6 +36,15 @@ jobs:
       - name: Validate installer
         run: bash -n scripts/install.sh
 
+      - name: Lint code
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Type check
+        run: npm run typecheck
+
       - name: Run tests
         run: npm test
 

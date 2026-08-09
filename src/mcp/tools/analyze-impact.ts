@@ -1,25 +1,13 @@
-import {
-  z,
-} from "zod";
+import { z } from 'zod';
 
-import type {
-  MCPContext,
-} from "../context.js";
+import type { MCPContext } from '../context.js';
 
-import {
-  ImpactAnalyzer,
-} from "../../code-intelligence/impact/impact-analyzer.js";
+import { ImpactAnalyzer } from '../../code-intelligence/impact/impact-analyzer.js';
 
 export const analyzeImpactSchema = {
-  symbolId:
-    z.string().min(1),
+  symbolId: z.string().min(1),
 
-  depth:
-    z.number()
-      .int()
-      .min(1)
-      .max(10)
-      .optional(),
+  depth: z.number().int().min(1).max(10).optional(),
 };
 
 export async function analyzeImpact(
@@ -27,12 +15,9 @@ export async function analyzeImpact(
   input: {
     symbolId: string;
     depth?: number;
-  },
+  }
 ) {
-  const symbol =
-    ctx.graph.getSymbol(
-      input.symbolId,
-    );
+  const symbol = ctx.graph.getSymbol(input.symbolId);
 
   if (!symbol) {
     return {
@@ -41,63 +26,39 @@ export async function analyzeImpact(
     };
   }
 
-  const analyzer =
-    new ImpactAnalyzer(
-      ctx.graph,
-    );
+  const analyzer = new ImpactAnalyzer(ctx.graph);
 
-  const impacts =
-    analyzer.analyze(
-      ctx.project.id,
-      symbol.id,
-      input.depth ?? 4,
-    );
+  const impacts = analyzer.analyze(ctx.project.id, symbol.id, input.depth ?? 4);
 
   return {
     found: true,
 
     target: {
-      id:
-        symbol.id,
+      id: symbol.id,
 
-      name:
-        symbol.name,
+      name: symbol.name,
 
-      qualifiedName:
-        symbol.qualifiedName,
+      qualifiedName: symbol.qualifiedName,
 
-      filePath:
-        symbol.filePath,
+      filePath: symbol.filePath,
 
-      type:
-        symbol.type,
+      type: symbol.type,
     },
 
-    impacts:
-      impacts.map(
-        (item) => ({
-          id:
-            item.symbol.id,
+    impacts: impacts.map((item) => ({
+      id: item.symbol.id,
 
-          name:
-            item.symbol.name,
+      name: item.symbol.name,
 
-          qualifiedName:
-            item.symbol
-              .qualifiedName,
+      qualifiedName: item.symbol.qualifiedName,
 
-          filePath:
-            item.symbol.filePath,
+      filePath: item.symbol.filePath,
 
-          type:
-            item.symbol.type,
+      type: item.symbol.type,
 
-          relation:
-            item.relation,
+      relation: item.relation,
 
-          depth:
-            item.depth,
-        }),
-      ),
+      depth: item.depth,
+    })),
   };
 }

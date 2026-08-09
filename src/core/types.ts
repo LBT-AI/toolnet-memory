@@ -1,16 +1,6 @@
-export type MemoryType =
-  | "code"
-  | "activity"
-  | "decision"
-  | "rule"
-  | "todo"
-  | "summary";
+export type MemoryType = 'code' | 'activity' | 'decision' | 'rule' | 'todo' | 'summary';
 
-export type ImportanceLevel =
-  | "critical"
-  | "high"
-  | "normal"
-  | "temporary";
+export type ImportanceLevel = 'critical' | 'high' | 'normal' | 'temporary';
 
 export interface MemoryRecord {
   id: string;
@@ -36,19 +26,19 @@ export interface ActivityEvent {
   projectId: string;
 
   type:
-    | "session_start"
-    | "session_end"
-    | "user_prompt"
-    | "tool_call"
-    | "file_read"
-    | "file_write"
-    | "command"
-    | "test"
-    | "error"
-    | "commit"
-    | "deploy"
-    | "decision"
-    | "todo";
+    | 'session_start'
+    | 'session_end'
+    | 'user_prompt'
+    | 'tool_call'
+    | 'file_read'
+    | 'file_write'
+    | 'command'
+    | 'test'
+    | 'error'
+    | 'commit'
+    | 'deploy'
+    | 'decision'
+    | 'todo';
 
   timestamp: string;
   data: Record<string, unknown>;
@@ -92,13 +82,7 @@ export interface SearchResult {
   memory: MemoryRecord;
   score: number;
 
-  source:
-    | "bm25"
-    | "vector"
-    | "graph"
-    | "recent"
-    | "important"
-    | "memory";
+  source: 'bm25' | 'vector' | 'graph' | 'recent' | 'important' | 'memory';
 }
 
 export interface CodeSymbol {
@@ -109,15 +93,15 @@ export interface CodeSymbol {
   qualifiedName?: string;
 
   type:
-    | "file"
-    | "module"
-    | "class"
-    | "interface"
-    | "function"
-    | "method"
-    | "route"
-    | "property"
-    | "service";
+    | 'file'
+    | 'module'
+    | 'class'
+    | 'interface'
+    | 'function'
+    | 'method'
+    | 'route'
+    | 'property'
+    | 'service';
 
   filePath: string;
 
@@ -136,19 +120,19 @@ export interface GraphEdge {
   to: string;
 
   type:
-    | "CALLS"
-    | "IMPORTS"
-    | "ROUTE"
-    | "TESTS"
-    | "USES_TYPE"
-    | "WRITES"
-    | "CALL_REFERENCE"
-    | "DEFINES"
-    | "INHERITS"
-    | "IMPLEMENTS"
-    | "HTTP_CALLS"
-    | "READS"
-    | "WRITES";
+    | 'CALLS'
+    | 'IMPORTS'
+    | 'ROUTE'
+    | 'TESTS'
+    | 'USES_TYPE'
+    | 'WRITES'
+    | 'CALL_REFERENCE'
+    | 'DEFINES'
+    | 'INHERITS'
+    | 'IMPLEMENTS'
+    | 'HTTP_CALLS'
+    | 'READS'
+    | 'WRITES';
 
   metadata?: Record<string, unknown>;
 }

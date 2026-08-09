@@ -1,160 +1,101 @@
-import {
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import {
-  ArchitectureEngine,
-  CodeGraphStore,
-} from "../../src/code-intelligence/index.js";
+import { ArchitectureEngine, CodeGraphStore } from '../../src/code-intelligence/index.js';
 
-describe(
-  "Architecture Engine",
-  () => {
-    it(
-      "builds architecture intelligence snapshot",
-      () => {
-        const graph =
-          new CodeGraphStore();
+describe('Architecture Engine', () => {
+  it('builds architecture intelligence snapshot', () => {
+    const graph = new CodeGraphStore();
 
-        const projectId =
-          "test";
+    const projectId = 'test';
 
-        graph.addSymbol({
-          id:
-            "cli",
+    graph.addSymbol({
+      id: 'cli',
 
-          projectId,
+      projectId,
 
-          name:
-            "tool",
+      name: 'tool',
 
-          qualifiedName:
-            "tool",
+      qualifiedName: 'tool',
 
-          type:
-            "file",
+      type: 'file',
 
-          filePath:
-            "bin/tool.ts",
+      filePath: 'bin/tool.ts',
 
-          startLine:
-            1,
+      startLine: 1,
 
-          endLine:
-            20,
-        });
+      endLine: 20,
+    });
 
-        graph.addSymbol({
-          id:
-            "service",
+    graph.addSymbol({
+      id: 'service',
 
-          projectId,
+      projectId,
 
-          name:
-            "Service",
+      name: 'Service',
 
-          qualifiedName:
-            "Service",
+      qualifiedName: 'Service',
 
-          type:
-            "class",
+      type: 'class',
 
-          filePath:
-            "src/core/service.ts",
+      filePath: 'src/core/service.ts',
 
-          startLine:
-            1,
+      startLine: 1,
 
-          endLine:
-            30,
-        });
+      endLine: 30,
+    });
 
-        graph.addSymbol({
-          id:
-            "store",
+    graph.addSymbol({
+      id: 'store',
 
-          projectId,
+      projectId,
 
-          name:
-            "Store",
+      name: 'Store',
 
-          qualifiedName:
-            "Store",
+      qualifiedName: 'Store',
 
-          type:
-            "class",
+      type: 'class',
 
-          filePath:
-            "src/storage/store.ts",
+      filePath: 'src/storage/store.ts',
 
-          startLine:
-            1,
+      startLine: 1,
 
-          endLine:
-            30,
-        });
+      endLine: 30,
+    });
 
-        graph.addEdge({
-          id:
-            "cli-service",
+    graph.addEdge({
+      id: 'cli-service',
 
-          projectId,
+      projectId,
 
-          from:
-            "cli",
+      from: 'cli',
 
-          to:
-            "service",
+      to: 'service',
 
-          type:
-            "CALL_REFERENCE",
-        });
+      type: 'CALL_REFERENCE',
+    });
 
-        graph.addEdge({
-          id:
-            "service-store",
+    graph.addEdge({
+      id: 'service-store',
 
-          projectId,
+      projectId,
 
-          from:
-            "service",
+      from: 'service',
 
-          to:
-            "store",
+      to: 'store',
 
-          type:
-            "CALL_REFERENCE",
-        });
+      type: 'CALL_REFERENCE',
+    });
 
-        const result =
-          new ArchitectureEngine(
-            graph,
-          ).analyze(
-            projectId,
-          );
+    const result = new ArchitectureEngine(graph).analyze(projectId);
 
-        expect(
-          result.summary.files,
-        ).toBe(3);
+    expect(result.summary.files).toBe(3);
 
-        expect(
-          result.entryPoints.length,
-        ).toBeGreaterThan(0);
+    expect(result.entryPoints.length).toBeGreaterThan(0);
 
-        expect(
-          result.hotspots.length,
-        ).toBeGreaterThan(0);
+    expect(result.hotspots.length).toBeGreaterThan(0);
 
-        expect(
-          result.layers.length,
-        ).toBe(3);
+    expect(result.layers.length).toBe(3);
 
-        expect(
-          result.clusters.length,
-        ).toBeGreaterThan(0);
-      },
-    );
-  },
-);
+    expect(result.clusters.length).toBeGreaterThan(0);
+  });
+});

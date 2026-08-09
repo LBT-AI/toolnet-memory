@@ -1,61 +1,40 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  loadConfig,
-  ProjectManager,
-} from "../core/index.js";
+import { loadConfig, ProjectManager } from '../core/index.js';
 
 import {
   createStorageProvider,
   withStorageRetry,
   ProjectScopedStorageProvider,
-} from "../storage/index.js";
+} from '../storage/index.js';
 
-import {
-  ToolNetMemoryRuntime,
-} from "./toolnet-memory-runtime.js";
+import { ToolNetMemoryRuntime } from './toolnet-memory-runtime.js';
 
-export function createToolNetMemoryRuntime(
-  rootPath: string = process.cwd(),
-) {
+export function createToolNetMemoryRuntime(rootPath: string = process.cwd()) {
   const config = loadConfig();
 
-  const project =
-    new ProjectManager()
-      .detect(rootPath);
+  const project = new ProjectManager().detect(rootPath);
 
-  const rawStorage =
-    createStorageProvider({
-      provider: config.storage.provider,
-      r2: config.storage.r2,
-      s3: config.storage.s3,
-      huggingface: config.storage.huggingface,
-      localRoot: config.storage.localRoot,
-    });
+  const rawStorage = createStorageProvider({
+    provider: config.storage.provider,
+    r2: config.storage.r2,
+    s3: config.storage.s3,
+    huggingface: config.storage.huggingface,
+    localRoot: config.storage.localRoot,
+  });
 
-  const retryStorage =
-    withStorageRetry(
-      rawStorage,
-      {
-        attempts:
-          Number(
-            process.env.TOOLNET_STORAGE_RETRIES ??
-            3,
-          ),
-      },
-    );
+  const retryStorage = withStorageRetry(rawStorage, {
+    attempts: Number(process.env.TOOLNET_STORAGE_RETRIES ?? 3),
+  });
 
-  const storage =
-    new ProjectScopedStorageProvider(
-      retryStorage,
-      project.id,
-      project.name,
-      project.remote ?? project.name,
-    );
+  const storage = new ProjectScopedStorageProvider(
+    retryStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
 
-  const embeddingModel =
-    process.env.HF_EMBEDDING_MODEL ??
-    "sentence-transformers/all-MiniLM-L6-v2";
+  const embeddingModel = process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2';
 
   return new ToolNetMemoryRuntime({
     project,

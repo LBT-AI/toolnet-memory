@@ -1,1 +1,1 @@
-export * from "./rich-graph-enricher.js";
+export * from './rich-graph-enricher.js';

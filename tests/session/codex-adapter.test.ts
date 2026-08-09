@@ -1,583 +1,302 @@
-import {
-  appendFileSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
-import {
-  tmpdir,
-} from "node:os";
+import { tmpdir } from 'node:os';
 
-import {
-  join,
-} from "node:path";
+import { join } from 'node:path';
 
-import {
-  afterEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterEach, describe, expect, it } from 'vitest';
 
-import type {
-  ProjectManifest,
-} from "../../src/core/types.js";
+import type { ProjectManifest } from '../../src/core/types.js';
 
-import type {
-  StorageObject,
-  StorageProvider,
-} from "../../src/storage/types.js";
+import type { StorageObject, StorageProvider } from '../../src/storage/types.js';
 
-import {
-  installCodexNotify,
-  syncCodexSession,
-} from "../../src/session/codex/index.js";
+import { installCodexNotify, syncCodexSession } from '../../src/session/codex/index.js';
 
-class MemoryStorage
-  implements StorageProvider
-{
-  readonly name =
-    "memory";
+class MemoryStorage implements StorageProvider {
+  readonly name = 'memory';
 
-  readonly objects =
-    new Map<
-      string,
-      Uint8Array
-    >();
+  readonly objects = new Map<string, Uint8Array>();
 
-  async put(
-    key: string,
-    data:
-      string |
-      Uint8Array,
-  ) {
-    this.objects.set(
-      key,
-      typeof data ===
-        "string"
-        ? Buffer.from(
-            data,
-          )
-        : data,
-    );
+  async put(key: string, data: string | Uint8Array) {
+    this.objects.set(key, typeof data === 'string' ? Buffer.from(data) : data);
   }
 
-  async get(
-    key: string,
-  ) {
-    return (
-      this.objects.get(
+  async get(key: string) {
+    return this.objects.get(key) ?? null;
+  }
+
+  async getText(key: string) {
+    const value = await this.get(key);
+
+    return value ? Buffer.from(value).toString('utf8') : null;
+  }
+
+  async exists(key: string) {
+    return this.objects.has(key);
+  }
+
+  async delete(key: string) {
+    this.objects.delete(key);
+  }
+
+  async list(prefix = ''): Promise<StorageObject[]> {
+    return Array.from(this.objects.entries())
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, value]) => ({
         key,
-      ) ??
-      null
-    );
-  }
-
-  async getText(
-    key: string,
-  ) {
-    const value =
-      await this.get(
-        key,
-      );
-
-    return value
-      ? Buffer.from(
-          value,
-        ).toString(
-          "utf8",
-        )
-      : null;
-  }
-
-  async exists(
-    key: string,
-  ) {
-    return this.objects.has(
-      key,
-    );
-  }
-
-  async delete(
-    key: string,
-  ) {
-    this.objects.delete(
-      key,
-    );
-  }
-
-  async list(
-    prefix =
-      "",
-  ): Promise<
-    StorageObject[]
-  > {
-    return Array.from(
-      this.objects.entries(),
-    )
-      .filter(
-        ([key]) =>
-          key.startsWith(
-            prefix,
-          ),
-      )
-      .map(
-        (
-          [key, value],
-        ) => ({
-          key,
-          size:
-            value.byteLength,
-        }),
-      );
+        size: value.byteLength,
+      }));
   }
 }
 
-const roots:
-  string[] = [];
+const roots: string[] = [];
 
-function makeProject():
-  ProjectManifest {
-  const root =
-    mkdtempSync(
-      join(
-        tmpdir(),
-        "toolnet-codex-",
-      ),
-    );
+function makeProject(): ProjectManifest {
+  const root = mkdtempSync(join(tmpdir(), 'toolnet-codex-'));
 
-  roots.push(
-    root,
-  );
+  roots.push(root);
 
-  const now =
-    new Date()
-      .toISOString();
+  const now = new Date().toISOString();
 
   return {
-    id:
-      "codex-project",
+    id: 'codex-project',
 
-    name:
-      "ToolNetSecrets",
+    name: 'ToolNetSecrets',
 
-    remote:
-      "ToolNetSecrets",
+    remote: 'ToolNetSecrets',
 
-    rootPath:
-      root,
+    rootPath: root,
 
-    createdAt:
-      now,
+    createdAt: now,
 
-    updatedAt:
-      now,
+    updatedAt: now,
 
-    graphVersion:
-      0,
+    graphVersion: 0,
 
-    memoryVersion:
-      0,
+    memoryVersion: 0,
   };
 }
 
-afterEach(
-  () => {
-    while (
-      roots.length
-    ) {
-      rmSync(
-        roots.pop()!,
-        {
-          recursive:
-            true,
+afterEach(() => {
+  while (roots.length) {
+    rmSync(roots.pop()!, {
+      recursive: true,
 
-          force:
-            true,
+      force: true,
+    });
+  }
+});
+
+describe('Codex adapter', () => {
+  it('imports canonical rollout incrementally using native thread id', async () => {
+    const project = makeProject();
+
+    const storage = new MemoryStorage();
+
+    const threadId = 'b5f6c1c2-1111-2222-3333-444455556666';
+
+    const rollout = join(project.rootPath, `rollout-${threadId}.jsonl`);
+
+    const lines = [
+      {
+        timestamp: '2026-08-05T00:00:00Z',
+
+        type: 'session_meta',
+
+        payload: {
+          id: threadId,
+
+          cwd: project.rootPath,
         },
-      );
-    }
-  },
-);
-
-describe(
-  "Codex adapter",
-  () => {
-    it(
-      "imports canonical rollout incrementally using native thread id",
-      async () => {
-        const project =
-          makeProject();
-
-        const storage =
-          new MemoryStorage();
-
-        const threadId =
-          "b5f6c1c2-1111-2222-3333-444455556666";
-
-        const rollout =
-          join(
-            project.rootPath,
-            `rollout-${threadId}.jsonl`,
-          );
-
-        const lines = [
-          {
-            timestamp:
-              "2026-08-05T00:00:00Z",
-
-            type:
-              "session_meta",
-
-            payload: {
-              id:
-                threadId,
-
-              cwd:
-                project.rootPath,
-            },
-          },
-
-          {
-            timestamp:
-              "2026-08-05T00:00:01Z",
-
-            type:
-              "response_item",
-
-            payload: {
-              type:
-                "message",
-
-              role:
-                "user",
-
-              content: [
-                {
-                  type:
-                    "input_text",
-
-                  text:
-                    "hello",
-                },
-              ],
-            },
-          },
-
-          {
-            timestamp:
-              "2026-08-05T00:00:02Z",
-
-            type:
-              "response_item",
-
-            payload: {
-              type:
-                "message",
-
-              role:
-                "assistant",
-
-              content: [
-                {
-                  type:
-                    "output_text",
-
-                  text:
-                    "hi",
-                },
-              ],
-            },
-          },
-        ];
-
-        writeFileSync(
-          rollout,
-          lines
-            .map(
-              item =>
-                JSON.stringify(
-                  item,
-                ),
-            )
-            .join(
-              "\n",
-            ) +
-            "\n",
-        );
-
-        const first =
-          await syncCodexSession({
-            project,
-            storage,
-            threadId,
-            rolloutPath:
-              rollout,
-
-            cwd:
-              project.rootPath,
-
-            turnId:
-              "turn-1",
-
-            idle:
-              true,
-          });
-
-        expect(
-          first.status,
-        ).toBe(
-          "idle",
-        );
-
-        expect(
-          first.imported,
-        ).toBe(
-          5,
-        );
-
-        const second =
-          await syncCodexSession({
-            project,
-            storage,
-            threadId,
-            rolloutPath:
-              rollout,
-
-            cwd:
-              project.rootPath,
-
-            turnId:
-              "turn-1",
-
-            idle:
-              true,
-          });
-
-        expect(
-          second.imported,
-        ).toBe(
-          0,
-        );
-
-        appendFileSync(
-          rollout,
-          JSON.stringify({
-            timestamp:
-              "2026-08-05T00:01:00Z",
-
-            type:
-              "event_msg",
-
-            payload: {
-              type:
-                "agent_message",
-
-              message:
-                "continued",
-            },
-          }) +
-          "\n",
-        );
-
-        const third =
-          await syncCodexSession({
-            project,
-            storage,
-            threadId,
-            rolloutPath:
-              rollout,
-
-            cwd:
-              project.rootPath,
-
-            turnId:
-              "turn-2",
-
-            idle:
-              true,
-          });
-
-        expect(
-          third.imported,
-        ).toBe(
-          2,
-        );
       },
+
+      {
+        timestamp: '2026-08-05T00:00:01Z',
+
+        type: 'response_item',
+
+        payload: {
+          type: 'message',
+
+          role: 'user',
+
+          content: [
+            {
+              type: 'input_text',
+
+              text: 'hello',
+            },
+          ],
+        },
+      },
+
+      {
+        timestamp: '2026-08-05T00:00:02Z',
+
+        type: 'response_item',
+
+        payload: {
+          type: 'message',
+
+          role: 'assistant',
+
+          content: [
+            {
+              type: 'output_text',
+
+              text: 'hi',
+            },
+          ],
+        },
+      },
+    ];
+
+    writeFileSync(rollout, lines.map((item) => JSON.stringify(item)).join('\n') + '\n');
+
+    const first = await syncCodexSession({
+      project,
+      storage,
+      threadId,
+      rolloutPath: rollout,
+
+      cwd: project.rootPath,
+
+      turnId: 'turn-1',
+
+      idle: true,
+    });
+
+    expect(first.status).toBe('idle');
+
+    expect(first.imported).toBe(5);
+
+    const second = await syncCodexSession({
+      project,
+      storage,
+      threadId,
+      rolloutPath: rollout,
+
+      cwd: project.rootPath,
+
+      turnId: 'turn-1',
+
+      idle: true,
+    });
+
+    expect(second.imported).toBe(0);
+
+    appendFileSync(
+      rollout,
+      JSON.stringify({
+        timestamp: '2026-08-05T00:01:00Z',
+
+        type: 'event_msg',
+
+        payload: {
+          type: 'agent_message',
+
+          message: 'continued',
+        },
+      }) + '\n'
     );
 
-    it(
-      "redacts secrets from rollout payload",
-      async () => {
-        const project =
-          makeProject();
+    const third = await syncCodexSession({
+      project,
+      storage,
+      threadId,
+      rolloutPath: rollout,
 
-        const storage =
-          new MemoryStorage();
+      cwd: project.rootPath,
 
-        const threadId =
-          "codex-secret-thread";
+      turnId: 'turn-2',
 
-        const rollout =
-          join(
-            project.rootPath,
-            "secret.jsonl",
-          );
+      idle: true,
+    });
 
-        writeFileSync(
-          rollout,
-          JSON.stringify({
-            timestamp:
-              "2026-08-05T00:00:00Z",
+    expect(third.imported).toBe(2);
+  });
 
-            type:
-              "session_meta",
+  it('redacts secrets from rollout payload', async () => {
+    const project = makeProject();
 
-            payload: {
-              id:
-                threadId,
+    const storage = new MemoryStorage();
 
-              cwd:
-                project.rootPath,
+    const threadId = 'codex-secret-thread';
 
-              token:
-                "top-secret-value",
-            },
-          }) +
-          "\n",
-        );
+    const rollout = join(project.rootPath, 'secret.jsonl');
 
-        await syncCodexSession({
-          project,
-          storage,
-          threadId,
-          rolloutPath:
-            rollout,
+    writeFileSync(
+      rollout,
+      JSON.stringify({
+        timestamp: '2026-08-05T00:00:00Z',
 
-          cwd:
-            project.rootPath,
-        });
+        type: 'session_meta',
 
-        const text =
-          Array.from(
-            storage.objects
-              .values(),
-          )
-            .map(
-              item =>
-                Buffer.from(
-                  item,
-                ).toString(
-                  "utf8",
-                ),
-            )
-            .join(
-              "\n",
-            );
+        payload: {
+          id: threadId,
 
-        expect(
-          text,
-        ).not.toContain(
-          "top-secret-value",
-        );
+          cwd: project.rootPath,
 
-        expect(
-          text,
-        ).toContain(
-          "[REDACTED]",
-        );
-      },
+          token: 'top-secret-value',
+        },
+      }) + '\n'
     );
 
-    it(
-      "preserves an existing Codex notify command",
-      () => {
-        const root =
-          mkdtempSync(
-            join(
-              tmpdir(),
-              "toolnet-codex-config-",
-            ),
-          );
+    await syncCodexSession({
+      project,
+      storage,
+      threadId,
+      rolloutPath: rollout,
 
-        roots.push(
-          root,
-        );
+      cwd: project.rootPath,
+    });
 
-        const config =
-          join(
-            root,
-            "config.toml",
-          );
+    const text = Array.from(storage.objects.values())
+      .map((item) => Buffer.from(item).toString('utf8'))
+      .join('\n');
 
-        const previous =
-          join(
-            root,
-            "previous.json",
-          );
+    expect(text).not.toContain('top-secret-value');
 
-        writeFileSync(
-          config,
-          [
-            'model = "gpt-5"',
-            'notify = ["echo", "old-notifier"]',
-            "",
-            "[sandbox]",
-            'mode = "workspace-write"',
-            "",
-          ].join(
-            "\n",
-          ),
-        );
+    expect(text).toContain('[REDACTED]');
+  });
 
-        const result =
-          installCodexNotify({
-            configFile:
-              config,
+  it('preserves an existing Codex notify command', () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolnet-codex-config-'));
 
-            previousFile:
-              previous,
+    roots.push(root);
 
-            binary:
-              "/usr/bin/toolnet-memory",
-          });
+    const config = join(root, 'config.toml');
 
-        expect(
-          result
-            .preservedPrevious,
-        ).toBe(
-          true,
-        );
+    const previous = join(root, 'previous.json');
 
-        const configText =
-          readFileSync(
-            config,
-            "utf8",
-          );
-
-        expect(
-          configText,
-        ).toContain(
-          "session:codex-notify",
-        );
-
-        const old =
-          JSON.parse(
-            readFileSync(
-              previous,
-              "utf8",
-            ),
-          );
-
-        expect(
-          old,
-        ).toEqual([
-          "echo",
-          "old-notifier",
-        ]);
-      },
+    writeFileSync(
+      config,
+      [
+        'model = "gpt-5"',
+        'notify = ["echo", "old-notifier"]',
+        '',
+        '[sandbox]',
+        'mode = "workspace-write"',
+        '',
+      ].join('\n')
     );
-  },
-);
+
+    const result = installCodexNotify({
+      configFile: config,
+
+      previousFile: previous,
+
+      binary: '/usr/bin/toolnet-memory',
+    });
+
+    expect(result.preservedPrevious).toBe(true);
+
+    const configText = readFileSync(config, 'utf8');
+
+    expect(configText).toContain('session:codex-notify');
+
+    const old = JSON.parse(readFileSync(previous, 'utf8'));
+
+    expect(old).toEqual(['echo', 'old-notifier']);
+  });
+});

@@ -89,7 +89,7 @@ Fixed bug in parser
       `.trim();
 
       const filtered = filterTranscript(transcript);
-      
+
       expect(filtered).toContain('Decision');
       expect(filtered).toContain('Fixed bug');
       expect(filtered).not.toContain('SYSTEM MESSAGE');
@@ -110,7 +110,7 @@ Decision: Continue with plan
       `.trim();
 
       const filtered = filterTranscript(transcript);
-      
+
       // Should keep decision but filter repeated "Processing..."
       expect(filtered).toContain('Decision');
       expect((filtered.match(/Processing/g) || []).length).toBeLessThan(6);
@@ -161,7 +161,7 @@ Decision: Continue with plan
       };
 
       const filtered = filterEventData(data);
-      
+
       expect(filtered.content).toBeUndefined();
       expect(filtered.metadata).toBeDefined();
     });
@@ -176,23 +176,19 @@ Decision: Continue with plan
       };
 
       const filtered = filterEventData(data);
-      
+
       expect(filtered.content).toContain('Decision');
       expect(filtered.metadata).toBeDefined();
     });
 
     it('should filter arrays', () => {
       const data = {
-        messages: [
-          'Decision: Use TypeScript',
-          '<SYSTEM MESSAGE> Internal',
-          'Fixed bug in parser',
-        ],
+        messages: ['Decision: Use TypeScript', '<SYSTEM MESSAGE> Internal', 'Fixed bug in parser'],
       };
 
       const filtered = filterEventData(data);
       const messages = filtered.messages as string[];
-      
+
       expect(messages).toHaveLength(2);
       expect(messages[0]).toContain('Decision');
       expect(messages[1]).toContain('Fixed');
@@ -267,7 +263,7 @@ npm notice created lockfile
       `.trim();
 
       const facts = extractDurableFacts(transcript);
-      
+
       expect(facts).toHaveLength(2);
       expect(facts[0]).toContain('Decision');
       expect(facts[1]).toContain('Fixed');
@@ -282,7 +278,7 @@ Next: Implement retry logic
       `.trim();
 
       const facts = extractDurableFacts(transcript);
-      
+
       expect(facts.length).toBeGreaterThan(0);
       expect(facts.some((f: string) => f.includes('Blocker'))).toBe(true);
       expect(facts.some((f: string) => f.includes('Next'))).toBe(true);
@@ -295,7 +291,7 @@ Fixed authentication with TOKEN: ghp-abcdef
       `.trim();
 
       const facts = extractDurableFacts(transcript);
-      
+
       expect(facts.every((f: string) => !f.includes('sk-123456'))).toBe(true);
       expect(facts.every((f: string) => !f.includes('ghp-abcdef'))).toBe(true);
       expect(facts.some((f: string) => f.includes('[REDACTED]'))).toBe(true);

@@ -1,282 +1,123 @@
-import {
-  MemoryEngine,
-} from "../../core/memory-engine.js";
+import { MemoryEngine } from '../../core/memory-engine.js';
 
-import type {
-  ProjectManifest,
-} from "../../core/types.js";
+import type { ProjectManifest } from '../../core/types.js';
 
-import {
-  MemoryStore,
-} from "../../storage/memory-store.js";
+import { MemoryStore } from '../../storage/memory-store.js';
 
-import type {
-  StorageProvider,
-} from "../../storage/types.js";
+import type { StorageProvider } from '../../storage/types.js';
 
-import type {
-  SessionIdentity,
-  NormalizedSessionEvent,
-} from "../types.js";
+import type { SessionIdentity, NormalizedSessionEvent } from '../types.js';
 
-import {
-  sha256,
-} from "../utils.js";
+import { sha256 } from '../utils.js';
 
-import type {
-  LearnedMemoryBatch,
-  LearnedMemoryCandidate,
-  MemoryReconcileResult,
-} from "./types.js";
+import type { LearnedMemoryBatch, LearnedMemoryCandidate, MemoryReconcileResult } from './types.js';
 
-function pad(
-  value: number,
-): string {
-  return String(
-    value,
-  ).padStart(
-    12,
-    "0",
-  );
+function pad(value: number): string {
+  return String(value).padStart(12, '0');
 }
 
-function journalPrefix(
-  identity:
-    SessionIdentity,
-): string {
-  return identity
-    .remotePrefix
-    .replace(
-      "/sessions/",
-      "/memory/learned/",
-    );
+function journalPrefix(identity: SessionIdentity): string {
+  return identity.remotePrefix.replace('/sessions/', '/memory/learned/');
 }
 
 export class SessionMemoryJournal {
-  constructor(
-    private readonly storage:
-      StorageProvider,
-  ) {}
+  constructor(private readonly storage: StorageProvider) {}
 
   async write(
-    identity:
-      SessionIdentity,
+    identity: SessionIdentity,
 
-    events:
-      NormalizedSessionEvent[],
+    events: NormalizedSessionEvent[],
 
-    candidates:
-      LearnedMemoryCandidate[],
-  ): Promise<
-    string |
-    null
-  > {
-    if (
-      candidates.length ===
-        0 ||
-      events.length ===
-        0
-    ) {
+    candidates: LearnedMemoryCandidate[]
+  ): Promise<string | null> {
+    if (candidates.length === 0 || events.length === 0) {
       return null;
     }
 
-    const firstSequence =
-      Math.min(
-        ...events.map(
-          item =>
-            item.sequence,
-        ),
-      );
+    const firstSequence = Math.min(...events.map((item) => item.sequence));
 
-    const lastSequence =
-      Math.max(
-        ...events.map(
-          item =>
-            item.sequence,
-        ),
-      );
+    const lastSequence = Math.max(...events.map((item) => item.sequence));
 
-    const batch:
-      LearnedMemoryBatch =
-    {
+    const batch: LearnedMemoryBatch = {
       version: 1,
 
-      projectId:
-        identity.projectId,
+      projectId: identity.projectId,
 
-      agent:
-        identity.agent,
+      agent: identity.agent,
 
-      nativeSessionId:
-        identity
-          .nativeSessionId,
+      nativeSessionId: identity.nativeSessionId,
 
-      sessionKey:
-        identity.sessionKey,
+      sessionKey: identity.sessionKey,
 
-      createdAt:
-        new Date()
-          .toISOString(),
+      createdAt: new Date().toISOString(),
 
       firstSequence,
       lastSequence,
 
-      candidateCount:
-        candidates.length,
+      candidateCount: candidates.length,
 
       candidates,
     };
 
-    const payload =
-      JSON.stringify(
-        batch,
-        null,
-        2,
-      ) +
-      "\n";
+    const payload = JSON.stringify(batch, null, 2) + '\n';
 
-    const digest =
-      sha256(
-        candidates
-          .map(
-            item =>
-              item.fingerprint,
-          )
-          .sort()
-          .join(
-            "|",
-          ),
-      ).slice(
-        0,
-        16,
-      );
+    const digest = sha256(
+      candidates
+        .map((item) => item.fingerprint)
+        .sort()
+        .join('|')
+    ).slice(0, 16);
 
-    const key =
-      [
-        journalPrefix(
-          identity,
-        ),
+    const key = [
+      journalPrefix(identity),
 
-        "batches",
+      'batches',
 
-        `${pad(
-          firstSequence,
-        )}-${pad(
-          lastSequence,
-        )}-${digest}.json`,
-      ].join(
-        "/",
-      );
+      `${pad(firstSequence)}-${pad(lastSequence)}-${digest}.json`,
+    ].join('/');
 
-    if (
-      !await this.storage
-        .exists(
-          key,
-        )
-    ) {
-      await this.storage.put(
-        key,
-        payload,
-        "application/json",
-      );
+    if (!(await this.storage.exists(key))) {
+      await this.storage.put(key, payload, 'application/json');
     }
 
     return key;
   }
 }
 
-function candidateFingerprint(
-  memory:
-    Record<
-      string,
-      any
-    >,
-): string |
-  undefined {
-  const value =
-    memory.metadata
-      ?.learningFingerprint;
+function candidateFingerprint(memory: Record<string, any>): string | undefined {
+  const value = memory.metadata?.learningFingerprint;
 
-  return typeof value ===
-    "string"
-    ? value
-    : undefined;
+  return typeof value === 'string' ? value : undefined;
 }
 
 async function loadBatches(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  storage:
-    StorageProvider,
-): Promise<
-  LearnedMemoryBatch[]
-> {
-  const prefix =
-    `projects/${project.id}/memory/learned/`;
+  storage: StorageProvider
+): Promise<LearnedMemoryBatch[]> {
+  const prefix = `projects/${project.id}/memory/learned/`;
 
-  const objects =
-    await storage.list(
-      prefix,
-    );
+  const objects = await storage.list(prefix);
 
-  const batches:
-    LearnedMemoryBatch[] =
-    [];
+  const batches: LearnedMemoryBatch[] = [];
 
-  for (
-    const object
-    of objects
-      .filter(
-        item =>
-          item.key.includes(
-            "/batches/",
-          ) &&
-          item.key.endsWith(
-            ".json",
-          ),
-      )
-      .sort(
-        (
-          left,
-          right,
-        ) =>
-          left.key.localeCompare(
-            right.key,
-          ),
-      )
-  ) {
-    const text =
-      await storage.getText(
-        object.key,
-      );
+  for (const object of objects
+    .filter((item) => item.key.includes('/batches/') && item.key.endsWith('.json'))
+    .sort((left, right) => left.key.localeCompare(right.key))) {
+    const text = await storage.getText(object.key);
 
-    if (
-      !text
-    ) {
+    if (!text) {
       continue;
     }
 
     try {
-      const parsed =
-        JSON.parse(
-          text,
-        ) as
-          LearnedMemoryBatch;
+      const parsed = JSON.parse(text) as LearnedMemoryBatch;
 
-      if (
-        parsed.version !==
-          1 ||
-        !Array.isArray(
-          parsed.candidates,
-        )
-      ) {
+      if (parsed.version !== 1 || !Array.isArray(parsed.candidates)) {
         continue;
       }
 
-      batches.push(
-        parsed,
-      );
+      batches.push(parsed);
     } catch {
       // Ignore incomplete/corrupt optional learning batch.
     }
@@ -286,166 +127,86 @@ async function loadBatches(
 }
 
 export async function reconcileSessionMemoryJournal(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  storage:
-    StorageProvider,
-): Promise<
-  MemoryReconcileResult
-> {
-  const batches =
-    await loadBatches(
-      project,
-      storage,
-    );
+  storage: StorageProvider
+): Promise<MemoryReconcileResult> {
+  const batches = await loadBatches(project, storage);
 
-  const store =
-    new MemoryStore(
-      storage,
-    );
+  const store = new MemoryStore(storage);
 
-  const existing =
-    await store.load(
-      project.id,
-    );
+  const existing = await store.load(project.id);
 
-  const engine =
-    new MemoryEngine();
+  const engine = new MemoryEngine();
 
-  engine.importRecords(
-    existing,
+  engine.importRecords(existing);
+
+  const fingerprints = new Set(
+    existing
+      .map((memory) => candidateFingerprint(memory))
+      .filter((value): value is string => Boolean(value))
   );
 
-  const fingerprints =
-    new Set(
-      existing
-        .map(
-          memory =>
-            candidateFingerprint(
-              memory,
-            ),
-        )
-        .filter(
-          (
-            value,
-          ): value is string =>
-            Boolean(
-              value,
-            ),
-        ),
-    );
+  let candidates = 0;
 
-  let candidates =
-    0;
+  let added = 0;
 
-  let added =
-    0;
+  let duplicates = 0;
 
-  let duplicates =
-    0;
+  for (const batch of batches) {
+    for (const candidate of batch.candidates) {
+      candidates += 1;
 
-  for (
-    const batch
-    of batches
-  ) {
-    for (
-      const candidate
-      of batch.candidates
-    ) {
-      candidates +=
-        1;
-
-      if (
-        fingerprints.has(
-          candidate
-            .fingerprint,
-        )
-      ) {
-        duplicates +=
-          1;
+      if (fingerprints.has(candidate.fingerprint)) {
+        duplicates += 1;
 
         continue;
       }
 
       engine.remember({
-        projectId:
-          project.id,
+        projectId: project.id,
 
-        type:
-          candidate.type,
+        type: candidate.type,
 
-        content:
-          candidate.content,
+        content: candidate.content,
 
-        importance:
-          candidate
-            .importance,
+        importance: candidate.importance,
 
-        tags:
-          candidate.tags,
+        tags: candidate.tags,
 
-        source:
-          "session-memory-learner",
+        source: 'session-memory-learner',
 
         metadata: {
-          learningFingerprint:
-            candidate
-              .fingerprint,
+          learningFingerprint: candidate.fingerprint,
 
-          learningKind:
-            candidate.kind,
+          learningKind: candidate.kind,
 
-          confidence:
-            candidate
-              .confidence,
+          confidence: candidate.confidence,
 
-          provenance:
-            candidate
-              .provenance,
+          provenance: candidate.provenance,
 
-          sourceCreatedAt:
-            candidate
-              .createdAt,
+          sourceCreatedAt: candidate.createdAt,
 
-          sessionKey:
-            candidate
-              .sessionKey,
+          sessionKey: candidate.sessionKey,
 
-          agent:
-            candidate.agent,
+          agent: candidate.agent,
 
-          nativeSessionId:
-            candidate
-              .nativeSessionId,
+          nativeSessionId: candidate.nativeSessionId,
         },
       });
 
-      fingerprints.add(
-        candidate
-          .fingerprint,
-      );
+      fingerprints.add(candidate.fingerprint);
 
-      added +=
-        1;
+      added += 1;
     }
   }
 
-  if (
-    added >
-    0
-  ) {
-    await store.save(
-      project.id,
-      engine.exportProject(
-        project.id,
-      ),
-    );
+  if (added > 0) {
+    await store.save(project.id, engine.exportProject(project.id));
   }
 
   return {
-    batches:
-      batches.length,
+    batches: batches.length,
 
     candidates,
 
@@ -453,11 +214,6 @@ export async function reconcileSessionMemoryJournal(
 
     duplicates,
 
-    memories:
-      engine
-        .exportProject(
-          project.id,
-        )
-        .length,
+    memories: engine.exportProject(project.id).length,
   };
 }

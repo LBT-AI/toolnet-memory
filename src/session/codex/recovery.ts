@@ -1,56 +1,28 @@
-import type {
-  ProjectManifest,
-} from "../../core/types.js";
+import type { ProjectManifest } from '../../core/types.js';
 
-import type {
-  StorageProvider,
-} from "../../storage/types.js";
+import type { StorageProvider } from '../../storage/types.js';
 
-import {
-  inspectCodexRollout,
-  listCodexRollouts,
-  pathBelongsToProject,
-} from "./discovery.js";
+import { inspectCodexRollout, listCodexRollouts, pathBelongsToProject } from './discovery.js';
 
-import {
-  syncCodexSession,
-} from "./adapter.js";
+import { syncCodexSession } from './adapter.js';
 
 export async function recoverCodexProject(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  storage:
-    StorageProvider,
+  storage: StorageProvider,
 
-  limit =
-    100,
+  limit = 100
 ) {
-  const results =
-    [];
+  const results = [];
 
-  for (
-    const rolloutPath
-    of listCodexRollouts()
-  ) {
-    const meta =
-      inspectCodexRollout(
-        rolloutPath,
-      );
+  for (const rolloutPath of listCodexRollouts()) {
+    const meta = inspectCodexRollout(rolloutPath);
 
-    if (
-      !meta.threadId ||
-      !meta.cwd
-    ) {
+    if (!meta.threadId || !meta.cwd) {
       continue;
     }
 
-    if (
-      !pathBelongsToProject(
-        project.rootPath,
-        meta.cwd,
-      )
-    ) {
+    if (!pathBelongsToProject(project.rootPath, meta.cwd)) {
       continue;
     }
 
@@ -59,20 +31,15 @@ export async function recoverCodexProject(
         project,
         storage,
 
-        threadId:
-          meta.threadId,
+        threadId: meta.threadId,
 
         rolloutPath,
 
-        cwd:
-          meta.cwd,
-      }),
+        cwd: meta.cwd,
+      })
     );
 
-    if (
-      results.length >=
-      limit
-    ) {
+    if (results.length >= limit) {
       break;
     }
   }

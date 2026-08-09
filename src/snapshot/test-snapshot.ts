@@ -1,82 +1,49 @@
-import "dotenv/config";
+import 'dotenv/config';
 
-import {
-  loadConfig,
-  ProjectManager,
-} from "../core/index.js";
+import { loadConfig, ProjectManager } from '../core/index.js';
 
-import {
-  createStorageProvider,
-  ProjectScopedStorageProvider,
-} from "../storage/index.js";
+import { createStorageProvider, ProjectScopedStorageProvider } from '../storage/index.js';
 
-import {
-  SnapshotManager,
-} from "./manager.js";
+import { SnapshotManager } from './manager.js';
 
 async function main() {
-  const config =
-    loadConfig();
+  const config = loadConfig();
 
-  const project =
-    new ProjectManager()
-      .detect();
+  const project = new ProjectManager().detect();
 
-  const rawStorage =
-    createStorageProvider({
-      provider:
-        config.storage.provider,
+  const rawStorage = createStorageProvider({
+    provider: config.storage.provider,
 
-      huggingface:
-        config.storage.huggingface,
+    huggingface: config.storage.huggingface,
 
-      localRoot:
-        config.storage.localRoot,
-    });
+    localRoot: config.storage.localRoot,
+  });
 
-  const storage =
-    new ProjectScopedStorageProvider(
-      rawStorage,
-      project.id,
-      project.name,
-      project.remote ?? project.name,
-    );
+  const storage = new ProjectScopedStorageProvider(
+    rawStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
 
+  const manager = new SnapshotManager(storage);
 
-  const manager =
-    new SnapshotManager(
-      storage,
-    );
+  const created = await manager.create(project.id, 'manual-test');
 
-  const created =
-    await manager.create(
-      project.id,
-      "manual-test",
-    );
-
-  const list =
-    await manager.list(
-      project.id,
-    );
+  const list = await manager.list(project.id);
 
   console.log({
-    ok:
-      Boolean(created),
+    ok: Boolean(created),
 
-    created:
-      created?.id,
+    created: created?.id,
 
-    snapshots:
-      list.length,
+    snapshots: list.length,
 
-    latest:
-      list[0]?.id,
+    latest: list[0]?.id,
   });
 }
 
-main().catch(
-  (error) => {
-    console.error(error);
-    process.exit(1);
-  },
-);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

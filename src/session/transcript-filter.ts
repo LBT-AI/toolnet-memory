@@ -18,7 +18,7 @@ const NOISE_PATTERNS = [
   /^<EPHEMERAL MESSAGE>/i,
   /^<system>/i,
   /^<ephemeral>/i,
-  
+
   // Tool execution noise
   /^ManageTask:/i,
   /^Task \d+ status:/i,
@@ -28,7 +28,7 @@ const NOISE_PATTERNS = [
   /^Prioritizing Tool Usage/i,
   /^Tool call:/i,
   /^Tool response:/i,
-  
+
   // Build/npm noise
   /^npm notice/i,
   /^npm WARN/i,
@@ -37,17 +37,17 @@ const NOISE_PATTERNS = [
   /^up to date/i,
   /^\d+ packages are looking for funding/i,
   /^run `npm fund` for details/i,
-  
+
   // Progress indicators
   /^[\d.]+%/,
   /^\[={10,}\]/,
   /^Loading\.\.\./i,
   /^Processing\.\.\./i,
-  
+
   // Raw bash output
   /^bash-\d+\.\d+\$/,
   /^\$ /,
-  
+
   // Empty or whitespace only
   /^\s*$/,
 ];
@@ -100,7 +100,7 @@ const DURABLE_KEYWORDS = [
  */
 function hasDurableFacts(line: string): boolean {
   const lower = line.toLowerCase();
-  return DURABLE_KEYWORDS.some(keyword => lower.includes(keyword));
+  return DURABLE_KEYWORDS.some((keyword) => lower.includes(keyword));
 }
 
 /**
@@ -111,19 +111,19 @@ function isNoise(line: string): boolean {
   if (!line.trim()) {
     return true;
   }
-  
+
   // Check noise patterns
   for (const pattern of NOISE_PATTERNS) {
     if (pattern.test(line)) {
       return true;
     }
   }
-  
+
   // Keep lines with durable facts even if they match some patterns
   if (hasDurableFacts(line)) {
     return false;
   }
-  
+
   // Filter repeated command output (more than 5 identical lines)
   return false;
 }
@@ -133,7 +133,7 @@ function isNoise(line: string): boolean {
  */
 function redactSensitive(text: string): string {
   let result = text;
-  
+
   for (const pattern of SENSITIVE_PATTERNS) {
     result = result.replace(pattern, (match) => {
       const parts = match.split(/[:\s=]+/);
@@ -143,7 +143,7 @@ function redactSensitive(text: string): string {
       return '[REDACTED]';
     });
   }
-  
+
   return result;
 }
 
@@ -152,7 +152,7 @@ function redactSensitive(text: string): string {
  */
 export function filterLine(line: string): FilteredContent {
   const trimmed = line.trim();
-  
+
   if (!trimmed) {
     return {
       content: '',
@@ -160,7 +160,7 @@ export function filterLine(line: string): FilteredContent {
       reason: 'empty',
     };
   }
-  
+
   if (isNoise(trimmed)) {
     return {
       content: '',
@@ -168,9 +168,9 @@ export function filterLine(line: string): FilteredContent {
       reason: 'noise',
     };
   }
-  
+
   const redacted = redactSensitive(trimmed);
-  
+
   return {
     content: redacted,
     filtered: false,
@@ -184,27 +184,27 @@ export function filterTranscript(text: string): string {
   const lines = text.split('\n');
   const filtered: string[] = [];
   const lineCount = new Map<string, number>();
-  
+
   for (const line of lines) {
     const result = filterLine(line);
-    
+
     if (result.filtered) {
       continue;
     }
-    
+
     // Detect repeated lines (spam)
     const normalized = result.content.toLowerCase().trim();
     const count = lineCount.get(normalized) || 0;
-    
+
     if (count >= 5) {
       // Skip repeated spam
       continue;
     }
-    
+
     lineCount.set(normalized, count + 1);
     filtered.push(result.content);
   }
-  
+
   return filtered.join('\n');
 }
 
@@ -213,7 +213,7 @@ export function filterTranscript(text: string): string {
  */
 export function filterEventData(data: Record<string, unknown>): Record<string, unknown> {
   const filtered: Record<string, unknown> = {};
-  
+
   for (const [key, value] of Object.entries(data)) {
     if (typeof value === 'string') {
       const result = filterLine(value);
@@ -223,21 +223,23 @@ export function filterEventData(data: Record<string, unknown>): Record<string, u
     } else if (value && typeof value === 'object' && !Array.isArray(value)) {
       filtered[key] = filterEventData(value as Record<string, unknown>);
     } else if (Array.isArray(value)) {
-      filtered[key] = value.map(item => {
-        if (typeof item === 'string') {
-          const result = filterLine(item);
-          return result.filtered ? null : result.content;
-        }
-        if (item && typeof item === 'object') {
-          return filterEventData(item as Record<string, unknown>);
-        }
-        return item;
-      }).filter(item => item !== null);
+      filtered[key] = value
+        .map((item) => {
+          if (typeof item === 'string') {
+            const result = filterLine(item);
+            return result.filtered ? null : result.content;
+          }
+          if (item && typeof item === 'object') {
+            return filterEventData(item as Record<string, unknown>);
+          }
+          return item;
+        })
+        .filter((item) => item !== null);
     } else {
       filtered[key] = value;
     }
   }
-  
+
   return filtered;
 }
 
@@ -246,22 +248,22 @@ export function filterEventData(data: Record<string, unknown>): Record<string, u
  */
 export function shouldFilterEvent(event: Record<string, unknown>): boolean {
   const type = typeof event.type === 'string' ? event.type.toLowerCase() : '';
-  
+
   // Filter system and ephemeral events
   if (type.includes('system') || type.includes('ephemeral')) {
     return true;
   }
-  
+
   // Filter tool call events (keep only results)
   if (type === 'tool_call' && !event.result) {
     return true;
   }
-  
+
   // Check if data contains only noise
   if (event.data && typeof event.data === 'object') {
     const data = event.data as Record<string, unknown>;
     const content = typeof data.content === 'string' ? data.content : '';
-    
+
     if (content) {
       const result = filterLine(content);
       if (result.filtered) {
@@ -269,7 +271,7 @@ export function shouldFilterEvent(event: Record<string, unknown>): boolean {
       }
     }
   }
-  
+
   return false;
 }
 
@@ -279,19 +281,19 @@ export function shouldFilterEvent(event: Record<string, unknown>): boolean {
 export function extractDurableFacts(text: string): string[] {
   const lines = text.split('\n');
   const facts: string[] = [];
-  
+
   for (const line of lines) {
     const trimmed = line.trim();
-    
+
     if (!trimmed || isNoise(trimmed)) {
       continue;
     }
-    
+
     if (hasDurableFacts(trimmed)) {
       const redacted = redactSensitive(trimmed);
       facts.push(redacted);
     }
   }
-  
+
   return facts;
 }

@@ -1,204 +1,116 @@
-import type {
-  CodeSymbol,
-  GraphEdge,
-} from "../../core/types.js";
+import type { CodeSymbol, GraphEdge } from '../../core/types.js';
 
-import type {
-  CodeGraphStore,
-} from "../graph/graph-store.js";
+import type { CodeGraphStore } from '../graph/graph-store.js';
 
-import type {
-  ChangedSymbol,
-} from "./change-mapper.js";
+import type { ChangedSymbol } from './change-mapper.js';
 
-export type RiskLevel =
-  | "LOW"
-  | "MEDIUM"
-  | "HIGH"
-  | "CRITICAL";
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export interface BlastImpact {
-  symbol:
-    CodeSymbol;
+  symbol: CodeSymbol;
 
-  relation:
-    GraphEdge["type"];
+  relation: GraphEdge['type'];
 
-  depth:
-    number;
+  depth: number;
 
-  sourceSymbolId:
-    string;
+  sourceSymbolId: string;
 }
 
 export interface BlastRadiusResult {
-  risk:
-    RiskLevel;
+  risk: RiskLevel;
 
-  riskScore:
-    number;
+  riskScore: number;
 
-  changedSymbols:
-    ChangedSymbol[];
+  changedSymbols: ChangedSymbol[];
 
-  impacted:
-    BlastImpact[];
+  impacted: BlastImpact[];
 
-  impactedFiles:
-    string[];
+  impactedFiles: string[];
 
-  suggestedTests:
-    string[];
+  suggestedTests: string[];
 }
 
-const RELATION_WEIGHT:
-  Record<string, number> = {
-    CALLS: 4,
-    CALL_REFERENCE: 6,
-    USES_TYPE: 4,
-    TESTS: 2,
-    ROUTE: 4,
-    WRITES: 3,
-    IMPORTS: 3,
-    INHERITS: 5,
-    IMPLEMENTS: 5,
-    DEFINES: 1,
-  };
+const RELATION_WEIGHT: Record<string, number> = {
+  CALLS: 4,
+  CALL_REFERENCE: 6,
+  USES_TYPE: 4,
+  TESTS: 2,
+  ROUTE: 4,
+  WRITES: 3,
+  IMPORTS: 3,
+  INHERITS: 5,
+  IMPLEMENTS: 5,
+  DEFINES: 1,
+};
 
-function riskLevel(
-  score: number,
-): RiskLevel {
-  if (
-    score >= 30
-  ) {
-    return "CRITICAL";
+function riskLevel(score: number): RiskLevel {
+  if (score >= 30) {
+    return 'CRITICAL';
   }
 
-  if (
-    score >= 16
-  ) {
-    return "HIGH";
+  if (score >= 16) {
+    return 'HIGH';
   }
 
-  if (
-    score >= 6
-  ) {
-    return "MEDIUM";
+  if (score >= 6) {
+    return 'MEDIUM';
   }
 
-  return "LOW";
+  return 'LOW';
 }
 
-function isTestFile(
-  path: string,
-): boolean {
-  const value =
-    path
-      .toLowerCase()
-      .replaceAll(
-        "\\",
-        "/",
-      );
+function isTestFile(path: string): boolean {
+  const value = path.toLowerCase().replaceAll('\\', '/');
 
   return (
-    value.startsWith(
-      "tests/",
-    ) ||
-    value.includes(
-      "/tests/",
-    ) ||
-    value.includes(
-      "__tests__",
-    ) ||
-    /\.(test|spec)\.[^.]+$/
-      .test(value)
+    value.startsWith('tests/') ||
+    value.includes('/tests/') ||
+    value.includes('__tests__') ||
+    /\.(test|spec)\.[^.]+$/.test(value)
   );
 }
 
 export class BlastRadiusAnalyzer {
-  constructor(
-    private readonly graph:
-      CodeGraphStore,
-  ) {}
+  constructor(private readonly graph: CodeGraphStore) {}
 
-  analyze(
-    projectId: string,
-    changedSymbols:
-      ChangedSymbol[],
-    maxDepth = 4,
-  ): BlastRadiusResult {
-    const edges =
-      this.graph
-        .allEdges(
-          projectId,
-        );
+  analyze(projectId: string, changedSymbols: ChangedSymbol[], maxDepth = 4): BlastRadiusResult {
+    const edges = this.graph.allEdges(projectId);
 
-    const impacted =
-      new Map<
-        string,
-        BlastImpact
-      >();
+    const impacted = new Map<string, BlastImpact>();
 
-    let score =
-      0;
+    let score = 0;
 
-    for (
-      const changed
-      of changedSymbols
-    ) {
-      if (
-        changed.fileStatus ===
-        "deleted"
-      ) {
+    for (const changed of changedSymbols) {
+      if (changed.fileStatus === 'deleted') {
         score += 8;
-      } else if (
-        changed.fileStatus ===
-        "renamed"
-      ) {
+      } else if (changed.fileStatus === 'renamed') {
         score += 5;
       } else {
         score += 2;
       }
 
-      if (
-        changed.symbol.type ===
-        "interface"
-      ) {
+      if (changed.symbol.type === 'interface') {
         score += 5;
       }
 
-      if (
-        changed.symbol.type ===
-        "class"
-      ) {
+      if (changed.symbol.type === 'class') {
         score += 3;
       }
 
-      const visited =
-        new Set<string>([
-          changed.symbol.id,
-        ]);
+      const visited = new Set<string>([changed.symbol.id]);
 
       const queue = [
         {
-          id:
-            changed.symbol.id,
+          id: changed.symbol.id,
 
-          depth:
-            0,
+          depth: 0,
         },
       ];
 
-      while (
-        queue.length
-      ) {
-        const current =
-          queue.shift()!;
+      while (queue.length) {
+        const current = queue.shift()!;
 
-        if (
-          current.depth >=
-          maxDepth
-        ) {
+        if (current.depth >= maxDepth) {
           continue;
         }
 
@@ -209,154 +121,86 @@ export class BlastRadiusAnalyzer {
          * A CALLS B
          * => A có nguy cơ ảnh hưởng.
          */
-        const incoming =
-          edges.filter(
-            (edge) =>
-              edge.to ===
-                current.id &&
-              [
-                "CALLS",
-              "CALL_REFERENCE",
-              "USES_TYPE",
-              "TESTS",
-              "ROUTE",
-              "WRITES",
+        const incoming = edges.filter(
+          (edge) =>
+            edge.to === current.id &&
+            [
+              'CALLS',
+              'CALL_REFERENCE',
+              'USES_TYPE',
+              'TESTS',
+              'ROUTE',
+              'WRITES',
 
-                "IMPORTS",
-                "INHERITS",
-                "IMPLEMENTS",
-                "DEFINES",
-              ].includes(
-                edge.type,
-              ),
-          );
+              'IMPORTS',
+              'INHERITS',
+              'IMPLEMENTS',
+              'DEFINES',
+            ].includes(edge.type)
+        );
 
-        for (
-          const edge
-          of incoming
-        ) {
-          if (
-            visited.has(
-              edge.from,
-            )
-          ) {
+        for (const edge of incoming) {
+          if (visited.has(edge.from)) {
             continue;
           }
 
-          visited.add(
-            edge.from,
-          );
+          visited.add(edge.from);
 
-          const symbol =
-            this.graph.getSymbol(
-              edge.from,
-            );
+          const symbol = this.graph.getSymbol(edge.from);
 
           if (!symbol) {
             continue;
           }
 
-          const depth =
-            current.depth + 1;
+          const depth = current.depth + 1;
 
-          const key =
-            `${changed.symbol.id}:${symbol.id}`;
+          const key = `${changed.symbol.id}:${symbol.id}`;
 
-          impacted.set(
-            key,
-            {
-              symbol,
-              relation:
-                edge.type,
-              depth,
-              sourceSymbolId:
-                changed.symbol.id,
-            },
-          );
+          impacted.set(key, {
+            symbol,
+            relation: edge.type,
+            depth,
+            sourceSymbolId: changed.symbol.id,
+          });
 
-          const relationWeight =
-            RELATION_WEIGHT[
-              edge.type
-            ] ?? 1;
+          const relationWeight = RELATION_WEIGHT[edge.type] ?? 1;
 
-          score +=
-            Math.max(
-              1,
-              relationWeight -
-                (depth - 1),
-            );
+          score += Math.max(1, relationWeight - (depth - 1));
 
           queue.push({
-            id:
-              symbol.id,
+            id: symbol.id,
             depth,
           });
         }
       }
     }
 
-    const impactedList =
-      [...impacted.values()]
-        .sort(
-          (a, b) =>
-            a.depth -
-            b.depth,
-        );
+    const impactedList = [...impacted.values()].sort((a, b) => a.depth - b.depth);
 
-    const impactedFiles =
-      [
-        ...new Set(
-          impactedList.map(
-            (item) =>
-              item.symbol
-                .filePath,
-          ),
-        ),
-      ];
+    const impactedFiles = [...new Set(impactedList.map((item) => item.symbol.filePath))];
 
     /*
      * Nếu graph đã index tests,
      * ưu tiên đề nghị đúng test liên quan.
      */
-    const suggestedTests =
-      impactedFiles.filter(
-        isTestFile,
-      );
+    const suggestedTests = impactedFiles.filter(isTestFile);
 
     /*
      * Nếu không tìm thấy test trực tiếp,
      * trả file production cần verify.
      */
-    if (
-      suggestedTests.length ===
-      0
-    ) {
-      suggestedTests.push(
-        ...impactedFiles
-          .filter(
-            (file) =>
-              !isTestFile(
-                file,
-              ),
-          )
-          .slice(
-            0,
-            10,
-          ),
-      );
+    if (suggestedTests.length === 0) {
+      suggestedTests.push(...impactedFiles.filter((file) => !isTestFile(file)).slice(0, 10));
     }
 
     return {
-      risk:
-        riskLevel(score),
+      risk: riskLevel(score),
 
-      riskScore:
-        score,
+      riskScore: score,
 
       changedSymbols,
 
-      impacted:
-        impactedList,
+      impacted: impactedList,
 
       impactedFiles,
 

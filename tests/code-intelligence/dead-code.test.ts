@@ -1,144 +1,83 @@
-import {
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import {
-  CodeGraphStore,
-  DeadCodeAnalyzer,
-} from "../../src/code-intelligence/index.js";
+import { CodeGraphStore, DeadCodeAnalyzer } from '../../src/code-intelligence/index.js';
 
-describe(
-  "Dead Code Analyzer",
-  () => {
-    it(
-      "finds unused implementation but excludes used symbols",
-      () => {
-        const graph =
-          new CodeGraphStore();
+describe('Dead Code Analyzer', () => {
+  it('finds unused implementation but excludes used symbols', () => {
+    const graph = new CodeGraphStore();
 
-        const projectId =
-          "test";
+    const projectId = 'test';
 
-        graph.addSymbol({
-          id:
-            "used",
+    graph.addSymbol({
+      id: 'used',
 
-          projectId,
+      projectId,
 
-          name:
-            "used",
+      name: 'used',
 
-          qualifiedName:
-            "used",
+      qualifiedName: 'used',
 
-          type:
-            "function",
+      type: 'function',
 
-          filePath:
-            "src/service.ts",
+      filePath: 'src/service.ts',
 
-          startLine:
-            1,
+      startLine: 1,
 
-          endLine:
-            5,
-        });
+      endLine: 5,
+    });
 
-        graph.addSymbol({
-          id:
-            "unused",
+    graph.addSymbol({
+      id: 'unused',
 
-          projectId,
+      projectId,
 
-          name:
-            "unused",
+      name: 'unused',
 
-          qualifiedName:
-            "unused",
+      qualifiedName: 'unused',
 
-          type:
-            "function",
+      type: 'function',
 
-          filePath:
-            "src/service.ts",
+      filePath: 'src/service.ts',
 
-          startLine:
-            10,
+      startLine: 10,
 
-          endLine:
-            15,
-        });
+      endLine: 15,
+    });
 
-        graph.addSymbol({
-          id:
-            "caller",
+    graph.addSymbol({
+      id: 'caller',
 
-          projectId,
+      projectId,
 
-          name:
-            "caller",
+      name: 'caller',
 
-          qualifiedName:
-            "caller",
+      qualifiedName: 'caller',
 
-          type:
-            "function",
+      type: 'function',
 
-          filePath:
-            "src/caller.ts",
+      filePath: 'src/caller.ts',
 
-          startLine:
-            1,
+      startLine: 1,
 
-          endLine:
-            5,
-        });
+      endLine: 5,
+    });
 
-        graph.addEdge({
-          id:
-            "call-used",
+    graph.addEdge({
+      id: 'call-used',
 
-          projectId,
+      projectId,
 
-          from:
-            "caller",
+      from: 'caller',
 
-          to:
-            "used",
+      to: 'used',
 
-          type:
-            "CALL_REFERENCE",
-        });
+      type: 'CALL_REFERENCE',
+    });
 
-        const result =
-          new DeadCodeAnalyzer(
-            graph,
-          ).analyze(
-            projectId,
-          );
+    const result = new DeadCodeAnalyzer(graph).analyze(projectId);
 
-        expect(
-          result.some(
-            (item) =>
-              item.symbolId ===
-              "unused",
-          ),
-        ).toBe(
-          true,
-        );
+    expect(result.some((item) => item.symbolId === 'unused')).toBe(true);
 
-        expect(
-          result.some(
-            (item) =>
-              item.symbolId ===
-              "used",
-          ),
-        ).toBe(
-          false,
-        );
-      },
-    );
-  },
-);
+    expect(result.some((item) => item.symbolId === 'used')).toBe(false);
+  });
+});

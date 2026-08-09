@@ -1,479 +1,252 @@
-import {
-  readFile,
-} from "node:fs/promises";
+import { readFile } from 'node:fs/promises';
 
-import {
-  join,
-} from "node:path";
+import { join } from 'node:path';
 
-import {
-  createHash,
-} from "node:crypto";
+import { createHash } from 'node:crypto';
 
-import * as ts from "typescript";
+import * as ts from 'typescript';
 
-import type {
-  CodeSymbol,
-} from "../../core/types.js";
+import type { CodeSymbol } from '../../core/types.js';
 
-import type {
-  ParsedFile,
-} from "../types.js";
+import type { ParsedFile } from '../types.js';
 
-function makeId(
-  projectId: string,
-  value: string,
-): string {
-  return createHash("sha256")
-    .update(
-      `${projectId}:${value}`,
-    )
-    .digest("hex")
-    .slice(0, 24);
+function makeId(projectId: string, value: string): string {
+  return createHash('sha256').update(`${projectId}:${value}`).digest('hex').slice(0, 24);
 }
 
-function lineOf(
-  source: ts.SourceFile,
-  node: ts.Node,
-): number {
-  return source
-    .getLineAndCharacterOfPosition(
-      node.getStart(source),
-    ).line + 1;
+function lineOf(source: ts.SourceFile, node: ts.Node): number {
+  return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
 }
 
 export async function parseTypeScriptFile(
   projectId: string,
   rootPath: string,
-  filePath: string,
+  filePath: string
 ): Promise<ParsedFile> {
-  const absolute =
-    join(
-      rootPath,
-      filePath,
-    );
+  const absolute = join(rootPath, filePath);
 
-  const text =
-    await readFile(
-      absolute,
-      "utf8",
-    );
+  const text = await readFile(absolute, 'utf8');
 
-  const source =
-    ts.createSourceFile(
-      filePath,
-      text,
-      ts.ScriptTarget.Latest,
-      true,
-      filePath.endsWith(".tsx") ||
-      filePath.endsWith(".jsx")
-        ? ts.ScriptKind.TSX
-        : ts.ScriptKind.TS,
-    );
+  const source = ts.createSourceFile(
+    filePath,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    filePath.endsWith('.tsx') || filePath.endsWith('.jsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
 
-  const symbols:
-    CodeSymbol[] = [];
+  const symbols: CodeSymbol[] = [];
 
-  const imports:
-    ParsedFile["imports"] = [];
+  const imports: ParsedFile['imports'] = [];
 
-  const calls:
-    ParsedFile["calls"] = [];
+  const calls: ParsedFile['calls'] = [];
 
-  const heritage:
-    ParsedFile["heritage"] = [];
+  const heritage: ParsedFile['heritage'] = [];
 
-  const fileSymbol:
-    CodeSymbol = {
-      id:
-        makeId(
-          projectId,
-          `file:${filePath}`,
-        ),
+  const fileSymbol: CodeSymbol = {
+    id: makeId(projectId, `file:${filePath}`),
 
-      projectId,
+    projectId,
 
-      name:
-        filePath,
+    name: filePath,
 
-      qualifiedName:
-        filePath,
+    qualifiedName: filePath,
 
-      type:
-        "file",
+    type: 'file',
 
-      filePath,
+    filePath,
 
-      startLine: 1,
+    startLine: 1,
 
-      endLine:
-        source
-          .getLineAndCharacterOfPosition(
-            source.end,
-          ).line + 1,
-    };
+    endLine: source.getLineAndCharacterOfPosition(source.end).line + 1,
+  };
 
   symbols.push(fileSymbol);
 
-  const callableStack:
-    string[] = [];
+  const callableStack: string[] = [];
 
-  const classStack:
-    {
-      id: string;
-      name: string;
-    }[] = [];
+  const classStack: {
+    id: string;
+    name: string;
+  }[] = [];
 
   function addSymbol(
     node: ts.Node,
     name: string,
-    type: CodeSymbol["type"],
-    qualifiedName?: string,
+    type: CodeSymbol['type'],
+    qualifiedName?: string
   ): string {
-    const symbolId =
-      makeId(
-        projectId,
-        `${filePath}:${type}:${qualifiedName ?? name}:${node.pos}`,
-      );
+    const symbolId = makeId(projectId, `${filePath}:${type}:${qualifiedName ?? name}:${node.pos}`);
 
     symbols.push({
-      id:
-        symbolId,
+      id: symbolId,
 
       projectId,
 
       name,
 
-      qualifiedName:
-        qualifiedName ??
-        name,
+      qualifiedName: qualifiedName ?? name,
 
       type,
 
       filePath,
 
-      startLine:
-        lineOf(
-          source,
-          node,
-        ),
+      startLine: lineOf(source, node),
 
-      endLine:
-        source
-          .getLineAndCharacterOfPosition(
-            node.end,
-          ).line + 1,
+      endLine: source.getLineAndCharacterOfPosition(node.end).line + 1,
     });
 
     return symbolId;
   }
 
-  function parseImport(
-    node:
-      ts.ImportDeclaration,
-  ) {
-    if (
-      !ts.isStringLiteral(
-        node.moduleSpecifier,
-      )
-    ) {
+  function parseImport(node: ts.ImportDeclaration) {
+    if (!ts.isStringLiteral(node.moduleSpecifier)) {
       return;
     }
 
-    const bindings:
-      ParsedFile["imports"][number]["bindings"] =
-      [];
+    const bindings: ParsedFile['imports'][number]['bindings'] = [];
 
-    const clause =
-      node.importClause;
+    const clause = node.importClause;
 
     if (clause?.name) {
       bindings.push({
-        localName:
-          clause.name.text,
+        localName: clause.name.text,
 
-        importedName:
-          "default",
+        importedName: 'default',
 
-        kind:
-          "default",
+        kind: 'default',
       });
     }
 
-    if (
-      clause?.namedBindings &&
-      ts.isNamedImports(
-        clause.namedBindings,
-      )
-    ) {
-      for (
-        const element
-        of clause.namedBindings.elements
-      ) {
+    if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+      for (const element of clause.namedBindings.elements) {
         bindings.push({
-          localName:
-            element.name.text,
+          localName: element.name.text,
 
-          importedName:
-            element.propertyName
-              ?.text ??
-            element.name.text,
+          importedName: element.propertyName?.text ?? element.name.text,
 
-          kind:
-            "named",
+          kind: 'named',
         });
       }
     }
 
-    if (
-      clause?.namedBindings &&
-      ts.isNamespaceImport(
-        clause.namedBindings,
-      )
-    ) {
+    if (clause?.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
       bindings.push({
-        localName:
-          clause.namedBindings
-            .name.text,
+        localName: clause.namedBindings.name.text,
 
-        importedName:
-          "*",
+        importedName: '*',
 
-        kind:
-          "namespace",
+        kind: 'namespace',
       });
     }
 
     imports.push({
-      source:
-        node.moduleSpecifier.text,
+      source: node.moduleSpecifier.text,
 
       bindings,
     });
   }
 
-  function addHeritage(
-    node:
-      ts.ClassDeclaration,
-    classId: string,
-  ) {
-    for (
-      const clause
-      of node.heritageClauses ?? []
-    ) {
-      for (
-        const type
-        of clause.types
-      ) {
-        const targetName =
-          type.expression
-            .getText(source)
-            .split(".")
-            .at(-1) ?? "";
+  function addHeritage(node: ts.ClassDeclaration, classId: string) {
+    for (const clause of node.heritageClauses ?? []) {
+      for (const type of clause.types) {
+        const targetName = type.expression.getText(source).split('.').at(-1) ?? '';
 
         if (!targetName) {
           continue;
         }
 
         heritage.push({
-          fromId:
-            classId,
+          fromId: classId,
 
           targetName,
 
-          type:
-            clause.token ===
-              ts.SyntaxKind.ExtendsKeyword
-              ? "INHERITS"
-              : "IMPLEMENTS",
+          type: clause.token === ts.SyntaxKind.ExtendsKeyword ? 'INHERITS' : 'IMPLEMENTS',
         });
       }
     }
   }
 
-  function visit(
-    node: ts.Node,
-  ): void {
-    let pushedCallable =
-      false;
+  function visit(node: ts.Node): void {
+    let pushedCallable = false;
 
-    let pushedClass =
-      false;
+    let pushedClass = false;
 
-    if (
-      ts.isImportDeclaration(
-        node,
-      )
-    ) {
+    if (ts.isImportDeclaration(node)) {
       parseImport(node);
     }
 
-    if (
-      ts.isInterfaceDeclaration(
-        node,
-      )
-    ) {
-      addSymbol(
-        node,
-        node.name.text,
-        "interface",
-        node.name.text,
-      );
+    if (ts.isInterfaceDeclaration(node)) {
+      addSymbol(node, node.name.text, 'interface', node.name.text);
     }
 
-    if (
-      ts.isClassDeclaration(
-        node,
-      ) &&
-      node.name
-    ) {
-      const classId =
-        addSymbol(
-          node,
-          node.name.text,
-          "class",
-          node.name.text,
-        );
+    if (ts.isClassDeclaration(node) && node.name) {
+      const classId = addSymbol(node, node.name.text, 'class', node.name.text);
 
-      addHeritage(
-        node,
-        classId,
-      );
+      addHeritage(node, classId);
 
       classStack.push({
-        id:
-          classId,
+        id: classId,
 
-        name:
-          node.name.text,
+        name: node.name.text,
       });
 
-      pushedClass =
-        true;
+      pushedClass = true;
     }
 
-    if (
-      ts.isFunctionDeclaration(
-        node,
-      ) &&
-      node.name
-    ) {
-      const symbolId =
-        addSymbol(
-          node,
-          node.name.text,
-          "function",
-          node.name.text,
-        );
+    if (ts.isFunctionDeclaration(node) && node.name) {
+      const symbolId = addSymbol(node, node.name.text, 'function', node.name.text);
 
-      callableStack.push(
-        symbolId,
-      );
+      callableStack.push(symbolId);
 
-      pushedCallable =
-        true;
+      pushedCallable = true;
     }
 
-    if (
-      ts.isMethodDeclaration(
-        node,
-      ) &&
-      node.name
-    ) {
-      const name =
-        node.name.getText(
-          source,
-        );
+    if (ts.isMethodDeclaration(node) && node.name) {
+      const name = node.name.getText(source);
 
-      const owner =
-        classStack.at(-1)
-          ?.name;
+      const owner = classStack.at(-1)?.name;
 
-      const symbolId =
-        addSymbol(
-          node,
-          name,
-          "method",
-          owner
-            ? `${owner}.${name}`
-            : name,
-        );
+      const symbolId = addSymbol(node, name, 'method', owner ? `${owner}.${name}` : name);
 
-      callableStack.push(
-        symbolId,
-      );
+      callableStack.push(symbolId);
 
-      pushedCallable =
-        true;
+      pushedCallable = true;
     }
 
-    if (
-      ts.isCallExpression(
-        node,
-      )
-    ) {
-      if (
-        ts.isIdentifier(
-          node.expression,
-        )
-      ) {
+    if (ts.isCallExpression(node)) {
+      if (ts.isIdentifier(node.expression)) {
         calls.push({
-          callerId:
-            callableStack.at(-1),
+          callerId: callableStack.at(-1),
 
-          calleeName:
-            node.expression.text,
+          calleeName: node.expression.text,
 
-          line:
-            lineOf(
-              source,
-              node,
-            ),
+          line: lineOf(source, node),
         });
       }
 
-      if (
-        ts.isPropertyAccessExpression(
-          node.expression,
-        )
-      ) {
-        const expression =
-          node.expression;
+      if (ts.isPropertyAccessExpression(node.expression)) {
+        const expression = node.expression;
 
         calls.push({
-          callerId:
-            callableStack.at(-1),
+          callerId: callableStack.at(-1),
 
-          qualifier:
-            expression.expression
-              .getText(source),
+          qualifier: expression.expression.getText(source),
 
-          calleeName:
-            expression.name.text,
+          calleeName: expression.name.text,
 
-          line:
-            lineOf(
-              source,
-              node,
-            ),
+          line: lineOf(source, node),
         });
       }
     }
 
-    ts.forEachChild(
-      node,
-      visit,
-    );
+    ts.forEachChild(node, visit);
 
-    if (
-      pushedCallable
-    ) {
+    if (pushedCallable) {
       callableStack.pop();
     }
 
-    if (
-      pushedClass
-    ) {
+    if (pushedClass) {
       classStack.pop();
     }
   }

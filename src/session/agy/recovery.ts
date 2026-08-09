@@ -1,47 +1,21 @@
-import {
-  existsSync,
-} from "node:fs";
+import { existsSync } from 'node:fs';
 
-import {
-  homedir,
-} from "node:os";
+import { homedir } from 'node:os';
 
-import {
-  join,
-  resolve,
-} from "node:path";
+import { join, resolve } from 'node:path';
 
-import {
-  DatabaseSync,
-} from "node:sqlite";
+import { DatabaseSync } from 'node:sqlite';
 
-import type {
-  ProjectManifest,
-} from "../../core/types.js";
+import type { ProjectManifest } from '../../core/types.js';
 
-import type {
-  StorageProvider,
-} from "../../storage/types.js";
+import type { StorageProvider } from '../../storage/types.js';
 
-import {
-  defaultAgyTranscript,
-  syncAgySession,
-} from "./adapter.js";
+import { defaultAgyTranscript, syncAgySession } from './adapter.js';
 
-function uriToPath(
-  value: string,
-): string {
-  if (
-    value.startsWith(
-      "file://",
-    )
-  ) {
+function uriToPath(value: string): string {
+  if (value.startsWith('file://')) {
     try {
-      return decodeURIComponent(
-        new URL(
-          value,
-        ).pathname,
-      );
+      return decodeURIComponent(new URL(value).pathname);
     } catch {
       return value;
     }
@@ -50,131 +24,64 @@ function uriToPath(
   return value;
 }
 
-function workspaceList(
-  value: unknown,
-): string[] {
-  if (
-    typeof value !==
-      "string" ||
-    !value
-  ) {
+function workspaceList(value: unknown): string[] {
+  if (typeof value !== 'string' || !value) {
     return [];
   }
 
   try {
-    const parsed =
-      JSON.parse(
-        value,
-      );
+    const parsed = JSON.parse(value);
 
-    if (
-      Array.isArray(
-        parsed,
-      )
-    ) {
-      return parsed
-        .filter(
-          item =>
-            typeof item ===
-            "string",
-        )
-        .map(
-          uriToPath,
-        );
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item) => typeof item === 'string').map(uriToPath);
     }
   } catch {
     // continue
   }
 
-  return [
-    uriToPath(
-      value,
-    ),
-  ];
+  return [uriToPath(value)];
 }
 
 function belongs(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  workspaces:
-    string[],
+  workspaces: string[]
 ): boolean {
-  const root =
-    resolve(
-      project.rootPath,
-    );
+  const root = resolve(project.rootPath);
 
-  return workspaces.some(
-    workspace => {
-      const path =
-        resolve(
-          workspace,
-        );
+  return workspaces.some((workspace) => {
+    const path = resolve(workspace);
 
-      return (
-        path === root ||
-        path.startsWith(
-          root +
-          "/",
-        ) ||
-        root.startsWith(
-          path +
-          "/",
-        )
-      );
-    },
-  );
+    return path === root || path.startsWith(root + '/') || root.startsWith(path + '/');
+  });
 }
 
 export async function recoverAgyProject(
-  project:
-    ProjectManifest,
+  project: ProjectManifest,
 
-  storage:
-    StorageProvider,
+  storage: StorageProvider,
 
-  limit =
-    10,
+  limit = 10
 ) {
   console.log(`Recovering Agy sessions for project: ${project.name}`);
   console.log(`Limit: ${limit} sessions`);
   console.log('');
   const summaryDb =
-    process.env
-      .AGY_SUMMARY_DB ??
-    join(
-      homedir(),
-      ".gemini",
-      "antigravity-cli",
-      "conversation_summaries.db",
-    );
+    process.env.AGY_SUMMARY_DB ??
+    join(homedir(), '.gemini', 'antigravity-cli', 'conversation_summaries.db');
 
-  if (
-    !existsSync(
-      summaryDb,
-    )
-  ) {
-    throw new Error(
-      `Agy summary database not found: ${summaryDb}`,
-    );
+  if (!existsSync(summaryDb)) {
+    throw new Error(`Agy summary database not found: ${summaryDb}`);
   }
 
-  const db =
-    new DatabaseSync(
-      summaryDb,
-      {
-        readOnly:
-          true,
-      },
-    );
+  const db = new DatabaseSync(summaryDb, {
+    readOnly: true,
+  });
 
-  db.exec(
-    "PRAGMA query_only = ON",
-  );
+  db.exec('PRAGMA query_only = ON');
 
-  const rows =
-    db.prepare(
+  const rows = db
+    .prepare(
       `
       SELECT
         conversation_id,
@@ -185,63 +92,33 @@ export async function recoverAgyProject(
       FROM conversation_summaries
       ORDER BY
         last_user_input_time DESC
-      `,
-    ).all() as
-      Record<
-        string,
-        unknown
-      >[];
+      `
+    )
+    .all() as Record<string, unknown>[];
 
   db.close();
 
-  const results =
-    [];
+  const results = [];
 
   let processed = 0;
   const total = Math.min(rows.length, limit);
 
-  for (
-    const row
-    of rows
-  ) {
-    const id =
-      typeof row
-        .conversation_id ===
-        "string"
-        ? row
-            .conversation_id
-        : "";
+  for (const row of rows) {
+    const id = typeof row.conversation_id === 'string' ? row.conversation_id : '';
 
-    if (
-      !id
-    ) {
+    if (!id) {
       continue;
     }
 
-    const workspaces =
-      workspaceList(
-        row.workspace_uris,
-      );
+    const workspaces = workspaceList(row.workspace_uris);
 
-    if (
-      !belongs(
-        project,
-        workspaces,
-      )
-    ) {
+    if (!belongs(project, workspaces)) {
       continue;
     }
 
-    const transcriptPath =
-      defaultAgyTranscript(
-        id,
-      );
+    const transcriptPath = defaultAgyTranscript(id);
 
-    if (
-      !existsSync(
-        transcriptPath,
-      )
-    ) {
+    if (!existsSync(transcriptPath)) {
       continue;
     }
 
@@ -252,34 +129,24 @@ export async function recoverAgyProject(
       project,
       storage,
 
-      conversationId:
-        id,
+      conversationId: id,
 
       transcriptPath,
 
-      workspacePaths:
-        workspaces,
+      workspacePaths: workspaces,
 
-      modelName:
-        typeof row
-          .agent_name ===
-          "string"
-          ? row
-              .agent_name
-          : undefined,
+      modelName: typeof row.agent_name === 'string' ? row.agent_name : undefined,
 
-      phase:
-        "recover",
+      phase: 'recover',
     });
 
-    console.log(`  ✓ Imported ${result.imported} events (${result.eventCount} total, ${result.chunkCount} chunks)`);
+    console.log(
+      `  ✓ Imported ${result.imported} events (${result.eventCount} total, ${result.chunkCount} chunks)`
+    );
 
     results.push(result);
 
-    if (
-      results.length >=
-      limit
-    ) {
+    if (results.length >= limit) {
       break;
     }
   }

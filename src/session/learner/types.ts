@@ -1,19 +1,8 @@
-import type {
-  ImportanceLevel,
-  MemoryType,
-} from "../../core/types.js";
+import type { ImportanceLevel, MemoryType } from '../../core/types.js';
 
-import type {
-  SessionAgent,
-} from "../types.js";
+import type { SessionAgent } from '../types.js';
 
-export type LearnedMemoryKind =
-  | "rule"
-  | "decision"
-  | "todo"
-  | "fix"
-  | "architecture"
-  | "context";
+export type LearnedMemoryKind = 'rule' | 'decision' | 'todo' | 'fix' | 'architecture' | 'context';
 
 export interface LearnedMemoryCandidate {
   version: 1;
@@ -22,53 +11,40 @@ export interface LearnedMemoryCandidate {
 
   projectId: string;
 
-  agent:
-    SessionAgent;
+  agent: SessionAgent;
 
-  nativeSessionId:
-    string;
+  nativeSessionId: string;
 
   sessionKey: string;
 
-  kind:
-    LearnedMemoryKind;
+  kind: LearnedMemoryKind;
 
-  type:
-    MemoryType;
+  type: MemoryType;
 
   content: string;
 
   confidence: number;
 
-  importance:
-    ImportanceLevel;
+  importance: ImportanceLevel;
 
   tags: string[];
 
   provenance: {
-    agent:
-      SessionAgent;
+    agent: SessionAgent;
 
-    nativeSessionId:
-      string;
+    nativeSessionId: string;
 
-    sessionKey:
-      string;
+    sessionKey: string;
 
-    eventIds:
-      string[];
+    eventIds: string[];
 
-    sourceEventIds:
-      string[];
+    sourceEventIds: string[];
 
-    sourcePaths:
-      string[];
+    sourcePaths: string[];
 
-    firstSequence:
-      number;
+    firstSequence: number;
 
-    lastSequence:
-      number;
+    lastSequence: number;
   };
 
   createdAt: string;
@@ -79,27 +55,21 @@ export interface LearnedMemoryBatch {
 
   projectId: string;
 
-  agent:
-    SessionAgent;
+  agent: SessionAgent;
 
-  nativeSessionId:
-    string;
+  nativeSessionId: string;
 
   sessionKey: string;
 
   createdAt: string;
 
-  firstSequence:
-    number;
+  firstSequence: number;
 
-  lastSequence:
-    number;
+  lastSequence: number;
 
-  candidateCount:
-    number;
+  candidateCount: number;
 
-  candidates:
-    LearnedMemoryCandidate[];
+  candidates: LearnedMemoryCandidate[];
 }
 
 export interface SessionLearningResult {
@@ -107,8 +77,7 @@ export interface SessionLearningResult {
 
   candidates: number;
 
-  journalWritten:
-    boolean;
+  journalWritten: boolean;
 
   nextOffset: number;
 }

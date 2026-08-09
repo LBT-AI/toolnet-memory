@@ -1,9 +1,6 @@
-import "dotenv/config";
-import { loadConfig } from "../core/index.js";
-import {
-  createStorageProvider,
-  withStorageRetry,
-} from "./index.js";
+import 'dotenv/config';
+import { loadConfig } from '../core/index.js';
+import { createStorageProvider, withStorageRetry } from './index.js';
 
 const config = loadConfig();
 
@@ -15,10 +12,10 @@ const storage = withStorageRetry(
     huggingface: config.storage.huggingface,
     localRoot: config.storage.localRoot,
   }),
-  { attempts: 3 },
+  { attempts: 3 }
 );
 
-const objects = await storage.list("");
+const objects = await storage.list('');
 
 console.log(`TOTAL: ${objects.length}\n`);
 
