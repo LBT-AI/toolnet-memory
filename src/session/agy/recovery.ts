@@ -135,8 +135,11 @@ export async function recoverAgyProject(
     StorageProvider,
 
   limit =
-    100,
+    10,
 ) {
+  console.log(`Recovering Agy sessions for project: ${project.name}`);
+  console.log(`Limit: ${limit} sessions`);
+  console.log('');
   const summaryDb =
     process.env
       .AGY_SUMMARY_DB ??
@@ -194,6 +197,9 @@ export async function recoverAgyProject(
   const results =
     [];
 
+  let processed = 0;
+  const total = Math.min(rows.length, limit);
+
   for (
     const row
     of rows
@@ -239,31 +245,36 @@ export async function recoverAgyProject(
       continue;
     }
 
-    results.push(
-      await syncAgySession({
-        project,
-        storage,
+    processed++;
+    console.log(`[${processed}/${total}] Processing conversation: ${id.slice(0, 8)}...`);
 
-        conversationId:
-          id,
+    const result = await syncAgySession({
+      project,
+      storage,
 
-        transcriptPath,
+      conversationId:
+        id,
 
-        workspacePaths:
-          workspaces,
+      transcriptPath,
 
-        modelName:
-          typeof row
-            .agent_name ===
-            "string"
-            ? row
-                .agent_name
-            : undefined,
+      workspacePaths:
+        workspaces,
 
-        phase:
-          "recover",
-      }),
-    );
+      modelName:
+        typeof row
+          .agent_name ===
+          "string"
+          ? row
+              .agent_name
+          : undefined,
+
+      phase:
+        "recover",
+    });
+
+    console.log(`  ✓ Imported ${result.imported} events (${result.eventCount} total, ${result.chunkCount} chunks)`);
+
+    results.push(result);
 
     if (
       results.length >=
@@ -272,6 +283,11 @@ export async function recoverAgyProject(
       break;
     }
   }
+
+  console.log('');
+  console.log(`✓ Recovery complete: ${results.length} sessions processed`);
+  console.log(`Total events: ${results.reduce((sum, r) => sum + r.eventCount, 0)}`);
+  console.log(`Total chunks: ${results.reduce((sum, r) => sum + r.chunkCount, 0)}`);
 
   return results;
 }

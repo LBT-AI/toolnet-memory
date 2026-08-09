@@ -19,6 +19,11 @@ import {
   readCodexRollout,
 } from "./rollout.js";
 
+import {
+  shouldFilterEvent,
+  filterEventData,
+} from "../transcript-filter.js";
+
 export interface CodexSyncOptions {
   project:
     ProjectManifest;
@@ -250,8 +255,19 @@ export async function syncCodexSession(
     });
   }
 
+  // Filter noisy events before recording
+  const filteredEvents = rollout.events.filter(event => {
+    if (shouldFilterEvent(event.data as Record<string, unknown>)) {
+      return false;
+    }
+    return true;
+  }).map(event => ({
+    ...event,
+    data: filterEventData(event.data as Record<string, unknown>),
+  }));
+
   events.push(
-    ...rollout.events,
+    ...filteredEvents,
   );
 
   /*

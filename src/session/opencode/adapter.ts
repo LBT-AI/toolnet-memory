@@ -33,6 +33,11 @@ import {
   SessionCore,
 } from "../core.js";
 
+import {
+  shouldFilterEvent,
+  filterEventData,
+} from "../transcript-filter.js";
+
 interface OpenCodeRow {
   [key: string]:
     unknown;
@@ -1261,9 +1266,23 @@ export async function syncOpenCodeSession(
         ),
     );
 
+    // Filter noisy events before recording
+    const filteredTimed = timed.filter(item => {
+      if (shouldFilterEvent(item.event.data as Record<string, unknown>)) {
+        return false;
+      }
+      return true;
+    }).map(item => ({
+      ...item,
+      event: {
+        ...item.event,
+        data: filterEventData(item.event.data as Record<string, unknown>),
+      },
+    }));
+
     const recorded =
       core.recordMany(
-        timed.map(
+        filteredTimed.map(
           item =>
             item.event,
         ),

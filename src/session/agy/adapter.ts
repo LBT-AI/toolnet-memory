@@ -27,6 +27,11 @@ import {
   readAgyTranscript,
 } from "./transcript.js";
 
+import {
+  shouldFilterEvent,
+  filterEventData,
+} from "../transcript-filter.js";
+
 export interface AgySyncOptions {
   project:
     ProjectManifest;
@@ -266,8 +271,19 @@ export async function syncAgySession(
     });
   }
 
+  // Filter noisy events before recording
+  const filteredEvents = transcript.events.filter(event => {
+    if (shouldFilterEvent(event.data as Record<string, unknown>)) {
+      return false;
+    }
+    return true;
+  }).map(event => ({
+    ...event,
+    data: filterEventData(event.data as Record<string, unknown>),
+  }));
+
   events.push(
-    ...transcript.events,
+    ...filteredEvents,
   );
 
   if (
