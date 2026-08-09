@@ -1,238 +1,155 @@
-import {
-  existsSync,
-} from "node:fs";
+#!/usr/bin/env node
+/**
+ * Context Runtime CLI
+ * Fast context operations without deep memory access
+ */
 
-import {
-  dirname,
-  join,
-  resolve,
-} from "node:path";
+import * as fs from 'fs';
+import * as path from 'path';
+import { buildFastProjectContext, syncAgentInstructionFiles, hashContext, findProjectRoot } from './fast-context.js';
+import { refreshStartupBriefCache } from './brief-cache.js';
+import { ProjectManager, loadConfig } from '../core/index.js';
+import { createStorageProvider, ProjectScopedStorageProvider, withStorageRetry } from '../storage/index.js';
 
-import {
-  loadConfig,
-  ProjectManager,
-} from "../core/index.js";
-
-import {
-  createStorageProvider,
-  ProjectScopedStorageProvider,
-  withStorageRetry,
-} from "../storage/index.js";
-
-import {
-  getStartupBriefForInjection,
-  refreshStartupBriefCache,
-} from "./brief-cache.js";
-
-function after(
-  args:
-    string[],
-
-  flag:
-    string,
-) {
-  const index =
-    args.indexOf(
-      flag,
-    );
-
-  return index >=
-    0
-    ? args[
-        index + 1
-      ]
-    : undefined;
+interface CliOptions {
+  project?: string;
+  limit?: number;
 }
 
-function existingProjectRoot(
-  start:
-    string,
-): string |
-null {
-  let current =
-    resolve(start);
+function parseArgs(): { command: string; options: CliOptions } {
+  const args = process.argv.slice(2);
+  const command = args[0] || 'print';
+  const options: CliOptions = {};
 
-  while (
-    true
-  ) {
-    if (
-      existsSync(
-        join(
-          current,
-          ".toolnet",
-          "project.json",
-        ),
-      )
-    ) {
-      return current;
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === '--project' && args[i + 1]) {
+      options.project = args[i + 1];
+      i++;
+    } else if (args[i] === '--limit' && args[i + 1]) {
+      options.limit = parseInt(args[i + 1], 10);
+      i++;
     }
-
-    const parent =
-      dirname(
-        current,
-      );
-
-    if (
-      parent ===
-      current
-    ) {
-      return null;
-    }
-
-    current =
-      parent;
   }
-}
 
-function storageFor(
-  project:
-    ReturnType<
-      ProjectManager[
-        "detect"
-      ]
-    >,
-) {
-  const config =
-    loadConfig();
-
-  const raw =
-    withStorageRetry(
-      createStorageProvider({
-        provider:
-          config.storage
-            .provider,
-
-        huggingface:
-          config.storage
-            .huggingface,
-
-        localRoot:
-          config.storage
-            .localRoot,
-      }),
-      {
-        attempts:
-          2,
-      },
-    );
-
-  return new ProjectScopedStorageProvider(
-    raw,
-    project.id,
-    project.name,
-    project.remote ??
-      project.name,
-  );
+  return { command, options };
 }
 
 async function main() {
-  const [
-    command =
-      "print",
-    ...args
-  ] =
-    process.argv.slice(
-      2,
-    );
+  const { command, options } = parseArgs();
 
-  const requested =
-    after(
-      args,
-      "--project",
-    ) ??
-    process.cwd();
-
-  const root =
-    existingProjectRoot(
-      requested,
-    );
-
-  /*
-   * Global agent integrations must silently ignore
-   * projects which are not managed by ToolNet.
-   */
-  if (
-    !root
-  ) {
-    return;
+  try {
+    switch (command) {
+      case 'print':
+        await handlePrint(options);
+        break;
+      case 'sync':
+        await handleSync(options);
+        break;
+      case 'refresh':
+        await handleRefresh(options);
+        break;
+      case 'profile-show':
+        await handleProfileShow(options);
+        break;
+      case 'profile-sync':
+        await handleProfileSync(options);
+        break;
+      default:
+        console.error(`Unknown command: ${command}`);
+        console.error('Available commands: print, sync, refresh, profile-show, profile-sync');
+        process.exit(1);
+    }
+  } catch (error) {
+    console.error('Error:', error instanceof Error ? error.message : String(error));
+    process.exit(1);
   }
-
-  const project =
-    new ProjectManager()
-      .detect(root);
-
-  const storage =
-    storageFor(
-      project,
-    );
-
-  const tokens =
-    Number(
-      after(
-        args,
-        "--tokens",
-      ) ??
-      900,
-    );
-
-  if (
-    command ===
-    "refresh"
-  ) {
-    const cache =
-      await refreshStartupBriefCache(
-        project,
-        storage,
-        Number.isFinite(tokens)
-          ? tokens
-          : 900,
-      );
-
-    console.log(
-      cache.text,
-    );
-
-    return;
-  }
-
-  const cache =
-    await getStartupBriefForInjection(
-      project,
-      storage,
-      Number.isFinite(tokens)
-        ? tokens
-        : 900,
-    );
-
-  if (
-    !cache
-  ) {
-    return;
-  }
-
-  if (
-    command ===
-      "sync"
-  ) {
-    console.log(
-      cache.digest,
-    );
-
-    return;
-  }
-
-  process.stdout.write(
-    cache.text +
-    "\n",
-  );
 }
 
-main().catch(
-  () => {
-    /*
-     * Context integration must never break an agent.
-     */
-    process.exitCode =
-      0;
-  },
-);
+async function handlePrint(options: CliOptions) {
+  const context = buildFastProjectContext({ projectPath: options.project });
+  
+  if (!context) {
+    console.error('No ToolNet project found. Run toolnet-memory init first.');
+    process.exit(1);
+  }
+
+  process.stdout.write(context);
+}
+
+async function handleSync(options: CliOptions) {
+  const context = buildFastProjectContext({ projectPath: options.project });
+  
+  if (!context) {
+    console.error('No ToolNet project found.');
+    process.exit(1);
+  }
+
+  const hash = hashContext(context);
+  console.log(`Context hash: ${hash}`);
+  console.log(`Context size: ${context.length} chars`);
+}
+
+async function handleRefresh(options: CliOptions) {
+  console.log('Refreshing deep startup brief cache...');
+  
+  const projectPath = options.project || process.cwd();
+  const projectRoot = findProjectRoot(projectPath);
+  
+  if (!projectRoot) {
+    console.error('No ToolNet project found.');
+    process.exit(1);
+  }
+
+  const project = new ProjectManager().detect(projectRoot);
+  const config = loadConfig();
+  const raw = withStorageRetry(
+    createStorageProvider({
+      provider: config.storage.provider,
+      huggingface: config.storage.huggingface,
+      localRoot: config.storage.localRoot,
+    }),
+    { attempts: 2 }
+  );
+  const storage = new ProjectScopedStorageProvider(
+    raw,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
+
+  // Use deep refresh logic
+  await refreshStartupBriefCache(project, storage);
+
+  console.log('Deep startup brief cache refreshed.');
+}
+
+async function handleProfileShow(options: CliOptions) {
+  const projectPath = options.project || process.cwd();
+  const projectRoot = findProjectRoot(projectPath);
+  
+  if (!projectRoot) {
+    console.error('No ToolNet project found.');
+    process.exit(1);
+  }
+
+  const profilePath = path.join(projectRoot, '.toolnet', 'profile.md');
+  
+  if (!fs.existsSync(profilePath)) {
+    console.error('No profile.md found in .toolnet directory.');
+    process.exit(1);
+  }
+
+  const content = fs.readFileSync(profilePath, 'utf-8');
+  process.stdout.write(content);
+}
+
+async function handleProfileSync(options: CliOptions) {
+  const created = syncAgentInstructionFiles({ projectPath: options.project });
+  
+  console.log('Created/updated:');
+  for (const file of created) {
+    console.log(`- ${file}`);
+  }
+}
+
+main();

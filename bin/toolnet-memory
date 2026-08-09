@@ -19,7 +19,7 @@ if [ "${1:-}" = "--version" ] || [ "${1:-}" = "-v" ]; then
   exit 0
 fi
 
-COMMAND="${1:-help}"
+COMMAND="${1:-context:print}"
 
 run() {
   DIST="$1"
@@ -389,6 +389,26 @@ case "$COMMAND" in
     exec "$TSX" "$ROOT/src/work-continuity/context-runtime-cli.ts" refresh "$@"
     ;;
 
+  profile:show)
+    shift
+
+    if [ -f "$ROOT/bundle/context-runtime.js" ]; then
+      exec node "$ROOT/bundle/context-runtime.js" profile-show "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/context-runtime-cli.ts" profile-show "$@"
+    ;;
+
+  profile:sync)
+    shift
+
+    if [ -f "$ROOT/bundle/context-runtime.js" ]; then
+      exec node "$ROOT/bundle/context-runtime.js" profile-sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/work-continuity/context-runtime-cli.ts" profile-sync "$@"
+    ;;
+
   session:codex-context)
     shift
 
@@ -405,9 +425,44 @@ case "$COMMAND" in
 
   help|--help|-h)
     cat <<'HELP'
-ToolNet Memory
+ToolNet Memory - Project Context & Memory System
 
-Commands:
+FAST CONTEXT (default):
+  toolnet-memory                          Print fast project context (default)
+  toolnet-memory context:print            Print fast project context
+  toolnet-memory context:sync             Show context hash/size
+  toolnet-memory profile:show             Show .toolnet/profile.md
+  toolnet-memory profile:sync             Sync profile to GEMINI.md/AGENTS.md/CLAUDE.md
+
+MANUAL DEEP RECOVERY (do not run automatically):
+  toolnet-memory context:refresh          Rebuild deep startup brief cache
+  toolnet-memory brief [--tokens N]       Show full project brief
+  toolnet-memory handoff:latest           Show latest session handoff
+  toolnet-memory session:agy-recover [--limit N]      Recover Agy sessions
+  toolnet-memory session:codex-recover [--limit N]    Recover Codex sessions
+  toolnet-memory session:opencode-recover [--limit N] Recover OpenCode sessions
+
+MEMORY OPERATIONS:
+  toolnet-memory memory:reconcile [--project PATH]
+
+PROJECT MANUAL:
+  toolnet-memory project:manual-init [--project PATH]
+  toolnet-memory project:manual-show [--project PATH]
+  toolnet-memory project:manual-sync [--project PATH]
+
+WORK CONTINUITY:
+  toolnet-memory work:status [--project PATH]
+  toolnet-memory work:json [--project PATH]
+  toolnet-memory work:reconcile [--project PATH]
+
+CODE INTELLIGENCE:
+  toolnet-memory index
+  toolnet-memory index:graph
+  toolnet-memory incremental
+  toolnet-memory semantic "query"
+  toolnet-memory impact [file]
+
+SETUP & INTEGRATION:
   toolnet-memory --version
   toolnet-memory doctor
   toolnet-memory setup
@@ -415,36 +470,26 @@ Commands:
   toolnet-memory config get KEY
   toolnet-memory config set KEY VALUE
   toolnet-memory config open
-  toolnet-memory index
-  toolnet-memory index:graph
-  toolnet-memory incremental
-  toolnet-memory semantic "query"
-  toolnet-memory impact [file]
-  toolnet-memory mcp
   toolnet-memory integrate:auto
+  toolnet-memory integrate:opencode
+  toolnet-memory integrate:agy
+  toolnet-memory integrate:codex
+  toolnet-memory mcp
+
+SNAPSHOTS:
   toolnet-memory snapshot:list
   toolnet-memory snapshot:create "reason"
   toolnet-memory snapshot:restore <id>
   toolnet-memory recover
-  toolnet-memory integrate:opencode
-  toolnet-memory integrate:agy
-  toolnet-memory integrate:codex
-  toolnet-memory session:codex-sync <thread-id>
-  toolnet-memory session:codex-recover [--limit N]
-  toolnet-memory memory:reconcile [--project PATH]
-  toolnet-memory project:manual-init [--project PATH]
-  toolnet-memory project:manual-show [--project PATH]
-  toolnet-memory project:manual-sync [--project PATH]
-  toolnet-memory work:status [--project PATH]
-  toolnet-memory work:json [--project PATH]
-  toolnet-memory work:reconcile [--project PATH]
-  toolnet-memory brief [--project PATH] [--tokens N]
-  toolnet-memory brief:json [--project PATH] [--tokens N]
-  toolnet-memory handoff:latest [--project PATH]
+
+SESSION SYNC (manual):
   toolnet-memory session:agy-sync <conversation-id> --transcript <path>
-  toolnet-memory session:agy-recover [--limit N]
+  toolnet-memory session:codex-sync <thread-id>
   toolnet-memory session:opencode-sync <session-id>
-  toolnet-memory session:opencode-recover [--limit N]
+
+IMPORTANT:
+Deep recovery commands (brief, handoff:latest, session:*-recover) are manual only.
+Do not run them automatically at startup. Use fast context commands instead.
 HELP
     ;;
 
