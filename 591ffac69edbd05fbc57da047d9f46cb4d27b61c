@@ -1,0 +1,10 @@
+{"id":"665a8218-dacf-4669-8b1e-9776b20a7f3a","ts":"2026-08-09T06:26:21.563Z","path":"/home/linux1/toolnet-memory/src/guard/rules.ts","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
+{"id":"d2d3b787-5f4c-4cf3-9093-cd31133885c3","ts":"2026-08-09T06:26:54.153Z","path":"/home/linux1/toolnet-memory/src/guard/evidence.ts","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
+{"id":"a0aa211b-6693-4bda-a6dc-55e158fc3f07","ts":"2026-08-09T06:27:29.020Z","path":"/home/linux1/toolnet-memory/src/guard/detector.ts","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
+{"id":"1d1d563a-00f0-4d39-a4e7-2580d5dacb54","ts":"2026-08-09T06:27:58.289Z","path":"/home/linux1/toolnet-memory/src/guard/cli.ts","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
+{"id":"3b11c0a8-f520-4231-a9b2-e2ea0c26ead9","ts":"2026-08-09T06:28:14.688Z","path":"/home/linux1/toolnet-memory/bin/toolnet-memory","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
+{"id":"95f9b8cf-5c24-4066-86ff-cb14873023d5","ts":"2026-08-09T06:28:22.548Z","path":"/home/linux1/toolnet-memory/bin/toolnet-memory","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
+{"id":"123c6059-b765-46e6-8099-427db031374e","ts":"2026-08-09T06:28:57.943Z","path":"/home/linux1/toolnet-memory/tests/guard/guard.test.ts","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
+{"id":"baa78192-c126-4f7c-a4da-609caef24c8d","ts":"2026-08-09T06:29:34.489Z","path":"/home/linux1/toolnet-memory/src/guard/evidence.ts","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
+{"id":"df5af6e5-ab14-4630-a98c-b6dcce4a108e","ts":"2026-08-09T06:30:18.348Z","path":"/home/linux1/toolnet-memory/tests/guard/guard.test.ts","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
+{"id":"87829c9b-49b9-4d54-9f9a-523fd4d5f395","ts":"2026-08-09T06:30:32.211Z","path":"/home/linux1/toolnet-memory/tests/guard/guard.test.ts","version":"1.0.0","taskID":"4dd4c02f-c87a-48dd-8a62-a3c085528fee"}
