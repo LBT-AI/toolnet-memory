@@ -100,45 +100,78 @@ toolnet-memory doctor
 
 ## Storage Configuration
 
-ToolNet Memory supports multiple storage backends. **Cloudflare R2 is recommended** for production use due to zero egress fees and S3 compatibility.
+ToolNet Memory supports multiple storage backends.
+**Cloudflare R2 is the default and recommended provider**, but ToolNet Memory does not require Cloudflare or Hugging Face. You can also use any supported S3-compatible backend or run fully local without any cloud storage.
 
-### Cloudflare R2 (Recommended)
+### Cloudflare R2 — default
 
-```bash
-# In ~/.config/toolnet-memory/.env
-STORAGE_PROVIDER=r2
+````bash
+# ~/.config/toolnet-memory/.env
+MEMORY_STORAGE_PROVIDER=r2
 R2_ACCOUNT_ID=your-account-id
+R2_BUCKET=toolnet-memory
 R2_ACCESS_KEY_ID=your-access-key
 R2_SECRET_ACCESS_KEY=your-secret-key
-R2_BUCKET_NAME=toolnet-memory
-```
 
-### AWS S3 / S3-Compatible
+Generic S3 / S3-compatible
 
-```bash
-STORAGE_PROVIDER=s3
+Works with AWS S3 and compatible services such as MinIO, Backblaze B2 S3, Wasabi, and similar providers.
+
+MEMORY_STORAGE_PROVIDER=s3
+# Leave empty for AWS S3.
+S3_ENDPOINT=
 S3_REGION=us-east-1
 S3_BUCKET=toolnet-memory
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-```
+S3_ACCESS_KEY_ID=your-access-key
+S3_SECRET_ACCESS_KEY=your-secret-key
+S3_FORCE_PATH_STYLE=false
 
-### Hugging Face S3 (Legacy)
+Local storage — no cloud required
 
-```bash
-STORAGE_PROVIDER=huggingface
-HF_TOKEN=hf_your_token
-HF_REPO=username/toolnet-memory
-```
+ToolNet Memory can run completely locally.
 
-### Local Storage
+MEMORY_STORAGE_PROVIDER=local
+MEMORY_LOCAL_STORAGE_PATH=/path/to/toolnet-memory-storage
+MEMORY_LOCAL_CACHE_MB=200
 
-```bash
-STORAGE_PROVIDER=local
-LOCAL_STORAGE_PATH=/path/to/storage
-```
+Local mode is useful for:
 
-See [docs/STORAGE.md](docs/STORAGE.md) for detailed setup instructions.
+* offline development,
+* private projects that must not use remote storage,
+* testing,
+* single-machine workflows.
+
+No R2, S3, or Hugging Face account is required.
+
+Hugging Face S3 — legacy compatibility
+
+Existing installations can continue using the Hugging Face S3-compatible backend.
+
+MEMORY_STORAGE_PROVIDER=huggingface
+HF_NAMESPACE=your-namespace
+HF_BUCKET=toolnet-memory
+HF_S3_ACCESS_KEY_ID=your-access-key
+HF_S3_SECRET_ACCESS_KEY=your-secret-key
+
+Hugging Face remains supported for compatibility, but new installations should normally prefer R2, generic S3, or local storage.
+
+Embedding provider
+
+The current Hugging Face embedding configuration is independent from the storage provider.
+
+For example, you can use:
+
+Cloudflare R2 storage + Hugging Face embeddings
+Local storage + Hugging Face embeddings
+Generic S3 storage + Hugging Face embeddings
+
+Embedding configuration:
+
+HF_TOKEN=
+HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+
+See docs/STORAGE.md⁠ for detailed provider setup.
+
 
 ## One-time VPS setup
 
@@ -146,7 +179,7 @@ Global configuration is stored at:
 
 ```text
 ~/.config/toolnet-memory/.env
-```
+````
 
 Run setup once on a new VPS/user account:
 
@@ -269,6 +302,66 @@ Session transcripts are filtered to remove:
 - npm install/build noise
 - Sensitive data patterns
 - Redundant context
+
+## Memory retrieval and automation
+
+ToolNet Memory exposes retrieval and automation controls through the global environment configuration.
+
+These settings are optional. The defaults are designed to work without manual tuning.
+
+Automatic memory behavior
+
+MEMORY_AUTO_CAPTURE=true
+MEMORY_AUTO_RETRIEVE=true
+MEMORY_AUTO_SUMMARIZE=true
+MEMORY_AUTO_SYNC=true
+
+- MEMORY_AUTO_CAPTURE — capture meaningful project activity.
+- MEMORY_AUTO_RETRIEVE — allow relevant memory retrieval.
+- MEMORY_AUTO_SUMMARIZE — generate compact summaries instead of persisting raw conversational noise.
+- MEMORY_AUTO_SYNC — sync eligible project state to the configured storage backend.
+
+Retrieval limits
+
+MEMORY_MAX_CANDIDATES=50
+MEMORY_RERANK_TOP=10
+MEMORY_FINAL_CONTEXT=5
+MEMORY_TOKEN_BUDGET=2000
+
+The retrieval pipeline is intentionally bounded:
+
+candidate search
+↓
+max 50 candidates
+↓
+rerank top 10
+↓
+select up to 5 final context items
+↓
+enforce token budget
+
+Remote storage can contain a large project history, but ToolNet Memory should never dump the entire history into an agent prompt.
+
+Session continuity
+
+TOOLNET_SESSION_LEARNING=1
+TOOLNET_WORK_CONTINUITY=1
+TOOLNET_SEMANTIC_CONTINUITY=1
+TOOLNET_SMART_HANDOFF=1
+
+These flags control automatic session learning, work-state continuity, semantic continuity, and compact handoff generation.
+
+Session history is filtered and selectively promoted. Raw transcript content is not intended to be injected into normal startup context.
+
+Context modes
+
+Normal agent startup uses a small local context budget.
+
+minimal → project rules + current task
+focused → minimal + a small number of relevant memories
+deep → manual recovery only
+
+Use deep recovery only when older session history is genuinely required.
 
 ## Example Workflow
 
