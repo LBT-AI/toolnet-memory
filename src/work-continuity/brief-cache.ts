@@ -10,6 +10,8 @@ import { sha256, writeJsonAtomic } from '../session/utils.js';
 
 import { buildStartupBrief } from './brief.js';
 
+import { estimateTokens, truncateByTokens } from './token-budget.js';
+
 export interface StartupBriefCache {
   version: 1;
 
@@ -59,13 +61,22 @@ export async function refreshStartupBriefCache(
 
   storage: StorageProvider,
 
-  maxTokens = 900
+  maxTokens = 800
 ): Promise<StartupBriefCache> {
   const brief = await buildStartupBrief({
     project,
     storage,
     maxTokens,
   });
+
+  // Enforce token budget with truncation
+  let text = brief.text;
+  const tokens = estimateTokens(text);
+
+  if (tokens > maxTokens) {
+    text = truncateByTokens(text, maxTokens);
+    text += '\n\n[Context trimmed by ToolNet Memory token budget]\n';
+  }
 
   const cache: StartupBriefCache = {
     version: 1,
@@ -74,11 +85,11 @@ export async function refreshStartupBriefCache(
 
     projectName: project.name,
 
-    text: brief.text,
+    text,
 
-    digest: sha256(brief.text),
+    digest: sha256(text),
 
-    estimatedTokens: brief.estimatedTokens,
+    estimatedTokens: estimateTokens(text),
 
     generatedAt: new Date().toISOString(),
   };

@@ -7,6 +7,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
+import { createMinimalContext, compactBullets } from './token-budget.js';
+
 interface FastContextOptions {
   projectPath?: string;
   maxChars?: number;
@@ -76,10 +78,9 @@ function filterSensitiveContent(content: string): string {
 
 /**
  * Build fast project context from local files only
+ * Enforces 800 token budget for minimal context
  */
 export function buildFastProjectContext(options: FastContextOptions = {}): string | null {
-  const maxChars = options.maxChars || 50000;
-
   // Find project root
   const startPath = options.projectPath || process.cwd();
   const projectRoot = findProjectRoot(startPath);
@@ -103,65 +104,24 @@ export function buildFastProjectContext(options: FastContextOptions = {}): strin
   // Read local files
   const profilePath = path.join(projectRoot, '.toolnet', 'profile.md');
   const currentPath = path.join(projectRoot, '.toolnet', 'current.md');
-  const geminiPath = path.join(projectRoot, 'GEMINI.md');
-  const agentsPath = path.join(projectRoot, 'AGENTS.md');
-  const claudePath = path.join(projectRoot, 'CLAUDE.md');
 
-  let profileContent = readFileSafe(profilePath);
-  let currentContent = readFileSafe(currentPath);
+  let profileContent = readFileSafe(profilePath) || '';
+  let currentContent = readFileSafe(currentPath) || '';
 
   // Filter sensitive content
-  if (profileContent) {
-    profileContent = filterSensitiveContent(profileContent);
-  }
-  if (currentContent) {
-    currentContent = filterSensitiveContent(currentContent);
-  }
+  profileContent = filterSensitiveContent(profileContent);
+  currentContent = filterSensitiveContent(currentContent);
 
-  // Check agent instruction files
-  const hasGemini = fs.existsSync(geminiPath);
-  const hasAgents = fs.existsSync(agentsPath);
-  const hasClaude = fs.existsSync(claudePath);
+  // Build minimal context with token budget enforcement
+  const header = `[TOOLNET PROJECT CONTEXT]\n\nProject: ${projectName}\nRoot: ${projectRoot}\n\n`;
 
-  // Build context output
-  const sections: string[] = [];
+  const minimalContext = createMinimalContext(profileContent, currentContent);
 
-  sections.push('[TOOLNET PROJECT CONTEXT]');
-  sections.push('');
-  sections.push(`Project: ${projectName}`);
-  sections.push('');
-  sections.push(`Root: ${projectRoot}`);
-  sections.push('');
+  const footer = `\nForbidden At Startup:
+- Do not run session:agy-recover, handoff:latest, or brief automatically
+- Deep memory only when user explicitly asks\n`;
 
-  if (profileContent) {
-    sections.push(`Profile: ${profilePath}`);
-    sections.push('');
-    sections.push('Mandatory Rules:');
-    sections.push(truncateContent(profileContent, Math.floor(maxChars * 0.6)));
-    sections.push('');
-  }
-
-  if (currentContent) {
-    sections.push('Current Work:');
-    sections.push(truncateContent(currentContent, Math.floor(maxChars * 0.3)));
-    sections.push('');
-  }
-
-  sections.push('Agent Instruction Files:');
-  sections.push(`- GEMINI.md: ${hasGemini ? 'yes' : 'no'}`);
-  sections.push(`- AGENTS.md: ${hasAgents ? 'yes' : 'no'}`);
-  sections.push(`- CLAUDE.md: ${hasClaude ? 'yes' : 'no'}`);
-  sections.push('');
-
-  sections.push('Forbidden At Startup:');
-  sections.push('- Do not run toolnet-memory session:agy-recover automatically.');
-  sections.push('- Do not run toolnet-memory handoff:latest automatically.');
-  sections.push('- Do not run toolnet-memory brief automatically.');
-  sections.push('- Do not scan old transcripts unless the user explicitly asks.');
-  sections.push('');
-
-  const fullContext = sections.join('\n');
-  return truncateContent(fullContext, maxChars);
+  return header + minimalContext + footer;
 }
 
 /**

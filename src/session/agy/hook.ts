@@ -229,10 +229,11 @@ async function main() {
        * End of one Agy execution:
        * publish the newest compact Startup Brief so another
        * agent/VPS can resume immediately.
+       * Use 800 token budget for minimal context.
        */
       if (phase === 'stop') {
         try {
-          await refreshStartupBriefCache(project, storage, 900);
+          await refreshStartupBriefCache(project, storage, 800);
         } catch {
           // Optional derived cache.
         }

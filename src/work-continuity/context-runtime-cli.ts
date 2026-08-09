@@ -23,12 +23,14 @@ import {
 interface CliOptions {
   project?: string;
   limit?: number;
+  mode?: 'minimal' | 'focused' | 'deep';
+  query?: string;
 }
 
 function parseArgs(): { command: string; options: CliOptions } {
   const args = process.argv.slice(2);
   const command = args[0] || 'print';
-  const options: CliOptions = {};
+  const options: CliOptions = { mode: 'minimal' };
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === '--project' && args[i + 1]) {
@@ -37,6 +39,12 @@ function parseArgs(): { command: string; options: CliOptions } {
     } else if (args[i] === '--limit' && args[i + 1]) {
       options.limit = parseInt(args[i + 1], 10);
       i++;
+    } else if (args[i] === '--focused' && args[i + 1]) {
+      options.mode = 'focused';
+      options.query = args[i + 1];
+      i++;
+    } else if (args[i] === '--deep') {
+      options.mode = 'deep';
     }
   }
 
@@ -75,14 +83,23 @@ async function main() {
 }
 
 async function handlePrint(options: CliOptions) {
-  const context = buildFastProjectContext({ projectPath: options.project });
+  const mode = options.mode || 'minimal';
 
-  if (!context) {
-    console.error('No ToolNet project found. Run toolnet-memory init first.');
+  if (mode === 'minimal') {
+    // Fast local context only (default)
+    const context = buildFastProjectContext({ projectPath: options.project });
+
+    if (!context) {
+      console.error('No ToolNet project found. Run toolnet-memory init first.');
+      process.exit(1);
+    }
+
+    process.stdout.write(context);
+  } else if (mode === 'focused' || mode === 'deep') {
+    console.error('Focused and deep modes require storage access.');
+    console.error('Use: toolnet-memory brief --deep for deep context');
     process.exit(1);
   }
-
-  process.stdout.write(context);
 }
 
 async function handleSync(options: CliOptions) {

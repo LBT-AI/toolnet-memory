@@ -4,6 +4,13 @@ memory:
   auto_summarize: true
   auto_sync: true
 
+context:
+  mode: minimal
+  startup_max_tokens: 800
+  retrieval_max_items: 3
+  retrieval_max_tokens: 1200
+  deep_max_tokens: 4000
+
 retrieval:
   max_candidates: 50
   rerank_top: 10

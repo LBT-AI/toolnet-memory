@@ -109,7 +109,7 @@ async function main() {
 
     if (idle || compacted || error) {
       try {
-        await refreshStartupBriefCache(project, storage, 900);
+await refreshStartupBriefCache(project, storage, 800);
       } catch {
         // Derived cache must never break session capture.
       }
