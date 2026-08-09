@@ -280,6 +280,39 @@ case "$COMMAND" in
     exit 1
     ;;
 
+  guard:check)
+    shift
+
+    if [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/guard/cli.ts" "$@"
+    fi
+
+    echo "Guard not available."
+    exit 1
+    ;;
+
+  guard:explain)
+    shift
+
+    if [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/guard/cli.ts" "$@"
+    fi
+
+    echo "Guard not available."
+    exit 1
+    ;;
+
+  guard:json)
+    shift
+
+    if [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/guard/cli.ts" --json "$@"
+    fi
+
+    echo "Guard not available."
+    exit 1
+    ;;
+
   project:manual-init)
     shift
 
@@ -457,8 +490,16 @@ MEMORY OPERATIONS:
   toolnet-memory memory:review [--project PATH] [--session ID]
   toolnet-memory memory:reconcile [--project PATH]
 
+GUARD (Architecture & Rule Checking):
+  toolnet-memory guard:check                    Check project rules and evidence
+  toolnet-memory guard:check --file <path>      Check if file violates rules
+  toolnet-memory guard:check --command "<cmd>"  Check if command is dangerous
+  toolnet-memory guard:explain                  Show rules and evidence
+  toolnet-memory guard:json                     Output guard result as JSON
+
 NOTE: Raw transcripts are not injected into prompts.
       Durable memory is promoted selectively based on importance scoring.
+      Guard mode: warn (default), strict, or off (TOOLNET_GUARD_MODE)
 
 PROJECT MANUAL:
   toolnet-memory project:manual-init [--project PATH]
