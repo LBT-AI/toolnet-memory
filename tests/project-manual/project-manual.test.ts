@@ -225,7 +225,7 @@ describe(
 
 ## Critical Rules
 
-- [enforce] Only edit /root/mercedes/mercedes-vns
+- [enforce] Only edit /project/src
 - [enforce] Never edit production directly.
 - [advisory] Prefer small focused files.
 `,

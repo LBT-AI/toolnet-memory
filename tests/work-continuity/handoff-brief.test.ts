@@ -234,7 +234,7 @@ describe(
 `# Mercedes
 
 ## Critical Rules
-- [enforce] Only edit source at /root/mercedes/mercedes-vns
+- [enforce] Only edit source at /project/src
 - [enforce] Never edit production directly.
 `,
         );
@@ -446,7 +446,7 @@ Phase 1 đang làm`,
 `# Mercedes Project
 
 ## Critical Rules
-- [enforce] Only edit /root/mercedes/mercedes-vns
+- [enforce] Only edit /project/src
 - [enforce] Never edit /var/www/mercedesbenz-vns.com directly.
 - [enforce] Deploy only with ./deploy-theme.sh --apply
 
