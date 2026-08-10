@@ -4,6 +4,8 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
+import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
+
 import { installAutoIntegrations } from './auto-integrate.js';
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'toolnet-memory');
@@ -367,6 +369,226 @@ async function secretQuestion(rl: readline.Interface, label: string): Promise<st
   });
 }
 
+type StorageTestResult = {
+  ok: boolean;
+  message: string;
+};
+
+function normalizeEndpoint(value: string): string {
+  return value.trim().replace(/\/+$/, '');
+}
+
+function r2Endpoint(accountId: string): string {
+  return `https://${accountId}.r2.cloudflarestorage.com`;
+}
+
+async function testS3Connection(options: {
+  endpoint?: string;
+  region: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  forcePathStyle?: boolean;
+}): Promise<StorageTestResult> {
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  timeout.unref?.();
+
+  const client = new S3Client({
+    region: options.region,
+    endpoint: options.endpoint || undefined,
+    forcePathStyle: options.forcePathStyle ?? false,
+    credentials: {
+      accessKeyId: options.accessKeyId,
+      secretAccessKey: options.secretAccessKey,
+    },
+  });
+
+  try {
+    await client.send(
+      new HeadBucketCommand({
+        Bucket: options.bucket,
+      }),
+      {
+        abortSignal: controller.signal,
+      }
+    );
+
+    return {
+      ok: true,
+      message: `Bucket "${options.bucket}" reachable`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    clearTimeout(timeout);
+    client.destroy();
+  }
+}
+
+async function testR2Storage(values: Map<string, string>): Promise<StorageTestResult> {
+  const accountId = values.get('R2_ACCOUNT_ID')?.trim() ?? '';
+
+  const bucket = values.get('R2_BUCKET')?.trim() ?? '';
+
+  const accessKeyId = values.get('R2_ACCESS_KEY_ID')?.trim() ?? '';
+
+  const secretAccessKey = values.get('R2_SECRET_ACCESS_KEY')?.trim() ?? '';
+
+  if (!accountId || !bucket || !accessKeyId || !secretAccessKey) {
+    return {
+      ok: false,
+      message: 'R2 configuration is incomplete',
+    };
+  }
+
+  return testS3Connection({
+    endpoint: r2Endpoint(accountId),
+    region: 'auto',
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+  });
+}
+
+async function testGenericS3Storage(values: Map<string, string>): Promise<StorageTestResult> {
+  const endpoint = normalizeEndpoint(values.get('S3_ENDPOINT') ?? '');
+
+  const region = values.get('S3_REGION')?.trim() || 'us-east-1';
+
+  const bucket = values.get('S3_BUCKET')?.trim() ?? '';
+
+  const accessKeyId = values.get('S3_ACCESS_KEY_ID')?.trim() ?? '';
+
+  const secretAccessKey = values.get('S3_SECRET_ACCESS_KEY')?.trim() ?? '';
+
+  if (!bucket || !accessKeyId || !secretAccessKey) {
+    return {
+      ok: false,
+      message: 'S3 configuration is incomplete',
+    };
+  }
+
+  return testS3Connection({
+    endpoint: endpoint || undefined,
+    region,
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    forcePathStyle: values.get('S3_FORCE_PATH_STYLE') === 'true',
+  });
+}
+
+async function testHuggingFaceStorage(values: Map<string, string>): Promise<StorageTestResult> {
+  const endpoint = normalizeEndpoint(values.get('HF_URL') ?? '');
+
+  const bucket = values.get('HF_BUCKET')?.trim() ?? '';
+
+  const accessKeyId = values.get('HF_S3_ACCESS_KEY_ID')?.trim() ?? '';
+
+  const secretAccessKey = values.get('HF_S3_SECRET_ACCESS_KEY')?.trim() ?? '';
+
+  if (!endpoint) {
+    return {
+      ok: false,
+      message: 'HF_URL / S3 endpoint is required for connection test',
+    };
+  }
+
+  if (!bucket || !accessKeyId || !secretAccessKey) {
+    return {
+      ok: false,
+      message: 'Hugging Face S3 configuration is incomplete',
+    };
+  }
+
+  return testS3Connection({
+    endpoint,
+    region: 'us-east-1',
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    forcePathStyle: true,
+  });
+}
+
+async function testLocalStorage(values: Map<string, string>): Promise<StorageTestResult> {
+  const storagePath =
+    values.get('MEMORY_LOCAL_STORAGE_PATH')?.trim() ||
+    path.join(os.homedir(), '.local', 'share', 'toolnet-memory');
+
+  const probe = path.join(storagePath, `.toolnet-test-${process.pid}-${Date.now()}`);
+
+  try {
+    fs.mkdirSync(storagePath, {
+      recursive: true,
+      mode: 0o700,
+    });
+
+    fs.writeFileSync(probe, 'toolnet-memory\n', {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
+
+    fs.unlinkSync(probe);
+
+    return {
+      ok: true,
+      message: `Writable: ${storagePath}`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function testStorage(
+  provider: StorageProviderName,
+  values: Map<string, string>
+): Promise<StorageTestResult> {
+  switch (provider) {
+    case 'r2':
+      return testR2Storage(values);
+
+    case 's3':
+      return testGenericS3Storage(values);
+
+    case 'huggingface':
+      return testHuggingFaceStorage(values);
+
+    case 'local':
+      return testLocalStorage(values);
+  }
+}
+
+async function showStorageTest(
+  provider: StorageProviderName,
+  values: Map<string, string>
+): Promise<StorageTestResult> {
+  console.log('');
+  console.log(`Testing ${providerLabel(provider)}...`);
+
+  const result = await testStorage(provider, values);
+
+  if (result.ok) {
+    console.log(`✓ ${result.message}`);
+  } else {
+    console.log('✗ Connection test failed');
+    console.log(`  ${result.message}`);
+  }
+
+  console.log('');
+
+  return result;
+}
+
 function printHeader(): void {
   console.log('');
   console.log('╔══════════════════════════════════════╗');
@@ -476,8 +698,16 @@ async function configureR2(rl: readline.Interface, values: Map<string, string>):
   const bucket = await rl.question(`BUCKET [${values.get('R2_BUCKET') || 'toolnet-memory'}]: `);
 
   setIfEntered(values, 'R2_ACCOUNT_ID', accountId);
+
   setIfEntered(values, 'R2_ACCESS_KEY_ID', access);
+
   setIfEntered(values, 'R2_BUCKET', bucket, 'toolnet-memory');
+
+  const finalAccountId = values.get('R2_ACCOUNT_ID')?.trim();
+
+  if (finalAccountId) {
+    console.log(`URL: ${r2Endpoint(finalAccountId)}`);
+  }
 
   const secret = await secretQuestion(
     rl,
@@ -512,13 +742,27 @@ async function configureS3(rl: readline.Interface, values: Map<string, string>):
 
   const bucket = await rl.question(`BUCKET [${values.get('S3_BUCKET') || 'toolnet-memory'}]: `);
 
+  const currentPathStyle = values.get('S3_FORCE_PATH_STYLE') === 'true';
+
+  const pathStyle = await rl.question(`FORCE PATH STYLE [${currentPathStyle ? 'Y' : 'N'}] (y/n): `);
+
   if (endpoint.trim()) {
-    values.set('S3_ENDPOINT', endpoint.trim());
+    values.set('S3_ENDPOINT', normalizeEndpoint(endpoint));
   }
 
   setIfEntered(values, 'S3_REGION', region, 'us-east-1');
+
   setIfEntered(values, 'S3_ACCESS_KEY_ID', access);
+
   setIfEntered(values, 'S3_BUCKET', bucket, 'toolnet-memory');
+
+  if (pathStyle.trim()) {
+    const value = pathStyle.trim().toLowerCase();
+
+    values.set('S3_FORCE_PATH_STYLE', value === 'y' || value === 'yes' ? 'true' : 'false');
+  } else if (!values.has('S3_FORCE_PATH_STYLE')) {
+    values.set('S3_FORCE_PATH_STYLE', 'false');
+  }
 
   const secret = await secretQuestion(
     rl,
@@ -540,6 +784,12 @@ async function configureHuggingFace(
   console.log('Hugging Face S3');
   console.log('──────────────────────────────────────');
 
+  const namespace = await rl.question(
+    values.get('HF_NAMESPACE')
+      ? `NAMESPACE [${values.get('HF_NAMESPACE')}]: `
+      : 'NAMESPACE [optional]: '
+  );
+
   const access = await rl.question(
     values.get('HF_S3_ACCESS_KEY_ID')
       ? `ACCESS KEY ID [${masked(values.get('HF_S3_ACCESS_KEY_ID'))}]: `
@@ -549,12 +799,18 @@ async function configureHuggingFace(
   const bucket = await rl.question(`BUCKET [${values.get('HF_BUCKET') || 'toolnet-memory'}]: `);
 
   const url = await rl.question(
-    values.get('HF_URL') ? `URL [${values.get('HF_URL')}]: ` : 'URL [optional]: '
+    values.get('HF_URL') ? `URL [${values.get('HF_URL')}]: ` : 'URL / S3 ENDPOINT: '
   );
 
+  setIfEntered(values, 'HF_NAMESPACE', namespace);
+
   setIfEntered(values, 'HF_S3_ACCESS_KEY_ID', access);
+
   setIfEntered(values, 'HF_BUCKET', bucket, 'toolnet-memory');
-  setIfEntered(values, 'HF_URL', url);
+
+  if (url.trim()) {
+    values.set('HF_URL', normalizeEndpoint(url));
+  }
 
   const secret = await secretQuestion(
     rl,
@@ -583,73 +839,137 @@ async function configureLocal(rl: readline.Interface, values: Map<string, string
 }
 
 async function storageWizard(rl: readline.Interface, values: Map<string, string>): Promise<void> {
-  const current = providerFrom(values);
+  const original = new Map(values);
 
-  const provider = await chooseStorageProvider(rl, current);
+  while (true) {
+    const provider = await chooseStorageProvider(rl, providerFrom(values));
 
-  if (provider === 'back') {
-    return;
-  }
-
-  const snapshot = new Map(values);
-
-  values.set('MEMORY_STORAGE_PROVIDER', provider);
-
-  if (provider === 'r2') {
-    await configureR2(rl, values);
-  } else if (provider === 's3') {
-    await configureS3(rl, values);
-  } else if (provider === 'huggingface') {
-    await configureHuggingFace(rl, values);
-  } else {
-    await configureLocal(rl, values);
-  }
-
-  const missing = requiredFor(provider).filter((key) => !values.get(key)?.trim());
-
-  if (missing.length === 0) {
-    console.log('');
-    console.log(`✓ ${providerLabel(provider)} configuration ready`);
-    console.log('');
-    return;
-  }
-
-  console.log('');
-  console.log('⚠ Missing required fields:');
-
-  for (const key of missing) {
-    console.log(`  - ${key}`);
-  }
-
-  console.log('');
-  console.log('  1. Retry');
-  console.log('  2. Save anyway');
-  console.log('  3. Cancel changes');
-  console.log('');
-
-  const action = (await rl.question('Choose [1]: ')).trim() || '1';
-
-  if (action === '3') {
-    values.clear();
-
-    for (const [key, value] of snapshot.entries()) {
-      values.set(key, value);
+    if (provider === 'back') {
+      return;
     }
 
-    console.log('');
-    console.log('Storage changes cancelled.');
-    console.log('');
-    return;
-  }
+    const providerSnapshot = new Map(values);
 
-  if (action === '1') {
-    await storageWizard(rl, values);
-    return;
-  }
+    values.set('MEMORY_STORAGE_PROVIDER', provider);
 
-  console.log('');
-  console.log('⚠ Storage saved with incomplete configuration.');
-  console.log('');
+    if (provider === 'r2') {
+      await configureR2(rl, values);
+    } else if (provider === 's3') {
+      await configureS3(rl, values);
+    } else if (provider === 'huggingface') {
+      await configureHuggingFace(rl, values);
+    } else {
+      await configureLocal(rl, values);
+    }
+
+    const missing = requiredFor(provider).filter((key) => !values.get(key)?.trim());
+
+    if (missing.length) {
+      console.log('');
+      console.log('⚠ Missing required fields:');
+
+      for (const key of missing) {
+        console.log(`  - ${key}`);
+      }
+
+      console.log('');
+      console.log('  1. Retry');
+      console.log('  2. Save anyway');
+      console.log('  3. Choose another provider');
+      console.log('  4. Cancel');
+      console.log('');
+
+      const action = (await rl.question('Choose [1]: ')).trim() || '1';
+
+      if (action === '2') {
+        saveEnv(values);
+
+        console.log('');
+        console.log('⚠ Saved with incomplete configuration');
+        console.log('');
+        return;
+      }
+
+      if (action === '3') {
+        values.clear();
+
+        for (const [key, value] of providerSnapshot) {
+          values.set(key, value);
+        }
+
+        continue;
+      }
+
+      if (action === '4') {
+        values.clear();
+
+        for (const [key, value] of original) {
+          values.set(key, value);
+        }
+
+        console.log('');
+        console.log('Storage changes cancelled.');
+        console.log('');
+        return;
+      }
+
+      continue;
+    }
+
+    const result = await showStorageTest(provider, values);
+
+    if (result.ok) {
+      saveEnv(values);
+
+      console.log(`✓ ${providerLabel(provider)} configuration saved`);
+      console.log(`  ${ENV_FILE}`);
+      console.log('');
+
+      return;
+    }
+
+    console.log('  1. Retry');
+    console.log('  2. Save anyway');
+    console.log('  3. Choose another provider');
+    console.log('  4. Cancel');
+    console.log('');
+
+    const action = (await rl.question('Choose [1]: ')).trim() || '1';
+
+    if (action === '2') {
+      saveEnv(values);
+
+      console.log('');
+      console.log('⚠ Saved even though connection test failed');
+      console.log('');
+
+      return;
+    }
+
+    if (action === '3') {
+      values.clear();
+
+      for (const [key, value] of providerSnapshot) {
+        values.set(key, value);
+      }
+
+      continue;
+    }
+
+    if (action === '4') {
+      values.clear();
+
+      for (const [key, value] of original) {
+        values.set(key, value);
+      }
+
+      console.log('');
+      console.log('Storage changes cancelled.');
+      console.log('');
+
+      return;
+    }
+  }
 }
 
 async function aiWizardPlaceholder(rl: readline.Interface): Promise<void> {
