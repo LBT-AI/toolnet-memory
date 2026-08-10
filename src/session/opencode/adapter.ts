@@ -1,5 +1,7 @@
 import { existsSync } from 'node:fs';
 
+import { execFileSync } from 'node:child_process';
+
 import { homedir } from 'node:os';
 
 import { isAbsolute, join, relative, resolve } from 'node:path';
@@ -86,9 +88,32 @@ export interface OpenCodeRecoveryOptions {
 }
 
 export function defaultOpenCodeDbPath(): string {
-  return (
-    process.env.OPENCODE_DB_PATH ?? join(homedir(), '.local', 'share', 'opencode', 'opencode.db')
-  );
+  /*
+   * Prefer OpenCode's own resolver.
+   * This respects OpenCode/XDG configuration
+   * instead of hardcoding ToolNet assumptions.
+   */
+  try {
+    const resolved = execFileSync('opencode', ['db', 'path'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 5000,
+    }).trim();
+
+    if (resolved) {
+      return resolved;
+    }
+  } catch {
+    // Continue through supported fallbacks.
+  }
+
+  if (process.env.OPENCODE_DB) {
+    return process.env.OPENCODE_DB;
+  }
+
+  const dataRoot = process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share');
+
+  return join(dataRoot, 'opencode', 'opencode.db');
 }
 
 function valueString(value: unknown): string {
@@ -476,6 +501,72 @@ function messageEvent(
   };
 }
 
+function compactToolPartData(data: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {
+    ...data,
+  };
+
+  const state =
+    data.state && typeof data.state === 'object' && !Array.isArray(data.state)
+      ? {
+          ...(data.state as Record<string, unknown>),
+        }
+      : undefined;
+
+  if (state) {
+    const output = state.output;
+
+    /*
+     * Raw command/tool output can be massive.
+     * Keep only a compact diagnostic preview.
+     */
+    if (typeof output === 'string') {
+      const normalized = output.replace(/\r\n/g, '\n');
+
+      const max = 500;
+
+      state.outputSummary =
+        normalized.length <= max
+          ? normalized
+          : `${normalized.slice(
+              0,
+              350
+            )}\n...[ToolNet truncated ${normalized.length - max} chars]...\n${normalized.slice(
+              -150
+            )}`;
+
+      delete state.output;
+    } else if (output !== undefined) {
+      state.outputSummary = '[non-text tool output omitted]';
+
+      delete state.output;
+    }
+
+    /*
+     * Tool input may also accidentally contain
+     * very large payloads. Keep structure but
+     * cap large string fields.
+     */
+    if (state.input && typeof state.input === 'object' && !Array.isArray(state.input)) {
+      const input = {
+        ...(state.input as Record<string, unknown>),
+      };
+
+      for (const [key, value] of Object.entries(input)) {
+        if (typeof value === 'string' && value.length > 1000) {
+          input[key] = `${value.slice(0, 1000)}...[ToolNet truncated]`;
+        }
+      }
+
+      state.input = input;
+    }
+
+    result.state = state;
+  }
+
+  return result;
+}
+
 function partEvent(
   dbPath: string,
 
@@ -517,7 +608,7 @@ function partEvent(
 
         messageId,
 
-        ...data,
+        ...(partType === 'tool' ? compactToolPartData(data) : data),
       },
 
       provenance: {
