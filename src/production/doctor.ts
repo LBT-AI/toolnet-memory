@@ -14,6 +14,10 @@ import {
 
 import { createEmbeddingProvider } from '../embeddings/index.js';
 
+import { loadAiConfig } from '../ai/config.js';
+
+import { createAiProvider } from '../ai/factory.js';
+
 import { SnapshotManager } from '../snapshot/index.js';
 
 import { checkProductionConfig } from './config-check.js';
@@ -27,6 +31,14 @@ type DoctorResult = {
   storage?: {
     ok: boolean;
     provider?: string;
+  } | null;
+
+  llm?: {
+    ok: boolean;
+    provider?: string;
+    model?: string;
+    latencyMs?: number;
+    error?: string;
   } | null;
 
   embedding?: {
@@ -75,6 +87,28 @@ function printHuman(result: DoctorResult): void {
       console.log(`✓ Storage${provider}`);
     } else {
       console.log('✗ Storage');
+    }
+  }
+
+  if (result.llm) {
+    if (result.llm.ok) {
+      const details: string[] = [];
+
+      if (result.llm.provider) {
+        details.push(result.llm.provider);
+      }
+
+      if (result.llm.model) {
+        details.push(result.llm.model);
+      }
+
+      if (typeof result.llm.latencyMs === 'number') {
+        details.push(`${result.llm.latencyMs} ms`);
+      }
+
+      console.log(`✓ LLM${details.length ? ` (${details.join(', ')})` : ''}`);
+    } else {
+      console.log(`✗ LLM${result.llm.error ? ` (${result.llm.error})` : ''}`);
     }
   }
 
@@ -217,6 +251,41 @@ async function main(): Promise<void> {
 
   const embeddings = createEmbeddingProvider();
 
+  const aiConfig = loadAiConfig();
+
+  let llmHealth: DoctorResult['llm'];
+
+  try {
+    const provider = createAiProvider({
+      id: aiConfig.llm.provider,
+
+      apiKey: aiConfig.llm.apiKey,
+
+      baseUrl: aiConfig.llm.baseUrl,
+
+      model: aiConfig.llm.model,
+
+      accountId: aiConfig.llm.accountId,
+    });
+
+    const result = await provider.healthCheck();
+
+    llmHealth = {
+      ok: result.ok,
+      provider: aiConfig.llm.provider,
+      model: result.model ?? aiConfig.llm.model,
+      latencyMs: result.latencyMs,
+      error: result.ok ? undefined : result.message,
+    };
+  } catch (error) {
+    llmHealth = {
+      ok: false,
+      provider: aiConfig.llm.provider,
+      model: aiConfig.llm.model,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
   const health = await new ProductionHealth(storage, embeddings).run();
 
   const memories = await new MemoryStore(storage).load(project.id);
@@ -232,9 +301,10 @@ async function main(): Promise<void> {
   const snapshots = await new SnapshotManager(storage).list(project.id);
 
   const result: DoctorResult = {
-    ok: health.ok,
+    ok: health.ok && Boolean(llmHealth?.ok),
     project: project.name,
     storage: health.storage,
+    llm: llmHealth,
     embedding: health.embedding,
     memory: memories.length,
     graphSymbols: graph?.symbols.length ?? 0,

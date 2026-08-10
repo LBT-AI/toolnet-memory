@@ -68,6 +68,21 @@ case "$COMMAND" in
     run bundle/doctor.js src/production/doctor.ts "$@"
     ;;
 
+  provider:list)
+    shift
+    run bundle/provider.js src/ai/provider-cli.ts list "$@"
+    ;;
+
+  provider:status)
+    shift
+    run bundle/provider.js src/ai/provider-cli.ts status "$@"
+    ;;
+
+  provider:test)
+    shift
+    run bundle/provider.js src/ai/provider-cli.ts test "$@"
+    ;;
+
   run)
     run bundle/runtime.js src/index.ts
     ;;
@@ -521,6 +536,9 @@ CODE INTELLIGENCE:
 SETUP & INTEGRATION:
   toolnet-memory --version
   toolnet-memory doctor
+  toolnet-memory provider:list
+  toolnet-memory provider:status
+  toolnet-memory provider:test [llm|embedding]
   toolnet-memory setup
   toolnet-memory update
   toolnet-memory config get KEY
