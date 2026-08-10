@@ -7,3 +7,4 @@ export * from './router.js';
 export * from './providers/openai-compatible.js';
 export * from './providers/gemini.js';
 export * from './providers/cloudflare.js';
+export * from './fallback.js';

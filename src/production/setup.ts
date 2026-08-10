@@ -47,6 +47,18 @@ const KNOWN_ENV_KEYS = new Set([
   'TOOLNET_LLM_API_KEY',
   'TOOLNET_LLM_BASE_URL',
   'TOOLNET_LLM_MODEL',
+  'TOOLNET_LLM_FALLBACK_1_PROVIDER',
+  'TOOLNET_LLM_FALLBACK_1_API_KEY',
+  'TOOLNET_LLM_FALLBACK_1_BASE_URL',
+  'TOOLNET_LLM_FALLBACK_1_MODEL',
+  'TOOLNET_LLM_FALLBACK_1_ACCOUNT_ID',
+  'TOOLNET_LLM_FALLBACK_2_PROVIDER',
+  'TOOLNET_LLM_FALLBACK_2_API_KEY',
+  'TOOLNET_LLM_FALLBACK_2_BASE_URL',
+  'TOOLNET_LLM_FALLBACK_2_MODEL',
+  'TOOLNET_LLM_FALLBACK_2_ACCOUNT_ID',
+  'TOOLNET_LLM_FALLBACK_COOLDOWN_MS',
+  'TOOLNET_LLM_MAX_RETRIES',
   'TOOLNET_LLM_ACCOUNT_ID',
 
   'TOOLNET_EMBEDDING_PROVIDER',
@@ -239,6 +251,23 @@ function renderEnv(values: Map<string, string>): string {
     `TOOLNET_LLM_BASE_URL=${values.get('TOOLNET_LLM_BASE_URL') ?? ''}`,
     `TOOLNET_LLM_MODEL=${values.get('TOOLNET_LLM_MODEL') ?? ''}`,
     `TOOLNET_LLM_ACCOUNT_ID=${values.get('TOOLNET_LLM_ACCOUNT_ID') ?? ''}`,
+    '',
+    '# ----------------------------------------------------------',
+    '# LLM fallback chain',
+    '# ----------------------------------------------------------',
+    `TOOLNET_LLM_FALLBACK_1_PROVIDER=${values.get('TOOLNET_LLM_FALLBACK_1_PROVIDER') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_1_API_KEY=${values.get('TOOLNET_LLM_FALLBACK_1_API_KEY') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_1_BASE_URL=${values.get('TOOLNET_LLM_FALLBACK_1_BASE_URL') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_1_MODEL=${values.get('TOOLNET_LLM_FALLBACK_1_MODEL') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_1_ACCOUNT_ID=${values.get('TOOLNET_LLM_FALLBACK_1_ACCOUNT_ID') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_2_PROVIDER=${values.get('TOOLNET_LLM_FALLBACK_2_PROVIDER') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_2_API_KEY=${values.get('TOOLNET_LLM_FALLBACK_2_API_KEY') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_2_BASE_URL=${values.get('TOOLNET_LLM_FALLBACK_2_BASE_URL') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_2_MODEL=${values.get('TOOLNET_LLM_FALLBACK_2_MODEL') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_2_ACCOUNT_ID=${values.get('TOOLNET_LLM_FALLBACK_2_ACCOUNT_ID') ?? ''}`,
+    `TOOLNET_LLM_FALLBACK_COOLDOWN_MS=${values.get('TOOLNET_LLM_FALLBACK_COOLDOWN_MS') ?? '60000'}`,
+    `TOOLNET_LLM_MAX_RETRIES=${values.get('TOOLNET_LLM_MAX_RETRIES') ?? '1'}`,
+
     '',
     '# ----------------------------------------------------------',
     '# Embedding - canonical ToolNet configuration',
@@ -1940,6 +1969,292 @@ async function copyLlmToEmbedding(
   console.log('');
 }
 
+function fallbackPrefix(slot: 1 | 2): string {
+  return `TOOLNET_LLM_FALLBACK_${slot}`;
+}
+
+function clearFallback(values: Map<string, string>, slot: 1 | 2): void {
+  const prefix = fallbackPrefix(slot);
+
+  for (const suffix of ['PROVIDER', 'API_KEY', 'BASE_URL', 'MODEL', 'ACCOUNT_ID']) {
+    values.delete(`${prefix}_${suffix}`);
+  }
+}
+
+function fallbackProviderName(values: Map<string, string>, slot: 1 | 2): string {
+  const prefix = fallbackPrefix(slot);
+
+  const provider = values.get(`${prefix}_PROVIDER`);
+
+  if (!provider) {
+    return 'not configured';
+  }
+
+  const model = values.get(`${prefix}_MODEL`);
+
+  return `${aiProviderLabel(provider)}${model ? ` / ${model}` : ''}`;
+}
+
+async function configureFallbackSlot(
+  rl: readline.Interface,
+  values: Map<string, string>,
+  slot: 1 | 2
+): Promise<void> {
+  console.log('');
+  console.log(`Fallback ${slot}`);
+
+  console.log('──────────────────────────────────────');
+
+  const selected = await chooseAiProvider(rl, undefined);
+
+  if (selected === 'back') {
+    return;
+  }
+
+  const primary = values.get('TOOLNET_LLM_PROVIDER');
+
+  if (selected === primary) {
+    console.log('');
+    console.log('⚠ Fallback cannot be the same provider as Primary.');
+    console.log('');
+    return;
+  }
+
+  const otherSlot: 1 | 2 = slot === 1 ? 2 : 1;
+
+  const otherProvider = values.get(`${fallbackPrefix(otherSlot)}_PROVIDER`);
+
+  if (selected === otherProvider) {
+    console.log('');
+    console.log('⚠ This provider is already used by the other fallback.');
+    console.log('');
+    return;
+  }
+
+  const definition = AI_WIZARD_PROVIDERS.find((item) => item.id === selected);
+
+  if (!definition) {
+    return;
+  }
+
+  const prefix = fallbackPrefix(slot);
+
+  clearFallback(values, slot);
+
+  values.set(`${prefix}_PROVIDER`, selected);
+
+  if (definition.accountIdRequired) {
+    const accountId = await rl.question('ACCOUNT ID: ');
+
+    if (accountId.trim()) {
+      values.set(`${prefix}_ACCOUNT_ID`, accountId.trim());
+    }
+  }
+
+  if (definition.apiKeyRequired || selected === 'custom') {
+    const apiKey = await secretQuestion(
+      rl,
+      definition.apiKeyRequired ? 'API KEY: ' : 'API KEY [optional]: '
+    );
+
+    if (apiKey.trim()) {
+      values.set(`${prefix}_API_KEY`, apiKey.trim());
+    }
+  }
+
+  if (selected === 'cloudflare') {
+    const accountId = values.get(`${prefix}_ACCOUNT_ID`);
+
+    if (accountId) {
+      values.set(
+        `${prefix}_BASE_URL`,
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai`
+      );
+    }
+  } else {
+    const defaultBase = definition.baseUrl ?? '';
+
+    const baseUrl = await rl.question(
+      defaultBase
+        ? `BASE URL [${defaultBase}]: `
+        : definition.baseUrlRequired
+          ? 'BASE URL: '
+          : 'BASE URL [optional]: '
+    );
+
+    const resolved = baseUrl.trim() || defaultBase;
+
+    if (resolved) {
+      values.set(`${prefix}_BASE_URL`, normalizeEndpoint(resolved));
+    }
+  }
+
+  const defaultModel = definition.suggestedModel ?? '';
+
+  const model = await rl.question(defaultModel ? `MODEL [${defaultModel}]: ` : 'MODEL: ');
+
+  const resolvedModel = model.trim() || defaultModel;
+
+  if (!resolvedModel) {
+    console.log('');
+    console.log('⚠ MODEL is required.');
+    console.log('');
+
+    clearFallback(values, slot);
+
+    return;
+  }
+
+  values.set(`${prefix}_MODEL`, resolvedModel);
+
+  saveEnv(values);
+
+  console.log('');
+  console.log(`✓ Fallback ${slot} saved`);
+
+  console.log(`  ${aiProviderLabel(selected)} / ${resolvedModel}`);
+
+  console.log('');
+}
+
+async function fallbackPolicyWizard(
+  rl: readline.Interface,
+  values: Map<string, string>
+): Promise<void> {
+  const currentCooldown = values.get('TOOLNET_LLM_FALLBACK_COOLDOWN_MS') || '60000';
+
+  const currentRetries = values.get('TOOLNET_LLM_MAX_RETRIES') || '1';
+
+  console.log('');
+  console.log('Fallback Policy');
+
+  console.log('──────────────────────────────────────');
+
+  const cooldownInput = await rl.question(`COOLDOWN MS [${currentCooldown}]: `);
+
+  if (cooldownInput.trim()) {
+    const cooldown = Number(cooldownInput.trim());
+
+    if (Number.isFinite(cooldown) && cooldown >= 0) {
+      values.set('TOOLNET_LLM_FALLBACK_COOLDOWN_MS', String(Math.floor(cooldown)));
+    } else {
+      console.log('⚠ Invalid cooldown; keeping previous value.');
+    }
+  }
+
+  const retriesInput = await rl.question(`MAX RETRIES [${currentRetries}]: `);
+
+  if (retriesInput.trim()) {
+    const retries = Number(retriesInput.trim());
+
+    if (Number.isFinite(retries) && retries >= 0 && retries <= 5) {
+      values.set('TOOLNET_LLM_MAX_RETRIES', String(Math.floor(retries)));
+    } else {
+      console.log('⚠ MAX RETRIES must be between 0 and 5.');
+    }
+  }
+
+  saveEnv(values);
+
+  console.log('');
+  console.log('✓ Fallback policy saved');
+
+  console.log('');
+}
+
+async function fallbackWizard(rl: readline.Interface, values: Map<string, string>): Promise<void> {
+  while (true) {
+    console.log('');
+    console.log('LLM Fallback');
+
+    console.log('──────────────────────────────────────');
+
+    console.log(
+      `  Primary    : ${
+        values.get('TOOLNET_LLM_PROVIDER')
+          ? `${aiProviderLabel(values.get('TOOLNET_LLM_PROVIDER'))} / ${
+              values.get('TOOLNET_LLM_MODEL') || 'model not configured'
+            }`
+          : 'not configured'
+      }`
+    );
+
+    console.log(`  Fallback 1 : ${fallbackProviderName(values, 1)}`);
+
+    console.log(`  Fallback 2 : ${fallbackProviderName(values, 2)}`);
+
+    console.log(`  Cooldown   : ${values.get('TOOLNET_LLM_FALLBACK_COOLDOWN_MS') || '60000'} ms`);
+
+    console.log(`  Retries    : ${values.get('TOOLNET_LLM_MAX_RETRIES') || '1'}`);
+
+    console.log('');
+    console.log('  1. Configure Fallback 1');
+
+    console.log('  2. Configure Fallback 2');
+
+    console.log('  3. Remove Fallback 1');
+
+    console.log('  4. Remove Fallback 2');
+
+    console.log('  5. Retry / cooldown settings');
+
+    console.log('  0. Back');
+
+    console.log('');
+
+    const choice = (await rl.question('Choose: ')).trim();
+
+    if (choice === '0') {
+      return;
+    }
+
+    if (choice === '1') {
+      await configureFallbackSlot(rl, values, 1);
+
+      continue;
+    }
+
+    if (choice === '2') {
+      await configureFallbackSlot(rl, values, 2);
+
+      continue;
+    }
+
+    if (choice === '3') {
+      clearFallback(values, 1);
+
+      saveEnv(values);
+
+      console.log('');
+      console.log('✓ Fallback 1 removed');
+      console.log('');
+
+      continue;
+    }
+
+    if (choice === '4') {
+      clearFallback(values, 2);
+
+      saveEnv(values);
+
+      console.log('');
+      console.log('✓ Fallback 2 removed');
+      console.log('');
+
+      continue;
+    }
+
+    if (choice === '5') {
+      await fallbackPolicyWizard(rl, values);
+
+      continue;
+    }
+
+    console.log('');
+    console.log('⚠ Invalid selection');
+  }
+}
+
 async function aiModelMenu(rl: readline.Interface, values: Map<string, string>): Promise<void> {
   while (true) {
     console.log('');
@@ -1979,6 +2294,8 @@ async function aiModelMenu(rl: readline.Interface, values: Map<string, string>):
 
     console.log('  3. Use LLM provider credentials for Embedding');
 
+    console.log('  4. Configure LLM Fallbacks');
+
     console.log('  0. Back');
 
     console.log('');
@@ -2003,6 +2320,12 @@ async function aiModelMenu(rl: readline.Interface, values: Map<string, string>):
 
     if (choice === '3') {
       await copyLlmToEmbedding(rl, values);
+
+      continue;
+    }
+
+    if (choice === '4') {
+      await fallbackWizard(rl, values);
 
       continue;
     }

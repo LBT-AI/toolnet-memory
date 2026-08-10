@@ -399,3 +399,60 @@ export function resolveAiProviderConfig(id = resolveAiProviderId()): AiProviderC
     accountId: legacy.accountId,
   };
 }
+
+export interface ToolNetLlmFallbackConfig {
+  slot: 1 | 2;
+  config: CanonicalModelConfig;
+}
+
+function fallbackEnv(slot: 1 | 2, suffix: string): string | undefined {
+  return env(`TOOLNET_LLM_FALLBACK_${slot}_${suffix}`);
+}
+
+export function resolveLlmFallbacks(): ToolNetLlmFallbackConfig[] {
+  const output: ToolNetLlmFallbackConfig[] = [];
+
+  for (const slot of [1, 2] as const) {
+    const provider = fallbackEnv(slot, 'PROVIDER');
+
+    if (!provider || !isAiProviderId(provider)) {
+      continue;
+    }
+
+    const definition = getAiProviderDefinition(provider);
+
+    output.push({
+      slot,
+
+      config: {
+        provider,
+
+        apiKey: fallbackEnv(slot, 'API_KEY'),
+
+        baseUrl: first(fallbackEnv(slot, 'BASE_URL'), definition.defaultBaseUrl),
+
+        model: first(fallbackEnv(slot, 'MODEL'), definition.defaultModel),
+
+        accountId: fallbackEnv(slot, 'ACCOUNT_ID'),
+      },
+    });
+  }
+
+  return output;
+}
+
+export function resolveLlmFallbackOptions() {
+  const cooldownRaw = env('TOOLNET_LLM_FALLBACK_COOLDOWN_MS');
+
+  const retriesRaw = env('TOOLNET_LLM_MAX_RETRIES');
+
+  const cooldownMs = Number(cooldownRaw ?? 60_000);
+
+  const maxRetries = Number(retriesRaw ?? 1);
+
+  return {
+    cooldownMs: Number.isFinite(cooldownMs) && cooldownMs >= 0 ? cooldownMs : 60_000,
+
+    maxRetries: Number.isFinite(maxRetries) && maxRetries >= 0 ? Math.floor(maxRetries) : 1,
+  };
+}
