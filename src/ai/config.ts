@@ -328,16 +328,29 @@ function resolveCanonicalEmbedding() {
       legacyModel = env(`${provider.toUpperCase().replace(/-/g, '_')}_EMBEDDING_MODEL`);
   }
 
+  const accountId = first(env('TOOLNET_EMBEDDING_ACCOUNT_ID'), legacyAccountId);
+
+  const configuredBaseUrl = first(
+    env('TOOLNET_EMBEDDING_BASE_URL'),
+    legacyBaseUrl,
+    definition.defaultBaseUrl
+  );
+
+  const baseUrl =
+    provider === 'cloudflare' && !configuredBaseUrl && accountId
+      ? `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`
+      : configuredBaseUrl;
+
   return {
     provider,
 
     apiKey: first(env('TOOLNET_EMBEDDING_API_KEY'), legacyKey),
 
-    baseUrl: first(env('TOOLNET_EMBEDDING_BASE_URL'), legacyBaseUrl, definition.defaultBaseUrl),
+    baseUrl,
 
     model: first(env('TOOLNET_EMBEDDING_MODEL'), legacyModel),
 
-    accountId: first(env('TOOLNET_EMBEDDING_ACCOUNT_ID'), legacyAccountId),
+    accountId,
   };
 }
 

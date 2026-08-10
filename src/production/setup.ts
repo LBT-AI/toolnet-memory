@@ -1357,6 +1357,661 @@ async function testAiProvider(values: Map<string, string>): Promise<{
   }
 }
 
+type EmbeddingWizardProvider = {
+  id: AiProviderId | 'local';
+  label: string;
+  baseUrl?: string;
+  suggestedModel?: string;
+  apiKeyRequired: boolean;
+  accountIdRequired?: boolean;
+  baseUrlRequired?: boolean;
+};
+
+const EMBEDDING_WIZARD_PROVIDERS: readonly EmbeddingWizardProvider[] = [
+  {
+    id: 'local',
+    label: 'Local / Hash',
+    apiKeyRequired: false,
+  },
+
+  {
+    id: 'huggingface',
+    label: 'Hugging Face',
+    suggestedModel: 'sentence-transformers/all-MiniLM-L6-v2',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'openai-compatible',
+    label: 'OpenAI-compatible',
+    apiKeyRequired: true,
+    baseUrlRequired: true,
+  },
+
+  {
+    id: 'alibaba',
+    label: 'Alibaba / DashScope',
+    baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    suggestedModel: 'text-embedding-v4',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'nvidia',
+    label: 'NVIDIA NIM',
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'ollama',
+    label: 'Ollama / Local',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    apiKeyRequired: false,
+  },
+
+  {
+    id: 'gemini',
+    label: 'Gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    suggestedModel: 'gemini-embedding-001',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'cloudflare',
+    label: 'Cloudflare Workers AI',
+    suggestedModel: '@cf/baai/bge-base-en-v1.5',
+    apiKeyRequired: true,
+    accountIdRequired: true,
+  },
+
+  {
+    id: 'custom',
+    label: 'Custom OpenAI-compatible endpoint',
+    apiKeyRequired: false,
+    baseUrlRequired: true,
+  },
+] as const;
+
+function embeddingProviderLabel(id: string | undefined): string {
+  return EMBEDDING_WIZARD_PROVIDERS.find((item) => item.id === id)?.label ?? id ?? 'not configured';
+}
+
+async function chooseEmbeddingProvider(
+  rl: readline.Interface,
+  current?: string
+): Promise<EmbeddingWizardProvider | 'back'> {
+  console.log('');
+  console.log('Embedding Model');
+  console.log('──────────────────────────────────────');
+
+  EMBEDDING_WIZARD_PROVIDERS.forEach((provider, index) => {
+    console.log(`  ${index + 1}. ${provider.label}${current === provider.id ? '  ✓ current' : ''}`);
+  });
+
+  console.log('');
+  console.log('  0. Back');
+  console.log('');
+
+  const answer = (await rl.question('Choose embedding provider: ')).trim();
+
+  if (answer === '0') {
+    return 'back';
+  }
+
+  const index = Number(answer) - 1;
+
+  if (Number.isInteger(index) && index >= 0 && index < EMBEDDING_WIZARD_PROVIDERS.length) {
+    return EMBEDDING_WIZARD_PROVIDERS[index];
+  }
+
+  console.log('');
+  console.log('⚠ Invalid selection');
+
+  return chooseEmbeddingProvider(rl, current);
+}
+
+function clearEmbeddingConfig(values: Map<string, string>): void {
+  values.delete('TOOLNET_EMBEDDING_API_KEY');
+
+  values.delete('TOOLNET_EMBEDDING_BASE_URL');
+
+  values.delete('TOOLNET_EMBEDDING_MODEL');
+
+  values.delete('TOOLNET_EMBEDDING_ACCOUNT_ID');
+}
+
+async function configureEmbedding(
+  rl: readline.Interface,
+  values: Map<string, string>,
+  definition: EmbeddingWizardProvider
+): Promise<void> {
+  const previous = values.get('TOOLNET_EMBEDDING_PROVIDER');
+
+  if (previous && previous !== definition.id) {
+    clearEmbeddingConfig(values);
+  }
+
+  values.set('TOOLNET_EMBEDDING_PROVIDER', definition.id);
+
+  console.log('');
+  console.log(definition.label);
+  console.log('──────────────────────────────────────');
+
+  if (definition.id === 'local') {
+    clearEmbeddingConfig(values);
+
+    console.log('✓ Local embedding selected');
+
+    console.log('  No API key required.');
+
+    return;
+  }
+
+  if (definition.accountIdRequired) {
+    const current = values.get('TOOLNET_EMBEDDING_ACCOUNT_ID');
+
+    const accountId = await rl.question(current ? `ACCOUNT ID [${current}]: ` : 'ACCOUNT ID: ');
+
+    setIfEntered(values, 'TOOLNET_EMBEDDING_ACCOUNT_ID', accountId);
+  } else {
+    values.delete('TOOLNET_EMBEDDING_ACCOUNT_ID');
+  }
+
+  if (definition.apiKeyRequired || definition.id === 'custom') {
+    const existing = values.get('TOOLNET_EMBEDDING_API_KEY');
+
+    const key = await secretQuestion(
+      rl,
+      existing
+        ? 'API KEY [configured, Enter = keep]: '
+        : definition.apiKeyRequired
+          ? 'API KEY: '
+          : 'API KEY [optional]: '
+    );
+
+    if (key.trim()) {
+      values.set('TOOLNET_EMBEDDING_API_KEY', key.trim());
+    }
+  } else {
+    values.delete('TOOLNET_EMBEDDING_API_KEY');
+  }
+
+  if (definition.id === 'cloudflare') {
+    const accountId = values.get('TOOLNET_EMBEDDING_ACCOUNT_ID')?.trim();
+
+    if (accountId) {
+      const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`;
+
+      values.set('TOOLNET_EMBEDDING_BASE_URL', url);
+
+      console.log(`BASE URL: ${url}`);
+    }
+  } else {
+    const existing = values.get('TOOLNET_EMBEDDING_BASE_URL');
+
+    const defaultBase = existing || definition.baseUrl || '';
+
+    const entered = await rl.question(
+      defaultBase
+        ? `BASE URL [${defaultBase}]: `
+        : definition.baseUrlRequired
+          ? 'BASE URL: '
+          : 'BASE URL [optional]: '
+    );
+
+    const resolved = entered.trim() || defaultBase;
+
+    if (resolved) {
+      values.set('TOOLNET_EMBEDDING_BASE_URL', normalizeEndpoint(resolved));
+    }
+  }
+
+  const currentModel = values.get('TOOLNET_EMBEDDING_MODEL');
+
+  const defaultModel = currentModel || definition.suggestedModel || '';
+
+  const model = await rl.question(defaultModel ? `MODEL [${defaultModel}]: ` : 'MODEL: ');
+
+  const resolvedModel = model.trim() || defaultModel;
+
+  if (resolvedModel) {
+    values.set('TOOLNET_EMBEDDING_MODEL', resolvedModel);
+  }
+}
+
+function embeddingConfigComplete(
+  values: Map<string, string>,
+  definition: EmbeddingWizardProvider
+): boolean {
+  if (definition.id === 'local') {
+    return true;
+  }
+
+  if (definition.apiKeyRequired && !values.get('TOOLNET_EMBEDDING_API_KEY')?.trim()) {
+    return false;
+  }
+
+  if (definition.accountIdRequired && !values.get('TOOLNET_EMBEDDING_ACCOUNT_ID')?.trim()) {
+    return false;
+  }
+
+  if (definition.baseUrlRequired && !values.get('TOOLNET_EMBEDDING_BASE_URL')?.trim()) {
+    return false;
+  }
+
+  return Boolean(values.get('TOOLNET_EMBEDDING_MODEL')?.trim());
+}
+
+async function testEmbeddingConfig(values: Map<string, string>): Promise<boolean> {
+  const provider = values.get('TOOLNET_EMBEDDING_PROVIDER')?.trim();
+
+  console.log('');
+  console.log(`Testing embedding: ${embeddingProviderLabel(provider)}...`);
+
+  if (provider === 'local') {
+    console.log('✓ Local embedding ready');
+
+    console.log('');
+    return true;
+  }
+
+  const apiKey = values.get('TOOLNET_EMBEDDING_API_KEY')?.trim();
+
+  const model = values.get('TOOLNET_EMBEDDING_MODEL')?.trim();
+
+  let baseUrl = values.get('TOOLNET_EMBEDDING_BASE_URL')?.trim();
+
+  try {
+    if (!model) {
+      throw new Error('Embedding model is missing');
+    }
+
+    if (provider === 'huggingface') {
+      if (!apiKey) {
+        throw new Error('API key is missing');
+      }
+
+      const response = await fetch(
+        `https://router.huggingface.co/hf-inference/models/${model}/pipeline/feature-extraction`,
+        {
+          method: 'POST',
+
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+
+            'Content-Type': 'application/json',
+          },
+
+          body: JSON.stringify({
+            inputs: ['toolnet memory test'],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+      }
+    } else if (provider === 'gemini') {
+      if (!apiKey) {
+        throw new Error('API key is missing');
+      }
+
+      const normalizedModel = model.replace(/^models\//, '');
+
+      baseUrl = baseUrl || 'https://generativelanguage.googleapis.com/v1beta';
+
+      const response = await fetch(
+        `${baseUrl.replace(/\/+$/, '')}/models/${encodeURIComponent(
+          normalizedModel
+        )}:embedContent?key=${encodeURIComponent(apiKey)}`,
+        {
+          method: 'POST',
+
+          headers: {
+            'content-type': 'application/json',
+          },
+
+          body: JSON.stringify({
+            model: `models/${normalizedModel}`,
+
+            content: {
+              parts: [
+                {
+                  text: 'toolnet memory test',
+                },
+              ],
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+      }
+    } else {
+      if (!baseUrl) {
+        throw new Error('BASE URL is missing');
+      }
+
+      const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/embeddings`, {
+        method: 'POST',
+
+        headers: {
+          'content-type': 'application/json',
+
+          ...(apiKey
+            ? {
+                authorization: `Bearer ${apiKey}`,
+              }
+            : {}),
+        },
+
+        body: JSON.stringify({
+          model,
+
+          input: ['toolnet memory test'],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+      }
+
+      const body = (await response.json()) as {
+        data?: Array<{
+          embedding?: number[];
+        }>;
+      };
+
+      if (!Array.isArray(body.data) || !Array.isArray(body.data[0]?.embedding)) {
+        throw new Error('Invalid embedding response');
+      }
+    }
+
+    console.log('✓ Embedding provider reachable');
+
+    console.log(`✓ Model: ${model}`);
+
+    console.log('');
+    return true;
+  } catch (error) {
+    console.log('✗ Embedding test failed');
+
+    console.log(`  ${error instanceof Error ? error.message : String(error)}`);
+
+    console.log('');
+    return false;
+  }
+}
+
+async function embeddingWizard(rl: readline.Interface, values: Map<string, string>): Promise<void> {
+  const original = new Map(values);
+
+  while (true) {
+    const definition = await chooseEmbeddingProvider(rl, values.get('TOOLNET_EMBEDDING_PROVIDER'));
+
+    if (definition === 'back') {
+      return;
+    }
+
+    await configureEmbedding(rl, values, definition);
+
+    if (!embeddingConfigComplete(values, definition)) {
+      console.log('');
+      console.log('⚠ Embedding configuration is incomplete.');
+
+      console.log('');
+      console.log('  1. Retry');
+      console.log('  2. Save anyway');
+      console.log('  3. Choose another provider');
+      console.log('  4. Cancel');
+      console.log('');
+
+      const action = (await rl.question('Choose [1]: ')).trim() || '1';
+
+      if (action === '2') {
+        saveEnv(values);
+        return;
+      }
+
+      if (action === '3') {
+        continue;
+      }
+
+      if (action === '4') {
+        values.clear();
+
+        for (const [key, value] of original) {
+          values.set(key, value);
+        }
+
+        return;
+      }
+
+      continue;
+    }
+
+    const ok = await testEmbeddingConfig(values);
+
+    if (ok) {
+      saveEnv(values);
+
+      console.log(`✓ ${definition.label} embedding configuration saved`);
+
+      console.log(`  ${ENV_FILE}`);
+
+      console.log('');
+      return;
+    }
+
+    console.log('  1. Retry');
+
+    console.log('  2. Save anyway');
+
+    console.log('  3. Choose another provider');
+
+    console.log('  4. Cancel');
+
+    console.log('');
+
+    const action = (await rl.question('Choose [1]: ')).trim() || '1';
+
+    if (action === '2') {
+      saveEnv(values);
+      return;
+    }
+
+    if (action === '3') {
+      continue;
+    }
+
+    if (action === '4') {
+      values.clear();
+
+      for (const [key, value] of original) {
+        values.set(key, value);
+      }
+
+      return;
+    }
+  }
+}
+
+async function copyLlmToEmbedding(
+  rl: readline.Interface,
+  values: Map<string, string>
+): Promise<void> {
+  const provider = values.get('TOOLNET_LLM_PROVIDER')?.trim();
+
+  if (!provider) {
+    console.log('');
+    console.log('⚠ Configure LLM first.');
+    console.log('');
+    return;
+  }
+
+  /*
+   * DeepSeek and Groq currently remain
+   * LLM-only in ToolNet's embedding wizard.
+   */
+  if (provider === 'deepseek' || provider === 'groq') {
+    console.log('');
+    console.log(`⚠ ${aiProviderLabel(provider)} is configured as LLM-only.`);
+
+    console.log('Choose Embedding separately.');
+
+    console.log('');
+    return;
+  }
+
+  values.set('TOOLNET_EMBEDDING_PROVIDER', provider);
+
+  const key = values.get('TOOLNET_LLM_API_KEY');
+
+  const baseUrl = values.get('TOOLNET_LLM_BASE_URL');
+
+  const accountId = values.get('TOOLNET_LLM_ACCOUNT_ID');
+
+  if (key) {
+    values.set('TOOLNET_EMBEDDING_API_KEY', key);
+  }
+
+  if (baseUrl) {
+    values.set('TOOLNET_EMBEDDING_BASE_URL', baseUrl);
+  }
+
+  if (accountId) {
+    values.set('TOOLNET_EMBEDDING_ACCOUNT_ID', accountId);
+  }
+
+  let suggested = '';
+
+  if (provider === 'alibaba') {
+    suggested = 'text-embedding-v4';
+  } else if (provider === 'gemini') {
+    suggested = 'gemini-embedding-001';
+  } else if (provider === 'cloudflare') {
+    suggested = '@cf/baai/bge-base-en-v1.5';
+  } else if (provider === 'huggingface') {
+    suggested = 'sentence-transformers/all-MiniLM-L6-v2';
+  }
+
+  const model = await rl.question(
+    suggested ? `EMBEDDING MODEL [${suggested}]: ` : 'EMBEDDING MODEL: '
+  );
+
+  const resolved = model.trim() || suggested;
+
+  if (!resolved) {
+    console.log('');
+    console.log('⚠ Embedding model is required.');
+    console.log('');
+    return;
+  }
+
+  values.set('TOOLNET_EMBEDDING_MODEL', resolved);
+
+  const ok = await testEmbeddingConfig(values);
+
+  if (!ok) {
+    const save = (await rl.question('Save anyway? (y/N): ')).trim().toLowerCase();
+
+    if (save !== 'y' && save !== 'yes') {
+      return;
+    }
+  }
+
+  saveEnv(values);
+
+  console.log('');
+  console.log('✓ LLM credentials reused for Embedding');
+
+  console.log(`✓ Embedding model: ${resolved}`);
+
+  console.log('');
+}
+
+async function aiModelMenu(rl: readline.Interface, values: Map<string, string>): Promise<void> {
+  while (true) {
+    console.log('');
+    console.log('AI Model');
+
+    console.log('──────────────────────────────────────');
+
+    const llmProvider = values.get('TOOLNET_LLM_PROVIDER');
+
+    const embeddingProvider = values.get('TOOLNET_EMBEDDING_PROVIDER');
+
+    console.log(
+      `  LLM       : ${
+        llmProvider
+          ? `${aiProviderLabel(llmProvider)} / ${
+              values.get('TOOLNET_LLM_MODEL') || 'model not configured'
+            }`
+          : 'not configured'
+      }`
+    );
+
+    console.log(
+      `  Embedding : ${
+        embeddingProvider
+          ? `${embeddingProviderLabel(embeddingProvider)} / ${
+              values.get('TOOLNET_EMBEDDING_MODEL') ||
+              (embeddingProvider === 'local' ? 'local hash' : 'model not configured')
+            }`
+          : 'legacy/default'
+      }`
+    );
+
+    console.log('');
+    console.log('  1. Configure LLM');
+
+    console.log('  2. Configure Embedding');
+
+    console.log('  3. Use LLM provider credentials for Embedding');
+
+    console.log('  0. Back');
+
+    console.log('');
+
+    const choice = (await rl.question('Choose: ')).trim();
+
+    if (choice === '0') {
+      return;
+    }
+
+    if (choice === '1') {
+      await aiWizard(rl, values);
+
+      continue;
+    }
+
+    if (choice === '2') {
+      await embeddingWizard(rl, values);
+
+      continue;
+    }
+
+    if (choice === '3') {
+      await copyLlmToEmbedding(rl, values);
+
+      continue;
+    }
+
+    console.log('');
+    console.log('⚠ Invalid selection');
+  }
+}
+
 async function aiWizard(rl: readline.Interface, values: Map<string, string>): Promise<void> {
   const original = new Map(values);
 
@@ -1618,7 +2273,7 @@ async function main(): Promise<void> {
       if (choice === 'ai') {
         const before = JSON.stringify([...values.entries()]);
 
-        await aiWizard(rl, values);
+        await aiModelMenu(rl, values);
 
         dirty = dirty || before !== JSON.stringify([...values.entries()]);
 
