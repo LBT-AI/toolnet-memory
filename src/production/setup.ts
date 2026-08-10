@@ -2481,7 +2481,291 @@ function enableAutomaticAgentMemory(): void {
   }
 }
 
+function firstValue(values: Map<string, string>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = values.get(key)?.trim();
+    if (value) {
+      return value;
+    }
+  }
+  return undefined;
+}
+function setCanonicalIfMissing(
+  values: Map<string, string>,
+  key: string,
+  value: string | undefined
+): void {
+  if (value && !values.get(key)?.trim()) {
+    values.set(key, value);
+  }
+}
+/*
+ * Phase 8 migration:
+ *
+ * Legacy environment names remain untouched for compatibility.
+ * We only COPY their values into canonical TOOLNET_* keys.
+ *
+ * This means old installations upgrade safely without breaking.
+ */
+function migrateLegacyAiConfig(values: Map<string, string>): boolean {
+  let migrated = false;
+  const before = JSON.stringify([...values.entries()]);
+  if (!values.get('TOOLNET_LLM_PROVIDER')?.trim()) {
+    let provider: string | undefined;
+    if (firstValue(values, 'GROQ_API_KEY')) {
+      provider = 'groq';
+    } else if (firstValue(values, 'DEEPSEEK_API_KEY')) {
+      provider = 'deepseek';
+    } else if (firstValue(values, 'NVIDIA_API_KEY', 'NVIDIA_NIM_API_KEY')) {
+      provider = 'nvidia';
+    } else if (firstValue(values, 'OPENROUTER_API_KEY')) {
+      provider = 'openrouter';
+    } else if (firstValue(values, 'ALIBABA_API_KEY', 'DASHSCOPE_API_KEY')) {
+      provider = 'alibaba';
+    } else if (firstValue(values, 'GEMINI_API_KEY', 'GOOGLE_API_KEY')) {
+      provider = 'gemini';
+    } else if (
+      firstValue(values, 'CLOUDFLARE_API_TOKEN') &&
+      firstValue(values, 'CLOUDFLARE_ACCOUNT_ID')
+    ) {
+      provider = 'cloudflare';
+    } else if (firstValue(values, 'HF_TOKEN')) {
+      provider = 'huggingface';
+    } else if (firstValue(values, 'OLLAMA_MODEL', 'OLLAMA_BASE_URL')) {
+      provider = 'ollama';
+    } else if (firstValue(values, 'OPENAI_API_KEY', 'MODEL_API_KEY')) {
+      provider = 'openai-compatible';
+    }
+    if (provider) {
+      values.set('TOOLNET_LLM_PROVIDER', provider);
+    }
+  }
+  const provider = values.get('TOOLNET_LLM_PROVIDER')?.trim();
+  switch (provider) {
+    case 'groq':
+      setCanonicalIfMissing(values, 'TOOLNET_LLM_API_KEY', firstValue(values, 'GROQ_API_KEY'));
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_BASE_URL',
+        firstValue(values, 'GROQ_BASE_URL') || 'https://api.groq.com/openai/v1'
+      );
+      setCanonicalIfMissing(values, 'TOOLNET_LLM_MODEL', firstValue(values, 'GROQ_MODEL'));
+      break;
+    case 'deepseek':
+      setCanonicalIfMissing(values, 'TOOLNET_LLM_API_KEY', firstValue(values, 'DEEPSEEK_API_KEY'));
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_BASE_URL',
+        firstValue(values, 'DEEPSEEK_BASE_URL') || 'https://api.deepseek.com'
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_MODEL',
+        firstValue(values, 'DEEPSEEK_MODEL') || 'deepseek-v4-flash'
+      );
+      break;
+    case 'nvidia':
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_API_KEY',
+        firstValue(values, 'NVIDIA_API_KEY', 'NVIDIA_NIM_API_KEY')
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_BASE_URL',
+        firstValue(values, 'NVIDIA_BASE_URL', 'NVIDIA_NIM_BASE_URL') ||
+          'https://integrate.api.nvidia.com/v1'
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_MODEL',
+        firstValue(values, 'NVIDIA_MODEL', 'NVIDIA_NIM_MODEL')
+      );
+      break;
+    case 'openrouter':
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_API_KEY',
+        firstValue(values, 'OPENROUTER_API_KEY')
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_BASE_URL',
+        firstValue(values, 'OPENROUTER_BASE_URL') || 'https://openrouter.ai/api/v1'
+      );
+      setCanonicalIfMissing(values, 'TOOLNET_LLM_MODEL', firstValue(values, 'OPENROUTER_MODEL'));
+      break;
+    case 'alibaba':
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_API_KEY',
+        firstValue(values, 'ALIBABA_API_KEY', 'DASHSCOPE_API_KEY')
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_BASE_URL',
+        firstValue(values, 'ALIBABA_BASE_URL', 'DASHSCOPE_BASE_URL')
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_MODEL',
+        firstValue(values, 'ALIBABA_MODEL', 'DASHSCOPE_MODEL')
+      );
+      break;
+    case 'gemini':
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_API_KEY',
+        firstValue(values, 'GEMINI_API_KEY', 'GOOGLE_API_KEY')
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_BASE_URL',
+        firstValue(values, 'GEMINI_BASE_URL') || 'https://generativelanguage.googleapis.com/v1beta'
+      );
+      setCanonicalIfMissing(values, 'TOOLNET_LLM_MODEL', firstValue(values, 'GEMINI_MODEL'));
+      break;
+    case 'huggingface':
+      setCanonicalIfMissing(values, 'TOOLNET_LLM_API_KEY', firstValue(values, 'HF_TOKEN'));
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_BASE_URL',
+        firstValue(values, 'HF_INFERENCE_BASE_URL') || 'https://router.huggingface.co/v1'
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_MODEL',
+        firstValue(values, 'HF_LLM_MODEL', 'HF_MODEL')
+      );
+      break;
+    case 'ollama':
+      setCanonicalIfMissing(values, 'TOOLNET_LLM_API_KEY', firstValue(values, 'OLLAMA_API_KEY'));
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_BASE_URL',
+        firstValue(values, 'OLLAMA_BASE_URL') || 'http://127.0.0.1:11434/v1'
+      );
+      setCanonicalIfMissing(values, 'TOOLNET_LLM_MODEL', firstValue(values, 'OLLAMA_MODEL'));
+      break;
+    case 'cloudflare':
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_API_KEY',
+        firstValue(values, 'CLOUDFLARE_API_TOKEN')
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_ACCOUNT_ID',
+        firstValue(values, 'CLOUDFLARE_ACCOUNT_ID')
+      );
+      setCanonicalIfMissing(values, 'TOOLNET_LLM_MODEL', firstValue(values, 'CLOUDFLARE_MODEL'));
+      break;
+    case 'openai-compatible':
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_API_KEY',
+        firstValue(values, 'OPENAI_API_KEY', 'MODEL_API_KEY')
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_BASE_URL',
+        firstValue(values, 'OPENAI_BASE_URL', 'MODEL_BASE_URL')
+      );
+      setCanonicalIfMissing(
+        values,
+        'TOOLNET_LLM_MODEL',
+        firstValue(values, 'OPENAI_MODEL', 'MODEL_NAME')
+      );
+      break;
+  }
+  /*
+   * Existing HF embedding configuration
+   * becomes canonical embedding config.
+   */
+  if (!values.get('TOOLNET_EMBEDDING_PROVIDER')?.trim() && firstValue(values, 'HF_TOKEN')) {
+    values.set('TOOLNET_EMBEDDING_PROVIDER', 'huggingface');
+    setCanonicalIfMissing(values, 'TOOLNET_EMBEDDING_API_KEY', firstValue(values, 'HF_TOKEN'));
+    setCanonicalIfMissing(
+      values,
+      'TOOLNET_EMBEDDING_MODEL',
+      firstValue(values, 'HF_EMBEDDING_MODEL') || 'sentence-transformers/all-MiniLM-L6-v2'
+    );
+  }
+  const after = JSON.stringify([...values.entries()]);
+  migrated = before !== after;
+  return migrated;
+}
+function setupSummaryValue(value: string | undefined, fallback = 'not configured'): string {
+  return value?.trim() || fallback;
+}
+function printFinalSetupSummary(values: Map<string, string>): void {
+  const storage = providerLabel(providerFrom(values));
+  const llmProvider = values.get('TOOLNET_LLM_PROVIDER');
+  const llmModel = values.get('TOOLNET_LLM_MODEL');
+  const embeddingProvider = values.get('TOOLNET_EMBEDDING_PROVIDER');
+  const embeddingModel = values.get('TOOLNET_EMBEDDING_MODEL');
+  const fallback1 = values.get('TOOLNET_LLM_FALLBACK_1_PROVIDER');
+  const fallback2 = values.get('TOOLNET_LLM_FALLBACK_2_PROVIDER');
+  console.log('');
+  console.log('TOOLNET MEMORY READY');
+  console.log('══════════════════════════════════════');
+  console.log(`Storage    : ${storage}`);
+  console.log(
+    `LLM        : ${
+      llmProvider
+        ? `${aiProviderLabel(llmProvider)} / ${setupSummaryValue(llmModel)}`
+        : 'not configured'
+    }`
+  );
+  console.log(
+    `Fallback 1 : ${
+      fallback1
+        ? `${aiProviderLabel(fallback1)} / ${setupSummaryValue(
+            values.get('TOOLNET_LLM_FALLBACK_1_MODEL')
+          )}`
+        : 'none'
+    }`
+  );
+  console.log(
+    `Fallback 2 : ${
+      fallback2
+        ? `${aiProviderLabel(fallback2)} / ${setupSummaryValue(
+            values.get('TOOLNET_LLM_FALLBACK_2_MODEL')
+          )}`
+        : 'none'
+    }`
+  );
+  console.log(
+    `Embedding  : ${
+      embeddingProvider
+        ? `${
+            embeddingProvider === 'local'
+              ? 'Local / Hash'
+              : embeddingProviderLabel(embeddingProvider)
+          } / ${setupSummaryValue(
+            embeddingModel,
+            embeddingProvider === 'local' ? 'local hash' : 'not configured'
+          )}`
+        : 'legacy/default'
+    }`
+  );
+  console.log('');
+  console.log(`Config     : ${ENV_FILE}`);
+  console.log(`Permissions: ${fs.statSync(ENV_FILE).mode.toString(8).slice(-3)}`);
+  console.log('');
+  console.log('Secrets    : hidden');
+  console.log('Config mode: canonical TOOLNET_*');
+  console.log('══════════════════════════════════════');
+}
 function ensureDefaults(values: Map<string, string>): void {
+  migrateLegacyAiConfig(values);
+  if (!values.has('TOOLNET_LLM_FALLBACK_COOLDOWN_MS')) {
+    values.set('TOOLNET_LLM_FALLBACK_COOLDOWN_MS', '60000');
+  }
+  if (!values.has('TOOLNET_LLM_MAX_RETRIES')) {
+    values.set('TOOLNET_LLM_MAX_RETRIES', '1');
+  }
+
   if (!values.has('MEMORY_STORAGE_PROVIDER')) {
     values.set('MEMORY_STORAGE_PROVIDER', providerFrom(values));
   }
@@ -2625,25 +2909,18 @@ async function main(): Promise<void> {
       }
 
       saveEnv(values);
-
-      console.log('');
-      console.log('✓ Configuration saved');
-      console.log(`  ${ENV_FILE}`);
-      console.log('');
-      console.log(`✓ Permissions: ${fs.statSync(ENV_FILE).mode.toString(8).slice(-3)}`);
-      console.log(`✓ Storage: ${providerLabel(providerFrom(values))}`);
-
       if (!storageConfigured(values)) {
+        console.log('');
         console.log('⚠ Storage configuration is incomplete.');
       }
-
       enableAutomaticAgentMemory();
-
+      printFinalSetupSummary(values);
       console.log('');
-      console.log('Next:');
+      console.log('Validate:');
+      console.log('  toolnet-memory provider:status');
+      console.log('  toolnet-memory provider:test');
       console.log('  toolnet-memory doctor');
       console.log('');
-
       return;
     }
   } finally {

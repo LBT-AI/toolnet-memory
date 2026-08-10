@@ -4,6 +4,19 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.2.16]
+
+- Added interactive multi-provider Storage and AI setup.
+- Added canonical TOOLNET_LLM_* and TOOLNET_EMBEDDING_* configuration.
+- Added DeepSeek and NVIDIA NIM providers.
+- Separated LLM and embedding providers.
+- Added Gemini embedding support.
+- Added provider list, status, test, and LLM-aware doctor diagnostics.
+- Added Primary -> Fallback 1 -> Fallback 2 resilient LLM routing.
+- Added bounded retries, cooldowns, and transient-error failover.
+- Added safe legacy-provider configuration migration.
+- Improved final setup summary and multi-provider documentation.
+
 ## [0.2.13]
 
 - Added smart session-memory promotion with selective durable-fact extraction.
@@ -89,3 +102,4 @@ Earlier `0.2.x` releases introduced and expanded:
 [0.2.12]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.12
 [0.2.11]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.11
 [0.2.10]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.10
+[0.2.16]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.16

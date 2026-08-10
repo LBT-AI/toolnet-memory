@@ -546,3 +546,77 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 ## License
 
 MIT © 2026 LBT-AI. See [LICENSE](LICENSE).
+
+## Multi-provider AI setup
+
+Run:
+
+```bash
+toolnet-memory setup
+
+ToolNet Memory separates AI configuration into independent roles:
+
+* LLM — reasoning, summarization, classification, and memory intelligence.
+* Embedding — semantic indexing and retrieval.
+* LLM Fallbacks — optional secondary providers for transient failures.
+
+Supported LLM providers include:
+
+* OpenAI-compatible
+* Alibaba / DashScope
+* OpenRouter
+* Groq
+* DeepSeek
+* NVIDIA NIM
+* Gemini
+* Hugging Face
+* Ollama / Local
+* Cloudflare Workers AI
+* Custom endpoints
+
+Canonical configuration:
+
+TOOLNET_LLM_PROVIDER=
+TOOLNET_LLM_API_KEY=
+TOOLNET_LLM_BASE_URL=
+TOOLNET_LLM_MODEL=
+TOOLNET_EMBEDDING_PROVIDER=
+TOOLNET_EMBEDDING_API_KEY=
+TOOLNET_EMBEDDING_BASE_URL=
+TOOLNET_EMBEDDING_MODEL=
+
+Optional resilient LLM chain:
+
+TOOLNET_LLM_FALLBACK_1_PROVIDER=
+TOOLNET_LLM_FALLBACK_1_API_KEY=
+TOOLNET_LLM_FALLBACK_1_BASE_URL=
+TOOLNET_LLM_FALLBACK_1_MODEL=
+TOOLNET_LLM_FALLBACK_2_PROVIDER=
+TOOLNET_LLM_FALLBACK_2_API_KEY=
+TOOLNET_LLM_FALLBACK_2_BASE_URL=
+TOOLNET_LLM_FALLBACK_2_MODEL=
+TOOLNET_LLM_FALLBACK_COOLDOWN_MS=60000
+TOOLNET_LLM_MAX_RETRIES=1
+
+Fallback is used only for transient failures such as:
+
+* timeout / network failure
+* HTTP 408
+* HTTP 429
+* HTTP 5xx
+
+HTTP 400, 401, and 403 are surfaced instead of silently switching providers.
+
+Legacy provider environment variables remain readable for backward compatibility. The setup wizard can migrate recognized legacy values into canonical TOOLNET_* configuration without deleting the original variables.
+
+Diagnostics:
+
+toolnet-memory provider:list
+toolnet-memory provider:status
+toolnet-memory provider:test
+toolnet-memory provider:test llm
+toolnet-memory provider:test embedding
+toolnet-memory doctor
+
+Provider status masks API keys and secrets.
+```
