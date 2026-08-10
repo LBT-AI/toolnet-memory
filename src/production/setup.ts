@@ -6,6 +6,10 @@ import { stdin as input, stdout as output } from 'node:process';
 
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 
+import { createAiProvider } from '../ai/factory.js';
+
+import type { AiProviderConfig, AiProviderId } from '../ai/types.js';
+
 import { installAutoIntegrations } from './auto-integrate.js';
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'toolnet-memory');
@@ -38,6 +42,18 @@ const KNOWN_ENV_KEYS = new Set([
 
   'HF_TOKEN',
   'HF_EMBEDDING_MODEL',
+
+  'TOOLNET_LLM_PROVIDER',
+  'TOOLNET_LLM_API_KEY',
+  'TOOLNET_LLM_BASE_URL',
+  'TOOLNET_LLM_MODEL',
+  'TOOLNET_LLM_ACCOUNT_ID',
+
+  'TOOLNET_EMBEDDING_PROVIDER',
+  'TOOLNET_EMBEDDING_API_KEY',
+  'TOOLNET_EMBEDDING_BASE_URL',
+  'TOOLNET_EMBEDDING_MODEL',
+  'TOOLNET_EMBEDDING_ACCOUNT_ID',
 
   'MEMORY_LOCAL_STORAGE_PATH',
   'MEMORY_LOCAL_CACHE_MB',
@@ -214,6 +230,24 @@ function renderEnv(values: Map<string, string>): string {
     `HF_S3_ACCESS_KEY_ID=${values.get('HF_S3_ACCESS_KEY_ID') ?? ''}`,
     `HF_S3_SECRET_ACCESS_KEY=${values.get('HF_S3_SECRET_ACCESS_KEY') ?? ''}`,
     `HF_URL=${values.get('HF_URL') ?? ''}`,
+    '',
+    '# ----------------------------------------------------------',
+    '# AI / LLM - canonical ToolNet configuration',
+    '# ----------------------------------------------------------',
+    `TOOLNET_LLM_PROVIDER=${values.get('TOOLNET_LLM_PROVIDER') ?? ''}`,
+    `TOOLNET_LLM_API_KEY=${values.get('TOOLNET_LLM_API_KEY') ?? ''}`,
+    `TOOLNET_LLM_BASE_URL=${values.get('TOOLNET_LLM_BASE_URL') ?? ''}`,
+    `TOOLNET_LLM_MODEL=${values.get('TOOLNET_LLM_MODEL') ?? ''}`,
+    `TOOLNET_LLM_ACCOUNT_ID=${values.get('TOOLNET_LLM_ACCOUNT_ID') ?? ''}`,
+    '',
+    '# ----------------------------------------------------------',
+    '# Embedding - canonical ToolNet configuration',
+    '# ----------------------------------------------------------',
+    `TOOLNET_EMBEDDING_PROVIDER=${values.get('TOOLNET_EMBEDDING_PROVIDER') ?? ''}`,
+    `TOOLNET_EMBEDDING_API_KEY=${values.get('TOOLNET_EMBEDDING_API_KEY') ?? ''}`,
+    `TOOLNET_EMBEDDING_BASE_URL=${values.get('TOOLNET_EMBEDDING_BASE_URL') ?? ''}`,
+    `TOOLNET_EMBEDDING_MODEL=${values.get('TOOLNET_EMBEDDING_MODEL') ?? ''}`,
+    `TOOLNET_EMBEDDING_ACCOUNT_ID=${values.get('TOOLNET_EMBEDDING_ACCOUNT_ID') ?? ''}`,
     '',
     '# ----------------------------------------------------------',
     '# Embedding - legacy/current compatibility',
@@ -607,9 +641,19 @@ function printCurrentStatus(values: Map<string, string>): void {
   );
 
   const llmProvider = values.get('TOOLNET_LLM_PROVIDER');
+
+  const llmModel = values.get('TOOLNET_LLM_MODEL');
+
   const embeddingProvider = values.get('TOOLNET_EMBEDDING_PROVIDER');
 
-  console.log(`LLM     : ${llmProvider || 'not configured'}`);
+  console.log(
+    `LLM     : ${
+      llmProvider
+        ? `${aiProviderLabel(llmProvider)}${llmModel ? ` / ${llmModel}` : ''}`
+        : 'not configured'
+    }`
+  );
+
   console.log(`Embedding: ${embeddingProvider || 'legacy/default'}`);
   console.log('');
 }
@@ -972,28 +1016,446 @@ async function storageWizard(rl: readline.Interface, values: Map<string, string>
   }
 }
 
-async function aiWizardPlaceholder(rl: readline.Interface): Promise<void> {
+type AiWizardDefinition = {
+  id: AiProviderId;
+  label: string;
+  baseUrl?: string;
+  suggestedModel?: string;
+  apiKeyRequired: boolean;
+  accountIdRequired?: boolean;
+  baseUrlRequired?: boolean;
+};
+
+const AI_WIZARD_PROVIDERS: readonly AiWizardDefinition[] = [
+  {
+    id: 'openai-compatible',
+    label: 'OpenAI-compatible',
+    apiKeyRequired: true,
+    baseUrlRequired: true,
+  },
+
+  {
+    id: 'alibaba',
+    label: 'Alibaba / DashScope',
+    baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    suggestedModel: 'qwen3.6-flash',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'groq',
+    label: 'Groq',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'gemini',
+    label: 'Gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    suggestedModel: 'gemini-3.6-flash',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'huggingface',
+    label: 'Hugging Face',
+    baseUrl: 'https://router.huggingface.co/v1',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'ollama',
+    label: 'Ollama / Local',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    apiKeyRequired: false,
+  },
+
+  {
+    id: 'custom',
+    label: 'Custom endpoint',
+    apiKeyRequired: false,
+    baseUrlRequired: true,
+  },
+
+  {
+    id: 'cloudflare',
+    label: 'Cloudflare Workers AI',
+    suggestedModel: '@cf/meta/llama-3.1-8b-instruct',
+    apiKeyRequired: true,
+    accountIdRequired: true,
+  },
+] as const;
+
+function aiProviderDefinition(id: string | undefined): AiWizardDefinition | undefined {
+  return AI_WIZARD_PROVIDERS.find((provider) => provider.id === id);
+}
+
+function aiProviderLabel(id: string | undefined): string {
+  return aiProviderDefinition(id)?.label ?? id ?? 'not configured';
+}
+
+function currentAiProvider(values: Map<string, string>): AiProviderId | undefined {
+  const provider = values.get('TOOLNET_LLM_PROVIDER')?.trim();
+
+  return AI_WIZARD_PROVIDERS.some((item) => item.id === provider)
+    ? (provider as AiProviderId)
+    : undefined;
+}
+
+async function chooseAiProvider(
+  rl: readline.Interface,
+  current?: AiProviderId
+): Promise<AiProviderId | 'back'> {
   console.log('');
   console.log('AI Model');
   console.log('──────────────────────────────────────');
+
+  AI_WIZARD_PROVIDERS.forEach((provider, index) => {
+    console.log(`  ${index + 1}. ${provider.label}${current === provider.id ? '  ✓ current' : ''}`);
+  });
+
   console.log('');
-  console.log('Phase 1 installs the setup framework.');
-  console.log('Multi-provider AI configuration will be added in Phase 3/4.');
-  console.log('');
-  console.log('Planned providers:');
-  console.log('  1. OpenAI-compatible');
-  console.log('  2. Alibaba / DashScope');
-  console.log('  3. OpenRouter');
-  console.log('  4. Groq');
-  console.log('  5. Gemini');
-  console.log('  6. Hugging Face');
-  console.log('  7. Ollama / Local');
-  console.log('  8. Custom endpoint');
-  console.log('  9. Cloudflare');
+  console.log('  0. Back');
   console.log('');
 
-  await rl.question('Press Enter to go back...');
+  const answer = (await rl.question('Choose provider: ')).trim();
+
+  if (answer === '0') {
+    return 'back';
+  }
+
+  const index = Number(answer) - 1;
+
+  if (Number.isInteger(index) && index >= 0 && index < AI_WIZARD_PROVIDERS.length) {
+    return AI_WIZARD_PROVIDERS[index].id;
+  }
+
   console.log('');
+  console.log('⚠ Invalid provider selection');
+
+  return chooseAiProvider(rl, current);
+}
+
+function aiConfigComplete(values: Map<string, string>, definition: AiWizardDefinition): boolean {
+  const model = values.get('TOOLNET_LLM_MODEL')?.trim();
+
+  if (!model) {
+    return false;
+  }
+
+  if (definition.apiKeyRequired && !values.get('TOOLNET_LLM_API_KEY')?.trim()) {
+    return false;
+  }
+
+  if (definition.accountIdRequired && !values.get('TOOLNET_LLM_ACCOUNT_ID')?.trim()) {
+    return false;
+  }
+
+  if (definition.baseUrlRequired && !values.get('TOOLNET_LLM_BASE_URL')?.trim()) {
+    return false;
+  }
+
+  return true;
+}
+
+function clearCanonicalLlm(values: Map<string, string>): void {
+  values.delete('TOOLNET_LLM_API_KEY');
+
+  values.delete('TOOLNET_LLM_BASE_URL');
+
+  values.delete('TOOLNET_LLM_MODEL');
+
+  values.delete('TOOLNET_LLM_ACCOUNT_ID');
+}
+
+async function configureAiProvider(
+  rl: readline.Interface,
+  values: Map<string, string>,
+  definition: AiWizardDefinition
+): Promise<void> {
+  console.log('');
+  console.log(definition.label);
+  console.log('──────────────────────────────────────');
+
+  const existingProvider = values.get('TOOLNET_LLM_PROVIDER');
+
+  /*
+   * Changing provider must not
+   * accidentally reuse another
+   * provider's endpoint/key/model.
+   */
+  if (existingProvider && existingProvider !== definition.id) {
+    clearCanonicalLlm(values);
+  }
+
+  values.set('TOOLNET_LLM_PROVIDER', definition.id);
+
+  if (definition.accountIdRequired) {
+    const current = values.get('TOOLNET_LLM_ACCOUNT_ID');
+
+    const accountId = await rl.question(current ? `ACCOUNT ID [${current}]: ` : 'ACCOUNT ID: ');
+
+    setIfEntered(values, 'TOOLNET_LLM_ACCOUNT_ID', accountId);
+  } else {
+    values.delete('TOOLNET_LLM_ACCOUNT_ID');
+  }
+
+  if (definition.apiKeyRequired || definition.id === 'custom') {
+    const currentKey = values.get('TOOLNET_LLM_API_KEY');
+
+    const apiKey = await secretQuestion(
+      rl,
+      currentKey
+        ? 'API KEY [configured, Enter = keep]: '
+        : definition.apiKeyRequired
+          ? 'API KEY: '
+          : 'API KEY [optional]: '
+    );
+
+    if (apiKey.trim()) {
+      values.set('TOOLNET_LLM_API_KEY', apiKey.trim());
+    }
+  } else {
+    values.delete('TOOLNET_LLM_API_KEY');
+  }
+
+  if (definition.id !== 'cloudflare') {
+    const currentBase = values.get('TOOLNET_LLM_BASE_URL');
+
+    const defaultBase = currentBase || definition.baseUrl || '';
+
+    const baseUrl = await rl.question(
+      defaultBase
+        ? `BASE URL [${defaultBase}]: `
+        : definition.baseUrlRequired
+          ? 'BASE URL: '
+          : 'BASE URL [optional]: '
+    );
+
+    const resolvedBase = baseUrl.trim() || defaultBase;
+
+    if (resolvedBase) {
+      values.set('TOOLNET_LLM_BASE_URL', normalizeEndpoint(resolvedBase));
+    } else {
+      values.delete('TOOLNET_LLM_BASE_URL');
+    }
+  } else {
+    /*
+     * Cloudflare provider builds
+     * /accounts/{id}/ai/run itself.
+     */
+    values.delete('TOOLNET_LLM_BASE_URL');
+  }
+
+  const currentModel = values.get('TOOLNET_LLM_MODEL');
+
+  const modelDefault = currentModel || definition.suggestedModel || '';
+
+  const model = await rl.question(modelDefault ? `MODEL [${modelDefault}]: ` : 'MODEL: ');
+
+  const resolvedModel = model.trim() || modelDefault;
+
+  if (resolvedModel) {
+    values.set('TOOLNET_LLM_MODEL', resolvedModel);
+  }
+}
+
+function aiProviderConfigFromValues(values: Map<string, string>): AiProviderConfig {
+  const provider = currentAiProvider(values);
+
+  if (!provider) {
+    throw new Error('AI provider is not configured');
+  }
+
+  return {
+    id: provider,
+
+    apiKey: values.get('TOOLNET_LLM_API_KEY')?.trim() || undefined,
+
+    baseUrl: values.get('TOOLNET_LLM_BASE_URL')?.trim() || undefined,
+
+    model: values.get('TOOLNET_LLM_MODEL')?.trim() || undefined,
+
+    accountId: values.get('TOOLNET_LLM_ACCOUNT_ID')?.trim() || undefined,
+  };
+}
+
+async function testAiProvider(values: Map<string, string>): Promise<{
+  ok: boolean;
+  message: string;
+}> {
+  const config = aiProviderConfigFromValues(values);
+
+  console.log('');
+  console.log(`Testing ${aiProviderLabel(config.id)}...`);
+
+  try {
+    const provider = createAiProvider(config);
+
+    const result = await provider.healthCheck();
+
+    if (result.ok) {
+      console.log(`✓ Provider reachable${result.latencyMs ? ` (${result.latencyMs} ms)` : ''}`);
+
+      console.log(`✓ Model: ${result.model ?? config.model ?? 'configured'}`);
+
+      console.log('');
+
+      return {
+        ok: true,
+        message: result.message,
+      };
+    }
+
+    console.log('✗ AI provider test failed');
+
+    console.log(`  ${result.message}`);
+
+    console.log('');
+
+    return {
+      ok: false,
+      message: result.message,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    console.log('✗ AI provider test failed');
+
+    console.log(`  ${message}`);
+
+    console.log('');
+
+    return {
+      ok: false,
+      message,
+    };
+  }
+}
+
+async function aiWizard(rl: readline.Interface, values: Map<string, string>): Promise<void> {
+  const original = new Map(values);
+
+  while (true) {
+    const selected = await chooseAiProvider(rl, currentAiProvider(values));
+
+    if (selected === 'back') {
+      return;
+    }
+
+    const definition = AI_WIZARD_PROVIDERS.find((provider) => provider.id === selected);
+
+    if (!definition) {
+      continue;
+    }
+
+    await configureAiProvider(rl, values, definition);
+
+    if (!aiConfigComplete(values, definition)) {
+      console.log('');
+      console.log('⚠ AI configuration is incomplete.');
+      console.log('');
+      console.log('  1. Retry');
+      console.log('  2. Save anyway');
+      console.log('  3. Choose another provider');
+      console.log('  4. Cancel');
+      console.log('');
+
+      const action = (await rl.question('Choose [1]: ')).trim() || '1';
+
+      if (action === '2') {
+        saveEnv(values);
+
+        console.log('');
+        console.log('⚠ AI configuration saved without validation');
+        console.log(`  ${ENV_FILE}`);
+        console.log('');
+
+        return;
+      }
+
+      if (action === '3') {
+        continue;
+      }
+
+      if (action === '4') {
+        values.clear();
+
+        for (const [key, value] of original) {
+          values.set(key, value);
+        }
+
+        console.log('');
+        console.log('AI changes cancelled.');
+        console.log('');
+
+        return;
+      }
+
+      continue;
+    }
+
+    const result = await testAiProvider(values);
+
+    if (result.ok) {
+      saveEnv(values);
+
+      console.log(`✓ ${definition.label} configuration saved`);
+
+      console.log(`  ${ENV_FILE}`);
+
+      console.log('');
+
+      return;
+    }
+
+    console.log('  1. Retry');
+    console.log('  2. Save anyway');
+    console.log('  3. Choose another provider');
+    console.log('  4. Cancel');
+    console.log('');
+
+    const action = (await rl.question('Choose [1]: ')).trim() || '1';
+
+    if (action === '2') {
+      saveEnv(values);
+
+      console.log('');
+      console.log('⚠ AI configuration saved even though provider test failed');
+
+      console.log(`  ${ENV_FILE}`);
+
+      console.log('');
+
+      return;
+    }
+
+    if (action === '3') {
+      continue;
+    }
+
+    if (action === '4') {
+      values.clear();
+
+      for (const [key, value] of original) {
+        values.set(key, value);
+      }
+
+      console.log('');
+      console.log('AI changes cancelled.');
+      console.log('');
+
+      return;
+    }
+  }
 }
 
 function enableAutomaticAgentMemory(): void {
@@ -1138,7 +1600,12 @@ async function main(): Promise<void> {
       }
 
       if (choice === 'ai') {
-        await aiWizardPlaceholder(rl);
+        const before = JSON.stringify([...values.entries()]);
+
+        await aiWizard(rl, values);
+
+        dirty = dirty || before !== JSON.stringify([...values.entries()]);
+
         continue;
       }
 
