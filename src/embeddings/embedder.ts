@@ -1,8 +1,12 @@
+import { loadAiConfig } from '../ai/config.js';
+
 import type { EmbeddingProvider } from './provider.js';
 
 import { HuggingFaceEmbeddingProvider } from './remote.js';
 
 import { HashEmbeddingProvider } from './local.js';
+
+import { OpenAiCompatibleEmbeddingProvider } from './openai-compatible.js';
 
 export class ResilientEmbeddingProvider implements EmbeddingProvider {
   readonly name = 'resilient';
@@ -44,17 +48,43 @@ export class ResilientEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
+function createRemoteEmbeddingProvider(): EmbeddingProvider | null {
+  const config = loadAiConfig().embedding;
+
+  if (config.provider === 'local') {
+    return null;
+  }
+
+  if (config.provider === 'huggingface') {
+    if (!config.apiKey || !config.model) {
+      return null;
+    }
+
+    return new HuggingFaceEmbeddingProvider({
+      token: config.apiKey,
+
+      model: config.model,
+    });
+  }
+
+  /*
+   * Providers exposing an
+   * OpenAI-compatible embeddings
+   * endpoint share one adapter.
+   */
+  if (config.baseUrl && config.model) {
+    return new OpenAiCompatibleEmbeddingProvider({
+      apiKey: config.apiKey,
+
+      baseUrl: config.baseUrl,
+
+      model: config.model,
+    });
+  }
+
+  return null;
+}
+
 export function createEmbeddingProvider(): EmbeddingProvider {
-  const token = process.env.HF_TOKEN;
-
-  const model = process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2';
-
-  const primary = token
-    ? new HuggingFaceEmbeddingProvider({
-        token,
-        model,
-      })
-    : null;
-
-  return new ResilientEmbeddingProvider(primary);
+  return new ResilientEmbeddingProvider(createRemoteEmbeddingProvider());
 }
