@@ -42,6 +42,14 @@ function providerFromLegacy(): AiProviderId | undefined {
     return 'groq';
   }
 
+  if (env('DEEPSEEK_API_KEY')) {
+    return 'deepseek';
+  }
+
+  if (env('NVIDIA_API_KEY') || env('NVIDIA_NIM_API_KEY')) {
+    return 'nvidia';
+  }
+
   if (env('OPENROUTER_API_KEY')) {
     return 'openrouter';
   }
@@ -118,6 +126,32 @@ function resolveLegacyLlmConfig(id: AiProviderId): CanonicalModelConfig {
         baseUrl: first(env('GROQ_BASE_URL'), definition.defaultBaseUrl),
 
         model: env('GROQ_MODEL'),
+      };
+
+    case 'deepseek':
+      return {
+        provider: id,
+
+        apiKey: env('DEEPSEEK_API_KEY'),
+
+        baseUrl: first(env('DEEPSEEK_BASE_URL'), definition.defaultBaseUrl),
+
+        model: first(env('DEEPSEEK_MODEL'), definition.defaultModel),
+      };
+
+    case 'nvidia':
+      return {
+        provider: id,
+
+        apiKey: first(env('NVIDIA_API_KEY'), env('NVIDIA_NIM_API_KEY')),
+
+        baseUrl: first(
+          env('NVIDIA_BASE_URL'),
+          env('NVIDIA_NIM_BASE_URL'),
+          definition.defaultBaseUrl
+        ),
+
+        model: first(env('NVIDIA_MODEL'), env('NVIDIA_NIM_MODEL'), definition.defaultModel),
       };
 
     case 'gemini':

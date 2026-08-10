@@ -34,6 +34,24 @@ export const AI_PROVIDER_DEFINITIONS: readonly AiProviderDefinition[] = [
   },
 
   {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    defaultBaseUrl: 'https://api.deepseek.com',
+    defaultModel: 'deepseek-v4-flash',
+    requiresApiKey: true,
+    transport: 'openai-compatible',
+  },
+
+  {
+    id: 'nvidia',
+    label: 'NVIDIA NIM',
+    defaultBaseUrl: 'https://integrate.api.nvidia.com/v1',
+    defaultModel: 'deepseek-ai/deepseek-v4-pro',
+    requiresApiKey: true,
+    transport: 'openai-compatible',
+  },
+
+  {
     id: 'gemini',
     label: 'Gemini',
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',

@@ -3,6 +3,8 @@ export type AiProviderId =
   | 'alibaba'
   | 'openrouter'
   | 'groq'
+  | 'deepseek'
+  | 'nvidia'
   | 'gemini'
   | 'huggingface'
   | 'ollama'

@@ -13,6 +13,8 @@ describe('AI provider registry', () => {
       'alibaba',
       'openrouter',
       'groq',
+      'deepseek',
+      'nvidia',
       'gemini',
       'huggingface',
       'ollama',
@@ -24,8 +26,13 @@ describe('AI provider registry', () => {
   it('resolves known providers', () => {
     expect(getAiProviderDefinition('cloudflare').label).toBe('Cloudflare Workers AI');
 
-    expect(isAiProviderId('gemini')).toBe(true);
+    expect(getAiProviderDefinition('deepseek').label).toBe('DeepSeek');
 
+    expect(getAiProviderDefinition('nvidia').label).toBe('NVIDIA NIM');
+
+    expect(isAiProviderId('gemini')).toBe(true);
+    expect(isAiProviderId('deepseek')).toBe(true);
+    expect(isAiProviderId('nvidia')).toBe(true);
     expect(isAiProviderId('invalid')).toBe(false);
   });
 });

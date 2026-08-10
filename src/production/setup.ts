@@ -1057,6 +1057,22 @@ const AI_WIZARD_PROVIDERS: readonly AiWizardDefinition[] = [
   },
 
   {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com',
+    suggestedModel: 'deepseek-v4-flash',
+    apiKeyRequired: true,
+  },
+
+  {
+    id: 'nvidia',
+    label: 'NVIDIA NIM',
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    suggestedModel: 'deepseek-ai/deepseek-v4-pro',
+    apiKeyRequired: true,
+  },
+
+  {
     id: 'gemini',
     label: 'Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
