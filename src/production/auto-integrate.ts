@@ -14,6 +14,8 @@ import { installCodexNotify } from '../session/codex/notify-installer.js';
 
 import { installCodexContextHook } from '../session/codex/context-hook-installer.js';
 
+import { installCodexMcp } from '../session/codex/mcp-installer.js';
+
 export interface AutoIntegrationResult {
   agent: 'agy' | 'opencode' | 'codex';
 
@@ -176,7 +178,15 @@ export function installAutoIntegrations(
           binary,
         });
 
-        const targets = [notify.configFile, context];
+        const mcp = installCodexMcp({
+          binary,
+        });
+
+        if (!mcp.installed) {
+          throw new Error(mcp.error ?? 'Codex MCP registration failed');
+        }
+
+        const targets = [notify.configFile, context, `mcp:${mcp.serverName}`];
 
         if (notify.preservedPrevious) {
           targets.push(notify.previousFile);

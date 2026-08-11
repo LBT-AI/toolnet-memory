@@ -4,3 +4,4 @@ export * from './adapter.js';
 export * from './project-resolver.js';
 export * from './recovery.js';
 export * from './notify-installer.js';
+export * from './mcp-installer.js';
