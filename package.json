@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -89,7 +89,6 @@
     "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
-    "prettier": "^3.9.6",
     "tsx": "^4.20.0",
     "vitest": "^3.2.0"
   },
