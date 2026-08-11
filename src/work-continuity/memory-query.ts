@@ -282,6 +282,10 @@ export function answerMemoryQuestion(
           lines.push(`Agent trước: ${origin.agent}.`);
         }
 
+        /*
+         * Prefer latest session-origin metadata.
+         * WorkState is the fallback.
+         */
         const currentTask = origin?.currentTask ?? state?.currentTask?.title;
 
         if (currentTask) {
@@ -294,17 +298,29 @@ export function answerMemoryQuestion(
           lines.push(`File gần nhất: ${lastFile}.`);
         }
 
-        if (origin?.latestNextAction ?? state?.nextActions?.[0]) {
-          lines.push(`Tiếp theo: ${origin?.latestNextAction ?? state?.nextActions?.[0]}.`);
+        const nextAction = origin?.latestNextAction ?? state?.nextActions?.[0];
+
+        if (nextAction) {
+          lines.push(`Tiếp theo: ${nextAction}.`);
         }
 
-        if (origin?.latestBlocker ?? state?.blockers?.at(-1)) {
-          lines.push(`Blocker: ${origin?.latestBlocker ?? state?.blockers?.at(-1)}.`);
+        const blocker = origin?.latestBlocker ?? state?.blockers?.at(-1);
+
+        if (blocker) {
+          lines.push(`Blocker: ${blocker}.`);
+        }
+
+        const decision = origin?.latestDecision ?? state?.decisions?.at(-1);
+
+        if (decision) {
+          lines.push(`Quyết định gần nhất: ${decision}.`);
         }
 
         return {
           intent,
+
           answer: lines.join(' '),
+
           source: origin ? 'session-origin' : 'work-state',
         };
       }
