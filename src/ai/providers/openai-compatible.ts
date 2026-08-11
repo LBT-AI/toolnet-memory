@@ -80,6 +80,12 @@ export class OpenAiCompatibleProvider implements AiProvider {
           temperature: options.temperature,
 
           max_tokens: options.maxTokens,
+
+          ...(this.id === 'alibaba'
+            ? {
+                enable_thinking: false,
+              }
+            : {}),
         }),
       }
     );
