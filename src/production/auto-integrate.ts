@@ -12,6 +12,8 @@ import { installAgyMcp } from '../session/agy/mcp-installer.js';
 
 import { installOpenCodePlugin } from '../session/opencode/plugin-installer.js';
 
+import { installOpenCodeMcp } from '../session/opencode/mcp-installer.js';
+
 import { installCodexNotify } from '../session/codex/notify-installer.js';
 
 import { installCodexContextHook } from '../session/codex/context-hook-installer.js';
@@ -129,7 +131,11 @@ export function installAutoIntegrations(
       });
     } else {
       try {
-        const file = installOpenCodePlugin({
+        const plugin = installOpenCodePlugin({
+          binary,
+        });
+
+        const mcp = installOpenCodeMcp({
           binary,
         });
 
@@ -140,7 +146,7 @@ export function installAutoIntegrations(
 
           installed: true,
 
-          targets: [file],
+          targets: [plugin, mcp.configFile, `mcp:${mcp.serverName}`],
         });
       } catch (error) {
         results.push({
