@@ -43,6 +43,8 @@ import {
   graphNeighborhoodSchema,
   deadCode,
   deadCodeSchema,
+  memoryAgentAsk,
+  memoryAgentAskSchema,
 } from './tools/index.js';
 
 function jsonText(value: unknown) {
@@ -193,6 +195,18 @@ export function createMCPServer(ctx: MCPContext) {
     'Find likely unused code. Results are candidates and must be verified before deletion.',
     deadCodeSchema,
     async (input) => jsonText(await deadCode(ctx, input))
+  );
+
+  server.tool(
+    'memory_agent_ask',
+    [
+      'Ask the ToolNet Memory Agent about this project.',
+      'Use this when continuing work from a previous session or another coding agent.',
+      'Useful for unfinished tasks, previous agent work, next actions, blockers, decisions and recently touched files.',
+      'Returns a concise answer instead of dumping full memory or transcripts.',
+    ].join(' '),
+    memoryAgentAskSchema,
+    async (input) => jsonText(await memoryAgentAsk(ctx, input))
   );
 
   return server;
