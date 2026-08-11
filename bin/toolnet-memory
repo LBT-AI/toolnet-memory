@@ -41,8 +41,14 @@ run() {
 }
 
 case "$COMMAND" in
+  ask)
+    shift
+    run bundle/memory-query.js src/work-continuity/memory-query-cli.ts "$@"
+    ;;
+
   handoff:refresh)
-    exec node "$ROOT_DIR/bundle/handoff-refresh.js" "$@"
+    shift
+    run bundle/handoff-refresh.js src/work-continuity/handoff-cli.ts "$@"
     ;;
 
   update)
@@ -524,6 +530,9 @@ PROJECT MANUAL:
   toolnet-memory project:manual-init [--project PATH]
   toolnet-memory project:manual-show [--project PATH]
   toolnet-memory project:manual-sync [--project PATH]
+
+MEMORY AGENT QUERY:
+  toolnet-memory ask "<question>"                 Ask concise project-memory questions
 
 WORK CONTINUITY:
   toolnet-memory work:status [--project PATH]
