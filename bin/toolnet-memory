@@ -41,6 +41,10 @@ run() {
 }
 
 case "$COMMAND" in
+  handoff:refresh)
+    exec node "$ROOT_DIR/bundle/handoff-refresh.js" "$@"
+    ;;
+
   update)
     shift
     run bundle/update.js src/production/update.ts "$@"

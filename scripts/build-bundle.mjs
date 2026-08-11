@@ -36,6 +36,7 @@ const entries = {
   'project-manual': 'src/project-manual/cli.ts',
 
   'work-continuity': 'src/work-continuity/cli.ts',
+  'handoff-refresh': 'src/work-continuity/handoff-cli.ts',
   context: 'src/work-continuity/context-cli.ts',
   'context-runtime': 'src/work-continuity/context-runtime-cli.ts',
 };

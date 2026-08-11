@@ -13,3 +13,4 @@ export * from './semantic-learner.js';
 export * from './brief-cache.js';
 export * from './injection.js';
 export * from './fast-handoff.js';
+export * from './handoff-refresh.js';
