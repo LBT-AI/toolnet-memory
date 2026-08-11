@@ -28,6 +28,8 @@ import { installCodexContextHook } from './context-hook-installer.js';
 
 import { refreshStartupBriefCache } from '../../work-continuity/brief-cache.js';
 
+import { refreshFastHandoffFromCurrent } from '../../work-continuity/handoff-refresh.js';
+
 function after(
   args: string[],
 
@@ -171,6 +173,18 @@ async function notify(raw: string) {
     await refreshStartupBriefCache(project, storage, 800);
   } catch {
     // Derived cache must never break Codex notify.
+  }
+
+  /*
+   * C3.1:
+   * Refresh the LOCAL fast handoff after each completed Codex turn.
+   *
+   * This is intentionally local-only and must never block/fail Codex.
+   */
+  try {
+    refreshFastHandoffFromCurrent(project);
+  } catch {
+    // Fast handoff must never break Codex notify.
   }
 }
 
