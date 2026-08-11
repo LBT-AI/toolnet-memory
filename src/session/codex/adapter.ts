@@ -12,7 +12,9 @@ import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 import { extractSessionMemory } from '../session-extractor.js';
 import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
 
-import { updateCurrentFromSession } from '../../work-continuity/auto-current.js';
+import { extractWorkObservations } from '../../work-continuity/extractor.js';
+import { applyObservationsToLocalWorkState } from '../../work-continuity/local-work-state.js';
+import { writeStableWorkStateToCurrent } from '../../work-continuity/work-state-current.js';
 
 export interface CodexSyncOptions {
   project: ProjectManifest;
@@ -169,28 +171,74 @@ export async function syncCodexSession(options: CodexSyncOptions) {
   events.push(...filteredEvents);
 
   /*
-   * C3.2
+   * C3.3
    *
-   * Update .toolnet/current.md from the already-filtered
-   * incremental Codex events.
+   * Convert the already-filtered incremental Codex events
+   * into durable WorkObservations, merge them with the
+   * previous LOCAL WorkState, then render current.md.
+   *
+   * This keeps TODO/Phase status stable across turns.
    *
    * LOCAL ONLY:
    * - no LLM
-   * - no storage
+   * - no remote storage
    * - no embedding
-   *
-   * The notify layer refreshes handoff.md immediately after
-   * syncCodexSession() returns.
    */
   if (options.idle && filteredEvents.length > 0) {
     try {
-      updateCurrentFromSession(options.project, {
+      const identity = {
+        projectId: options.project.id,
+
+        projectName: options.project.name,
+
+        projectRoot: options.project.rootPath,
+
         agent: 'codex',
+
         nativeSessionId: threadId,
-        events: filteredEvents,
-      });
+
+        sessionKey: `codex:${threadId}`,
+
+        remotePrefix: `projects/${options.project.id}/sessions/codex/${threadId}`,
+
+        localDirectory: '',
+      };
+
+      const normalizedForWork = filteredEvents.map((event, index) => ({
+        version: 1 as const,
+
+        id: `codex-work-${threadId}-${event.sourceSequence ?? index}`,
+
+        sequence: index + 1,
+
+        projectId: options.project.id,
+
+        agent: 'codex',
+
+        nativeSessionId: threadId,
+
+        type: event.type,
+
+        timestamp: event.timestamp ?? new Date().toISOString(),
+
+        role: event.role,
+
+        sourceEventId: event.sourceEventId,
+
+        sourceSequence: event.sourceSequence,
+
+        data: event.data ?? {},
+
+        provenance: event.provenance ?? {},
+      }));
+
+      const observations = extractWorkObservations(identity, normalizedForWork);
+
+      const workState = applyObservationsToLocalWorkState(options.project, observations);
+
+      writeStableWorkStateToCurrent(options.project, workState);
     } catch {
-      // Work-state update must never break Codex sync.
+      // Stable work-state must never break Codex sync.
     }
   }
 
