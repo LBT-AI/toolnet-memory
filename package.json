@@ -1,1 +1,107 @@
-{"name":"toolnet-memory","version":"0.2.17","description":"Persistent project memory, work continuity, and code intelligence for AI coding agents.","type":"module","license":"MIT","repository":{"type":"git","url":"git+https://github.com/LBT-AI/toolnet-memory.git"},"homepage":"https://github.com/LBT-AI/toolnet-memory#readme","bugs":{"url":"https://github.com/LBT-AI/toolnet-memory/issues"},"engines":{"node":">=22"},"keywords":["ai","memory","coding-agents","mcp","opencode","codex","antigravity","code-intelligence"],"scripts":{"dev":"tsx src/index.ts","build":"tsc -p tsconfig.json","lint":"eslint src tests --ext .ts","format":"prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.md\" \"*.json\"","format:check":"prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"*.md\" \"*.json\"","typecheck":"tsc --noEmit","start":"node dist/index.js","test":"vitest run","storage:test":"tsx src/storage/test-connection.ts","embedding:test":"tsx src/embeddings/test-connection.ts","vector:persist:test":"tsx src/retrieval/vector/test-persistence.ts","code:index:test":"tsx src/code-intelligence/test-index.ts","code:incremental:test":"tsx src/code-intelligence/test-incremental.ts","mcp":"tsx src/mcp/bootstrap.ts","snapshot:test":"tsx src/snapshot/test-snapshot.ts","code:semantic:test":"tsx src/code-intelligence/test-semantic.ts","doctor":"tsx src/production/doctor.ts","cli":"./bin/toolnet-memory","prod:check":"npm run build && npm test && npm run doctor","project:migrate":"tsx src/storage/project/migrate.ts","impact":"tsx src/code-intelligence/test-impact.ts","code:resolve:test":"tsx src/code-intelligence/test-resolution.ts","bucket:tree":"tsx src/storage/list-bucket-tree.ts","code:rich:test":"tsx src/code-intelligence/test-rich-graph.ts","storage:migrate:v2":"tsx src/storage/project/migrate-layout-v2.ts","storage:cleanup:v1":"tsx src/storage/project/cleanup-layout-v1.ts","code:architecture:test":"tsx src/code-intelligence/test-architecture.ts","code:analysis:test":"tsx src/code-intelligence/test-analysis.ts","code:visualization:test":"tsx src/code-intelligence/test-visualization.ts","graph:ui":"tsx src/visualization/server.ts","project:status":"tsx src/production/project-status.ts","build:prod":"npm run build && rm -rf dist/tests dist/visualization/public && mkdir -p dist/visualization/public/vendor && cp src/visualization/public/index.html dist/visualization/public/index.html && cp node_modules/3d-force-graph/dist/3d-force-graph.min.js dist/visualization/public/vendor/3d-force-graph.min.js && find dist -type f \\( -name \"*.bak-*\" -o -name \"*.map\" \\) -delete","prepack":"npm run build:prod","session:test":"vitest run tests/session/session-core.test.ts","session:opencode:test":"vitest run tests/session/opencode-adapter.test.ts","session:agy:test":"vitest run tests/session/agy-adapter.test.ts","session:codex:test":"vitest run tests/session/codex-adapter.test.ts","session:learner:test":"vitest run tests/session/session-memory-learner.test.ts","project-manual:test":"vitest run tests/project-manual/project-manual.test.ts","work-continuity:test":"vitest run tests/work-continuity/work-continuity.test.ts","work-handoff:test":"vitest run tests/work-continuity/handoff-brief.test.ts","semantic-work:test":"vitest run tests/work-continuity/semantic-context.test.ts","context-injection:test":"vitest run tests/work-continuity/context-injection.test.ts","build:bundle":"npm run build && node scripts/build-bundle.mjs","build:release":"npm run build:prod && node scripts/build-bundle.mjs"},"dependencies":{"@aws-sdk/client-s3":"^3.1102.0","@aws-sdk/s3-request-presigner":"^3.1102.0","@modelcontextprotocol/sdk":"^1.30.0","dotenv":"^17.4.2","typescript":"^5.9.3","zod":"^4.4.3"},"devDependencies":{"@types/node":"^24.0.0","@typescript-eslint/eslint-plugin":"^8.66.0","@typescript-eslint/parser":"^8.66.0","3d-force-graph":"^1.80.0","esbuild":"^0.28.1","eslint":"^10.8.1","eslint-config-prettier":"^10.1.8","eslint-plugin-prettier":"^5.5.6","tsx":"^4.20.0","vitest":"^3.2.0"},"bin":{"toolnet-memory":"bin/toolnet-memory"},"files":["bundle","bin/toolnet-memory","README.md",".env.example"],"publishConfig":{"access":"public"}}
+{
+  "name": "toolnet-memory",
+  "version": "0.2.17",
+  "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LBT-AI/toolnet-memory.git"
+  },
+  "homepage": "https://github.com/LBT-AI/toolnet-memory#readme",
+  "bugs": {
+    "url": "https://github.com/LBT-AI/toolnet-memory/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "ai",
+    "memory",
+    "coding-agents",
+    "mcp",
+    "opencode",
+    "codex",
+    "antigravity",
+    "code-intelligence"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src tests --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.md\" \"*.json\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"*.md\" \"*.json\"",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "storage:test": "tsx src/storage/test-connection.ts",
+    "embedding:test": "tsx src/embeddings/test-connection.ts",
+    "vector:persist:test": "tsx src/retrieval/vector/test-persistence.ts",
+    "code:index:test": "tsx src/code-intelligence/test-index.ts",
+    "code:incremental:test": "tsx src/code-intelligence/test-incremental.ts",
+    "mcp": "tsx src/mcp/bootstrap.ts",
+    "snapshot:test": "tsx src/snapshot/test-snapshot.ts",
+    "code:semantic:test": "tsx src/code-intelligence/test-semantic.ts",
+    "doctor": "tsx src/production/doctor.ts",
+    "cli": "./bin/toolnet-memory",
+    "prod:check": "npm run build && npm test && npm run doctor",
+    "project:migrate": "tsx src/storage/project/migrate.ts",
+    "impact": "tsx src/code-intelligence/test-impact.ts",
+    "code:resolve:test": "tsx src/code-intelligence/test-resolution.ts",
+    "bucket:tree": "tsx src/storage/list-bucket-tree.ts",
+    "code:rich:test": "tsx src/code-intelligence/test-rich-graph.ts",
+    "storage:migrate:v2": "tsx src/storage/project/migrate-layout-v2.ts",
+    "storage:cleanup:v1": "tsx src/storage/project/cleanup-layout-v1.ts",
+    "code:architecture:test": "tsx src/code-intelligence/test-architecture.ts",
+    "code:analysis:test": "tsx src/code-intelligence/test-analysis.ts",
+    "code:visualization:test": "tsx src/code-intelligence/test-visualization.ts",
+    "graph:ui": "tsx src/visualization/server.ts",
+    "project:status": "tsx src/production/project-status.ts",
+    "build:prod": "npm run build && rm -rf dist/tests dist/visualization/public && mkdir -p dist/visualization/public/vendor && cp src/visualization/public/index.html dist/visualization/public/index.html && cp node_modules/3d-force-graph/dist/3d-force-graph.min.js dist/visualization/public/vendor/3d-force-graph.min.js && find dist -type f \\( -name \"*.bak-*\" -o -name \"*.map\" \\) -delete",
+    "prepack": "npm run build:prod",
+    "session:test": "vitest run tests/session/session-core.test.ts",
+    "session:opencode:test": "vitest run tests/session/opencode-adapter.test.ts",
+    "session:agy:test": "vitest run tests/session/agy-adapter.test.ts",
+    "session:codex:test": "vitest run tests/session/codex-adapter.test.ts",
+    "session:learner:test": "vitest run tests/session/session-memory-learner.test.ts",
+    "project-manual:test": "vitest run tests/project-manual/project-manual.test.ts",
+    "work-continuity:test": "vitest run tests/work-continuity/work-continuity.test.ts",
+    "work-handoff:test": "vitest run tests/work-continuity/handoff-brief.test.ts",
+    "semantic-work:test": "vitest run tests/work-continuity/semantic-context.test.ts",
+    "context-injection:test": "vitest run tests/work-continuity/context-injection.test.ts",
+    "build:bundle": "npm run build && node scripts/build-bundle.mjs",
+    "build:release": "npm run build:prod && node scripts/build-bundle.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1102.0",
+    "@aws-sdk/s3-request-presigner": "^3.1102.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^17.4.2",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.66.0",
+    "@typescript-eslint/parser": "^8.66.0",
+    "3d-force-graph": "^1.80.0",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.8.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "tsx": "^4.20.0",
+    "vitest": "^3.2.0"
+  },
+  "bin": {
+    "toolnet-memory": "bin/toolnet-memory"
+  },
+  "files": [
+    "bundle",
+    "bin/toolnet-memory",
+    "README.md",
+    ".env.example"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
