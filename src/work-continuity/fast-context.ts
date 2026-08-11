@@ -7,7 +7,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-import { createMinimalContext, compactBullets } from './token-budget.js';
+import { createMinimalContext } from './token-budget.js';
+
+import { formatFastHandoffContext } from './fast-handoff.js';
 
 interface FastContextOptions {
   projectPath?: string;
@@ -117,11 +119,28 @@ export function buildFastProjectContext(options: FastContextOptions = {}): strin
 
   const minimalContext = createMinimalContext(profileContent, currentContent);
 
+  /*
+   * Fast handoff is also LOCAL ONLY.
+   *
+   * It contains the latest compact work state written by
+   * ToolNet continuity commands.
+   */
+  const handoffContext = formatFastHandoffContext(
+    {
+      id: '',
+      name: projectName,
+      rootPath: projectRoot,
+    } as any,
+    1600
+  );
+
+  const handoffSection = handoffContext ? `\n\n${handoffContext}\n` : '';
+
   const footer = `\nForbidden At Startup:
 - Do not run session:agy-recover, handoff:latest, or brief automatically
 - Deep memory only when user explicitly asks\n`;
 
-  return header + minimalContext + footer;
+  return header + minimalContext + handoffSection + footer;
 }
 
 /**
