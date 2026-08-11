@@ -1,16 +1,10 @@
-import { loadConfig } from '../../core/index.js';
-
-import {
-  createStorageProvider,
-  ProjectScopedStorageProvider,
-  withStorageRetry,
-} from '../../storage/index.js';
-
-import { buildCodexSessionStartOutput } from '../../work-continuity/index.js';
+import { buildFastProjectContext } from '../../work-continuity/fast-context.js';
 
 import { findCodexToolNetProject } from './project-resolver.js';
 
-async function readInput() {
+const MAX_CONTEXT_CHARS = 3200;
+
+async function readInput(): Promise<Record<string, unknown>> {
   let raw = '';
 
   for await (const chunk of process.stdin) {
@@ -18,7 +12,7 @@ async function readInput() {
   }
 
   if (!raw.trim()) {
-    return {} as Record<string, unknown>;
+    return {};
   }
 
   try {
@@ -28,11 +22,37 @@ async function readInput() {
   }
 }
 
-async function main() {
+function writeEmpty(): void {
+  process.stdout.write('{}');
+}
+
+function limitContext(text: string): string {
+  if (text.length <= MAX_CONTEXT_CHARS) {
+    return text;
+  }
+
+  return `${text.slice(0, MAX_CONTEXT_CHARS)}\n\n[ToolNet startup context truncated]`;
+}
+
+function debugTiming(startedAt: number, cwd: string, chars: number): void {
+  if (process.env.TOOLNET_CODEX_STARTUP_DEBUG !== '1') {
+    return;
+  }
+
+  const elapsedMs = Date.now() - startedAt;
+
+  process.stderr.write(
+    `[toolnet-memory] codex SessionStart ${elapsedMs}ms cwd=${cwd} chars=${chars}\n`
+  );
+}
+
+async function main(): Promise<void> {
+  const startedAt = Date.now();
+
   const input = await readInput();
 
   if (input.hook_event_name !== 'SessionStart') {
-    process.stdout.write('{}');
+    writeEmpty();
 
     return;
   }
@@ -40,55 +60,76 @@ async function main() {
   const cwd = typeof input.cwd === 'string' ? input.cwd : '';
 
   if (!cwd) {
-    process.stdout.write('{}');
+    writeEmpty();
 
     return;
   }
 
+  /*
+   * Important:
+   * SessionStart must never auto-create a ToolNet project.
+   *
+   * A valid .toolnet/project.json must already exist.
+   */
   const project = findCodexToolNetProject(cwd);
 
   if (!project) {
-    process.stdout.write('{}');
+    writeEmpty();
 
     return;
   }
 
   try {
-    const config = loadConfig();
-
-    const raw = withStorageRetry(
-      createStorageProvider({
-        provider: config.storage.provider,
-
-        huggingface: config.storage.huggingface,
-
-        localRoot: config.storage.localRoot,
-      }),
-      {
-        attempts: 2,
-      }
-    );
-
-    const storage = new ProjectScopedStorageProvider(
-      raw,
-      project.id,
-      project.name,
-      project.remote ?? project.name
-    );
-
-    const output = await buildCodexSessionStartOutput({
-      project,
-      storage,
+    /*
+     * C1 FAST PATH
+     *
+     * LOCAL FILES ONLY.
+     *
+     * Forbidden on Codex SessionStart:
+     * - Storage provider creation
+     * - R2 / S3 / Hugging Face
+     * - LLM calls
+     * - Embeddings
+     * - Semantic retrieval
+     * - Session recovery
+     * - Full code indexing
+     *
+     * Deep memory is available later through ToolNet/MCP.
+     */
+    const context = buildFastProjectContext({
+      projectPath: cwd,
     });
+
+    if (!context?.trim()) {
+      writeEmpty();
+
+      return;
+    }
+
+    const limited = limitContext(context);
+
+    const output = {
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+
+        additionalContext: limited,
+      },
+    };
+
+    debugTiming(startedAt, cwd, limited.length);
 
     process.stdout.write(JSON.stringify(output));
   } catch {
-    process.stdout.write('{}');
+    /*
+     * Fail open:
+     * ToolNet must never prevent Codex from starting.
+     */
+    writeEmpty();
   }
 }
 
 main().catch(() => {
-  process.stdout.write('{}');
+  writeEmpty();
 
   process.exitCode = 0;
 });
