@@ -15,6 +15,7 @@ import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memo
 import { extractWorkObservations } from '../../work-continuity/extractor.js';
 import { applyObservationsToLocalWorkState } from '../../work-continuity/local-work-state.js';
 import { writeStableWorkStateToCurrent } from '../../work-continuity/work-state-current.js';
+import { writeSessionOrigin } from '../../work-continuity/session-origin.js';
 
 export interface CodexSyncOptions {
   project: ProjectManifest;
@@ -237,6 +238,22 @@ export async function syncCodexSession(options: CodexSyncOptions) {
       const workState = applyObservationsToLocalWorkState(options.project, observations);
 
       writeStableWorkStateToCurrent(options.project, workState);
+
+      /*
+       * C3.4
+       *
+       * Keep metadata about the exact session that
+       * produced the latest work state.
+       */
+      writeSessionOrigin(options.project, {
+        agent: 'codex',
+
+        nativeSessionId: threadId,
+
+        observations,
+
+        workState,
+      });
     } catch {
       // Stable work-state must never break Codex sync.
     }

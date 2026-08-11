@@ -17,3 +17,4 @@ export * from './handoff-refresh.js';
 export * from './auto-current.js';
 export * from './local-work-state.js';
 export * from './work-state-current.js';
+export * from './session-origin.js';

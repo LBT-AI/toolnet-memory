@@ -6,6 +6,8 @@ import type { ProjectManifest } from '../core/types.js';
 
 import { readFastHandoff, writeFastHandoff } from './fast-handoff.js';
 
+import { formatSessionOrigin } from './session-origin.js';
+
 export interface HandoffRefreshResult {
   updated: boolean;
 
@@ -44,11 +46,14 @@ function compactCurrentForHandoff(project: ProjectManifest, current: string): st
       ? `${normalized.slice(0, maxChars)}\n\n[Current work truncated for fast handoff]`
       : normalized;
 
+  const origin = formatSessionOrigin(project);
+
   return [
     '# ToolNet Fast Handoff',
     '',
     `Project: ${project.name}`,
     '',
+    ...(origin ? [origin, ''] : []),
     body,
     '',
     '---',
