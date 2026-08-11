@@ -4,6 +4,17 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.2.17]
+
+- Added Codex fast local-only SessionStart context and dedicated fast handoff cache.
+- Added automatic current work state and stable cross-session TODO/phase tracking.
+- Added session-origin metadata for previous agent, session, task, file, blocker, decision, and next action handoff.
+- Added concise local memory queries and the AI-powered ToolNet Memory Agent.
+- Exposed `memory_agent_ask` through MCP for coding agents.
+- Added agent guidance for automatic memory queries in continuity scenarios.
+- Added automatic MCP registration for Codex, Agy / Antigravity, and OpenCode.
+- Preserved existing agent MCP servers, providers, permissions, and configuration entries during integration.
+
 ## [0.2.16]
 
 - Added interactive multi-provider Storage and AI setup.
@@ -96,10 +107,11 @@ Earlier `0.2.x` releases introduced and expanded:
 - Initial production release of ToolNet Memory.
 - Persistent project memory, storage, retrieval, and core coding-agent support.
 
+[0.2.17]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.17
+[0.2.16]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.16
 [0.2.9]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.9
 [0.1.0]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.1.0
 [0.2.13]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.13
 [0.2.12]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.12
 [0.2.11]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.11
 [0.2.10]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.10
-[0.2.16]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.16
