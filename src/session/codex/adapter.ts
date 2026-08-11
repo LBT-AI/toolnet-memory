@@ -12,6 +12,8 @@ import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 import { extractSessionMemory } from '../session-extractor.js';
 import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
 
+import { updateCurrentFromSession } from '../../work-continuity/auto-current.js';
+
 export interface CodexSyncOptions {
   project: ProjectManifest;
 
@@ -165,6 +167,32 @@ export async function syncCodexSession(options: CodexSyncOptions) {
     }));
 
   events.push(...filteredEvents);
+
+  /*
+   * C3.2
+   *
+   * Update .toolnet/current.md from the already-filtered
+   * incremental Codex events.
+   *
+   * LOCAL ONLY:
+   * - no LLM
+   * - no storage
+   * - no embedding
+   *
+   * The notify layer refreshes handoff.md immediately after
+   * syncCodexSession() returns.
+   */
+  if (options.idle && filteredEvents.length > 0) {
+    try {
+      updateCurrentFromSession(options.project, {
+        agent: 'codex',
+        nativeSessionId: threadId,
+        events: filteredEvents,
+      });
+    } catch {
+      // Work-state update must never break Codex sync.
+    }
+  }
 
   /*
    * AfterAgent/agent-turn-complete means this TURN is done.
