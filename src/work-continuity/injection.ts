@@ -12,6 +12,8 @@ import { writeJsonAtomic } from '../session/utils.js';
 
 import { getStartupBriefForInjection } from './brief-cache.js';
 
+import { memoryAgentStartupGuidance } from './agent-guidance.js';
+
 interface InjectionMarker {
   digest: string;
 
@@ -104,7 +106,7 @@ export async function buildAgyPreInvocationOutput(options: {
   return {
     injectSteps: [
       {
-        userMessage: cache.text,
+        userMessage: `${cache.text}\n\n${memoryAgentStartupGuidance()}`,
       },
     ],
   };

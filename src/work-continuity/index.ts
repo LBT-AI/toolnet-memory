@@ -20,3 +20,4 @@ export * from './work-state-current.js';
 export * from './session-origin.js';
 export * from './memory-query.js';
 export * from './memory-agent.js';
+export * from './agent-guidance.js';

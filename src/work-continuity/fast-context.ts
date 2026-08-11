@@ -11,6 +11,8 @@ import { createMinimalContext } from './token-budget.js';
 
 import { formatFastHandoffContext } from './fast-handoff.js';
 
+import { memoryAgentGuidance, memoryAgentStartupGuidance } from './agent-guidance.js';
+
 interface FastContextOptions {
   projectPath?: string;
   maxChars?: number;
@@ -136,9 +138,16 @@ export function buildFastProjectContext(options: FastContextOptions = {}): strin
 
   const handoffSection = handoffContext ? `\n\n${handoffContext}\n` : '';
 
-  const footer = `\nForbidden At Startup:
-- Do not run session:agy-recover, handoff:latest, or brief automatically
-- Deep memory only when user explicitly asks\n`;
+  const footer = `
+
+${memoryAgentStartupGuidance()}
+
+Forbidden At Startup:
+- Do not run session:agy-recover, handoff:latest, or brief automatically.
+- Do not perform deep recovery merely because an agent starts.
+- If the user asks to resume previous work and fast context is insufficient,
+  use memory_agent_ask before guessing.
+`;
 
   return header + minimalContext + handoffSection + footer;
 }
@@ -169,7 +178,10 @@ Read and follow:
 Rules:
 - Fast context first.
 - Do not run session:agy-recover, handoff:latest, or brief automatically.
-- Deep memory only when the user explicitly asks.
+- Do not invent previous-session state.
+- Current repository evidence overrides stale memory.
+
+${memoryAgentGuidance()}
 
 ---
 

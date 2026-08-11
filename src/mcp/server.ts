@@ -200,10 +200,13 @@ export function createMCPServer(ctx: MCPContext) {
   server.tool(
     'memory_agent_ask',
     [
-      'Ask the ToolNet Memory Agent about this project.',
-      'Use this when continuing work from a previous session or another coding agent.',
-      'Useful for unfinished tasks, previous agent work, next actions, blockers, decisions and recently touched files.',
-      'Returns a concise answer instead of dumping full memory or transcripts.',
+      'Ask ToolNet Memory Agent about previous project work.',
+      'CALL THIS TOOL before guessing when the user asks to continue/resume previous work,',
+      'mentions a previous agent/session, asks what was unfinished, what file was last touched,',
+      'which TODOs are complete, blockers, decisions, or what should happen next.',
+      'Use mode=local for direct state facts and mode=ai for composite or ambiguous continuity questions.',
+      'Do not use it for unrelated coding questions when current repository context is already sufficient.',
+      'Returns concise selected memory instead of raw transcripts or full memory dumps.',
     ].join(' '),
     memoryAgentAskSchema,
     async (input) => jsonText(await memoryAgentAsk(ctx, input))

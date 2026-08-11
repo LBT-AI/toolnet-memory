@@ -4,6 +4,8 @@ import { homedir } from 'node:os';
 
 import { dirname, join, parse, resolve } from 'node:path';
 
+import { memoryAgentGuidance } from '../../work-continuity/agent-guidance.js';
+
 const START = '<!-- TOOLNET_MEMORY_BOOTSTRAP_START -->';
 
 const END = '<!-- TOOLNET_MEMORY_BOOTSTRAP_END -->';
@@ -29,6 +31,9 @@ Rules:
 5. Use ToolNet MCP or selective retrieval when older project knowledge is actually needed.
 6. Raw transcripts must not be injected into prompts.
 7. Current repository evidence has priority over stale memory when they conflict.
+
+
+${memoryAgentGuidance()}
 
 ${END}`;
 
