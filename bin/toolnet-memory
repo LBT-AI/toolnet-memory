@@ -46,6 +46,11 @@ case "$COMMAND" in
     run bundle/memory-query.js src/work-continuity/memory-query-cli.ts "$@"
     ;;
 
+  ask-ai)
+    shift
+    run bundle/memory-agent.js src/work-continuity/memory-agent-cli.ts "$@"
+    ;;
+
   handoff:refresh)
     shift
     run bundle/handoff-refresh.js src/work-continuity/handoff-cli.ts "$@"

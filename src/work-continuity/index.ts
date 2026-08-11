@@ -19,3 +19,4 @@ export * from './local-work-state.js';
 export * from './work-state-current.js';
 export * from './session-origin.js';
 export * from './memory-query.js';
+export * from './memory-agent.js';

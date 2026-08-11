@@ -282,12 +282,16 @@ export function answerMemoryQuestion(
           lines.push(`Agent trước: ${origin.agent}.`);
         }
 
-        if (state?.currentTask) {
-          lines.push(`Task hiện tại: ${state.currentTask.title}.`);
+        const currentTask = origin?.currentTask ?? state?.currentTask?.title;
+
+        if (currentTask) {
+          lines.push(`Task hiện tại: ${currentTask}.`);
         }
 
-        if (origin?.lastTouchedFile) {
-          lines.push(`File gần nhất: ${origin.lastTouchedFile}.`);
+        const lastFile = origin?.lastTouchedFile ?? state?.filesTouched?.at(-1);
+
+        if (lastFile) {
+          lines.push(`File gần nhất: ${lastFile}.`);
         }
 
         if (origin?.latestNextAction ?? state?.nextActions?.[0]) {
