@@ -1,27 +1,68 @@
 import fs from 'node:fs';
+
 import path from 'node:path';
+
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
+
+import { spawn } from 'node:child_process';
+
+import { CliProgress } from './cli-progress.js';
 
 const PACKAGE = 'toolnet-memory';
 
+interface RunResult {
+  status: number;
+
+  stdout: string;
+
+  stderr: string;
+}
+
 function run(
   command: string,
-  args: string[],
-  options: {
-    capture?: boolean;
-  } = {}
-) {
-  return spawnSync(command, args, {
-    encoding: 'utf8',
-    stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+
+  args: string[]
+): Promise<RunResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+
+      env: process.env,
+    });
+
+    let stdout = '';
+
+    let stderr = '';
+
+    child.stdout?.setEncoding('utf8');
+
+    child.stderr?.setEncoding('utf8');
+
+    child.stdout?.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+
+    child.stderr?.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+
+    child.once('error', reject);
+
+    child.once('close', (code) => {
+      resolve({
+        status: code ?? 1,
+
+        stdout,
+
+        stderr,
+      });
+    });
   });
 }
 
 function localPackageRoot() {
   const here = path.dirname(fileURLToPath(import.meta.url));
 
-  // bundle/update.js -> package root
   return path.resolve(here, '..');
 }
 
@@ -36,7 +77,7 @@ function readVersion(root: string) {
 }
 
 function detectPrefix(root: string): string | null {
-  const marker = `${path.sep}lib${path.sep}node_modules${path.sep}${PACKAGE}`;
+  const marker = `${path.sep}lib${path.sep}` + `node_modules${path.sep}${PACKAGE}`;
 
   if (root.endsWith(marker)) {
     const prefix = root.slice(0, -marker.length);
@@ -47,30 +88,44 @@ function detectPrefix(root: string): string | null {
   return null;
 }
 
-function main() {
+async function main() {
   const root = localPackageRoot();
 
   const current = readVersion(root);
 
-  const latestResult = run('npm', ['view', `${PACKAGE}@latest`, 'version', '--silent'], {
-    capture: true,
-  });
-
-  if (latestResult.status !== 0) {
-    console.error('Unable to check the latest ToolNet Memory version.');
-
-    if (latestResult.stderr) {
-      console.error(latestResult.stderr.trim());
-    }
-
-    process.exit(1);
-  }
-
-  const latest = (latestResult.stdout ?? '').trim();
-
   console.log('');
   console.log('ToolNet Memory Update');
   console.log('=====================');
+  console.log('');
+
+  const check = new CliProgress('Checking npm registry').start();
+
+  let latestResult: RunResult;
+
+  try {
+    latestResult = await run('npm', ['view', `${PACKAGE}@latest`, 'version', '--silent']);
+  } catch (error) {
+    check.fail('Unable to reach npm registry');
+
+    throw error;
+  }
+
+  if (latestResult.status !== 0) {
+    check.fail('Unable to check latest version');
+
+    if (latestResult.stderr.trim()) {
+      console.error(latestResult.stderr.trim());
+    }
+
+    process.exitCode = 1;
+
+    return;
+  }
+
+  const latest = latestResult.stdout.trim();
+
+  check.succeed(`Latest version: v${latest}`);
+
   console.log('');
   console.log(`Current: v${current}`);
   console.log(`Latest : v${latest}`);
@@ -78,7 +133,9 @@ function main() {
 
   if (current === latest) {
     console.log('✓ ToolNet Memory is already up to date');
+
     console.log('');
+
     return;
   }
 
@@ -86,42 +143,83 @@ function main() {
 
   if (!prefix) {
     console.log('This appears to be a development checkout.');
+
     console.log('');
+
     console.log('Self-update is disabled for source checkouts.');
+
     console.log('');
+
     console.log('For the published CLI, install/update with:');
-    console.log('  npx toolnet-memory-install');
+
+    console.log('  npm install -g toolnet-memory@latest');
+
     console.log('');
-    process.exit(1);
+
+    process.exitCode = 1;
+
+    return;
   }
 
-  console.log(`Updating to v${latest}...`);
-  console.log('');
+  const install = new CliProgress(`Installing ToolNet Memory v${latest}`).start();
 
-  const result = run('npm', [
-    'install',
-    '-g',
-    '--prefix',
-    prefix,
-    `${PACKAGE}@latest`,
-    '--no-fund',
-    '--no-audit',
-    '--loglevel=error',
-  ]);
+  let result: RunResult;
+
+  try {
+    result = await run('npm', [
+      'install',
+      '-g',
+
+      '--prefix',
+      prefix,
+
+      `${PACKAGE}@${latest}`,
+
+      '--no-fund',
+      '--no-audit',
+
+      '--loglevel=error',
+    ]);
+  } catch (error) {
+    install.fail('ToolNet Memory update failed');
+
+    throw error;
+  }
 
   if (result.status !== 0) {
-    console.error('');
-    console.error('✗ Update failed');
-    console.error('');
-    console.error('You can retry using:');
-    console.error('  npx toolnet-memory-install');
+    install.fail('ToolNet Memory update failed');
 
-    process.exit(result.status ?? 1);
+    if (result.stderr.trim()) {
+      console.error('');
+      console.error(result.stderr.trim());
+    }
+
+    console.error('');
+    console.error('Retry with:');
+
+    console.error(`  npm install -g ${PACKAGE}@${latest}`);
+
+    console.error('');
+
+    process.exitCode = result.status || 1;
+
+    return;
   }
+
+  install.succeed(`Installed ToolNet Memory v${latest}`);
 
   console.log('');
   console.log(`✓ ToolNet Memory updated to v${latest}`);
+
   console.log('');
 }
 
-main();
+main().catch((error) => {
+  console.error('');
+
+  console.error(error instanceof Error ? error.message : String(error));
+
+  console.error('');
+
+  process.exitCode = 1;
+});

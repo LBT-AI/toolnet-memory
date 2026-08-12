@@ -4,6 +4,8 @@ import { resolve, join } from 'node:path';
 
 import { ProjectManager } from '../core/index.js';
 
+import { withProgress } from './cli-progress.js';
+
 export interface ToolNetInitResult {
   initialized: true;
 
@@ -92,7 +94,13 @@ async function main(): Promise<void> {
 
   const projectPath = explicitProject ?? positional ?? process.cwd();
 
-  const result = initializeToolNetProject(projectPath);
+  const result = await withProgress(
+    'Initializing ToolNet project',
+    () => initializeToolNetProject(projectPath),
+    {
+      enabled: !json,
+    }
+  );
 
   if (json) {
     console.log(JSON.stringify(result, null, 2));
