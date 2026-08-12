@@ -8,7 +8,7 @@ import {
 
 import { syncAgySession } from './adapter.js';
 
-import { installAgyHooks } from './hook-installer.js';
+import { installAgyPlugin } from './plugin-installer.js';
 
 import { recoverAgyProject } from './recovery.js';
 
@@ -45,12 +45,23 @@ function storageFor(project: ReturnType<ProjectManager['detect']>) {
 async function main() {
   const [command = 'help', ...args] = process.argv.slice(2);
 
-  if (command === 'install-hooks') {
-    const file = installAgyHooks({
+  if (command === 'install-hooks' || command === 'install-plugin') {
+    const result = installAgyPlugin({
       binary: after(args, '--bin'),
     });
 
-    console.log(`✅ Agy hooks installed: ${file}`);
+    console.log(`✅ ToolNet Antigravity plugin installed: ${result.pluginRoot}`);
+
+    for (const file of result.files) {
+      console.log(`  ✓ ${file}`);
+    }
+
+    if (result.migratedLegacy.length) {
+      console.log('  ✓ Legacy ToolNet Agy config migrated');
+    }
+
+    console.log('');
+    console.log('Restart Antigravity CLI before testing.');
 
     return;
   }
@@ -112,6 +123,7 @@ async function main() {
 
 Commands:
   install-hooks
+  install-plugin
   sync <conversation-id> --transcript <path>
   recover [--project PATH] [--limit N]
 `

@@ -6,9 +6,7 @@ import { join } from 'node:path';
 
 import { spawnSync } from 'node:child_process';
 
-import { installAgyHooks } from '../session/agy/hook-installer.js';
-
-import { installAgyMcp } from '../session/agy/mcp-installer.js';
+import { installAgyPlugin } from '../session/agy/plugin-installer.js';
 
 import { installOpenCodePlugin } from '../session/opencode/plugin-installer.js';
 
@@ -80,11 +78,7 @@ export function installAutoIntegrations(
       });
     } else {
       try {
-        const hooks = installAgyHooks({
-          binary,
-        });
-
-        const mcp = installAgyMcp({
+        const plugin = installAgyPlugin({
           binary,
         });
 
@@ -95,7 +89,7 @@ export function installAutoIntegrations(
 
           installed: true,
 
-          targets: [hooks, mcp.configFile],
+          targets: plugin.files,
         });
       } catch (error) {
         results.push({
