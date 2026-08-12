@@ -16,6 +16,8 @@ import { loadWorkState, reconcileWorkState } from './reducer.js';
 
 import type { WorkItem, WorkState } from './types.js';
 
+import { buildHandoffStateV2, type HandoffStateV2 } from './handoff-state.js';
+
 export interface SmartHandoff {
   version: 1;
 
@@ -67,6 +69,13 @@ export interface SmartHandoff {
   tests: string[];
 
   stateDigest: string;
+
+  /**
+   * Canonical compact cross-agent continuation state.
+   *
+   * Legacy top-level fields remain for backwards compatibility.
+   */
+  continuity: HandoffStateV2;
 }
 
 function substantiveState(state: WorkState) {
@@ -168,7 +177,23 @@ export class SmartHandoffManager {
       ? manual.rules.filter((rule) => rule.mode === 'enforce').map((rule) => rule.text)
       : [];
 
-    const stateDigest = sha256(JSON.stringify(substantiveState(state)));
+    const attention = [...enforceRules, ...state.warnings].slice(0, 20);
+
+    const continuity = buildHandoffStateV2({
+      project: this.options.project,
+
+      identity: this.options.identity,
+
+      state,
+
+      reason,
+
+      sequence,
+
+      attention,
+    });
+
+    const stateDigest = continuity.stateDigest;
 
     /*
      * Stable handoff ID.
@@ -231,13 +256,15 @@ export class SmartHandoffManager {
 
       warnings: state.warnings.slice(-10),
 
-      attention: [...enforceRules, ...state.warnings].slice(0, 20),
+      attention,
 
       filesTouched: state.filesTouched.slice(-20),
 
       tests: state.tests.slice(-15),
 
       stateDigest,
+
+      continuity,
     };
 
     const remoteKey = `projects/${this.options.project.id}/work/handoffs/${id}.json`;

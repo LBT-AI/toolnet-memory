@@ -1,0 +1,277 @@
+import type { ProjectManifest } from '../core/types.js';
+
+import type { SessionIdentity } from '../session/types.js';
+
+import { sha256 } from '../session/utils.js';
+
+import type { WorkItem, WorkState } from './types.js';
+
+export type HandoffTestStatus = 'passing' | 'failing' | 'unknown';
+
+export interface HandoffWorkItem {
+  id: string;
+
+  title: string;
+
+  status: WorkItem['status'];
+}
+
+export interface HandoffStateV2 {
+  schema: 'toolnet.handoff.v2';
+
+  version: 2;
+
+  project: {
+    id: string;
+
+    name: string;
+  };
+
+  source: {
+    agent: SessionIdentity['agent'];
+
+    nativeSessionId: string;
+
+    sessionKey: string;
+
+    sequence: number;
+
+    reason: string;
+  };
+
+  capturedAt: string;
+
+  goal?: string;
+
+  current: {
+    phase?: HandoffWorkItem;
+
+    task?: HandoffWorkItem;
+
+    file?: string;
+  };
+
+  completed: {
+    phases: string[];
+
+    tasks: string[];
+  };
+
+  remaining: {
+    phases: string[];
+
+    tasks: string[];
+
+    todos: string[];
+  };
+
+  nextAction?: string;
+
+  blockers: string[];
+
+  decisions: string[];
+
+  files: {
+    current?: string;
+
+    recent: string[];
+  };
+
+  tests: {
+    status: HandoffTestStatus;
+
+    recent: string[];
+  };
+
+  attention: string[];
+
+  progress: WorkState['progress'];
+
+  stateDigest: string;
+}
+
+function compact(values: string[], limit: number): string[] {
+  const seen = new Set<string>();
+
+  const output: string[] = [];
+
+  for (const raw of values) {
+    const value = raw.replace(/\s+/g, ' ').trim();
+
+    if (!value) {
+      continue;
+    }
+
+    const key = value.normalize('NFKC').toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+
+    output.push(value);
+
+    if (output.length >= limit) {
+      break;
+    }
+  }
+
+  return output;
+}
+
+function workItem(item: WorkItem | undefined): HandoffWorkItem | undefined {
+  if (!item) {
+    return undefined;
+  }
+
+  return {
+    id: item.id,
+
+    title: item.title,
+
+    status: item.status,
+  };
+}
+
+function inferTestStatus(tests: string[]): HandoffTestStatus {
+  const recent = tests.slice(-10).join('\n').toLowerCase();
+
+  if (/(?:failed|failing|failure|error|✗|❌)/u.test(recent)) {
+    return 'failing';
+  }
+
+  if (/(?:passed|passing|green|success|✓|✅)/u.test(recent)) {
+    return 'passing';
+  }
+
+  return 'unknown';
+}
+
+function digestPayload(value: unknown): string {
+  return sha256(JSON.stringify(value));
+}
+
+export function buildHandoffStateV2(options: {
+  project: ProjectManifest;
+
+  identity: SessionIdentity;
+
+  state: WorkState;
+
+  reason: string;
+
+  sequence: number;
+
+  attention?: string[];
+
+  capturedAt?: string;
+}): HandoffStateV2 {
+  const { project, identity, state } = options;
+
+  const currentFile = state.filesTouched.at(-1);
+
+  const completedPhases = state.phases
+    .filter((item) => item.status === 'completed')
+    .map((item) => item.title);
+
+  const completedTasks = state.tasks
+    .filter((item) => item.status === 'completed')
+    .map((item) => item.title);
+
+  const remainingPhases = state.phases
+    .filter((item) => item.status !== 'completed' && item.status !== 'cancelled')
+    .map((item) => item.title);
+
+  const remainingTasks = state.tasks
+    .filter((item) => item.status !== 'completed' && item.status !== 'cancelled')
+    .map((item) => item.title);
+
+  const nextActions = compact(state.nextActions, 10);
+
+  const todos = compact([...remainingTasks, ...nextActions], 15);
+
+  const recentTests = compact(state.tests.slice().reverse(), 10);
+
+  const recentFiles = compact(state.filesTouched.slice().reverse(), 20);
+
+  const withoutDigest: Omit<HandoffStateV2, 'stateDigest'> = {
+    schema: 'toolnet.handoff.v2',
+
+    version: 2,
+
+    project: {
+      id: project.id,
+
+      name: project.name,
+    },
+
+    source: {
+      agent: identity.agent,
+
+      nativeSessionId: identity.nativeSessionId,
+
+      sessionKey: identity.sessionKey,
+
+      sequence: options.sequence,
+
+      reason: options.reason,
+    },
+
+    capturedAt: options.capturedAt ?? new Date().toISOString(),
+
+    goal: state.goal,
+
+    current: {
+      phase: workItem(state.currentPhase),
+
+      task: workItem(state.currentTask),
+
+      file: currentFile,
+    },
+
+    completed: {
+      phases: compact(completedPhases, 20),
+
+      tasks: compact(completedTasks, 30),
+    },
+
+    remaining: {
+      phases: compact(remainingPhases, 20),
+
+      tasks: compact(remainingTasks, 30),
+
+      todos,
+    },
+
+    nextAction: nextActions[0],
+
+    blockers: compact(state.blockers.slice().reverse(), 10),
+
+    decisions: compact(state.decisions.slice().reverse(), 10),
+
+    files: {
+      current: currentFile,
+
+      recent: recentFiles,
+    },
+
+    tests: {
+      status: inferTestStatus(state.tests),
+
+      recent: recentTests,
+    },
+
+    attention: compact(options.attention ?? [], 20),
+
+    progress: state.progress,
+  };
+
+  const { capturedAt: _capturedAt, source: _source, ...stable } = withoutDigest;
+
+  return {
+    ...withoutDigest,
+
+    stateDigest: digestPayload(stable),
+  };
+}
