@@ -59,12 +59,56 @@ function jsonText(value: unknown) {
   };
 }
 
-export function createMCPServer(ctx: MCPContext) {
-  const server = new McpServer({
-    name: 'toolnet-memory',
+export const TOOLNET_MCP_SERVER_INSTRUCTIONS = [
+  '# ToolNet Memory — Persistent Project Continuity',
+  '',
+  'ToolNet Memory provides persistent work continuity across coding agents and sessions.',
+  '',
+  'CONTINUITY RULES:',
+  '',
+  '1. When the user asks to continue, resume, finish, pick up, or return to previous work,',
+  '   call memory_agent_ask BEFORE reconstructing previous work from git, files, or session history.',
+  '',
+  '2. Use memory_agent_ask with mode="local" for direct continuity facts such as:',
+  '   - current task',
+  '   - completed work',
+  '   - current/last file',
+  '   - TODOs',
+  '   - blockers',
+  '   - next action',
+  '',
+  '3. Use mode="ai" only when the continuity question is ambiguous or requires synthesis.',
+  '',
+  '4. NEVER reconstruct previous work by reading or searching raw agent/session history, including:',
+  '   - .toolnet/sessions/**',
+  '   - state.json',
+  '   - events.jsonl',
+  '   - raw transcripts',
+  '   - ~/.gemini/antigravity-cli/brain/**',
+  "   - another coding agent's internal session history",
+  '',
+  '5. Do not search the filesystem for the implementation or JSON schema of memory_agent_ask.',
+  '   Invoke the MCP tool directly.',
+  '',
+  '6. After ToolNet resolves continuity, inspect the current repository only to verify current truth.',
+  '   Current repository evidence overrides stale memory.',
+  '',
+  '7. Do not ask the user to repeat project context already available through ToolNet Memory.',
+  '',
+  '8. Do not call memory_agent_ask for unrelated coding questions when current context is sufficient.',
+].join('\\n');
 
-    version: '0.1.0',
-  });
+export function createMCPServer(ctx: MCPContext) {
+  const server = new McpServer(
+    {
+      name: 'toolnet-memory',
+
+      version: '0.1.0',
+    },
+    {
+      instructions: TOOLNET_MCP_SERVER_INSTRUCTIONS,
+    }
+  );
 
   server.tool(
     'memory_search',
