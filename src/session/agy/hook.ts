@@ -139,10 +139,51 @@ export function normalizeAgyInput(input: Record<string, unknown>): NormalizedInp
   };
 }
 
+export function buildAgyPreToolUseOutput(input: Record<string, unknown>): Record<string, unknown> {
+  const toolCall =
+    typeof input.toolCall === 'object' && input.toolCall !== null
+      ? (input.toolCall as Record<string, unknown>)
+      : {};
+
+  const args =
+    typeof toolCall.args === 'object' && toolCall.args !== null
+      ? (toolCall.args as Record<string, unknown>)
+      : {};
+
+  let serialized = '';
+
+  try {
+    serialized = JSON.stringify(args).replace(/\\\\/g, '/').toLowerCase();
+  } catch {
+    serialized = '';
+  }
+
+  if (serialized.includes('.toolnet/sessions')) {
+    return {
+      decision: 'deny',
+
+      reason:
+        'ToolNet continuity guard: do not replay raw .toolnet/sessions history. ' +
+        'Use the injected continuity handoff. If deeper history is required, ' +
+        'invoke memory_agent_ask directly.',
+    };
+  }
+
+  return {
+    decision: 'allow',
+  };
+}
+
 async function main() {
-  const phase = (process.argv[2] ?? 'post') as 'pre' | 'post' | 'stop';
+  const phase = (process.argv[2] ?? 'post') as 'pre' | 'post' | 'stop' | 'pre-tool';
 
   const input = await readStdin();
+
+  if (phase === 'pre-tool') {
+    process.stdout.write(JSON.stringify(buildAgyPreToolUseOutput(input)));
+
+    return;
+  }
 
   const normalized = normalizeAgyInput(input);
 
@@ -259,6 +300,8 @@ async function main() {
 main().catch(() => {
   if (process.argv[2] === 'stop') {
     process.stdout.write('{"decision":"stop"}');
+  } else if (process.argv[2] === 'pre-tool') {
+    process.stdout.write('{"decision":"allow"}');
   } else {
     process.stdout.write('{}');
   }

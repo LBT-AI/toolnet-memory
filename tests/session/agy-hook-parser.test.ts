@@ -112,6 +112,38 @@ describe('Agy Hook Input Parser', () => {
     expect(normalized.error).toBe('timeout occurred');
   });
 
+  it('blocks raw ToolNet session replay and allows normal source reads', async () => {
+    const { buildAgyPreToolUseOutput } = await import('../../src/session/agy/hook.js');
+
+    const blocked = buildAgyPreToolUseOutput({
+      toolCall: {
+        name: 'view_file',
+
+        args: {
+          AbsolutePath: '/tmp/project/.toolnet/sessions/codex/session/events.jsonl',
+        },
+      },
+    });
+
+    expect(blocked.decision).toBe('deny');
+
+    expect(String(blocked.reason)).toContain('memory_agent_ask');
+
+    const allowed = buildAgyPreToolUseOutput({
+      toolCall: {
+        name: 'view_file',
+
+        args: {
+          AbsolutePath: '/tmp/project/src/index.ts',
+        },
+      },
+    });
+
+    expect(allowed).toEqual({
+      decision: 'allow',
+    });
+  });
+
   it('handles empty input gracefully', async () => {
     const input = {};
 

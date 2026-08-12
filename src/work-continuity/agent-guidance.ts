@@ -46,6 +46,12 @@ Rules:
 
 - Never invent previous work.
 - Current repository evidence overrides stale memory.
+- NEVER reconstruct previous work by reading ToolNet internal session files.
+- NEVER read/list/search .toolnet/sessions/**, session state.json,
+  events.jsonl, or raw transcripts to discover previous-agent state.
+- Do not search the filesystem for the implementation/schema of
+  memory_agent_ask. Invoke the MCP tool directly when deeper
+  continuity is required.
 - Do not dump raw transcripts or full memory.
 - After receiving the ToolNet answer, continue the task
   instead of asking the user to repeat known context.
@@ -69,8 +75,19 @@ export function memoryAgentStartupGuidance(): string {
 Tool:
 - ${MEMORY_AGENT_TOOL}
 
-If the user asks to resume previous work and the fast context
-is insufficient, call ${MEMORY_AGENT_TOOL} before guessing.
+For resume/continue requests:
+
+1. Use the injected ToolNet continuity handoff FIRST.
+2. If the handoff is missing or ambiguous, invoke
+   ${MEMORY_AGENT_TOOL} directly BEFORE repository/history exploration.
+3. NEVER reconstruct prior work from:
+   - .toolnet/sessions/**
+   - state.json
+   - events.jsonl
+   - raw transcripts
+4. NEVER search for the implementation/schema of
+   ${MEMORY_AGENT_TOOL}; invoke the MCP tool directly.
+5. Inspect git/source only AFTER continuity context is known.
 
 Use:
 - mode="local" for current task, last file, blocker or next action.

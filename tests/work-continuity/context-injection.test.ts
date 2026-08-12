@@ -151,7 +151,7 @@ Phase 4.
       now: 1000000,
     });
 
-    expect(JSON.stringify(first)).toContain('userMessage');
+    expect(JSON.stringify(first)).toContain('ephemeralMessage');
 
     const second = await buildAgyPreInvocationOutput({
       project: p,
@@ -168,6 +168,141 @@ Phase 4.
     });
 
     expect(second).toEqual({});
+  });
+
+  it('Agy injects compact task/file/TODO/next action without session replay', async () => {
+    const p = project();
+
+    const storage = new MemoryStorage();
+
+    const now = new Date().toISOString();
+
+    const currentTask = {
+      id: 'task-current',
+
+      title: 'Fix Mercedes card price visibility',
+
+      status: 'in_progress',
+
+      confidence: 1,
+
+      updatedAt: now,
+
+      updatedBy: {
+        agent: 'codex',
+
+        nativeSessionId: 'codex-old',
+
+        eventId: 'event-current',
+      },
+    };
+
+    await storage.put(
+      `projects/${p.id}/work/current.json`,
+      JSON.stringify({
+        version: 1,
+
+        projectId: p.id,
+
+        projectName: p.name,
+
+        goal: 'Finish Mercedes UI fix',
+
+        phases: [],
+
+        tasks: [
+          {
+            id: 'task-done',
+
+            title: 'Locate price card CSS',
+
+            status: 'completed',
+
+            confidence: 1,
+
+            updatedAt: now,
+
+            updatedBy: {
+              agent: 'codex',
+
+              nativeSessionId: 'codex-old',
+
+              eventId: 'event-done',
+            },
+          },
+
+          currentTask,
+        ],
+
+        decisions: [],
+
+        blockers: [],
+
+        warnings: [],
+
+        nextActions: ['Change price text color and verify the card'],
+
+        filesTouched: ['src/components/PriceCard.tsx'],
+
+        tests: [],
+
+        currentTask,
+
+        progress: {
+          phasesTotal: 0,
+
+          phasesCompleted: 0,
+
+          tasksTotal: 2,
+
+          tasksCompleted: 1,
+
+          blocked: 0,
+        },
+
+        lastSession: {
+          agent: 'codex',
+
+          nativeSessionId: 'codex-old',
+
+          sessionKey: 'codex:codex-old',
+
+          updatedAt: now,
+        },
+
+        updatedAt: now,
+      })
+    );
+
+    const markers = mkdtempSync(join(tmpdir(), 'toolnet-compact-handoff-'));
+
+    roots.push(markers);
+
+    const output = await buildAgyPreInvocationOutput({
+      project: p,
+
+      storage,
+
+      conversationId: 'agy-new',
+
+      invocationNum: 0,
+
+      markerDirectory: markers,
+    });
+
+    const rendered = JSON.stringify(output);
+
+    expect(rendered).toContain('ephemeralMessage');
+
+    expect(rendered).toContain('Fix Mercedes card price visibility');
+
+    expect(rendered).toContain('src/components/PriceCard.tsx');
+
+    expect(rendered).toContain('Change price text color and verify the card');
+
+    expect(rendered).toContain('NEVER inspect .toolnet/sessions');
+
+    expect(rendered).toContain('memory_agent_ask');
   });
 
   it('Agy reinjects when an old conversation is resumed after a long pause', async () => {
@@ -209,7 +344,7 @@ Phase 4.
       now: 1_000_000 + 7 * 60 * 60 * 1000,
     });
 
-    expect(JSON.stringify(resumed)).toContain('userMessage');
+    expect(JSON.stringify(resumed)).toContain('ephemeralMessage');
   });
 
   it('Codex SessionStart returns model-visible project continuity', async () => {

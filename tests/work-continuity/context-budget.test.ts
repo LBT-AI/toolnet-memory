@@ -133,13 +133,15 @@ describe('Context Budget Enforcement', () => {
     });
 
     it('no transcript dumping in startup', () => {
-      // Fast context does not read transcripts
+      // Policy guidance may mention transcripts by name.
+      // What must never appear is raw session/transcript payload.
       const context = buildFastProjectContext();
 
       if (context) {
-        // Context should not contain transcript markers
-        expect(context).not.toContain('transcript');
-        expect(context).not.toContain('conversation');
+        expect(context).not.toMatch(/transcriptPath\\s*[:=]/i);
+        expect(context).not.toMatch(/conversation(?:Id|_id)\\s*[:=]/i);
+        expect(context).not.toMatch(/"sourceEventId"\\s*:/i);
+        expect(context).not.toMatch(/"nativeSessionId"\\s*:/i);
       }
     });
   });

@@ -45,6 +45,28 @@ export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
   root['toolnet-memory'] = {
     enabled: true,
 
+    /*
+     * Prevent raw ToolNet session replay.
+     *
+     * Compact continuity belongs in PreInvocation.
+     * Deep history belongs behind memory_agent_ask.
+     */
+    PreToolUse: [
+      {
+        matcher: 'view_file|list_dir|find_by_name|grep_search|run_command',
+
+        hooks: [
+          {
+            type: 'command',
+
+            command: `${command} pre-tool`,
+
+            timeout: 5,
+          },
+        ],
+      },
+    ],
+
     PreInvocation: [
       {
         type: 'command',
