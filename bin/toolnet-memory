@@ -181,6 +181,11 @@ case "$COMMAND" in
     exit 1
     ;;
 
+  integrate:detect)
+    shift
+    run bundle/auto-integrate.js src/production/auto-integrate.ts --detect-only "$@"
+    ;;
+
   integrate:auto)
     shift
     run bundle/auto-integrate.js src/production/auto-integrate.ts "$@"
@@ -506,10 +511,15 @@ case "$COMMAND" in
     cat <<'HELP'
 ToolNet Memory - Project Context & Memory System
 
+INTEGRATIONS:
+  toolnet-memory integrate:detect         Detect Agy, Codex and OpenCode
+  toolnet-memory integrate:auto           Detect and enable integrations
+
 PROJECT SETUP:
   toolnet-memory init [path]             Initialize ToolNet for a project
   toolnet-memory init --project <path>   Initialize an explicit project
   toolnet-memory init --json             Print machine-readable result
+  toolnet-memory init --no-integrate     Skip automatic agent integration
 
 FAST CONTEXT (default):
   toolnet-memory                          Print fast project context (default)

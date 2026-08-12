@@ -1,10 +1,4 @@
-import { existsSync } from 'node:fs';
-
-import { homedir } from 'node:os';
-
-import { join } from 'node:path';
-
-import { spawnSync } from 'node:child_process';
+import { detectAgentIntegrations, type AgentDetection } from './integration-detection.js';
 
 import { installAgyPlugin } from '../session/agy/plugin-installer.js';
 
@@ -30,24 +24,8 @@ export interface AutoIntegrationResult {
   error?: string;
 }
 
-function commandExists(command: string): boolean {
-  const result = spawnSync('sh', ['-lc', `command -v ${JSON.stringify(command)} >/dev/null 2>&1`], {
-    stdio: 'ignore',
-  });
-
-  return result.status === 0;
-}
-
-function detectAgy(): boolean {
-  return commandExists('agy') || existsSync(join(homedir(), '.gemini'));
-}
-
-function detectOpenCode(): boolean {
-  return commandExists('opencode') || existsSync(join(homedir(), '.config', 'opencode'));
-}
-
-function detectCodex(): boolean {
-  return commandExists('codex') || existsSync(process.env.CODEX_HOME ?? join(homedir(), '.codex'));
+export function detectAutoIntegrations(): AgentDetection[] {
+  return detectAgentIntegrations();
 }
 
 export function installAutoIntegrations(
@@ -60,13 +38,17 @@ export function installAutoIntegrations(
 
   const results: AutoIntegrationResult[] = [];
 
+  const detections = detectAutoIntegrations();
+
+  const detected = new Map(detections.map((item) => [item.agent, item.detected]));
+
   /*
    * Agy / Antigravity
    */
   {
-    const detected = options.force === true || detectAgy();
+    const isDetected = options.force === true || detected.get('agy') === true;
 
-    if (!detected) {
+    if (!isDetected) {
       results.push({
         agent: 'agy',
 
@@ -111,9 +93,9 @@ export function installAutoIntegrations(
    * OpenCode
    */
   {
-    const detected = options.force === true || detectOpenCode();
+    const isDetected = options.force === true || detected.get('opencode') === true;
 
-    if (!detected) {
+    if (!isDetected) {
       results.push({
         agent: 'opencode',
 
@@ -162,9 +144,9 @@ export function installAutoIntegrations(
    * Codex
    */
   {
-    const detected = options.force === true || detectCodex();
+    const isDetected = options.force === true || detected.get('codex') === true;
 
-    if (!detected) {
+    if (!isDetected) {
       results.push({
         agent: 'codex',
 
@@ -226,6 +208,32 @@ export function installAutoIntegrations(
   return results;
 }
 
+function printDetections(detections: AgentDetection[]): void {
+  console.log('');
+  console.log('ToolNet Memory Integration Detection');
+  console.log('====================================');
+  console.log('');
+
+  for (const item of detections) {
+    const name =
+      item.agent === 'agy' ? 'Agy / Antigravity' : item.agent === 'opencode' ? 'OpenCode' : 'Codex';
+
+    if (!item.detected) {
+      console.log(`○ ${name}: not detected`);
+
+      continue;
+    }
+
+    console.log(`✓ ${name}: detected`);
+
+    for (const evidence of item.evidence) {
+      console.log(`  ${evidence}`);
+    }
+  }
+
+  console.log('');
+}
+
 function printResults(results: AutoIntegrationResult[]): void {
   console.log('');
   console.log('ToolNet Memory AI Integrations');
@@ -268,6 +276,22 @@ async function main() {
   const force = args.includes('--all');
 
   const json = args.includes('--json');
+
+  const detectOnly = args.includes('--detect-only');
+
+  if (detectOnly) {
+    const detections = detectAutoIntegrations();
+
+    if (json) {
+      console.log(JSON.stringify(detections, null, 2));
+
+      return;
+    }
+
+    printDetections(detections);
+
+    return;
+  }
 
   const results = installAutoIntegrations({
     force,

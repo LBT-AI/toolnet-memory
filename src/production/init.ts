@@ -6,6 +6,8 @@ import { ProjectManager } from '../core/index.js';
 
 import { withProgress } from './cli-progress.js';
 
+import { installAutoIntegrations, type AutoIntegrationResult } from './auto-integrate.js';
+
 export interface ToolNetInitResult {
   initialized: true;
 
@@ -86,6 +88,8 @@ async function main(): Promise<void> {
 
   const json = args.includes('--json');
 
+  const autoIntegrate = !args.includes('--no-integrate');
+
   const explicitProject = valueAfter(args, '--project');
 
   const positional = args.find(
@@ -102,8 +106,30 @@ async function main(): Promise<void> {
     }
   );
 
+  let integrations: AutoIntegrationResult[] = [];
+
+  if (autoIntegrate) {
+    integrations = await withProgress(
+      'Detecting AI coding agents',
+      () => installAutoIntegrations(),
+      {
+        enabled: !json,
+      }
+    );
+  }
+
   if (json) {
-    console.log(JSON.stringify(result, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          ...result,
+
+          integrations,
+        },
+        null,
+        2
+      )
+    );
 
     return;
   }
@@ -119,6 +145,29 @@ async function main(): Promise<void> {
   console.log(`Root:     ${result.project.rootPath}`);
   console.log(`Manifest: ${result.manifestFile}`);
   console.log('');
+  if (autoIntegrate) {
+    console.log('AI integrations:');
+
+    const installed = integrations.filter((item) => item.detected && item.installed);
+
+    if (!installed.length) {
+      console.log('  ○ No supported coding agent detected');
+    } else {
+      for (const item of installed) {
+        const name =
+          item.agent === 'agy'
+            ? 'Agy / Antigravity'
+            : item.agent === 'opencode'
+              ? 'OpenCode'
+              : 'Codex';
+
+        console.log(`  ✓ ${name}`);
+      }
+    }
+
+    console.log('');
+  }
+
   console.log('Next: toolnet-memory doctor');
   console.log('');
 }
