@@ -7,6 +7,11 @@ import { Sanitizer } from '../security/sanitizer.js';
 import { ConflictDetector } from '../memory/conflict-detector.js';
 
 import {
+  planMemoryConsolidation,
+  type MemoryConsolidationResult,
+} from '../memory/consolidation.js';
+
+import {
   defaultExpiry,
   effectiveImportanceScore,
   isExpired,
@@ -191,6 +196,56 @@ export class MemoryEngine {
       .filter((result) => q.length === 0 || result.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
+  }
+
+  consolidate(projectId: string, now = Date.now()): MemoryConsolidationResult {
+    const plan = planMemoryConsolidation(this.list(projectId));
+
+    const canonicalIds: string[] = [];
+
+    let duplicatesRemoved = 0;
+
+    for (const group of plan.groups) {
+      const canonical = this.memories.get(group.canonicalId);
+
+      if (!canonical) {
+        continue;
+      }
+
+      canonical.tags = group.mergedTags;
+
+      canonical.metadata = {
+        ...(canonical.metadata ?? {}),
+
+        consolidation: {
+          version: 1,
+
+          consolidatedAt: new Date(now).toISOString(),
+
+          mergedIds: group.duplicateIds,
+
+          sources: group.mergedSources,
+        },
+      };
+
+      this.memories.set(canonical.id, canonical);
+
+      canonicalIds.push(canonical.id);
+
+      for (const duplicateId of group.duplicateIds) {
+        if (this.memories.delete(duplicateId)) {
+          duplicatesRemoved += 1;
+        }
+      }
+    }
+
+    return {
+      groupsConsolidated: canonicalIds.length,
+
+      duplicatesRemoved,
+
+      canonicalIds,
+    };
   }
 
   pruneExpired(projectId: string, now = Date.now()): number {
