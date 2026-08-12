@@ -4,9 +4,7 @@ import { createResilientAiRouter } from '../ai/router.js';
 
 import { answerMemoryQuestion } from './memory-query.js';
 
-import { loadLocalWorkState } from './local-work-state.js';
-
-import { readSessionOrigin } from './session-origin.js';
+import { retrieveMemoryContext } from './memory-retrieval.js';
 
 export interface MemoryAgentAnswer {
   answer: string;
@@ -31,51 +29,26 @@ function compactJson(value: unknown, maxChars: number): string {
 function buildMemoryContext(project: ProjectManifest, question: string): string {
   const direct = answerMemoryQuestion(project, question);
 
-  const origin = readSessionOrigin(project);
+  const retrieval = retrieveMemoryContext(project, question, {
+    maxFacts: 12,
 
-  const state = loadLocalWorkState(project);
+    maxChars: 3200,
+  });
 
-  const context = {
-    project: {
-      id: project.id,
+  return compactJson(
+    {
+      project: retrieval.context.project,
 
-      name: project.name,
+      intent: retrieval.intent,
+
+      directAnswer: direct.answer,
+
+      selectedMemory: retrieval.context.selectedFacts,
+
+      retrievalStats: retrieval.stats,
     },
-
-    directAnswer: direct.answer,
-
-    previousSession: origin,
-
-    workState: state
-      ? {
-          goal: state.goal,
-
-          plan: state.plan,
-
-          currentPhase: state.currentPhase,
-
-          currentTask: state.currentTask,
-
-          tasks: state.tasks,
-
-          blockers: state.blockers,
-
-          decisions: state.decisions,
-
-          nextActions: state.nextActions,
-
-          filesTouched: state.filesTouched,
-
-          tests: state.tests,
-
-          progress: state.progress,
-
-          lastSession: state.lastSession,
-        }
-      : null,
-  };
-
-  return compactJson(context, 7000);
+    4200
+  );
 }
 
 export async function askMemoryAgent(
