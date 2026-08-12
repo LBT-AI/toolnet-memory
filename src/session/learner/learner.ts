@@ -8,7 +8,7 @@ import type { NormalizedSessionEvent, SessionIdentity } from '../types.js';
 
 import type { SessionWal } from '../wal.js';
 
-import { extractLearnedMemories } from './extractor.js';
+import { runMemoryPipelineV2 } from '../../memory/pipeline-v2.js';
 
 import { SessionMemoryJournal } from './journal.js';
 
@@ -131,11 +131,13 @@ export class SessionMemoryLearner {
       };
     }
 
-    const candidates = extractLearnedMemories(
+    const pipeline = runMemoryPipelineV2(
       this.options.identity,
 
       read.events
     );
+
+    const candidates = pipeline.candidates;
 
     let journalWritten = false;
 
@@ -155,6 +157,26 @@ export class SessionMemoryLearner {
      * Advance only after immutable learning journal succeeds.
      * If journal write throws, next flush retries same range.
      */
+    this.options.wal.setSourceCursor('memory.pipeline.version', 2);
+
+    this.options.wal.setSourceCursor(
+      'memory.pipeline.normalized_events',
+      pipeline.stats.normalizedEvents
+    );
+
+    this.options.wal.setSourceCursor(
+      'memory.pipeline.persisted',
+      pipeline.stats.persistedCandidates
+    );
+
+    this.options.wal.setSourceCursor('memory.pipeline.permanent', pipeline.stats.permanent);
+
+    this.options.wal.setSourceCursor('memory.pipeline.task', pipeline.stats.task);
+
+    this.options.wal.setSourceCursor('memory.pipeline.session', pipeline.stats.session);
+
+    this.options.wal.setSourceCursor('memory.pipeline.transient', pipeline.stats.transient);
+
     this.options.wal.setSourceCursor('memory.learner.offset', read.nextOffset);
 
     return {
