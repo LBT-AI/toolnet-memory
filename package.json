@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.2.19",
+  "version": "0.2.20",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
