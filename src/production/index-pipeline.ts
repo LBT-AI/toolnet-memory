@@ -44,11 +44,25 @@ export interface IndexStageEvent {
   durationMs?: number;
 }
 
+export interface SourceIndexProgressEvent {
+  phase: 'scan' | 'parse';
+
+  current: number;
+
+  total: number;
+
+  file?: string;
+}
+
 export interface ProductionIndexOptions {
   onStage?: (event: IndexStageEvent) => void | Promise<void>;
+
+  onSourceProgress?: (event: SourceIndexProgressEvent) => void;
 }
 
 export interface ProductionIndexResult {
+  files: number;
+
   project: {
     id: string;
     name: string;
@@ -132,7 +146,11 @@ export async function runProductionIndex(
    * 1. SOURCE INDEX
    */
   const indexed = await stage('source-index', 'Source Index', async () => {
-    const result = await new RepositoryIndexer().index(project.id, project.rootPath);
+    const result = await new RepositoryIndexer().index(project.id, project.rootPath, {
+      onProgress: (event) => {
+        options.onSourceProgress?.(event);
+      },
+    });
 
     await graphStore.save({
       version: 1,
@@ -248,6 +266,8 @@ export async function runProductionIndex(
   });
 
   return {
+    files: indexed.files,
+
     project: {
       id: project.id,
 

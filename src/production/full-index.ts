@@ -4,7 +4,9 @@ import { join } from 'node:path';
 
 import { ProjectManager } from '../core/index.js';
 
-import { runProductionIndex } from './index-pipeline.js';
+import { runProductionIndex, type IndexStageId } from './index-pipeline.js';
+
+import { IndexLiveUI, type IndexUiStage } from './index-live-ui.js';
 
 const project = new ProjectManager().detect();
 
@@ -14,6 +16,47 @@ const lockFile = join(toolnetDir, 'index.lock');
 
 const statusFile = join(toolnetDir, 'last-index.json');
 
+const json = process.argv.includes('--json');
+
+const stages: IndexUiStage[] = [
+  {
+    id: 'source-index',
+    title: 'Source Index',
+  },
+  {
+    id: 'type-resolution',
+    title: 'Resolving refs',
+  },
+  {
+    id: 'rich-graph',
+    title: 'Building rich graph',
+  },
+  {
+    id: 'semantic-index',
+    title: 'Semantic index',
+  },
+  {
+    id: 'architecture',
+    title: 'Architecture intelligence',
+  },
+  {
+    id: 'analysis',
+    title: 'Graph analysis',
+  },
+  {
+    id: 'visualization',
+    title: 'Visualization dataset',
+  },
+];
+
+const ui = new IndexLiveUI({
+  rootPath: project.rootPath,
+
+  stages,
+
+  enabled: !json,
+});
+
 mkdirSync(toolnetDir, {
   recursive: true,
 });
@@ -21,6 +64,7 @@ mkdirSync(toolnetDir, {
 function writeStatus(value: Record<string, unknown>) {
   writeFileSync(statusFile, JSON.stringify(value, null, 2) + '\n', {
     encoding: 'utf8',
+
     mode: 0o600,
   });
 }
@@ -42,38 +86,38 @@ const startedAt = new Date().toISOString();
 const completedStages: string[] = [];
 
 try {
-  console.log();
-  console.log('==============================================');
-
-  console.log(' ToolNet Production Index');
-
-  console.log('==============================================');
-
-  console.log(`Project : ${project.name}`);
-
-  console.log(`Remote  : projects/${project.remote ?? project.name}/`);
-
-  console.log('Runtime : production/dist');
-
-  console.log('Snapshot: disabled');
+  ui.start();
 
   writeStatus({
     version: 2,
+
     state: 'running',
+
     startedAt,
+
     completedStages,
+
     project,
   });
 
   const result = await runProductionIndex(project, {
+    onSourceProgress: (event) => {
+      if (event.phase === 'scan') {
+        ui.scanningComplete(event.total);
+
+        return;
+      }
+
+      ui.parsingProgress(event.current, event.total);
+    },
+
     onStage: async (event) => {
       if (event.state === 'start') {
-        console.log();
-        console.log(`===== ${event.title} =====`);
+        ui.startStage(event.id, event.title);
       } else {
         completedStages.push(event.id);
 
-        console.log(`✅ ${event.title} (${((event.durationMs ?? 0) / 1000).toFixed(1)}s)`);
+        ui.completeStage(event.id, event.title, event.durationMs ?? 0);
       }
 
       writeStatus({
@@ -106,15 +150,24 @@ try {
     result,
   });
 
-  console.log();
-  console.log('==============================================');
+  if (json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    ui.finish({
+      files: result.files,
 
-  console.log(' FULL INDEX COMPLETE ✅');
+      symbols: result.graph.symbols,
 
-  console.log('==============================================');
+      edges: result.graph.edges,
 
-  console.log(JSON.stringify(result, null, 2));
+      durationMs: result.durationMs,
+
+      storage: result.storage,
+    });
+  }
 } catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+
   writeStatus({
     version: 2,
 
@@ -126,12 +179,14 @@ try {
 
     completedStages,
 
-    error: error instanceof Error ? error.message : String(error),
+    error: message,
   });
 
-  console.error('FULL INDEX FAILED ❌');
+  ui.fail(`Full index failed: ${message}`);
 
-  console.error(error);
+  if (json) {
+    console.error(message);
+  }
 
   process.exitCode = 1;
 } finally {
