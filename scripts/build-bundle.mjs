@@ -8,6 +8,7 @@ fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 
 const entries = {
+  init: 'src/production/init.ts',
   update: 'src/production/update.ts',
   config: 'src/production/config-cli.ts',
 

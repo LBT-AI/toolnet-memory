@@ -41,6 +41,11 @@ run() {
 }
 
 case "$COMMAND" in
+  init)
+    shift
+    run bundle/init.js src/production/init.ts "$@"
+    ;;
+
   ask)
     shift
     run bundle/memory-query.js src/work-continuity/memory-query-cli.ts "$@"
@@ -500,6 +505,11 @@ case "$COMMAND" in
   help|--help|-h)
     cat <<'HELP'
 ToolNet Memory - Project Context & Memory System
+
+PROJECT SETUP:
+  toolnet-memory init [path]             Initialize ToolNet for a project
+  toolnet-memory init --project <path>   Initialize an explicit project
+  toolnet-memory init --json             Print machine-readable result
 
 FAST CONTEXT (default):
   toolnet-memory                          Print fast project context (default)
