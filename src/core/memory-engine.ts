@@ -11,6 +11,8 @@ import {
   type MemoryConsolidationResult,
 } from '../memory/consolidation.js';
 
+import { assessMemoryQuality, type MemoryLifecycleResult } from '../memory/lifecycle.js';
+
 import {
   defaultExpiry,
   effectiveImportanceScore,
@@ -246,6 +248,70 @@ export class MemoryEngine {
 
       canonicalIds,
     };
+  }
+
+  reviewLifecycle(projectId: string, now = Date.now()): MemoryLifecycleResult {
+    const result: MemoryLifecycleResult = {
+      reviewed: 0,
+
+      trusted: 0,
+
+      useful: 0,
+
+      weak: 0,
+
+      noise: 0,
+
+      stale: 0,
+
+      protected: 0,
+
+      pruned: 0,
+    };
+
+    for (const memory of this.list(projectId)) {
+      const assessment = assessMemoryQuality(memory, now);
+
+      result.reviewed += 1;
+
+      result[assessment.tier] += 1;
+
+      if (assessment.stale) {
+        result.stale += 1;
+      }
+
+      if (assessment.protected) {
+        result.protected += 1;
+      }
+
+      memory.metadata = {
+        ...(memory.metadata ?? {}),
+
+        lifecycle: {
+          version: 1,
+
+          reviewedAt: new Date(now).toISOString(),
+
+          qualityScore: assessment.score,
+
+          tier: assessment.tier,
+
+          stale: assessment.stale,
+
+          protected: assessment.protected,
+
+          reasons: assessment.reasons,
+        },
+      };
+
+      this.memories.set(memory.id, memory);
+
+      if (assessment.pruneEligible && this.memories.delete(memory.id)) {
+        result.pruned += 1;
+      }
+    }
+
+    return result;
   }
 
   pruneExpired(projectId: string, now = Date.now()): number {

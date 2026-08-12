@@ -23,6 +23,13 @@ export class MemoryMaintenance {
      */
     const supersededRemoved = this.memory.pruneSuperseded(projectId, 30);
 
+    /*
+     * Quality/lifecycle review runs after structural cleanup.
+     * It annotates retained memory and conservatively removes
+     * only weak/noise records that are safe to discard.
+     */
+    const lifecycle = this.memory.reviewLifecycle(projectId);
+
     return {
       expiredRemoved,
 
@@ -31,6 +38,19 @@ export class MemoryMaintenance {
       groupsConsolidated: consolidation.groupsConsolidated,
 
       duplicatesRemoved: consolidation.duplicatesRemoved,
+
+      lifecycleReviewed: lifecycle.reviewed,
+
+      lifecyclePruned: lifecycle.pruned,
+
+      quality: {
+        trusted: lifecycle.trusted,
+        useful: lifecycle.useful,
+        weak: lifecycle.weak,
+        noise: lifecycle.noise,
+        stale: lifecycle.stale,
+        protected: lifecycle.protected,
+      },
 
       active: this.memory.list(projectId).length,
 
