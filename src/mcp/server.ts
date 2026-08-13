@@ -251,6 +251,7 @@ export function createMCPServer(ctx: MCPContext) {
       'Use mode=local for direct state facts and mode=ai for composite or ambiguous continuity questions.',
       'Do not use it for unrelated coding questions when current repository context is already sufficient.',
       'Returns concise selected memory instead of raw transcripts or full memory dumps.',
+      'Short conversational follow-ups are supported using compact ToolNet Memory focus; raw transcripts are never replayed.',
     ].join(' '),
     memoryAgentAskSchema,
     async (input) => jsonText(await memoryAgentAsk(ctx, input))
