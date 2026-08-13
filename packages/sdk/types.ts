@@ -322,6 +322,7 @@ export interface ToolNetApiWikiSummary {
     tags: string[];
     links: number;
     orphanPages: number;
+    automatedPages: number;
     updatedAt: string;
   };
 }

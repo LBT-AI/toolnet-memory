@@ -62,5 +62,6 @@ export interface WikiSummary {
   tags: string[];
   links: number;
   orphanPages: number;
+  automatedPages: number;
   updatedAt: string;
 }

@@ -160,6 +160,9 @@ export class WikiService {
       orphanPages: state.pages.filter(
         (page) => page.links.length === 0 && !backlinks.has(page.slug)
       ).length,
+      automatedPages: state.pages.filter((page) =>
+        page.tags.some((tag) => tag.startsWith('toolnet-auto-'))
+      ).length,
       updatedAt: state.updatedAt,
     };
   }

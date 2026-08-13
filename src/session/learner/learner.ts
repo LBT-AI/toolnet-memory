@@ -11,6 +11,7 @@ import type { SessionWal } from '../wal.js';
 import { runMemoryPipelineV2 } from '../../memory/pipeline-v2.js';
 
 import { offloadSessionEvents } from '../../memory/context-offload.js';
+import { promoteKnowledgeToWiki } from '../../wiki/automation.js';
 
 import { buildSkillMemoryAssets, persistSkillMemoryAssets } from '../../memory/skill-memory.js';
 
@@ -262,6 +263,40 @@ export class SessionMemoryLearner {
       this.options.wal.setSourceCursor('memory.context_offload.failed', 0);
     } catch {
       this.options.wal.setSourceCursor('memory.context_offload.failed', 1);
+    }
+
+    /*
+     * Knowledge Automation is a derived projection.
+     *
+     * Canonical hierarchy / Skill Memory / WAL remain authoritative.
+     * Wiki promotion is best-effort and must not block memory learning.
+     * The learner offset advances only after this attempt completes.
+     */
+    try {
+      const wikiAutomation = await promoteKnowledgeToWiki({
+        project: this.options.project,
+        storage: this.options.storage,
+        hierarchy: pipeline.hierarchy,
+      });
+
+      this.options.wal.setSourceCursor('memory.wiki_automation.scanned', wikiAutomation.scanned);
+
+      this.options.wal.setSourceCursor('memory.wiki_automation.eligible', wikiAutomation.eligible);
+
+      this.options.wal.setSourceCursor('memory.wiki_automation.created', wikiAutomation.created);
+
+      this.options.wal.setSourceCursor('memory.wiki_automation.updated', wikiAutomation.updated);
+
+      this.options.wal.setSourceCursor(
+        'memory.wiki_automation.unchanged',
+        wikiAutomation.unchanged
+      );
+
+      this.options.wal.setSourceCursor('memory.wiki_automation.skipped', wikiAutomation.skipped);
+
+      this.options.wal.setSourceCursor('memory.wiki_automation.failed', wikiAutomation.failed);
+    } catch {
+      this.options.wal.setSourceCursor('memory.wiki_automation.failed', 1);
     }
 
     this.options.wal.setSourceCursor('memory.learner.offset', read.nextOffset);
