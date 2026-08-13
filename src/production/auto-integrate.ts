@@ -12,8 +12,10 @@ import { installCodexContextHook } from '../session/codex/context-hook-installer
 
 import { installCodexMcp } from '../session/codex/mcp-installer.js';
 
+import { installClaudeIntegration } from '../session/claude/installer.js';
+
 export interface AutoIntegrationResult {
-  agent: 'agy' | 'opencode' | 'codex';
+  agent: 'agy' | 'opencode' | 'codex' | 'claude';
 
   detected: boolean;
 
@@ -141,6 +143,57 @@ export function installAutoIntegrations(
   }
 
   /*
+   * Claude Code
+   */
+  {
+    const isDetected = options.force === true || detected.get('claude') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'claude',
+
+        detected: false,
+
+        installed: false,
+
+        targets: [],
+      });
+    } else {
+      try {
+        const claude = installClaudeIntegration({
+          binary,
+        });
+
+        results.push({
+          agent: 'claude',
+
+          detected: true,
+
+          installed: true,
+
+          targets: [
+            claude.hooks.settingsFile,
+            claude.mcp.configFile,
+            `mcp:${claude.mcp.serverName}`,
+          ],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'claude',
+
+          detected: true,
+
+          installed: false,
+
+          targets: [],
+
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
    * Codex
    */
   {
@@ -216,7 +269,13 @@ function printDetections(detections: AgentDetection[]): void {
 
   for (const item of detections) {
     const name =
-      item.agent === 'agy' ? 'Agy / Antigravity' : item.agent === 'opencode' ? 'OpenCode' : 'Codex';
+      item.agent === 'agy'
+        ? 'Agy / Antigravity'
+        : item.agent === 'opencode'
+          ? 'OpenCode'
+          : item.agent === 'claude'
+            ? 'Claude Code'
+            : 'Codex';
 
     if (!item.detected) {
       console.log(`○ ${name}: not detected`);

@@ -250,6 +250,35 @@ case "$COMMAND" in
     exec "$TSX" "$ROOT/src/session/agy/cli.ts" install-hooks "$@"
     ;;
 
+  session:claude-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/claude-hook.js" ]; then
+      exec node "$ROOT/bundle/claude-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/claude/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/claude/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
+  integrate:claude)
+    shift
+
+    if [ -f "$ROOT/bundle/claude.js" ]; then
+      exec node "$ROOT/bundle/claude.js" install "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/claude/cli.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/claude/cli.ts" install "$@"
+    fi
+
+    echo "Claude Code integration installer not found."
+    exit 1
+    ;;
+
   session:codex-notify)
     shift
 

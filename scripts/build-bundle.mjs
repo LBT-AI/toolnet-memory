@@ -29,6 +29,8 @@ const entries = {
   opencode: 'src/session/opencode/cli.ts',
   agy: 'src/session/agy/cli.ts',
   'agy-hook': 'src/session/agy/hook.ts',
+  claude: 'src/session/claude/cli.ts',
+  'claude-hook': 'src/session/claude/hook.ts',
 
   codex: 'src/session/codex/cli.ts',
   'codex-context': 'src/session/codex/context-hook.ts',

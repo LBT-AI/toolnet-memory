@@ -10,7 +10,9 @@ import { agyDetectionPaths } from '../session/agy/config-paths.js';
 
 import { openCodeConfigDirectory } from '../session/opencode/config-paths.js';
 
-export type AgentIntegrationId = 'agy' | 'opencode' | 'codex';
+import { claudeConfigDirectory } from '../session/claude/config-paths.js';
+
+export type AgentIntegrationId = 'agy' | 'opencode' | 'codex' | 'claude';
 
 export interface AgentDetection {
   agent: AgentIntegrationId;
@@ -114,6 +116,20 @@ export function detectAgentIntegrations(
           home,
 
           xdgConfigHome: options.xdgConfigHome,
+        }),
+      ],
+    }),
+
+    detectOne({
+      agent: 'claude',
+
+      command: 'claude',
+
+      commandExists,
+
+      configPaths: [
+        claudeConfigDirectory({
+          home,
         }),
       ],
     }),
