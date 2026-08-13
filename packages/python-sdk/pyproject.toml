@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toolnet-memory-sdk"
+version = "0.2.21"
+description = "Python client for the ToolNet Memory HTTP API"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "ToolNet" }
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["toolnet_memory*"]

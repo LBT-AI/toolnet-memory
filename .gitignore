@@ -17,3 +17,7 @@ projects/
 *.bak-*
 toolnet-memory-backups/
 tmp/
+
+# Python generated cache
+__pycache__/
+*.py[cod]

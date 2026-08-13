@@ -57,7 +57,7 @@
     "code:visualization:test": "tsx src/code-intelligence/test-visualization.ts",
     "graph:ui": "tsx src/visualization/server.ts",
     "project:status": "tsx src/production/project-status.ts",
-    "build:prod": "npm run build && rm -rf dist/tests dist/visualization/public && mkdir -p dist/visualization/public/vendor && cp src/visualization/public/index.html dist/visualization/public/index.html && cp node_modules/3d-force-graph/dist/3d-force-graph.min.js dist/visualization/public/vendor/3d-force-graph.min.js && find dist -type f \\( -name \"*.bak-*\" -o -name \"*.map\" \\) -delete",
+    "build:prod": "npm run build && npm run build:sdk && rm -rf dist/tests dist/visualization/public && mkdir -p dist/visualization/public/vendor && cp src/visualization/public/index.html dist/visualization/public/index.html && cp node_modules/3d-force-graph/dist/3d-force-graph.min.js dist/visualization/public/vendor/3d-force-graph.min.js && find dist -type f \\( -name \"*.bak-*\" -o -name \"*.map\" \\) -delete",
     "prepack": "npm run build:prod",
     "session:test": "vitest run tests/session/session-core.test.ts",
     "session:opencode:test": "vitest run tests/session/opencode-adapter.test.ts",
@@ -70,7 +70,9 @@
     "semantic-work:test": "vitest run tests/work-continuity/semantic-context.test.ts",
     "context-injection:test": "vitest run tests/work-continuity/context-injection.test.ts",
     "build:bundle": "npm run build && node scripts/build-bundle.mjs",
-    "build:release": "npm run build:prod && node scripts/build-bundle.mjs"
+    "build:release": "npm run build:prod && node scripts/build-bundle.mjs",
+    "api": "tsx src/api/bootstrap.ts",
+    "build:sdk": "tsc -p tsconfig.sdk.json"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",
@@ -99,9 +101,16 @@
     "bundle",
     "bin/toolnet-memory",
     "README.md",
-    ".env.example"
+    ".env.example",
+    "dist/sdk"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "exports": {
+    "./sdk": {
+      "types": "./dist/sdk/public.d.ts",
+      "import": "./dist/sdk/public.js"
+    }
   }
 }

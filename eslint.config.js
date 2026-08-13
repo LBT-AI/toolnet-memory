@@ -7,7 +7,7 @@ export default [
     ignores: ['dist/', 'bundle/', 'node_modules/', '*.js', '*.mjs', '!eslint.config.js'],
   },
   {
-    files: ['src/**/*.ts', 'tests/**/*.ts'],
+    files: ['src/**/*.ts', 'tests/**/*.ts', 'packages/**/*.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {

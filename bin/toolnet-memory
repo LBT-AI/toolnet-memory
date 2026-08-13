@@ -111,6 +111,10 @@ case "$COMMAND" in
     run bundle/mcp.js src/mcp/bootstrap.ts
     ;;
 
+  api)
+    run bundle/api.js src/api/bootstrap.ts
+    ;;
+
   production:certify)
     run bundle/production-certify.js src/production/production-certify-cli.ts
     ;;
@@ -635,6 +639,7 @@ SETUP & INTEGRATION:
   toolnet-memory integrate:agy
   toolnet-memory integrate:codex
   toolnet-memory mcp
+  toolnet-memory api
 
 PRODUCTION:
   toolnet-memory production:certify             Verify packaged production runtime

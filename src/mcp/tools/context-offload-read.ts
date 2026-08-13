@@ -24,6 +24,9 @@ export interface ContextOffloadReadInput {
   maxChars?: number;
 }
 
-export async function contextOffloadRead(ctx: MCPContext, input: ContextOffloadReadInput) {
+export async function contextOffloadRead(
+  ctx: Pick<MCPContext, 'project'>,
+  input: ContextOffloadReadInput
+) {
   return readContextOffloadAsset(ctx.project.rootPath, input.assetId, input.maxChars ?? 6000);
 }

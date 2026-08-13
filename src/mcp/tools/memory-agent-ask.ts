@@ -34,7 +34,7 @@ export interface MemoryAgentAskInput {
   mode?: 'ai' | 'local';
 }
 
-export async function memoryAgentAsk(ctx: MCPContext, input: MemoryAgentAskInput) {
+export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: MemoryAgentAskInput) {
   const conversation = prepareMemoryConversation(ctx.project, input.question);
 
   /*

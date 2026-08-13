@@ -24,6 +24,7 @@ const entries = {
   setup: 'src/production/setup.ts',
   'auto-integrate': 'src/production/auto-integrate.ts',
   mcp: 'src/mcp/bootstrap.ts',
+  api: 'src/api/bootstrap.ts',
   snapshot: 'src/production/snapshot-cli.ts',
 
   opencode: 'src/session/opencode/cli.ts',

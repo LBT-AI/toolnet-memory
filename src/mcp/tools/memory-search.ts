@@ -8,7 +8,7 @@ export const memorySearchSchema = {
 };
 
 export async function memorySearch(
-  ctx: MCPContext,
+  ctx: Pick<MCPContext, 'project' | 'retrieval'>,
   input: {
     query: string;
     limit?: number;

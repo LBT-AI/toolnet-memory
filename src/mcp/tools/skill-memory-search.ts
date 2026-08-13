@@ -28,7 +28,10 @@ export interface SkillMemorySearchInput {
   limit?: number;
 }
 
-export async function skillMemorySearch(ctx: MCPContext, input: SkillMemorySearchInput) {
+export async function skillMemorySearch(
+  ctx: Pick<MCPContext, 'project'>,
+  input: SkillMemorySearchInput
+) {
   const matches = searchSkillMemory(ctx.project, input.query, input.limit ?? 5);
 
   return {

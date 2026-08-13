@@ -1,3 +1,2 @@
-export * from './client.js';
 export * from './remote-client.js';
 export * from './types.js';
