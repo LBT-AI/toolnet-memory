@@ -10,6 +10,8 @@ import type { SessionWal } from '../wal.js';
 
 import { runMemoryPipelineV2 } from '../../memory/pipeline-v2.js';
 
+import { offloadSessionEvents } from '../../memory/context-offload.js';
+
 import { SessionMemoryJournal } from './journal.js';
 
 import { SessionMemoryHierarchyJournal } from './hierarchy-journal.js';
@@ -221,6 +223,26 @@ export class SessionMemoryLearner {
       'memory.pipeline.hierarchy.journal_written',
       hierarchyJournalWritten ? 1 : 0
     );
+
+    /*
+     * T2 Context Offload is best-effort.
+     * Canonical WAL remains authoritative if local offload storage fails.
+     */
+    try {
+      const offload = offloadSessionEvents(this.options.project.rootPath, read.events);
+
+      this.options.wal.setSourceCursor('memory.context_offload.eligible', offload.eligible);
+
+      this.options.wal.setSourceCursor('memory.context_offload.written', offload.written);
+
+      this.options.wal.setSourceCursor('memory.context_offload.deduped', offload.deduped);
+
+      this.options.wal.setSourceCursor('memory.context_offload.graph_nodes', offload.graphNodes);
+
+      this.options.wal.setSourceCursor('memory.context_offload.failed', 0);
+    } catch {
+      this.options.wal.setSourceCursor('memory.context_offload.failed', 1);
+    }
 
     this.options.wal.setSourceCursor('memory.learner.offset', read.nextOffset);
 

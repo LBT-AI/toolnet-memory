@@ -45,6 +45,8 @@ import {
   deadCodeSchema,
   memoryAgentAsk,
   memoryAgentAskSchema,
+  contextOffloadRead,
+  contextOffloadReadSchema,
 } from './tools/index.js';
 
 function jsonText(value: unknown) {
@@ -96,6 +98,11 @@ export const TOOLNET_MCP_SERVER_INSTRUCTIONS = [
   '7. Do not ask the user to repeat project context already available through ToolNet Memory.',
   '',
   '8. Do not call memory_agent_ask for unrelated coding questions when current context is sufficient.',
+  '',
+  '9. Large tool/file payloads may be stored outside prompt context.',
+  '   If the compact graph references a needed asset, call context_offload_read.',
+  '',
+  '10. Never bulk-load offloaded assets. Read only the minimum asset required.',
 ].join('\\n');
 
 export function createMCPServer(ctx: MCPContext) {
@@ -255,6 +262,17 @@ export function createMCPServer(ctx: MCPContext) {
     ].join(' '),
     memoryAgentAskSchema,
     async (input) => jsonText(await memoryAgentAsk(ctx, input))
+  );
+
+  server.tool(
+    'context_offload_read',
+    [
+      'Read one external ToolNet tool/file asset referenced by the compact context graph.',
+      'Use only when needed for the current task.',
+      'Never bulk-load all offloaded assets.',
+    ].join(' '),
+    contextOffloadReadSchema,
+    async (input) => jsonText(await contextOffloadRead(ctx, input))
   );
 
   return server;

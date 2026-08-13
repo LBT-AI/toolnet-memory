@@ -14,6 +14,8 @@ import { getStartupBriefForInjection } from './brief-cache.js';
 
 import { memoryAgentStartupGuidance } from './agent-guidance.js';
 
+import { buildCompactContextOffloadGraph } from '../memory/context-offload.js';
+
 import { loadWorkState } from './reducer.js';
 
 import type { WorkState } from './types.js';
@@ -192,7 +194,15 @@ export async function buildAgyContinuityContext(options: {
    * Guidance is injected even if no saved handoff exists.
    * This prevents the agent from falling back to session replay.
    */
-  return [continuity, memoryAgentStartupGuidance()].filter(Boolean).join('\n\n').trim();
+  const offloadGraph = buildCompactContextOffloadGraph(options.project.rootPath, {
+    maxAssets: 6,
+    maxChars: 900,
+  });
+
+  return [continuity, offloadGraph, memoryAgentStartupGuidance()]
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
 }
 
 export async function buildAgyPreInvocationOutput(options: {
@@ -273,7 +283,14 @@ export async function buildCodexSessionStartOutput(options: {
 }): Promise<Record<string, unknown>> {
   const cache = await getStartupBriefForInjection(options.project, options.storage, 900);
 
-  if (!cache?.text) {
+  const offloadGraph = buildCompactContextOffloadGraph(options.project.rootPath, {
+    maxAssets: 6,
+    maxChars: 900,
+  });
+
+  const context = [cache?.text ?? '', offloadGraph].filter(Boolean).join('\n\n').trim();
+
+  if (!context) {
     return {};
   }
 
@@ -281,7 +298,7 @@ export async function buildCodexSessionStartOutput(options: {
     hookSpecificOutput: {
       hookEventName: 'SessionStart',
 
-      additionalContext: cache.text,
+      additionalContext: context,
     },
   };
 }

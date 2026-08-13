@@ -9,6 +9,8 @@ import * as crypto from 'crypto';
 
 import { createMinimalContext } from './token-budget.js';
 
+import { buildCompactContextOffloadGraph } from '../memory/context-offload.js';
+
 import { formatFastHandoffContext } from './fast-handoff.js';
 
 import { memoryAgentGuidance, memoryAgentStartupGuidance } from './agent-guidance.js';
@@ -138,6 +140,13 @@ export function buildFastProjectContext(options: FastContextOptions = {}): strin
 
   const handoffSection = handoffContext ? `\n\n${handoffContext}\n` : '';
 
+  const offloadGraph = buildCompactContextOffloadGraph(projectRoot, {
+    maxAssets: 6,
+    maxChars: 900,
+  });
+
+  const offloadSection = offloadGraph ? `\n\n${offloadGraph}\n` : '';
+
   const footer = `
 
 ${memoryAgentStartupGuidance()}
@@ -149,7 +158,7 @@ Forbidden At Startup:
   use memory_agent_ask before guessing.
 `;
 
-  return header + minimalContext + handoffSection + footer;
+  return header + minimalContext + handoffSection + offloadSection + footer;
 }
 
 /**
