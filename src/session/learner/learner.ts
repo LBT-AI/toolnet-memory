@@ -12,6 +12,8 @@ import { runMemoryPipelineV2 } from '../../memory/pipeline-v2.js';
 
 import { offloadSessionEvents } from '../../memory/context-offload.js';
 
+import { buildSkillMemoryAssets, persistSkillMemoryAssets } from '../../memory/skill-memory.js';
+
 import { SessionMemoryJournal } from './journal.js';
 
 import { SessionMemoryHierarchyJournal } from './hierarchy-journal.js';
@@ -174,6 +176,18 @@ export class SessionMemoryLearner {
     }
 
     /*
+     * T3 Skill Memory.
+     *
+     * Successful work is promoted into deterministic reusable SOP assets.
+     * Skill persistence is authoritative for this learner range:
+     * if a skill asset should be written and persistence fails,
+     * the learner throws before memory.learner.offset advances.
+     */
+    const skillAssets = buildSkillMemoryAssets(this.options.identity, read.events, pipeline.state);
+
+    const skillPersist = persistSkillMemoryAssets(this.options.project, skillAssets);
+
+    /*
      * Advance only after immutable learning journal succeeds.
      * If journal write throws, next flush retries same range.
      */
@@ -223,6 +237,12 @@ export class SessionMemoryLearner {
       'memory.pipeline.hierarchy.journal_written',
       hierarchyJournalWritten ? 1 : 0
     );
+
+    this.options.wal.setSourceCursor('memory.skill.assets', skillAssets.length);
+
+    this.options.wal.setSourceCursor('memory.skill.written', skillPersist.written);
+
+    this.options.wal.setSourceCursor('memory.skill.deduped', skillPersist.deduped);
 
     /*
      * T2 Context Offload is best-effort.

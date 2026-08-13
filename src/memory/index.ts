@@ -13,3 +13,4 @@ export * from './maintenance.js';
 export * from './consolidator.js';
 export * from './hierarchy.js';
 export * from './context-offload.js';
+export * from './skill-memory.js';

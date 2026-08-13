@@ -47,6 +47,8 @@ import {
   memoryAgentAskSchema,
   contextOffloadRead,
   contextOffloadReadSchema,
+  skillMemorySearch,
+  skillMemorySearchSchema,
 } from './tools/index.js';
 
 function jsonText(value: unknown) {
@@ -273,6 +275,18 @@ export function createMCPServer(ctx: MCPContext) {
     ].join(' '),
     contextOffloadReadSchema,
     async (input) => jsonText(await contextOffloadRead(ctx, input))
+  );
+
+  server.tool(
+    'skill_memory_search',
+    [
+      'Search successful ToolNet project work promoted into reusable Skill Memory SOPs.',
+      'Call this before repeating a task that may have been solved successfully before.',
+      'Returns compact procedure steps, files and verification evidence.',
+      'Raw transcripts are never returned.',
+    ].join(' '),
+    skillMemorySearchSchema,
+    async (input) => jsonText(await skillMemorySearch(ctx, input))
   );
 
   return server;

@@ -20,3 +20,4 @@ export * from './graph-neighborhood.js';
 export * from './dead-code.js';
 export * from './memory-agent-ask.js';
 export * from './context-offload-read.js';
+export * from './skill-memory-search.js';
