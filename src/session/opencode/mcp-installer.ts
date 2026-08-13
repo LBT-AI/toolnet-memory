@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 
-import { homedir } from 'node:os';
-
 import { dirname, join } from 'node:path';
+
+import { openCodeJsonConfigFile } from './config-paths.js';
 
 export interface InstallOpenCodeMcpOptions {
   configFile?: string;
@@ -30,20 +30,6 @@ type JsonObject = Record<string, unknown>;
 
 function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function globalConfigDirectory(): string {
-  const xdg = process.env.XDG_CONFIG_HOME?.trim();
-
-  if (xdg) {
-    return join(xdg, 'opencode');
-  }
-
-  return join(homedir(), '.config', 'opencode');
-}
-
-function defaultConfigFile(): string {
-  return join(globalConfigDirectory(), 'opencode.json');
 }
 
 function atomicWriteJson(file: string, value: unknown): void {
@@ -108,10 +94,47 @@ function sameServer(value: unknown, binary: string): boolean {
   );
 }
 
+function removeLegacyToolNetMcp(
+  root: JsonObject,
+  serverName: string
+): {
+  root: JsonObject;
+  changed: boolean;
+} {
+  const legacy = root.mcpServers;
+
+  if (!isObject(legacy) || !Object.prototype.hasOwnProperty.call(legacy, serverName)) {
+    return {
+      root,
+      changed: false,
+    };
+  }
+
+  /*
+   * ToolNet owns only its own entry.
+   * Preserve all other legacy MCP servers.
+   */
+  const nextLegacy: JsonObject = {
+    ...legacy,
+  };
+
+  delete nextLegacy[serverName];
+
+  return {
+    root: {
+      ...root,
+
+      mcpServers: nextLegacy,
+    },
+
+    changed: true,
+  };
+}
+
 export function installOpenCodeMcp(
   options: InstallOpenCodeMcpOptions = {}
 ): InstallOpenCodeMcpResult {
-  const configFile = options.configFile ?? defaultConfigFile();
+  const configFile = options.configFile ?? openCodeJsonConfigFile();
 
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
 
@@ -127,7 +150,11 @@ export function installOpenCodeMcp(
 
   const preservedJsonc = existsSync(jsoncFile) ? jsoncFile : undefined;
 
-  const root = readConfig(configFile);
+  const originalRoot = readConfig(configFile);
+
+  const legacyMigration = removeLegacyToolNetMcp(originalRoot, serverName);
+
+  const root = legacyMigration.root;
 
   const currentMcp = root.mcp;
 
@@ -143,7 +170,7 @@ export function installOpenCodeMcp(
 
   const existing = mcp[serverName];
 
-  if (sameServer(existing, binary)) {
+  if (sameServer(existing, binary) && !legacyMigration.changed) {
     return {
       installed: true,
 

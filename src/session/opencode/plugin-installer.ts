@@ -4,6 +4,12 @@ import { homedir } from 'node:os';
 
 import { dirname, join, parse, resolve } from 'node:path';
 
+import {
+  openCodeAgentsFile,
+  openCodeConfigDirectory,
+  openCodePluginDirectory,
+} from './config-paths.js';
+
 import { memoryAgentGuidance } from '../../work-continuity/agent-guidance.js';
 
 const START = '<!-- TOOLNET_MEMORY_BOOTSTRAP_START -->';
@@ -11,9 +17,9 @@ const START = '<!-- TOOLNET_MEMORY_BOOTSTRAP_START -->';
 const END = '<!-- TOOLNET_MEMORY_BOOTSTRAP_END -->';
 
 function installBootstrapInstructions() {
-  const file = join(homedir(), '.config', 'opencode', 'AGENTS.md');
+  const file = openCodeAgentsFile();
 
-  mkdirSync(join(homedir(), '.config', 'opencode'), {
+  mkdirSync(openCodeConfigDirectory(), {
     recursive: true,
   });
 
@@ -69,7 +75,7 @@ export function installOpenCodePlugin(
     binary?: string;
   } = {}
 ): string {
-  const directory = options.directory ?? join(homedir(), '.config', 'opencode', 'plugins');
+  const directory = options.directory ?? openCodePluginDirectory();
 
   mkdirSync(directory, {
     recursive: true,

@@ -6,6 +6,8 @@ import { join } from 'node:path';
 
 import { spawnSync } from 'node:child_process';
 
+import { openCodeConfigDirectory } from '../session/opencode/config-paths.js';
+
 export type AgentIntegrationId = 'agy' | 'opencode' | 'codex';
 
 export interface AgentDetection {
@@ -24,6 +26,8 @@ export interface DetectAgentIntegrationOptions {
   home?: string;
 
   codexHome?: string;
+
+  xdgConfigHome?: string;
 
   commandExists?: (command: string) => boolean;
 }
@@ -101,7 +105,13 @@ export function detectAgentIntegrations(
 
       commandExists,
 
-      configPaths: [join(home, '.config', 'opencode')],
+      configPaths: [
+        openCodeConfigDirectory({
+          home,
+
+          xdgConfigHome: options.xdgConfigHome,
+        }),
+      ],
     }),
 
     detectOne({
