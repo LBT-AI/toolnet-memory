@@ -8,6 +8,8 @@ import type { RetrievalEngine } from '../retrieval/retrieval-engine.js';
 
 import { MemoryHubError, type MemoryHubService } from '../hub/index.js';
 
+import { WikiError, type WikiService } from '../wiki/index.js';
+
 import {
   apiContextOffloadRead,
   apiHealth,
@@ -31,11 +33,23 @@ import {
   apiHubTeams,
 } from './routes/hub.js';
 
+import {
+  apiWikiBacklinks,
+  apiWikiCreatePage,
+  apiWikiHistory,
+  apiWikiPage,
+  apiWikiPages,
+  apiWikiSearch,
+  apiWikiSummary,
+  apiWikiUpdatePage,
+} from './routes/wiki.js';
+
 export interface ApiServerOptions {
   project: ProjectManifest;
   retrieval: RetrievalEngine;
   token?: string;
   hub?: MemoryHubService;
+  wiki?: WikiService;
 }
 
 function requestPrincipal(req: IncomingMessage): string {
@@ -377,11 +391,115 @@ export function createApiServer(options: ApiServerOptions): Server {
         return;
       }
 
+      if (url.pathname.startsWith('/v1/wiki') && (!options.wiki || !options.hub)) {
+        sendJson(res, 503, {
+          error: 'Wiki unavailable',
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/wiki') {
+        sendJson(res, 200, await apiWikiSummary(options.wiki!, options.hub!, principal));
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/wiki/pages') {
+        sendJson(res, 200, await apiWikiPages(options.wiki!, options.hub!, principal));
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/v1/wiki/pages') {
+        sendJson(
+          res,
+          201,
+          await apiWikiCreatePage(options.wiki!, options.hub!, principal, await readJsonBody(req))
+        );
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/wiki/search') {
+        const query = url.searchParams.get('q') ?? '';
+
+        const parsedLimit = Number(url.searchParams.get('limit') ?? 10);
+
+        const limit = Number.isInteger(parsedLimit) ? Math.max(1, Math.min(20, parsedLimit)) : 10;
+
+        sendJson(
+          res,
+          200,
+          await apiWikiSearch(options.wiki!, options.hub!, principal, query, limit)
+        );
+        return;
+      }
+
+      const wikiHistoryMatch = /^\/v1\/wiki\/pages\/([^/]+)\/history$/u.exec(url.pathname);
+
+      if (req.method === 'GET' && wikiHistoryMatch) {
+        sendJson(
+          res,
+          200,
+          await apiWikiHistory(
+            options.wiki!,
+            options.hub!,
+            principal,
+            decodeURIComponent(wikiHistoryMatch[1])
+          )
+        );
+        return;
+      }
+
+      const wikiBacklinksMatch = /^\/v1\/wiki\/pages\/([^/]+)\/backlinks$/u.exec(url.pathname);
+
+      if (req.method === 'GET' && wikiBacklinksMatch) {
+        sendJson(
+          res,
+          200,
+          await apiWikiBacklinks(
+            options.wiki!,
+            options.hub!,
+            principal,
+            decodeURIComponent(wikiBacklinksMatch[1])
+          )
+        );
+        return;
+      }
+
+      const wikiPageMatch = /^\/v1\/wiki\/pages\/([^/]+)$/u.exec(url.pathname);
+
+      if (req.method === 'GET' && wikiPageMatch) {
+        sendJson(
+          res,
+          200,
+          await apiWikiPage(
+            options.wiki!,
+            options.hub!,
+            principal,
+            decodeURIComponent(wikiPageMatch[1])
+          )
+        );
+        return;
+      }
+
+      if (req.method === 'PUT' && wikiPageMatch) {
+        sendJson(
+          res,
+          200,
+          await apiWikiUpdatePage(
+            options.wiki!,
+            options.hub!,
+            principal,
+            decodeURIComponent(wikiPageMatch[1]),
+            await readJsonBody(req)
+          )
+        );
+        return;
+      }
+
       sendJson(res, 404, {
         error: 'Not found',
       });
     } catch (error) {
-      if (error instanceof MemoryHubError) {
+      if (error instanceof MemoryHubError || error instanceof WikiError) {
         sendJson(res, error.statusCode, {
           error: error.message,
         });

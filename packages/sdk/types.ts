@@ -127,7 +127,9 @@ export type ToolNetHubScope =
   | 'agents:write'
   | 'acl:manage'
   | 'loadouts:write'
-  | 'observability:read';
+  | 'observability:read'
+  | 'wiki:read'
+  | 'wiki:write';
 
 export interface ToolNetHubTeam {
   id: string;
@@ -277,4 +279,90 @@ export interface ToolNetApiHubObservability {
     lastActivityAt?: string;
     events: ToolNetHubEvent[];
   };
+}
+
+export interface ToolNetWikiPage {
+  id: string;
+  slug: string;
+  title: string;
+  summary?: string;
+  content: string;
+  tags: string[];
+  links: string[];
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ToolNetWikiRevision {
+  id: string;
+  pageId: string;
+  slug: string;
+  revision: number;
+  title: string;
+  summary?: string;
+  content: string;
+  tags: string[];
+  links: string[];
+  createdAt: string;
+}
+
+export interface ToolNetWikiSearchResult {
+  page: ToolNetWikiPage;
+  score: number;
+}
+
+export interface ToolNetApiWikiSummary {
+  schema: 'toolnet.api-wiki-summary.v1';
+  wiki: {
+    schema: 'toolnet.wiki-summary.v1';
+    projectId: string;
+    pages: number;
+    revisions: number;
+    tags: string[];
+    links: number;
+    orphanPages: number;
+    updatedAt: string;
+  };
+}
+
+export interface ToolNetApiWikiPages {
+  schema: 'toolnet.api-wiki-pages.v1';
+  pages: ToolNetWikiPage[];
+}
+
+export interface ToolNetApiWikiPage {
+  schema: 'toolnet.api-wiki-page.v1';
+  page: ToolNetWikiPage;
+}
+
+export interface ToolNetApiCreateWikiPageInput {
+  slug?: string;
+  title: string;
+  summary?: string;
+  content: string;
+  tags?: string[];
+}
+
+export interface ToolNetApiUpdateWikiPageInput {
+  title?: string;
+  summary?: string;
+  content?: string;
+  tags?: string[];
+}
+
+export interface ToolNetApiWikiSearch {
+  schema: 'toolnet.api-wiki-search.v1';
+  query: string;
+  results: ToolNetWikiSearchResult[];
+}
+
+export interface ToolNetApiWikiHistory {
+  schema: 'toolnet.api-wiki-history.v1';
+  revisions: ToolNetWikiRevision[];
+}
+
+export interface ToolNetApiWikiBacklinks {
+  schema: 'toolnet.api-wiki-backlinks.v1';
+  pages: ToolNetWikiPage[];
 }

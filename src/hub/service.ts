@@ -19,6 +19,8 @@ const DEFAULT_TOOLS = [
   'memory_agent_ask',
   'skill_memory_search',
   'context_offload_read',
+  'wiki_search',
+  'wiki_read',
 ];
 
 export class MemoryHubError extends Error {
@@ -137,7 +139,9 @@ export class MemoryHubService {
 
     const grant = this.grantFor(state, principal);
 
-    return Boolean(grant && (grant.role === 'owner' || grant.scopes.includes(scope)));
+    return Boolean(
+      grant && (grant.role === 'owner' || grant.role === 'admin' || grant.scopes.includes(scope))
+    );
   }
 
   private async requireScope(principal: string, scope: MemoryHubScope): Promise<void> {

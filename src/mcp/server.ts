@@ -49,6 +49,10 @@ import {
   contextOffloadReadSchema,
   skillMemorySearch,
   skillMemorySearchSchema,
+  wikiSearch,
+  wikiSearchSchema,
+  wikiRead,
+  wikiReadSchema,
 } from './tools/index.js';
 
 function jsonText(value: unknown) {
@@ -287,6 +291,28 @@ export function createMCPServer(ctx: MCPContext) {
     ].join(' '),
     skillMemorySearchSchema,
     async (input) => jsonText(await skillMemorySearch(ctx, input))
+  );
+
+  server.tool(
+    'wiki_search',
+    [
+      'Search the ToolNet project Wiki for durable project knowledge.',
+      'Use Wiki before rereading broad project history when a maintained knowledge page may exist.',
+      'Returns compact metadata; call wiki_read only for the page needed.',
+    ].join(' '),
+    wikiSearchSchema,
+    async (input) => jsonText(await wikiSearch(ctx, input))
+  );
+
+  server.tool(
+    'wiki_read',
+    [
+      'Read one ToolNet Wiki page by slug or id.',
+      'Returns the maintained page plus compact backlinks.',
+      'Do not bulk-read unrelated Wiki pages.',
+    ].join(' '),
+    wikiReadSchema,
+    async (input) => jsonText(await wikiRead(ctx, input))
   );
 
   return server;

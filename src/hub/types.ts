@@ -5,6 +5,8 @@ export const MEMORY_HUB_SCOPES = [
   'acl:manage',
   'loadouts:write',
   'observability:read',
+  'wiki:read',
+  'wiki:write',
 ] as const;
 
 export type MemoryHubScope = (typeof MEMORY_HUB_SCOPES)[number];

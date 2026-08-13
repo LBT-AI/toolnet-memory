@@ -25,6 +25,14 @@ import type {
   ToolNetApiHubTeam,
   ToolNetApiHubTeams,
   ToolNetApiSetHubLoadoutInput,
+  ToolNetApiCreateWikiPageInput,
+  ToolNetApiUpdateWikiPageInput,
+  ToolNetApiWikiBacklinks,
+  ToolNetApiWikiHistory,
+  ToolNetApiWikiPage,
+  ToolNetApiWikiPages,
+  ToolNetApiWikiSearch,
+  ToolNetApiWikiSummary,
 } from './types.js';
 
 export class ToolNetApiClient {
@@ -133,6 +141,53 @@ export class ToolNetApiClient {
 
   hubObservability(): Promise<ToolNetApiHubObservability> {
     return this.request<ToolNetApiHubObservability>('/v1/hub/observability');
+  }
+
+  wiki(): Promise<ToolNetApiWikiSummary> {
+    return this.request<ToolNetApiWikiSummary>('/v1/wiki');
+  }
+
+  wikiPages(): Promise<ToolNetApiWikiPages> {
+    return this.request<ToolNetApiWikiPages>('/v1/wiki/pages');
+  }
+
+  createWikiPage(input: ToolNetApiCreateWikiPageInput): Promise<ToolNetApiWikiPage> {
+    return this.request<ToolNetApiWikiPage>('/v1/wiki/pages', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  wikiPage(slug: string): Promise<ToolNetApiWikiPage> {
+    return this.request<ToolNetApiWikiPage>(`/v1/wiki/pages/${encodeURIComponent(slug)}`);
+  }
+
+  updateWikiPage(slug: string, input: ToolNetApiUpdateWikiPageInput): Promise<ToolNetApiWikiPage> {
+    return this.request<ToolNetApiWikiPage>(`/v1/wiki/pages/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  }
+
+  wikiSearch(query: string, limit = 10): Promise<ToolNetApiWikiSearch> {
+    const params = new URLSearchParams({
+      q: query,
+      limit: String(limit),
+    });
+
+    return this.request<ToolNetApiWikiSearch>(`/v1/wiki/search?${params.toString()}`);
+  }
+
+  wikiHistory(slug: string): Promise<ToolNetApiWikiHistory> {
+    return this.request<ToolNetApiWikiHistory>(
+      `/v1/wiki/pages/${encodeURIComponent(slug)}/history`
+    );
+  }
+
+  wikiBacklinks(slug: string): Promise<ToolNetApiWikiBacklinks> {
+    return this.request<ToolNetApiWikiBacklinks>(
+      `/v1/wiki/pages/${encodeURIComponent(slug)}/backlinks`
+    );
   }
 
   protected async request<T>(path: string, init: RequestInit = {}): Promise<T> {

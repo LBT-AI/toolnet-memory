@@ -32,6 +32,7 @@ class ToolNetApiClient:
         self,
         path: str,
         payload: dict[str, Any] | None = None,
+        method: str | None = None,
     ) -> Any:
         headers = {
             "Accept": "application/json",
@@ -44,10 +45,12 @@ class ToolNetApiClient:
             headers["X-ToolNet-Principal"] = self.principal
 
         data: bytes | None = None
-        method = "GET"
+        request_method = method or "GET"
 
         if payload is not None:
-            method = "POST"
+            if method is None:
+                request_method = "POST"
+
             headers["Content-Type"] = "application/json"
             data = json.dumps(payload).encode("utf-8")
 
@@ -55,7 +58,7 @@ class ToolNetApiClient:
             f"{self.base_url}{path}",
             data=data,
             headers=headers,
-            method=method,
+            method=request_method,
         )
 
         try:
@@ -257,3 +260,101 @@ class ToolNetApiClient:
 
     def hub_observability(self) -> dict[str, Any]:
         return self._request("/v1/hub/observability")
+
+    def wiki(self) -> dict[str, Any]:
+        return self._request("/v1/wiki")
+
+    def wiki_pages(self) -> dict[str, Any]:
+        return self._request("/v1/wiki/pages")
+
+    def create_wiki_page(
+        self,
+        title: str,
+        content: str,
+        slug: str | None = None,
+        summary: str | None = None,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "title": title,
+            "content": content,
+        }
+
+        if slug is not None:
+            payload["slug"] = slug
+
+        if summary is not None:
+            payload["summary"] = summary
+
+        if tags is not None:
+            payload["tags"] = tags
+
+        return self._request("/v1/wiki/pages", payload)
+
+    def wiki_page(self, slug: str) -> dict[str, Any]:
+        from urllib.parse import quote
+
+        return self._request(
+            f"/v1/wiki/pages/{quote(slug, safe='')}"
+        )
+
+    def update_wiki_page(
+        self,
+        slug: str,
+        title: str | None = None,
+        content: str | None = None,
+        summary: str | None = None,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        from urllib.parse import quote
+
+        payload: dict[str, Any] = {}
+
+        if title is not None:
+            payload["title"] = title
+
+        if content is not None:
+            payload["content"] = content
+
+        if summary is not None:
+            payload["summary"] = summary
+
+        if tags is not None:
+            payload["tags"] = tags
+
+        return self._request(
+            f"/v1/wiki/pages/{quote(slug, safe='')}",
+            payload,
+            method="PUT",
+        )
+
+    def wiki_search(
+        self,
+        query: str,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        from urllib.parse import urlencode
+
+        return self._request(
+            "/v1/wiki/search?"
+            + urlencode(
+                {
+                    "q": query,
+                    "limit": limit,
+                }
+            )
+        )
+
+    def wiki_history(self, slug: str) -> dict[str, Any]:
+        from urllib.parse import quote
+
+        return self._request(
+            f"/v1/wiki/pages/{quote(slug, safe='')}/history"
+        )
+
+    def wiki_backlinks(self, slug: str) -> dict[str, Any]:
+        from urllib.parse import quote
+
+        return self._request(
+            f"/v1/wiki/pages/{quote(slug, safe='')}/backlinks"
+        )

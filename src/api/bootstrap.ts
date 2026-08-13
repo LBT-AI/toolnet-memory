@@ -13,6 +13,8 @@ import {
 
 import { MemoryHubService, MemoryHubStore } from '../hub/index.js';
 
+import { WikiService, WikiStore } from '../wiki/index.js';
+
 import { createApiServer } from './server.js';
 
 const HOST = process.env.TOOLNET_API_HOST ?? '127.0.0.1';
@@ -53,6 +55,12 @@ async function main(): Promise<void> {
 
   await hub.initialize();
 
+  const wikiStore = new WikiStore(storage, project);
+
+  const wiki = new WikiService(wikiStore);
+
+  await wiki.initialize();
+
   const memory = new MemoryEngine();
 
   const memoryStore = new MemoryStore(storage);
@@ -66,6 +74,7 @@ async function main(): Promise<void> {
     retrieval,
     token: process.env.TOOLNET_API_TOKEN?.trim() || undefined,
     hub,
+    wiki,
   });
 
   server.listen(PORT, HOST, () => {

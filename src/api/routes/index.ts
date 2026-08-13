@@ -3,3 +3,4 @@ export * from './projects.js';
 export * from './memory.js';
 export * from './search.js';
 export * from './hub.js';
+export * from './wiki.js';
