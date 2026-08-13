@@ -32,6 +32,7 @@ const entries = {
   claude: 'src/session/claude/cli.ts',
   'claude-hook': 'src/session/claude/hook.ts',
   'continuity-certify': 'src/production/continuity-certify-cli.ts',
+  'recovery-certify': 'src/production/recovery-certify-cli.ts',
 
   codex: 'src/session/codex/cli.ts',
   'codex-context': 'src/session/codex/context-hook.ts',

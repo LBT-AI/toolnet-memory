@@ -6,6 +6,16 @@ import { answerRetrievedMemoryQuestion } from './memory-local-answer.js';
 
 import { retrieveMemoryContext } from './memory-retrieval.js';
 
+type MemoryAgentRouter = Pick<ReturnType<typeof createResilientAiRouter>, 'generate'>;
+
+export interface MemoryAgentOptions {
+  /**
+   * Primarily used by recovery certification/tests.
+   * Production callers continue to use createResilientAiRouter().
+   */
+  router?: MemoryAgentRouter;
+}
+
 export interface MemoryAgentAnswer {
   answer: string;
 
@@ -53,13 +63,14 @@ function buildMemoryContext(project: ProjectManifest, question: string): string 
 
 export async function askMemoryAgent(
   project: ProjectManifest,
-  question: string
+  question: string,
+  options: MemoryAgentOptions = {}
 ): Promise<MemoryAgentAnswer> {
   const local = answerRetrievedMemoryQuestion(project, question);
 
   const context = buildMemoryContext(project, question);
 
-  const router = createResilientAiRouter();
+  const router = options.router ?? createResilientAiRouter();
 
   try {
     const result = await router.generate({
