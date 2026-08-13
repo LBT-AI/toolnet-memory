@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 
-import { homedir } from 'node:os';
+import { dirname } from 'node:path';
 
-import { dirname, join } from 'node:path';
+import { agyHooksFile } from './config-paths.js';
 
 export interface InstallAgyHookOptions {
   hooksFile?: string;
@@ -15,25 +15,35 @@ function quote(value: string): string {
 }
 
 export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
-  const hooksFile = options.hooksFile ?? join(homedir(), '.gemini', 'config', 'hooks.json');
+  const hooksFile = options.hooksFile ?? agyHooksFile();
 
   mkdirSync(dirname(hooksFile), {
     recursive: true,
+
+    mode: 0o700,
   });
 
   let root: Record<string, unknown> = {};
 
   if (existsSync(hooksFile)) {
+    let parsed: unknown;
+
     try {
-      root = JSON.parse(readFileSync(hooksFile, 'utf8'));
+      parsed = JSON.parse(readFileSync(hooksFile, 'utf8'));
     } catch (error) {
       throw new Error(
         `Invalid existing Agy hooks.json: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('Invalid existing Agy hooks.json: root must be a JSON object.');
+    }
+
+    root = parsed as Record<string, unknown>;
   }
 
-  const binary = options.binary ?? 'toolnet-memory';
+  const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
 
   const command = `${quote(binary)} session:agy-hook`;
 
@@ -98,11 +108,21 @@ export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
     ],
   };
 
-  writeFileSync(hooksFile, JSON.stringify(root, null, 2) + '\n', {
-    encoding: 'utf8',
+  const temporary = `${hooksFile}.tmp-${process.pid}-${Date.now()}`;
 
-    mode: 0o600,
-  });
+  try {
+    writeFileSync(temporary, JSON.stringify(root, null, 2) + '\n', {
+      encoding: 'utf8',
+
+      mode: 0o600,
+    });
+
+    renameSync(temporary, hooksFile);
+  } finally {
+    rmSync(temporary, {
+      force: true,
+    });
+  }
 
   return hooksFile;
 }

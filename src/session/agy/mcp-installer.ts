@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 
-import { homedir } from 'node:os';
+import { dirname } from 'node:path';
 
-import { dirname, join } from 'node:path';
+import { agyMcpConfigFile } from './config-paths.js';
 
 export interface InstallAgyMcpOptions {
   configFile?: string;
@@ -35,6 +35,8 @@ function isObject(value: unknown): value is JsonObject {
 function atomicWriteJson(file: string, value: unknown): void {
   mkdirSync(dirname(file), {
     recursive: true,
+
+    mode: 0o700,
   });
 
   const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
@@ -89,7 +91,7 @@ function sameServer(value: unknown, binary: string): boolean {
 }
 
 export function installAgyMcp(options: InstallAgyMcpOptions = {}): InstallAgyMcpResult {
-  const configFile = options.configFile ?? join(homedir(), '.gemini', 'config', 'mcp_config.json');
+  const configFile = options.configFile ?? agyMcpConfigFile();
 
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
 

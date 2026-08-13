@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 
-import { homedir } from 'node:os';
-
 import { dirname, join } from 'node:path';
 
 import { installAgyHooks } from './hook-installer.js';
 
 import { installAgyMcp } from './mcp-installer.js';
+
+import { agyHooksFile, agyMcpConfigFile, agyPluginRoot } from './config-paths.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -195,8 +195,7 @@ export function installAgyPlugin(options: InstallAgyPluginOptions = {}): Install
 
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
 
-  const pluginRoot =
-    options.pluginRoot ?? join(homedir(), '.gemini', 'antigravity-cli', 'plugins', pluginName);
+  const pluginRoot = options.pluginRoot ?? agyPluginRoot(pluginName);
 
   const pluginFile = join(pluginRoot, 'plugin.json');
 
@@ -208,6 +207,8 @@ export function installAgyPlugin(options: InstallAgyPluginOptions = {}): Install
 
   mkdirSync(pluginRoot, {
     recursive: true,
+
+    mode: 0o700,
   });
 
   writeIfChanged(
@@ -245,11 +246,9 @@ export function installAgyPlugin(options: InstallAgyPluginOptions = {}): Install
    * Migrate only ToolNet-owned legacy entries.
    * Preserve every unrelated MCP server/hook.
    */
-  const legacyMcpFile =
-    options.legacyMcpFile ?? join(homedir(), '.gemini', 'config', 'mcp_config.json');
+  const legacyMcpFile = options.legacyMcpFile ?? agyMcpConfigFile();
 
-  const legacyHooksFile =
-    options.legacyHooksFile ?? join(homedir(), '.gemini', 'config', 'hooks.json');
+  const legacyHooksFile = options.legacyHooksFile ?? agyHooksFile();
 
   const migratedLegacy: string[] = [];
 

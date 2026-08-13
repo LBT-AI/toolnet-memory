@@ -6,6 +6,8 @@ import { join } from 'node:path';
 
 import { spawnSync } from 'node:child_process';
 
+import { agyDetectionPaths } from '../session/agy/config-paths.js';
+
 import { openCodeConfigDirectory } from '../session/opencode/config-paths.js';
 
 export type AgentIntegrationId = 'agy' | 'opencode' | 'codex';
@@ -95,7 +97,9 @@ export function detectAgentIntegrations(
 
       commandExists,
 
-      configPaths: [join(home, '.gemini', 'antigravity-cli'), join(home, '.gemini', 'config')],
+      configPaths: agyDetectionPaths({
+        home,
+      }),
     }),
 
     detectOne({
