@@ -17,10 +17,12 @@ class ToolNetApiClient:
         self,
         base_url: str,
         token: str | None = None,
+        principal: str | None = None,
         timeout: float = 10.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.principal = principal
         self.timeout = timeout
 
         if not self.base_url:
@@ -37,6 +39,9 @@ class ToolNetApiClient:
 
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
+
+        if self.principal:
+            headers["X-ToolNet-Principal"] = self.principal
 
         data: bytes | None = None
         method = "GET"
@@ -143,3 +148,112 @@ class ToolNetApiClient:
             payload["maxChars"] = max_chars
 
         return self._request("/v1/offload/read", payload)
+
+    def hub(self) -> dict[str, Any]:
+        return self._request("/v1/hub")
+
+    def hub_teams(self) -> dict[str, Any]:
+        return self._request("/v1/hub/teams")
+
+    def create_hub_team(
+        self,
+        name: str,
+        team_id: str | None = None,
+        description: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+
+        if team_id is not None:
+            payload["id"] = team_id
+
+        if description is not None:
+            payload["description"] = description
+
+        return self._request("/v1/hub/teams", payload)
+
+    def hub_agents(self) -> dict[str, Any]:
+        return self._request("/v1/hub/agents")
+
+    def create_hub_agent(
+        self,
+        name: str,
+        agent_id: str | None = None,
+        kind: str | None = None,
+        team_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name}
+
+        if agent_id is not None:
+            payload["id"] = agent_id
+
+        if kind is not None:
+            payload["kind"] = kind
+
+        if team_ids is not None:
+            payload["teamIds"] = team_ids
+
+        return self._request("/v1/hub/agents", payload)
+
+    def hub_acl(self) -> dict[str, Any]:
+        return self._request("/v1/hub/acl")
+
+    def grant_hub_acl(
+        self,
+        principal: str,
+        role: str,
+        scopes: list[str] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "principal": principal,
+            "role": role,
+        }
+
+        if scopes is not None:
+            payload["scopes"] = scopes
+
+        return self._request("/v1/hub/acl/grant", payload)
+
+    def revoke_hub_acl(
+        self,
+        principal: str,
+    ) -> dict[str, Any]:
+        return self._request(
+            "/v1/hub/acl/revoke",
+            {"principal": principal},
+        )
+
+    def hub_loadouts(self) -> dict[str, Any]:
+        return self._request("/v1/hub/loadouts")
+
+    def set_hub_loadout(
+        self,
+        agent_id: str,
+        tools: list[str] | None = None,
+        memory_mode: str | None = None,
+        skill_memory: bool | None = None,
+        context_offload: bool | None = None,
+        max_context_chars: int | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "agentId": agent_id,
+        }
+
+        if tools is not None:
+            payload["tools"] = tools
+
+        if memory_mode is not None:
+            payload["memoryMode"] = memory_mode
+
+        if skill_memory is not None:
+            payload["skillMemory"] = skill_memory
+
+        if context_offload is not None:
+            payload["contextOffload"] = context_offload
+
+        if max_context_chars is not None:
+            payload["maxContextChars"] = max_context_chars
+
+        return self._request("/v1/hub/loadouts", payload)
+
+    def hub_observability(self) -> dict[str, Any]:
+        return self._request("/v1/hub/observability")

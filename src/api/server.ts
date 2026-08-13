@@ -6,6 +6,8 @@ import type { ProjectManifest } from '../core/types.js';
 
 import type { RetrievalEngine } from '../retrieval/retrieval-engine.js';
 
+import { MemoryHubError, type MemoryHubService } from '../hub/index.js';
+
 import {
   apiContextOffloadRead,
   apiHealth,
@@ -15,10 +17,33 @@ import {
   apiSkillMemorySearch,
 } from './routes/index.js';
 
+import {
+  apiHubAcl,
+  apiHubAgents,
+  apiHubCreateAgent,
+  apiHubCreateTeam,
+  apiHubGrantAcl,
+  apiHubLoadouts,
+  apiHubObservability,
+  apiHubRevokeAcl,
+  apiHubSetLoadout,
+  apiHubSummary,
+  apiHubTeams,
+} from './routes/hub.js';
+
 export interface ApiServerOptions {
   project: ProjectManifest;
   retrieval: RetrievalEngine;
   token?: string;
+  hub?: MemoryHubService;
+}
+
+function requestPrincipal(req: IncomingMessage): string {
+  const value = req.headers['x-toolnet-principal'];
+
+  const principal = Array.isArray(value) ? value[0] : value;
+
+  return principal?.trim() || 'anonymous';
 }
 
 function isAuthorized(req: IncomingMessage, token?: string): boolean {
@@ -184,6 +209,27 @@ export function createApiServer(options: ApiServerOptions): Server {
     try {
       const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 
+      const principal = requestPrincipal(req);
+      const startedAt = Date.now();
+
+      res.once('finish', () => {
+        if (!options.hub) {
+          return;
+        }
+
+        void options.hub
+          .recordRequest({
+            method: req.method ?? 'GET',
+            path: url.pathname,
+            principal,
+            statusCode: res.statusCode,
+            durationMs: Date.now() - startedAt,
+          })
+          .catch(() => {
+            // Observability is best-effort.
+          });
+      });
+
       if (url.pathname.startsWith('/v1/') && !isAuthorized(req, options.token)) {
         sendJson(res, 401, {
           error: 'Unauthorized',
@@ -257,10 +303,98 @@ export function createApiServer(options: ApiServerOptions): Server {
         return;
       }
 
+      if (url.pathname.startsWith('/v1/hub') && !options.hub) {
+        sendJson(res, 503, {
+          error: 'Memory Hub unavailable',
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/hub') {
+        sendJson(res, 200, await apiHubSummary(options.hub!, principal));
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/hub/teams') {
+        sendJson(res, 200, await apiHubTeams(options.hub!, principal));
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/v1/hub/teams') {
+        sendJson(
+          res,
+          201,
+          await apiHubCreateTeam(options.hub!, principal, await readJsonBody(req))
+        );
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/hub/agents') {
+        sendJson(res, 200, await apiHubAgents(options.hub!, principal));
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/v1/hub/agents') {
+        sendJson(
+          res,
+          201,
+          await apiHubCreateAgent(options.hub!, principal, await readJsonBody(req))
+        );
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/hub/acl') {
+        sendJson(res, 200, await apiHubAcl(options.hub!, principal));
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/v1/hub/acl/grant') {
+        sendJson(res, 200, await apiHubGrantAcl(options.hub!, principal, await readJsonBody(req)));
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/v1/hub/acl/revoke') {
+        sendJson(res, 200, await apiHubRevokeAcl(options.hub!, principal, await readJsonBody(req)));
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/hub/loadouts') {
+        sendJson(res, 200, await apiHubLoadouts(options.hub!, principal));
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/v1/hub/loadouts') {
+        sendJson(
+          res,
+          200,
+          await apiHubSetLoadout(options.hub!, principal, await readJsonBody(req))
+        );
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/hub/observability') {
+        sendJson(res, 200, await apiHubObservability(options.hub!, principal));
+        return;
+      }
+
       sendJson(res, 404, {
         error: 'Not found',
       });
     } catch (error) {
+      if (error instanceof MemoryHubError) {
+        sendJson(res, error.statusCode, {
+          error: error.message,
+        });
+        return;
+      }
+
+      if (error instanceof Error && error.message.startsWith('Invalid ')) {
+        sendJson(res, 400, {
+          error: error.message,
+        });
+        return;
+      }
+
       sendJson(res, 500, {
         error: error instanceof Error ? error.message : String(error),
       });

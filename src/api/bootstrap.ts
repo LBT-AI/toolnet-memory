@@ -11,6 +11,8 @@ import {
   withStorageRetry,
 } from '../storage/index.js';
 
+import { MemoryHubService, MemoryHubStore } from '../hub/index.js';
+
 import { createApiServer } from './server.js';
 
 const HOST = process.env.TOOLNET_API_HOST ?? '127.0.0.1';
@@ -41,6 +43,16 @@ async function main(): Promise<void> {
     project.remote ?? project.name
   );
 
+  const hubStore = new MemoryHubStore(
+    storage,
+    project,
+    process.env.TOOLNET_HUB_OWNER?.trim() || 'owner'
+  );
+
+  const hub = new MemoryHubService(hubStore, Number(process.env.TOOLNET_HUB_MAX_EVENTS ?? 100));
+
+  await hub.initialize();
+
   const memory = new MemoryEngine();
 
   const memoryStore = new MemoryStore(storage);
@@ -53,6 +65,7 @@ async function main(): Promise<void> {
     project,
     retrieval,
     token: process.env.TOOLNET_API_TOKEN?.trim() || undefined,
+    hub,
   });
 
   server.listen(PORT, HOST, () => {

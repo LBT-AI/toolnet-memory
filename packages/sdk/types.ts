@@ -1,6 +1,7 @@
 export interface ToolNetApiClientOptions {
   baseUrl: string;
   token?: string;
+  principal?: string;
   timeoutMs?: number;
 }
 
@@ -115,5 +116,165 @@ export interface ToolNetApiContextOffloadRead {
     bytes: number;
     truncated: boolean;
     content: string;
+  };
+}
+
+export type ToolNetHubRole = 'owner' | 'admin' | 'member' | 'viewer';
+
+export type ToolNetHubScope =
+  | 'hub:read'
+  | 'teams:write'
+  | 'agents:write'
+  | 'acl:manage'
+  | 'loadouts:write'
+  | 'observability:read';
+
+export interface ToolNetHubTeam {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ToolNetHubAgent {
+  id: string;
+  name: string;
+  kind?: string;
+  teamIds: string[];
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ToolNetHubAclGrant {
+  principal: string;
+  role: ToolNetHubRole;
+  scopes: ToolNetHubScope[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ToolNetHubLoadout {
+  agentId: string;
+  tools: string[];
+  memoryMode: 'local' | 'ai';
+  skillMemory: boolean;
+  contextOffload: boolean;
+  maxContextChars: number;
+  updatedAt: string;
+}
+
+export interface ToolNetHubEvent {
+  id: string;
+  kind: 'request' | 'mutation';
+  action: string;
+  principal: string;
+  ok: boolean;
+  statusCode?: number;
+  durationMs?: number;
+  timestamp: string;
+}
+
+export interface ToolNetApiHubSummary {
+  schema: 'toolnet.api-hub-summary.v1';
+  hub: {
+    schema: 'toolnet.memory-hub.v1';
+    project: {
+      id: string;
+      name: string;
+      remote: string;
+    };
+    teams: number;
+    agents: number;
+    aclGrants: number;
+    loadouts: number;
+    updatedAt: string;
+  };
+}
+
+export interface ToolNetApiHubTeams {
+  schema: 'toolnet.api-hub-teams.v1';
+  teams: ToolNetHubTeam[];
+}
+
+export interface ToolNetApiCreateHubTeamInput {
+  id?: string;
+  name: string;
+  description?: string;
+}
+
+export interface ToolNetApiHubTeam {
+  schema: 'toolnet.api-hub-team.v1';
+  team: ToolNetHubTeam;
+}
+
+export interface ToolNetApiHubAgents {
+  schema: 'toolnet.api-hub-agents.v1';
+  agents: ToolNetHubAgent[];
+}
+
+export interface ToolNetApiCreateHubAgentInput {
+  id?: string;
+  name: string;
+  kind?: string;
+  teamIds?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface ToolNetApiHubAgent {
+  schema: 'toolnet.api-hub-agent.v1';
+  agent: ToolNetHubAgent;
+}
+
+export interface ToolNetApiHubAcl {
+  schema: 'toolnet.api-hub-acl.v1';
+  grants: ToolNetHubAclGrant[];
+}
+
+export interface ToolNetApiGrantHubAclInput {
+  principal: string;
+  role: ToolNetHubRole;
+  scopes?: ToolNetHubScope[];
+}
+
+export interface ToolNetApiHubAclGrant {
+  schema: 'toolnet.api-hub-acl-grant.v1';
+  grant: ToolNetHubAclGrant;
+}
+
+export interface ToolNetApiHubAclRevoke {
+  schema: 'toolnet.api-hub-acl-revoke.v1';
+  principal: string;
+  revoked: true;
+}
+
+export interface ToolNetApiHubLoadouts {
+  schema: 'toolnet.api-hub-loadouts.v1';
+  loadouts: ToolNetHubLoadout[];
+}
+
+export interface ToolNetApiSetHubLoadoutInput {
+  agentId: string;
+  tools?: string[];
+  memoryMode?: 'local' | 'ai';
+  skillMemory?: boolean;
+  contextOffload?: boolean;
+  maxContextChars?: number;
+}
+
+export interface ToolNetApiHubLoadout {
+  schema: 'toolnet.api-hub-loadout.v1';
+  loadout: ToolNetHubLoadout;
+}
+
+export interface ToolNetApiHubObservability {
+  schema: 'toolnet.api-hub-observability.v1';
+  observability: {
+    requests: number;
+    mutations: number;
+    errors: number;
+    lastActivityAt?: string;
+    events: ToolNetHubEvent[];
   };
 }
