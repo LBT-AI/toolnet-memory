@@ -6,6 +6,8 @@ import { extractLearnedMemories } from '../session/learner/extractor.js';
 
 import type { LearnedMemoryCandidate } from '../session/learner/types.js';
 
+import { buildMemoryHierarchy, type MemoryHierarchy } from './hierarchy.js';
+
 import { extractSessionMemory } from '../session/session-extractor.js';
 
 export type MemoryKnowledgeClass = 'permanent' | 'task' | 'session' | 'transient';
@@ -62,6 +64,8 @@ export interface MemoryPipelineV2Result {
   candidates: MemoryPipelineCandidate[];
 
   retrievalIndex: MemoryRetrievalIndexEntry[];
+
+  hierarchy: MemoryHierarchy;
 
   stats: {
     inputEvents: number;
@@ -228,7 +232,12 @@ function enrichCandidate(candidate: LearnedMemoryCandidate): MemoryPipelineCandi
 
     retrievalTerms: terms,
 
-    tags: uniqueStrings([...candidate.tags, `class:${knowledgeClass}`, `kind:${candidate.kind}`]),
+    tags: uniqueStrings([
+      ...candidate.tags,
+      'level:fact',
+      `class:${knowledgeClass}`,
+      `kind:${candidate.kind}`,
+    ]),
   };
 }
 
@@ -376,6 +385,16 @@ export function runMemoryPipelineV2(
     terms: candidate.retrievalTerms,
   }));
 
+  /*
+   * Stage 8:
+   * deterministic hierarchical memory assets.
+   *
+   * Raw payload remains in the normalized session source.
+   * Hierarchy keeps provenance references and promotes
+   * selected facts into semantic scenes/durable knowledge.
+   */
+  const hierarchy = buildMemoryHierarchy(normalizedEvents, candidates);
+
   const countClass = (value: MemoryKnowledgeClass) =>
     extracted.filter((candidate) => candidate.knowledgeClass === value).length;
 
@@ -391,6 +410,8 @@ export function runMemoryPipelineV2(
     candidates,
 
     retrievalIndex,
+
+    hierarchy,
 
     stats: {
       inputEvents: events.length,

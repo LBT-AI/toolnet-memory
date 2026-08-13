@@ -172,6 +172,16 @@ describe('Memory Pipeline v2', () => {
 
     expect(result.retrievalIndex.every((entry) => entry.terms.length > 0)).toBe(true);
 
+    expect(result.hierarchy.schema).toBe('toolnet.memory-hierarchy.v1');
+
+    expect(result.hierarchy.stats.raw).toBe(result.stats.normalizedEvents);
+
+    expect(result.hierarchy.stats.facts).toBe(result.candidates.length);
+
+    expect(result.hierarchy.stats.scenes).toBeGreaterThan(0);
+
+    expect(result.hierarchy.stats.knowledge).toBeGreaterThan(0);
+
     expect(result.candidates.some((candidate) => /npm notice added/i.test(candidate.content))).toBe(
       false
     );

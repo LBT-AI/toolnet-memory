@@ -11,3 +11,4 @@ export * from './conflict-detector.js';
 export * from './maintenance.js';
 
 export * from './consolidator.js';
+export * from './hierarchy.js';

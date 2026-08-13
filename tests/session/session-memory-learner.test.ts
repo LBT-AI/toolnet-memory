@@ -141,6 +141,12 @@ describe('Session Memory Learner', () => {
 
     expect(journalKeys.length).toBe(1);
 
+    const hierarchyKeys = Array.from(storage.objects.keys()).filter((key) =>
+      key.includes('/memory/hierarchy/')
+    );
+
+    expect(hierarchyKeys).toHaveLength(1);
+
     /*
      * Learner journal must not blindly modify current snapshot.
      */

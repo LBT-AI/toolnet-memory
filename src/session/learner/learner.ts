@@ -12,6 +12,8 @@ import { runMemoryPipelineV2 } from '../../memory/pipeline-v2.js';
 
 import { SessionMemoryJournal } from './journal.js';
 
+import { SessionMemoryHierarchyJournal } from './hierarchy-journal.js';
+
 import type { SessionLearningResult } from './types.js';
 
 interface EventRead {
@@ -92,6 +94,8 @@ function readEvents(filePath: string, offset: number): EventRead {
 export class SessionMemoryLearner {
   private readonly journal: SessionMemoryJournal;
 
+  private readonly hierarchyJournal: SessionMemoryHierarchyJournal;
+
   constructor(
     private readonly options: {
       project: ProjectManifest;
@@ -104,6 +108,8 @@ export class SessionMemoryLearner {
     }
   ) {
     this.journal = new SessionMemoryJournal(options.storage);
+
+    this.hierarchyJournal = new SessionMemoryHierarchyJournal(options.storage);
   }
 
   async learnNew(): Promise<SessionLearningResult> {
@@ -153,6 +159,18 @@ export class SessionMemoryLearner {
       journalWritten = Boolean(key);
     }
 
+    let hierarchyJournalWritten = false;
+
+    if (pipeline.hierarchy.facts.length > 0) {
+      const key = await this.hierarchyJournal.write(
+        this.options.identity,
+        read.events,
+        pipeline.hierarchy
+      );
+
+      hierarchyJournalWritten = Boolean(key);
+    }
+
     /*
      * Advance only after immutable learning journal succeeds.
      * If journal write throws, next flush retries same range.
@@ -176,6 +194,33 @@ export class SessionMemoryLearner {
     this.options.wal.setSourceCursor('memory.pipeline.session', pipeline.stats.session);
 
     this.options.wal.setSourceCursor('memory.pipeline.transient', pipeline.stats.transient);
+
+    this.options.wal.setSourceCursor(
+      'memory.pipeline.hierarchy.version',
+      pipeline.hierarchy.version
+    );
+
+    this.options.wal.setSourceCursor('memory.pipeline.hierarchy.raw', pipeline.hierarchy.stats.raw);
+
+    this.options.wal.setSourceCursor(
+      'memory.pipeline.hierarchy.facts',
+      pipeline.hierarchy.stats.facts
+    );
+
+    this.options.wal.setSourceCursor(
+      'memory.pipeline.hierarchy.scenes',
+      pipeline.hierarchy.stats.scenes
+    );
+
+    this.options.wal.setSourceCursor(
+      'memory.pipeline.hierarchy.knowledge',
+      pipeline.hierarchy.stats.knowledge
+    );
+
+    this.options.wal.setSourceCursor(
+      'memory.pipeline.hierarchy.journal_written',
+      hierarchyJournalWritten ? 1 : 0
+    );
 
     this.options.wal.setSourceCursor('memory.learner.offset', read.nextOffset);
 
