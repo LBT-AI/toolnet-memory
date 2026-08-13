@@ -250,6 +250,21 @@ case "$COMMAND" in
     exec "$TSX" "$ROOT/src/session/agy/cli.ts" install-hooks "$@"
     ;;
 
+  certify:continuity)
+    shift
+
+    if [ -f "$ROOT/bundle/continuity-certify.js" ]; then
+      exec node "$ROOT/bundle/continuity-certify.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/production/continuity-certify-cli.ts" ]; then
+      exec "$TSX" "$ROOT/src/production/continuity-certify-cli.ts" "$@"
+    fi
+
+    echo "Continuity certification runtime not found."
+    exit 1
+    ;;
+
   session:claude-hook)
     shift
 

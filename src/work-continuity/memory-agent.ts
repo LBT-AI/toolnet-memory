@@ -2,7 +2,7 @@ import type { ProjectManifest } from '../core/types.js';
 
 import { createResilientAiRouter } from '../ai/router.js';
 
-import { answerMemoryQuestion } from './memory-query.js';
+import { answerRetrievedMemoryQuestion } from './memory-local-answer.js';
 
 import { retrieveMemoryContext } from './memory-retrieval.js';
 
@@ -27,7 +27,7 @@ function compactJson(value: unknown, maxChars: number): string {
 }
 
 function buildMemoryContext(project: ProjectManifest, question: string): string {
-  const direct = answerMemoryQuestion(project, question);
+  const direct = answerRetrievedMemoryQuestion(project, question);
 
   const retrieval = retrieveMemoryContext(project, question, {
     maxFacts: 12,
@@ -55,7 +55,7 @@ export async function askMemoryAgent(
   project: ProjectManifest,
   question: string
 ): Promise<MemoryAgentAnswer> {
-  const local = answerMemoryQuestion(project, question);
+  const local = answerRetrievedMemoryQuestion(project, question);
 
   const context = buildMemoryContext(project, question);
 

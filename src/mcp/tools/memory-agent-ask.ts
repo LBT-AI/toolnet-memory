@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { MCPContext } from '../context.js';
 
-import { answerMemoryQuestion } from '../../work-continuity/memory-query.js';
+import { answerRetrievedMemoryQuestion } from '../../work-continuity/memory-local-answer.js';
 
 import { askMemoryAgent } from '../../work-continuity/memory-agent.js';
 
@@ -67,7 +67,7 @@ export async function memoryAgentAsk(ctx: MCPContext, input: MemoryAgentAskInput
      * Compact prior focus must never influence the regex
      * intent classifier.
      */
-    const result = answerMemoryQuestion(ctx.project, conversation.originalQuestion);
+    const result = answerRetrievedMemoryQuestion(ctx.project, conversation.originalQuestion);
 
     return {
       answer: result.answer,

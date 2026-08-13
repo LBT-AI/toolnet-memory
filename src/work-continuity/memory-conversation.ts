@@ -310,6 +310,23 @@ export function answerMemoryConversationFollowUp(
   };
 }
 
+/**
+ * Explicit TODO questions are direct continuity queries.
+ *
+ * They must not inherit prior conversational focus merely
+ * because they are short. Otherwise a previous task/file
+ * focus can hide the canonical remaining TODO state.
+ */
+function isExplicitTodoQuestion(question: string): boolean {
+  const value = normalize(question);
+
+  return (
+    /(?:^|\s)(?:todo|to-do)(?:\s|$)/u.test(value) ||
+    /(?:việc|task)\s+(?:còn lại|chưa làm|chưa xong|chưa hoàn thành)/u.test(value) ||
+    /(?:còn|các)\s+(?:todo|việc)\b/u.test(value)
+  );
+}
+
 export function prepareMemoryConversation(
   project: ProjectManifest,
   question: string,
@@ -326,7 +343,10 @@ export function prepareMemoryConversation(
   const previous = readConversation(project, now, maxAgeMs);
 
   const usePriorFocus = Boolean(
-    previous && previous.focus.length > 0 && looksLikeFollowUp(question)
+    previous &&
+    previous.focus.length > 0 &&
+    looksLikeFollowUp(question) &&
+    !isExplicitTodoQuestion(question)
   );
 
   const resolvedQuestion =
