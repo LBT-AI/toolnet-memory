@@ -35,6 +35,17 @@ import type {
   ToolNetApiWikiSummary,
 } from './types.js';
 
+import type {
+  ToolNetApiGovernancePolicy,
+  ToolNetApiGovernanceReview,
+  ToolNetApiGovernanceReviews,
+  ToolNetApiGovernanceSummary,
+  ToolNetApiKnowledgeQuality,
+  ToolNetGovernanceDecisionInput,
+  ToolNetKnowledgeGovernancePolicy,
+  ToolNetKnowledgeGovernanceReviewStatus,
+} from './types.js';
+
 export class ToolNetApiClient {
   private readonly baseUrl: string;
   private readonly token?: string;
@@ -188,6 +199,48 @@ export class ToolNetApiClient {
     return this.request<ToolNetApiWikiBacklinks>(
       `/v1/wiki/pages/${encodeURIComponent(slug)}/backlinks`
     );
+  }
+
+  governance(): Promise<ToolNetApiGovernanceSummary> {
+    return this.request<ToolNetApiGovernanceSummary>('/v1/governance');
+  }
+
+  governanceReviews(
+    status?: ToolNetKnowledgeGovernanceReviewStatus
+  ): Promise<ToolNetApiGovernanceReviews> {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : '';
+
+    return this.request<ToolNetApiGovernanceReviews>(`/v1/governance/reviews${suffix}`);
+  }
+
+  reviewKnowledge(
+    reviewId: string,
+    input: ToolNetGovernanceDecisionInput
+  ): Promise<ToolNetApiGovernanceReview> {
+    return this.request<ToolNetApiGovernanceReview>(
+      `/v1/governance/reviews/${encodeURIComponent(reviewId)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }
+    );
+  }
+
+  knowledgeQuality(): Promise<ToolNetApiKnowledgeQuality> {
+    return this.request<ToolNetApiKnowledgeQuality>('/v1/governance/quality');
+  }
+
+  governancePolicy(): Promise<ToolNetApiGovernancePolicy> {
+    return this.request<ToolNetApiGovernancePolicy>('/v1/governance/policy');
+  }
+
+  setGovernancePolicy(
+    input: Partial<ToolNetKnowledgeGovernancePolicy>
+  ): Promise<ToolNetApiGovernancePolicy> {
+    return this.request<ToolNetApiGovernancePolicy>('/v1/governance/policy', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
   }
 
   protected async request<T>(path: string, init: RequestInit = {}): Promise<T> {

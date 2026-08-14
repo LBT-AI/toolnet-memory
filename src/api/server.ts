@@ -9,6 +9,7 @@ import type { RetrievalEngine } from '../retrieval/retrieval-engine.js';
 import { MemoryHubError, type MemoryHubService } from '../hub/index.js';
 
 import { WikiError, type WikiService } from '../wiki/index.js';
+import type { KnowledgeGovernanceService } from '../wiki/index.js';
 
 import {
   apiContextOffloadRead,
@@ -44,12 +45,23 @@ import {
   apiWikiUpdatePage,
 } from './routes/wiki.js';
 
+import {
+  apiGovernanceAudit,
+  apiGovernancePolicy,
+  apiGovernanceQuality,
+  apiGovernanceReviewDecision,
+  apiGovernanceReviews,
+  apiGovernanceSetPolicy,
+  apiGovernanceSummary,
+} from './routes/governance.js';
+
 export interface ApiServerOptions {
   project: ProjectManifest;
   retrieval: RetrievalEngine;
   token?: string;
   hub?: MemoryHubService;
   wiki?: WikiService;
+  governance?: KnowledgeGovernanceService;
 }
 
 function requestPrincipal(req: IncomingMessage): string {
@@ -491,6 +503,98 @@ export function createApiServer(options: ApiServerOptions): Server {
             decodeURIComponent(wikiPageMatch[1]),
             await readJsonBody(req)
           )
+        );
+        return;
+      }
+
+      if (
+        url.pathname.startsWith('/v1/governance') &&
+        (!options.governance || !options.wiki || !options.hub)
+      ) {
+        sendJson(res, 503, {
+          error: 'Knowledge Governance unavailable',
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/governance') {
+        sendJson(
+          res,
+          200,
+          await apiGovernanceSummary(options.governance!, options.hub!, principal)
+        );
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/governance/reviews') {
+        sendJson(
+          res,
+          200,
+          await apiGovernanceReviews(
+            options.governance!,
+            options.hub!,
+            principal,
+            url.searchParams.get('status') ?? undefined
+          )
+        );
+        return;
+      }
+
+      const governanceReviewMatch = /^\/v1\/governance\/reviews\/([^/]+)$/u.exec(url.pathname);
+
+      if (req.method === 'POST' && governanceReviewMatch) {
+        sendJson(
+          res,
+          200,
+          await apiGovernanceReviewDecision(
+            options.governance!,
+            options.wiki!,
+            options.hub!,
+            principal,
+            decodeURIComponent(governanceReviewMatch[1]),
+            await readJsonBody(req)
+          )
+        );
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/governance/quality') {
+        sendJson(
+          res,
+          200,
+          await apiGovernanceQuality(options.governance!, options.wiki!, options.hub!, principal)
+        );
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/governance/policy') {
+        sendJson(res, 200, await apiGovernancePolicy(options.governance!, options.hub!, principal));
+        return;
+      }
+
+      if (req.method === 'PUT' && url.pathname === '/v1/governance/policy') {
+        sendJson(
+          res,
+          200,
+          await apiGovernanceSetPolicy(
+            options.governance!,
+            options.hub!,
+            principal,
+            await readJsonBody(req)
+          )
+        );
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/governance/audit') {
+        const rawLimit = Number(url.searchParams.get('limit') ?? 100);
+
+        const limit = Number.isInteger(rawLimit) ? Math.max(1, Math.min(500, rawLimit)) : 100;
+
+        sendJson(
+          res,
+          200,
+          await apiGovernanceAudit(options.governance!, options.hub!, principal, limit)
         );
         return;
       }

@@ -358,3 +358,93 @@ class ToolNetApiClient:
         return self._request(
             f"/v1/wiki/pages/{quote(slug, safe='')}/backlinks"
         )
+
+    def governance(self) -> dict[str, Any]:
+        return self._request(
+            "/v1/governance"
+        )
+
+    def governance_reviews(
+        self,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        from urllib.parse import urlencode
+
+        path = "/v1/governance/reviews"
+
+        if status is not None:
+            path += "?" + urlencode(
+                {"status": status}
+            )
+
+        return self._request(path)
+
+    def review_knowledge(
+        self,
+        review_id: str,
+        action: str,
+        note: str | None = None,
+        target_review_id: str | None = None,
+    ) -> dict[str, Any]:
+        from urllib.parse import quote
+
+        payload: dict[str, Any] = {
+            "action": action,
+        }
+
+        if note is not None:
+            payload["note"] = note
+
+        if target_review_id is not None:
+            payload["targetReviewId"] = (
+                target_review_id
+            )
+
+        return self._request(
+            "/v1/governance/reviews/"
+            + quote(review_id, safe=""),
+            payload,
+        )
+
+    def knowledge_quality(
+        self,
+    ) -> dict[str, Any]:
+        return self._request(
+            "/v1/governance/quality"
+        )
+
+    def governance_policy(
+        self,
+    ) -> dict[str, Any]:
+        return self._request(
+            "/v1/governance/policy"
+        )
+
+    def set_governance_policy(
+        self,
+        auto_approve_threshold: float | None = None,
+        critical_approve_threshold: float | None = None,
+        stale_after_days: int | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+
+        if auto_approve_threshold is not None:
+            payload["autoApproveThreshold"] = (
+                auto_approve_threshold
+            )
+
+        if critical_approve_threshold is not None:
+            payload[
+                "criticalApproveThreshold"
+            ] = critical_approve_threshold
+
+        if stale_after_days is not None:
+            payload["staleAfterDays"] = (
+                stale_after_days
+            )
+
+        return self._request(
+            "/v1/governance/policy",
+            payload,
+            method="PUT",
+        )

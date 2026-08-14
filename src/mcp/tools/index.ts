@@ -23,3 +23,4 @@ export * from './context-offload-read.js';
 export * from './skill-memory-search.js';
 export * from './wiki-search.js';
 export * from './wiki-read.js';
+export * from './knowledge-governance-status.js';

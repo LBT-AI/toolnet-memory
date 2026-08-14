@@ -129,7 +129,9 @@ export type ToolNetHubScope =
   | 'loadouts:write'
   | 'observability:read'
   | 'wiki:read'
-  | 'wiki:write';
+  | 'wiki:write'
+  | 'governance:read'
+  | 'governance:write';
 
 export interface ToolNetHubTeam {
   id: string;
@@ -366,4 +368,102 @@ export interface ToolNetApiWikiHistory {
 export interface ToolNetApiWikiBacklinks {
   schema: 'toolnet.api-wiki-backlinks.v1';
   pages: ToolNetWikiPage[];
+}
+
+export type ToolNetKnowledgeGovernanceReviewStatus =
+  'pending' | 'approved' | 'rejected' | 'superseded';
+
+export type ToolNetKnowledgeGovernanceRisk = 'normal' | 'critical' | 'conflict';
+
+export interface ToolNetKnowledgeGovernancePolicy {
+  autoApproveThreshold: number;
+  criticalApproveThreshold: number;
+  staleAfterDays: number;
+}
+
+export interface ToolNetKnowledgeGovernanceReview {
+  id: string;
+  sourceKey: string;
+  sourceType: 'memory' | 'scene' | 'skill';
+  slug: string;
+  digest: string;
+  title: string;
+  summary?: string;
+  content: string;
+  tags: string[];
+  confidence: number;
+  risk: ToolNetKnowledgeGovernanceRisk;
+  reasons: string[];
+  conflicts: string[];
+  status: ToolNetKnowledgeGovernanceReviewStatus;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNote?: string;
+  appliedAt?: string;
+  supersededBy?: string;
+  mergedInto?: string;
+}
+
+export interface ToolNetApiGovernanceSummary {
+  schema: 'toolnet.api-governance-summary.v1';
+  governance: {
+    schema: 'toolnet.knowledge-governance-summary.v1';
+    projectId: string;
+    pending: number;
+    approved: number;
+    rejected: number;
+    superseded: number;
+    criticalPending: number;
+    conflictPending: number;
+    auditEvents: number;
+    policy: ToolNetKnowledgeGovernancePolicy;
+    updatedAt: string;
+  };
+}
+
+export interface ToolNetApiGovernanceReviews {
+  schema: 'toolnet.api-governance-reviews.v1';
+  reviews: ToolNetKnowledgeGovernanceReview[];
+}
+
+export interface ToolNetApiGovernanceReview {
+  schema: 'toolnet.api-governance-review.v1';
+  review: ToolNetKnowledgeGovernanceReview;
+}
+
+export interface ToolNetGovernanceDecisionInput {
+  action: 'approve' | 'reject' | 'supersede' | 'merge';
+  note?: string;
+  targetReviewId?: string;
+}
+
+export interface ToolNetApiKnowledgeQuality {
+  schema: 'toolnet.api-knowledge-quality.v1';
+  quality: {
+    schema: 'toolnet.knowledge-quality.v1';
+    totalPages: number;
+    automatedPages: number;
+    manualPages: number;
+    stalePages: Array<{
+      slug: string;
+      title: string;
+      updatedAt: string;
+      ageDays: number;
+    }>;
+    duplicateTitles: Array<{
+      title: string;
+      pages: string[];
+    }>;
+    pendingReviews: number;
+    lowConfidenceReviews: number;
+    conflicts: number;
+    generatedAt: string;
+  };
+}
+
+export interface ToolNetApiGovernancePolicy {
+  schema: 'toolnet.api-governance-policy.v1';
+  policy: ToolNetKnowledgeGovernancePolicy;
 }

@@ -7,6 +7,8 @@ export const MEMORY_HUB_SCOPES = [
   'observability:read',
   'wiki:read',
   'wiki:write',
+  'governance:read',
+  'governance:write',
 ] as const;
 
 export type MemoryHubScope = (typeof MEMORY_HUB_SCOPES)[number];

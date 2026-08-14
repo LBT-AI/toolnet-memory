@@ -10,6 +10,8 @@ import { WikiError, WikiService, wikiSlug } from './service.js';
 
 import { WikiStore, type WikiStorage } from './store.js';
 
+import { KnowledgeGovernanceService, KnowledgeGovernanceStore } from './governance.js';
+
 import type { WikiPageV1 } from './types.js';
 
 const LEDGER_KEY = 'wiki/automation.v1.json';
@@ -75,6 +77,9 @@ export interface WikiAutomationResult {
   unchanged: number;
   skipped: number;
   failed: number;
+  reviewPending: number;
+  autoApproved: number;
+  reviewApproved: number;
   pages: Array<{
     sourceKey: string;
     sourceType: WikiAutomationSourceType;
@@ -540,12 +545,21 @@ export async function promoteKnowledgeToWiki(
     unchanged: 0,
     skipped: 0,
     failed: skills.failed,
+    reviewPending: 0,
+    autoApproved: 0,
+    reviewApproved: 0,
     pages: [],
   };
 
   const wiki = new WikiService(new WikiStore(options.storage, options.project));
 
   await wiki.initialize();
+
+  const governance = new KnowledgeGovernanceService(
+    new KnowledgeGovernanceStore(options.storage, options.project)
+  );
+
+  await governance.initialize();
 
   const ledger = await loadLedger(options.storage, options.project.id);
 
@@ -574,12 +588,49 @@ export async function promoteKnowledgeToWiki(
 
       const tags = unique([...candidate.tags, marker]);
 
+      const pageContent = generatedContent(candidate);
+
+      const gate = await governance.gate(
+        {
+          sourceKey: candidate.sourceKey,
+          sourceType: candidate.sourceType,
+          slug,
+          marker,
+          digest: nextDigest,
+          title: candidate.title,
+          ...(candidate.summary
+            ? {
+                summary: candidate.summary,
+              }
+            : {}),
+          content: pageContent,
+          tags,
+        },
+        [...pageBySlug.values()]
+      );
+
+      if (!gate.allowed) {
+        if (gate.mode === 'pending-review') {
+          result.reviewPending += 1;
+        } else {
+          result.skipped += 1;
+        }
+
+        continue;
+      }
+
+      if (gate.mode === 'auto-approved') {
+        result.autoApproved += 1;
+      } else if (gate.mode === 'review-approved') {
+        result.reviewApproved += 1;
+      }
+
       if (!page) {
         page = await wiki.createPage({
           slug,
           title: candidate.title,
           summary: candidate.summary,
-          content: generatedContent(candidate),
+          content: pageContent,
           tags,
         });
 
@@ -597,7 +648,7 @@ export async function promoteKnowledgeToWiki(
         page = await wiki.updatePage(slug, {
           title: candidate.title,
           summary: candidate.summary ?? '',
-          content: generatedContent(candidate),
+          content: pageContent,
           tags,
         });
 
@@ -642,6 +693,8 @@ export async function promoteKnowledgeToWiki(
       }
 
       entryBySource.set(candidate.sourceKey, entry);
+
+      await governance.markApplied(candidate.sourceKey, nextDigest);
     } catch (error) {
       if (error instanceof WikiError && error.statusCode === 409) {
         result.skipped += 1;

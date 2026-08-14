@@ -21,6 +21,7 @@ const DEFAULT_TOOLS = [
   'context_offload_read',
   'wiki_search',
   'wiki_read',
+  'knowledge_governance_status',
 ];
 
 export class MemoryHubError extends Error {

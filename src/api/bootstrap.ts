@@ -14,6 +14,7 @@ import {
 import { MemoryHubService, MemoryHubStore } from '../hub/index.js';
 
 import { WikiService, WikiStore } from '../wiki/index.js';
+import { KnowledgeGovernanceService, KnowledgeGovernanceStore } from '../wiki/index.js';
 
 import { createApiServer } from './server.js';
 
@@ -61,6 +62,10 @@ async function main(): Promise<void> {
 
   await wiki.initialize();
 
+  const governance = new KnowledgeGovernanceService(new KnowledgeGovernanceStore(storage, project));
+
+  await governance.initialize();
+
   const memory = new MemoryEngine();
 
   const memoryStore = new MemoryStore(storage);
@@ -75,6 +80,7 @@ async function main(): Promise<void> {
     token: process.env.TOOLNET_API_TOKEN?.trim() || undefined,
     hub,
     wiki,
+    governance,
   });
 
   server.listen(PORT, HOST, () => {

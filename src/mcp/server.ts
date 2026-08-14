@@ -55,6 +55,11 @@ import {
   wikiReadSchema,
 } from './tools/index.js';
 
+import {
+  knowledgeGovernanceStatus,
+  knowledgeGovernanceStatusSchema,
+} from './tools/knowledge-governance-status.js';
+
 function jsonText(value: unknown) {
   return {
     content: [
@@ -313,6 +318,17 @@ export function createMCPServer(ctx: MCPContext) {
     ].join(' '),
     wikiReadSchema,
     async (input) => jsonText(await wikiRead(ctx, input))
+  );
+
+  server.tool(
+    'knowledge_governance_status',
+    [
+      'Inspect ToolNet Knowledge Governance health.',
+      'Returns review counts, confidence, conflicts, stale knowledge, and optional compact pending reviews.',
+      'Use this before trusting or changing important durable project knowledge.',
+    ].join(' '),
+    knowledgeGovernanceStatusSchema,
+    async (input) => jsonText(await knowledgeGovernanceStatus(ctx, input))
   );
 
   return server;

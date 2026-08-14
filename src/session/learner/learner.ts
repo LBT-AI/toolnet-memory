@@ -295,6 +295,21 @@ export class SessionMemoryLearner {
       this.options.wal.setSourceCursor('memory.wiki_automation.skipped', wikiAutomation.skipped);
 
       this.options.wal.setSourceCursor('memory.wiki_automation.failed', wikiAutomation.failed);
+
+      this.options.wal.setSourceCursor(
+        'memory.wiki_automation.review_pending',
+        wikiAutomation.reviewPending
+      );
+
+      this.options.wal.setSourceCursor(
+        'memory.wiki_automation.auto_approved',
+        wikiAutomation.autoApproved
+      );
+
+      this.options.wal.setSourceCursor(
+        'memory.wiki_automation.review_approved',
+        wikiAutomation.reviewApproved
+      );
     } catch {
       this.options.wal.setSourceCursor('memory.wiki_automation.failed', 1);
     }
