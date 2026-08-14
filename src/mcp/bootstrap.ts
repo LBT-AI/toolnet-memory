@@ -1,52 +1,30 @@
 import 'dotenv/config';
 
-import { loadConfig, MemoryEngine, ProjectManager } from '../core/index.js';
+import { MemoryEngine } from '../core/memory-engine.js';
+import { ProjectManager } from '../core/project-manager.js';
 
 import { RetrievalEngine } from '../retrieval/retrieval-engine.js';
 
-import { createEmbeddingProvider } from '../embeddings/index.js';
+import { CodeGraphStore } from '../code-intelligence/graph/graph-store.js';
+import { ReferenceResolver } from '../code-intelligence/symbols/reference-resolver.js';
 
-import {
-  CodeGraphStore,
-  ReferenceResolver,
-  SemanticCodeEngine,
-} from '../code-intelligence/index.js';
-
-import {
-  createStorageProvider,
-  withStorageRetry,
-  ProjectScopedStorageProvider,
-  MemoryStore,
-  PersistentCodeGraphStore,
-} from '../storage/index.js';
+import type { MCPContext } from './context.js';
 
 import { startMCPServer } from './server.js';
+import { hydrateMCPContext } from './hydration.js';
 
 import { ProjectLock } from '../production/project-lock.js';
 
 async function main() {
-  const config = loadConfig();
-
+  /*
+   * Only cheap/local state belongs before MCP stdio connect.
+   *
+   * No remote storage.
+   * No graph fetch.
+   * No embeddings.
+   * No semantic initialization.
+   */
   const project = new ProjectManager().detect();
-
-  const rawStorage = createStorageProvider({
-    provider: config.storage.provider,
-
-    huggingface: config.storage.huggingface,
-
-    localRoot: config.storage.localRoot,
-  });
-
-  const retryStorage = withStorageRetry(rawStorage, {
-    attempts: Number(process.env.TOOLNET_STORAGE_RETRIES ?? 3),
-  });
-
-  const storage = new ProjectScopedStorageProvider(
-    retryStorage,
-    project.id,
-    project.name,
-    project.remote ?? project.name
-  );
 
   const processLock = new ProjectLock(project.id);
 
@@ -57,53 +35,52 @@ async function main() {
   };
 
   process.once('SIGINT', stop);
-
   process.once('SIGTERM', stop);
 
   const memory = new MemoryEngine();
-
-  const memoryStore = new MemoryStore(storage);
-
-  memory.importRecords(await memoryStore.load(project.id));
-
   const retrieval = new RetrievalEngine(memory);
 
   const graph = new CodeGraphStore();
-
-  const graphSnapshot = await new PersistentCodeGraphStore(storage).load(project.id);
-
-  if (graphSnapshot) {
-    graph.import(graphSnapshot.symbols, graphSnapshot.edges);
-  }
-
   const references = new ReferenceResolver(graph);
 
-  const codeSemantic = new SemanticCodeEngine({
-    projectId: project.id,
-
-    rootPath: project.rootPath,
-
-    model: process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2',
-
-    storage,
-
-    embeddings: createEmbeddingProvider(),
-
-    graph,
-  });
-
-  await codeSemantic.initialize();
-
-  await startMCPServer({
+  const ctx: MCPContext = {
     project,
     memory,
     retrieval,
     graph,
     references,
-    codeSemantic,
-    memoryStore,
-    storage,
-  });
+  };
+
+  /*
+   * CRITICAL STARTUP CONTRACT:
+   *
+   * Connect MCP before touching remote storage or embeddings.
+   * OpenCode / Agy / Codex can now complete initialize + tools/list
+   * immediately.
+   */
+  await startMCPServer(ctx);
+
+  /*
+   * Remote state is hydrated after stdio is live.
+   *
+   * Mutating ctx is intentional: registered MCP tools retain the same
+   * context object and see memory/graph/storage/semantic as they become ready.
+   */
+  void hydrateMCPContext(ctx)
+    .then((result) => {
+      if (result.errors.length > 0) {
+        console.error(
+          `[toolnet-memory] MCP background hydration degraded: ${result.errors.join(' | ')}`
+        );
+      }
+    })
+    .catch((error) => {
+      console.error(
+        `[toolnet-memory] MCP background hydration failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    });
 }
 
 main().catch((error) => {

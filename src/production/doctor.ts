@@ -5,6 +5,7 @@ import { loadConfig, ProjectManager } from '../core/index.js';
 import {
   createStorageProvider,
   withStorageRetry,
+  ProjectScopedStorageProvider,
   MemoryStore,
   PersistentCodeGraphStore,
   PersistentVectorStore,
@@ -236,7 +237,7 @@ async function main(): Promise<void> {
 
   const project = new ProjectManager().detect();
 
-  const storage = withStorageRetry(
+  const rawStorage = withStorageRetry(
     createStorageProvider({
       provider: config.storage.provider,
       r2: config.storage.r2,
@@ -247,6 +248,13 @@ async function main(): Promise<void> {
     {
       attempts: 3,
     }
+  );
+
+  const storage = new ProjectScopedStorageProvider(
+    rawStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
   );
 
   const embeddings = createEmbeddingProvider();
@@ -286,7 +294,7 @@ async function main(): Promise<void> {
     };
   }
 
-  const health = await new ProductionHealth(storage, embeddings).run();
+  const health = await new ProductionHealth(rawStorage, embeddings).run();
 
   const memories = await new MemoryStore(storage).load(project.id);
 
