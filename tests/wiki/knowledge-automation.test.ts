@@ -129,7 +129,8 @@ describe('Knowledge Automation', () => {
       hierarchy,
     });
 
-    expect(first.created).toBe(3);
+    expect(first.created).toBe(2);
+    expect(first.reviewPending).toBe(1);
     expect(first.failed).toBe(0);
 
     const wiki = new WikiService(new WikiStore(storage, project));
@@ -138,7 +139,7 @@ describe('Knowledge Automation', () => {
 
     const pages = await wiki.listPages();
 
-    expect(pages).toHaveLength(3);
+    expect(pages).toHaveLength(2);
 
     expect(pages.some((page) => page.content.includes('THIS RAW TRANSCRIPT'))).toBe(false);
 
@@ -148,7 +149,7 @@ describe('Knowledge Automation', () => {
 
     const summary = await wiki.summary();
 
-    expect(summary.automatedPages).toBe(3);
+    expect(summary.automatedPages).toBe(2);
   });
 
   it('deduplicates unchanged sources and creates revisions only when knowledge changes', async () => {
