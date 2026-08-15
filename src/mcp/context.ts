@@ -14,6 +14,8 @@ import type { MemoryStore } from '../storage/memory-store.js';
 
 import type { StorageProvider } from '../storage/types.js';
 
+import type { MCPRuntimeState } from './runtime-state.js';
+
 export interface MCPContext {
   project: ProjectManifest;
 
@@ -30,4 +32,6 @@ export interface MCPContext {
   memoryStore?: MemoryStore;
 
   storage?: StorageProvider;
+
+  runtime?: MCPRuntimeState;
 }

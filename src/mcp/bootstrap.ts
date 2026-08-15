@@ -13,16 +13,22 @@ import type { MCPContext } from './context.js';
 import { startMCPServer } from './server.js';
 import { hydrateMCPContext } from './hydration.js';
 
+import { createMCPRuntimeState, markMCPConnected, markRuntimeFailed } from './runtime-state.js';
+
 import { ProjectLock } from '../production/project-lock.js';
 
+function degradedRetryDelay(): number {
+  const configured = Number(process.env.TOOLNET_MCP_DEGRADED_RETRY_MS ?? 30_000);
+
+  return Number.isFinite(configured) && configured >= 1_000 ? Math.floor(configured) : 30_000;
+}
+
 async function main() {
+  const processStartedAt = Date.now();
+
   /*
-   * Only cheap/local state belongs before MCP stdio connect.
-   *
-   * No remote storage.
-   * No graph fetch.
-   * No embeddings.
-   * No semantic initialization.
+   * Only local/lightweight state belongs before
+   * the MCP stdio handshake.
    */
   const project = new ProjectManager().detect();
 
@@ -43,44 +49,53 @@ async function main() {
   const graph = new CodeGraphStore();
   const references = new ReferenceResolver(graph);
 
+  const runtime = createMCPRuntimeState(processStartedAt);
+
   const ctx: MCPContext = {
     project,
     memory,
     retrieval,
     graph,
     references,
+    runtime,
   };
 
   /*
-   * CRITICAL STARTUP CONTRACT:
-   *
-   * Connect MCP before touching remote storage or embeddings.
-   * OpenCode / Agy / Codex can now complete initialize + tools/list
-   * immediately.
+   * Handshake first.
    */
   await startMCPServer(ctx);
 
+  markMCPConnected(runtime);
+
   /*
-   * Remote state is hydrated after stdio is live.
-   *
-   * Mutating ctx is intentional: registered MCP tools retain the same
-   * context object and see memory/graph/storage/semantic as they become ready.
+   * Hydration is retryable and never owns MCP process
+   * availability.
    */
-  void hydrateMCPContext(ctx)
-    .then((result) => {
-      if (result.errors.length > 0) {
-        console.error(
-          `[toolnet-memory] MCP background hydration degraded: ${result.errors.join(' | ')}`
-        );
+  const hydrate = async (): Promise<void> => {
+    try {
+      await hydrateMCPContext(ctx);
+
+      if (runtime.phase === 'degraded') {
+        const timer = setTimeout(() => {
+          void hydrate();
+        }, degradedRetryDelay());
+
+        timer.unref();
       }
-    })
-    .catch((error) => {
-      console.error(
-        `[toolnet-memory] MCP background hydration failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    });
+    } catch (error) {
+      markRuntimeFailed(runtime, error);
+
+      const timer = setTimeout(() => {
+        runtime.phase = 'degraded';
+
+        void hydrate();
+      }, degradedRetryDelay());
+
+      timer.unref();
+    }
+  };
+
+  void hydrate();
 }
 
 main().catch((error) => {

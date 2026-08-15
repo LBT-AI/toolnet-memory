@@ -1,5 +1,17 @@
 import type { MCPContext } from './context.js';
 
+import {
+  createMCPRuntimeState,
+  markDependencyFailed,
+  markDependencyLoading,
+  markDependencyReady,
+  markHydrationCompleted,
+  markHydrationStarted,
+  recordDependencyAttempt,
+  recordRuntimeRetry,
+  retryOperation,
+} from './runtime-state.js';
+
 export interface MCPHydrationResult {
   memory: 'ready' | 'failed';
   graph: 'ready' | 'failed';
@@ -7,30 +19,71 @@ export interface MCPHydrationResult {
   errors: string[];
 }
 
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function positiveInteger(input: string | undefined, fallback: number): number {
+  const value = Number(input);
+
+  if (!Number.isFinite(value) || value < 1) {
+    return fallback;
+  }
+
+  return Math.floor(value);
+}
+
+function nonNegativeInteger(input: string | undefined, fallback: number): number {
+  const value = Number(input);
+
+  if (!Number.isFinite(value) || value < 0) {
+    return fallback;
+  }
+
+  return Math.floor(value);
+}
+
+function resultFromContext(ctx: MCPContext): MCPHydrationResult {
+  const runtime = ctx.runtime;
+
+  if (!runtime) {
+    return {
+      memory: 'failed',
+      graph: 'failed',
+      semantic: 'failed',
+      errors: ['runtime unavailable'],
+    };
+  }
+
+  return {
+    memory: runtime.dependencies.memory.state === 'ready' ? 'ready' : 'failed',
+
+    graph: runtime.dependencies.graph.state === 'ready' ? 'ready' : 'failed',
+
+    semantic: runtime.dependencies.semantic.state === 'ready' ? 'ready' : 'failed',
+
+    errors: [...runtime.errors],
+  };
 }
 
 /**
- * Hydrate remote/project-backed MCP state after stdio has already connected.
+ * Background hydration for MCP.
  *
- * Important:
- * - MCP startup must never wait for S3/R2/Hugging Face.
- * - MCP startup must never wait for embedding initialization.
- * - Individual hydration failures degrade capabilities without killing MCP.
+ * MCP stdio is already connected before this function runs.
+ *
+ * Failed dependencies are retried independently and leave the
+ * server in degraded mode instead of killing the MCP process.
  */
 export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationResult> {
-  const result: MCPHydrationResult = {
-    memory: 'failed',
-    graph: 'failed',
-    semantic: 'failed',
-    errors: [],
-  };
+  const runtime = ctx.runtime ?? createMCPRuntimeState(Date.now());
+
+  ctx.runtime = runtime;
+
+  markHydrationStarted(runtime);
+
+  runtime.dataSource = 'embedded';
+
+  const attempts = positiveInteger(process.env.TOOLNET_MCP_HYDRATION_RETRIES, 3);
+
+  const delayMs = nonNegativeInteger(process.env.TOOLNET_MCP_HYDRATION_RETRY_DELAY_MS, 500);
 
   try {
-    /*
-     * Keep heavy storage/AWS modules outside the MCP handshake path.
-     */
     const [{ loadConfig }, storageModule] = await Promise.all([
       import('../core/config.js'),
       import('../storage/index.js'),
@@ -62,65 +115,120 @@ export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationRe
     ctx.storage = storage;
     ctx.memoryStore = memoryStore;
 
-    /*
-     * Memory and graph are independent remote reads.
-     * One failing must not prevent the other from becoming available.
-     */
-    const [memoryResult, graphResult] = await Promise.allSettled([
-      memoryStore.load(ctx.project.id),
-      new storageModule.PersistentCodeGraphStore(storage).load(ctx.project.id),
-    ]);
+    const memoryTask =
+      runtime.dependencies.memory.state === 'ready'
+        ? Promise.resolve()
+        : (async () => {
+            markDependencyLoading(runtime, 'memory');
 
-    if (memoryResult.status === 'fulfilled') {
-      ctx.memory.importRecords(memoryResult.value);
-      result.memory = 'ready';
-    } else {
-      result.errors.push(`memory: ${message(memoryResult.reason)}`);
-    }
+            try {
+              const records = await retryOperation(() => memoryStore.load(ctx.project.id), {
+                attempts,
+                delayMs,
 
-    if (graphResult.status === 'fulfilled') {
-      if (graphResult.value) {
-        ctx.graph.import(graphResult.value.symbols, graphResult.value.edges);
+                onAttempt: () => {
+                  recordDependencyAttempt(runtime, 'memory');
+                },
+
+                onRetry: () => {
+                  recordRuntimeRetry(runtime);
+                },
+              });
+
+              ctx.memory.importRecords(records);
+
+              markDependencyReady(runtime, 'memory');
+            } catch (error) {
+              markDependencyFailed(runtime, 'memory', error);
+            }
+          })();
+
+    const graphTask =
+      runtime.dependencies.graph.state === 'ready'
+        ? Promise.resolve()
+        : (async () => {
+            markDependencyLoading(runtime, 'graph');
+
+            try {
+              const graph = await retryOperation(
+                () => new storageModule.PersistentCodeGraphStore(storage).load(ctx.project.id),
+                {
+                  attempts,
+                  delayMs,
+
+                  onAttempt: () => {
+                    recordDependencyAttempt(runtime, 'graph');
+                  },
+
+                  onRetry: () => {
+                    recordRuntimeRetry(runtime);
+                  },
+                }
+              );
+
+              if (graph) {
+                ctx.graph.import(graph.symbols, graph.edges);
+              }
+
+              markDependencyReady(runtime, 'graph');
+            } catch (error) {
+              markDependencyFailed(runtime, 'graph', error);
+            }
+          })();
+
+    await Promise.all([memoryTask, graphTask]);
+
+    if (runtime.dependencies.semantic.state !== 'ready') {
+      markDependencyLoading(runtime, 'semantic');
+
+      try {
+        const [{ SemanticCodeEngine }, { createEmbeddingProvider }] = await Promise.all([
+          import('../code-intelligence/semantic/semantic-code-engine.js'),
+          import('../embeddings/index.js'),
+        ]);
+
+        const semantic = new SemanticCodeEngine({
+          projectId: ctx.project.id,
+          rootPath: ctx.project.rootPath,
+
+          model: process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2',
+
+          storage,
+
+          embeddings: createEmbeddingProvider(),
+
+          graph: ctx.graph,
+        });
+
+        await retryOperation(() => semantic.initialize(), {
+          attempts,
+          delayMs,
+
+          onAttempt: () => {
+            recordDependencyAttempt(runtime, 'semantic');
+          },
+
+          onRetry: () => {
+            recordRuntimeRetry(runtime);
+          },
+        });
+
+        ctx.codeSemantic = semantic;
+
+        markDependencyReady(runtime, 'semantic');
+      } catch (error) {
+        markDependencyFailed(runtime, 'semantic', error);
       }
-
-      result.graph = 'ready';
-    } else {
-      result.errors.push(`graph: ${message(graphResult.reason)}`);
-    }
-
-    /*
-     * Semantic initialization is deliberately last.
-     * It can involve vector storage and embedding providers and must never
-     * delay MCP initialize/tools-list.
-     */
-    try {
-      const [{ SemanticCodeEngine }, { createEmbeddingProvider }] = await Promise.all([
-        import('../code-intelligence/semantic/semantic-code-engine.js'),
-        import('../embeddings/index.js'),
-      ]);
-
-      const semantic = new SemanticCodeEngine({
-        projectId: ctx.project.id,
-        rootPath: ctx.project.rootPath,
-        model: process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2',
-        storage,
-        embeddings: createEmbeddingProvider(),
-        graph: ctx.graph,
-      });
-
-      await semantic.initialize();
-
-      /*
-       * Expose semantic search only after initialization is complete.
-       */
-      ctx.codeSemantic = semantic;
-      result.semantic = 'ready';
-    } catch (error) {
-      result.errors.push(`semantic: ${message(error)}`);
     }
   } catch (error) {
-    result.errors.push(`storage: ${message(error)}`);
+    for (const dependency of ['memory', 'graph', 'semantic'] as const) {
+      if (runtime.dependencies[dependency].state !== 'ready') {
+        markDependencyFailed(runtime, dependency, error);
+      }
+    }
   }
 
-  return result;
+  markHydrationCompleted(runtime);
+
+  return resultFromContext(ctx);
 }

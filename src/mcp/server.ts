@@ -60,6 +60,8 @@ import {
   knowledgeGovernanceStatusSchema,
 } from './tools/knowledge-governance-status.js';
 
+import { toolnetStatus, toolnetStatusSchema } from './tools/toolnet-status.js';
+
 function jsonText(value: unknown) {
   return {
     content: [
@@ -318,6 +320,17 @@ export function createMCPServer(ctx: MCPContext) {
     ].join(' '),
     wikiReadSchema,
     async (input) => jsonText(await wikiRead(ctx, input))
+  );
+
+  server.tool(
+    'toolnet_status',
+    [
+      'Inspect ToolNet MCP runtime health.',
+      'Returns dependency readiness, degraded state, retry counts,',
+      'startup timing, hydration timing, storage source and project data counts.',
+    ].join(' '),
+    toolnetStatusSchema,
+    async () => jsonText(toolnetStatus(ctx))
   );
 
   server.tool(
