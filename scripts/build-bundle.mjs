@@ -25,6 +25,8 @@ const entries = {
   'auto-integrate': 'src/production/auto-integrate.ts',
   mcp: 'src/mcp/bootstrap.ts',
   api: 'src/api/bootstrap.ts',
+  service: 'src/service/daemon.ts',
+  'service-cli': 'src/service/cli.ts',
   snapshot: 'src/production/snapshot-cli.ts',
 
   opencode: 'src/session/opencode/cli.ts',

@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import type { MCPContext } from '../context.js';
 
+import { invalidateServiceProject } from '../../service/client.js';
+
 export const memoryForgetSchema = {
   id: z.string().min(1),
 };
@@ -16,6 +18,10 @@ export async function memoryForget(
 
   if (deleted && ctx.memoryStore) {
     await ctx.memoryStore.save(ctx.project.id, ctx.memory.exportProject(ctx.project.id));
+  }
+
+  if (deleted) {
+    void invalidateServiceProject(ctx.project);
   }
 
   return {

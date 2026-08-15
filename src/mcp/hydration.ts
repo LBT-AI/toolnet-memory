@@ -12,6 +12,8 @@ import {
   retryOperation,
 } from './runtime-state.js';
 
+import { tryHydrateFromService } from '../service/client.js';
+
 export interface MCPHydrationResult {
   memory: 'ready' | 'failed';
   graph: 'ready' | 'failed';
@@ -62,14 +64,6 @@ function resultFromContext(ctx: MCPContext): MCPHydrationResult {
   };
 }
 
-/**
- * Background hydration for MCP.
- *
- * MCP stdio is already connected before this function runs.
- *
- * Failed dependencies are retried independently and leave the
- * server in degraded mode instead of killing the MCP process.
- */
 export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationResult> {
   const runtime = ctx.runtime ?? createMCPRuntimeState(Date.now());
 
@@ -77,13 +71,49 @@ export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationRe
 
   markHydrationStarted(runtime);
 
-  runtime.dataSource = 'embedded';
-
   const attempts = positiveInteger(process.env.TOOLNET_MCP_HYDRATION_RETRIES, 3);
 
   const delayMs = nonNegativeInteger(process.env.TOOLNET_MCP_HYDRATION_RETRY_DELAY_MS, 500);
 
+  /*
+   * Fast path:
+   * ask the optional local daemon for shared cache.
+   *
+   * Missing daemon is not an error.
+   */
+  if (
+    runtime.dependencies.memory.state !== 'ready' ||
+    runtime.dependencies.graph.state !== 'ready'
+  ) {
+    const daemon = await tryHydrateFromService(ctx.project, {
+      timeoutMs: positiveInteger(process.env.TOOLNET_SERVICE_REQUEST_TIMEOUT_MS, 1_000),
+    });
+
+    if (daemon) {
+      runtime.dataSource = 'daemon';
+
+      if (runtime.dependencies.memory.state !== 'ready') {
+        ctx.memory.importRecords(daemon.memory);
+
+        markDependencyReady(runtime, 'memory');
+      }
+
+      if (runtime.dependencies.graph.state !== 'ready') {
+        if (daemon.graph) {
+          ctx.graph.import(daemon.graph.symbols, daemon.graph.edges);
+        }
+
+        markDependencyReady(runtime, 'graph');
+      }
+    }
+  }
+
   try {
+    /*
+     * Even with daemon cache, build a lightweight scoped
+     * storage object so write tools and semantic search can
+     * continue to persist normally.
+     */
     const [{ loadConfig }, storageModule] = await Promise.all([
       import('../core/config.js'),
       import('../storage/index.js'),
@@ -119,6 +149,8 @@ export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationRe
       runtime.dependencies.memory.state === 'ready'
         ? Promise.resolve()
         : (async () => {
+            runtime.dataSource = 'embedded';
+
             markDependencyLoading(runtime, 'memory');
 
             try {
@@ -147,6 +179,8 @@ export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationRe
       runtime.dependencies.graph.state === 'ready'
         ? Promise.resolve()
         : (async () => {
+            runtime.dataSource = 'embedded';
+
             markDependencyLoading(runtime, 'graph');
 
             try {

@@ -115,6 +115,41 @@ case "$COMMAND" in
     run bundle/api.js src/api/bootstrap.ts
     ;;
 
+  service)
+    shift
+    run bundle/service.js src/service/daemon.ts "$@"
+    ;;
+
+  service:install)
+    shift
+    run bundle/service-cli.js src/service/cli.ts install "$@"
+    ;;
+
+  service:start)
+    shift
+    run bundle/service-cli.js src/service/cli.ts start "$@"
+    ;;
+
+  service:stop)
+    shift
+    run bundle/service-cli.js src/service/cli.ts stop "$@"
+    ;;
+
+  service:restart)
+    shift
+    run bundle/service-cli.js src/service/cli.ts restart "$@"
+    ;;
+
+  service:status)
+    shift
+    run bundle/service-cli.js src/service/cli.ts status "$@"
+    ;;
+
+  service:remove)
+    shift
+    run bundle/service-cli.js src/service/cli.ts remove "$@"
+    ;;
+
   production:certify)
     run bundle/production-certify.js src/production/production-certify-cli.ts
     ;;
@@ -640,6 +675,15 @@ SETUP & INTEGRATION:
   toolnet-memory integrate:codex
   toolnet-memory mcp
   toolnet-memory api
+
+OPTIONAL BACKGROUND SERVICE:
+  toolnet-memory service:install        Install/start daemon in PM2
+  toolnet-memory service:start          Start installed daemon
+  toolnet-memory service:stop           Stop daemon
+  toolnet-memory service:restart        Restart daemon after ToolNet updates
+  toolnet-memory service:status         Show daemon/cache status
+  toolnet-memory service:remove         Remove daemon from PM2
+  toolnet-memory service                Run daemon in foreground
 
 PRODUCTION:
   toolnet-memory production:certify             Verify packaged production runtime

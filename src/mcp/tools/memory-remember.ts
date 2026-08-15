@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import type { MCPContext } from '../context.js';
 
+import { invalidateServiceProject } from '../../service/client.js';
+
 export const memoryRememberSchema = {
   type: z.enum(['activity', 'decision', 'rule', 'todo', 'summary']),
 
@@ -41,6 +43,8 @@ export async function memoryRemember(
   if (ctx.memoryStore) {
     await ctx.memoryStore.save(ctx.project.id, ctx.memory.exportProject(ctx.project.id));
   }
+
+  void invalidateServiceProject(ctx.project);
 
   return record;
 }

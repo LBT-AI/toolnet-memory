@@ -8,6 +8,8 @@ import { runProductionIndex, type IndexStageId } from './index-pipeline.js';
 
 import { IndexLiveUI, type IndexUiStage } from './index-live-ui.js';
 
+import { invalidateServiceProject } from '../service/client.js';
+
 const project = new ProjectManager().detect();
 
 const toolnetDir = join(project.rootPath, '.toolnet');
@@ -149,6 +151,8 @@ try {
 
     result,
   });
+
+  await invalidateServiceProject(project);
 
   if (json) {
     console.log(JSON.stringify(result, null, 2));
