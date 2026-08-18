@@ -117,18 +117,42 @@ const CAPTURE_TIMEOUT_MS = 20000
 
 const REMOTE_TIMEOUT_MS = 120000
 
-const STATUS_FILE = path.join(
+const GLOBAL_STATUS_FILE = path.join(
   os.homedir(),
   ".config",
   "toolnet-memory",
   "opencode-sync-status.json"
 )
 
+function projectStatusFile(
+  data
+) {
+  if (
+    typeof data?.projectRoot ===
+      "string" &&
+    data.projectRoot.length > 0
+  ) {
+    return path.join(
+      data.projectRoot,
+      ".toolnet",
+      "runtime",
+      "opencode-status.json"
+    )
+  }
+
+  return GLOBAL_STATUS_FILE
+}
+
 function writeStatus(data) {
   try {
+    const statusFile =
+      projectStatusFile(
+        data
+      )
+
     fs.mkdirSync(
       path.dirname(
-        STATUS_FILE
+        statusFile
       ),
       {
         recursive: true,
@@ -136,7 +160,7 @@ function writeStatus(data) {
     )
 
     fs.writeFileSync(
-      STATUS_FILE,
+      statusFile,
       JSON.stringify(
         {
           timestamp:
@@ -388,6 +412,42 @@ export const ToolNetMemoryPlugin =
     let contextCache = {
       value: "",
       expiresAt: 0,
+    }
+
+    /*
+     * Compact startup context is injected once
+     * per native OpenCode session.
+     *
+     * Deep history is retrieved through
+     * memory_agent_ask / MCP on demand.
+     */
+    const injectedSessions =
+      new Set()
+
+    function contextSessionKey(
+      input
+    ) {
+      const candidates = [
+        input?.sessionID,
+        input?.sessionId,
+        input?.session?.id,
+        input?.info?.id,
+        lastSessionId,
+      ]
+
+      const sessionId =
+        candidates.find(
+          value =>
+            typeof value ===
+              "string" &&
+            value.length > 0
+        )
+
+      return sessionId
+        ? "session:" +
+            sessionId
+        : "project:" +
+            projectRoot
     }
 
     async function readContext() {
@@ -831,9 +891,26 @@ export const ToolNetMemoryPlugin =
        */
       "experimental.chat.system.transform":
         async (
-          _input,
+          input,
           output
         ) => {
+          const injectionKey =
+            contextSessionKey(
+              input
+            )
+
+          /*
+           * Never inject ToolNet context on
+           * every model turn.
+           */
+          if (
+            injectedSessions.has(
+              injectionKey
+            )
+          ) {
+            return
+          }
+
           const context =
             await readContext()
 
@@ -850,6 +927,10 @@ export const ToolNetMemoryPlugin =
               context
             )
 
+            injectedSessions.add(
+              injectionKey
+            )
+
             return
           }
 
@@ -859,8 +940,14 @@ export const ToolNetMemoryPlugin =
           ) {
             output.system =
               output.system
-                ? \`\${output.system}\\n\\n\${context}\`
+                ? output.system +
+                    "\\n\\n" +
+                    context
                 : context
+
+            injectedSessions.add(
+              injectionKey
+            )
           }
         },
 

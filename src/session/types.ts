@@ -229,6 +229,16 @@ export interface LocalSessionState {
   createdAt: string;
   updatedAt: string;
 
+  /**
+   * Timestamp of the latest fsync'd local event.
+   */
+  lastLocalEventAt?: string;
+
+  /**
+   * Timestamp of the latest successful remote acknowledgement.
+   */
+  lastRemoteAt?: string;
+
   lastSequence: number;
 
   lastRemoteSequence: number;

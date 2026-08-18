@@ -25,6 +25,11 @@ import { checkProductionConfig } from './config-check.js';
 
 import { ProductionHealth } from './health.js';
 
+import {
+  inspectSessionCaptureHealth,
+  type SessionCaptureHealth,
+} from './session-capture-health.js';
+
 type DoctorResult = {
   ok: boolean;
   project?: string;
@@ -55,6 +60,8 @@ type DoctorResult = {
   codeChunks?: number;
   codeVectors?: number;
   snapshots?: number;
+
+  capture?: SessionCaptureHealth;
 
   config?: {
     ok: boolean;
@@ -191,6 +198,50 @@ function printHuman(result: DoctorResult): void {
     if (result.snapshots !== undefined) {
       console.log(`${branch} ${dim('Snapshots')}      ${white(String(result.snapshots))}`);
     }
+  }
+
+  if (result.capture) {
+    console.log(pipe);
+    console.log(`${cyan('◇')} ${white('Session continuity')}`);
+
+    console.log(
+      `${branch} ${dim('Agents')}         ${white(
+        result.capture.agents.length ? result.capture.agents.join(', ') : 'none'
+      )}`
+    );
+
+    if (result.capture.latestAgent) {
+      console.log(
+        `${branch} ${dim('Latest agent')}   ${white(String(result.capture.latestAgent))}`
+      );
+    }
+
+    if (result.capture.currentTask) {
+      console.log(`${branch} ${dim('Current task')}   ${white(result.capture.currentTask)}`);
+    }
+
+    if (result.capture.currentFile) {
+      console.log(`${branch} ${dim('Current file')}   ${white(result.capture.currentFile)}`);
+    }
+
+    if (result.capture.lastCaptureAt) {
+      console.log(`${branch} ${dim('Last capture')}  ${white(result.capture.lastCaptureAt)}`);
+    }
+
+    if (result.capture.lastFlushAt) {
+      console.log(`${branch} ${dim('Last flush')}    ${white(result.capture.lastFlushAt)}`);
+    }
+
+    console.log(`${branch} ${dim('Pending WAL')}   ${white(String(result.capture.pendingWal))}`);
+
+    const sync =
+      result.capture.syncHealth === 'healthy'
+        ? green(result.capture.syncHealth)
+        : result.capture.syncHealth === 'degraded'
+          ? red(result.capture.syncHealth)
+          : amber(result.capture.syncHealth);
+
+    console.log(`${branch} ${dim('Sync health')}   ${sync}`);
   }
 
   const errors = result.config?.errors ?? [];
@@ -330,8 +381,15 @@ async function main(): Promise<void> {
 
   const snapshots = await new SnapshotManager(storage).list(project.id);
 
+  const capture = inspectSessionCaptureHealth(project);
+
+  const captureWarnings =
+    capture.syncHealth === 'degraded'
+      ? [`Session capture degraded${capture.opencode?.error ? `: ${capture.opencode.error}` : ''}`]
+      : [];
+
   const result: DoctorResult = {
-    ok: health.ok && Boolean(llmHealth?.ok),
+    ok: health.ok && Boolean(llmHealth?.ok) && capture.ok,
     project: project.name,
     storage: health.storage,
     llm: llmHealth,
@@ -343,7 +401,8 @@ async function main(): Promise<void> {
     codeChunks: chunks?.chunks.length ?? 0,
     codeVectors: codeVectors?.records.length ?? 0,
     snapshots: snapshots.length,
-    warnings: configCheck.warnings,
+    capture,
+    warnings: [...configCheck.warnings, ...captureWarnings],
   };
 
   output(result);

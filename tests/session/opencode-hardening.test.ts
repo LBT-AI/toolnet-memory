@@ -299,6 +299,18 @@ describe('OpenCode adapter hardening', () => {
       expect(pluginText).toContain('queueRemote');
 
       expect(pluginText).not.toContain('const SYNC_TIMEOUT_MS = 15000');
+
+      expect(pluginText).toContain('const injectedSessions');
+
+      expect(pluginText).toContain('function contextSessionKey');
+
+      expect(pluginText).toContain('injectedSessions.has');
+
+      expect(pluginText).toContain('injectedSessions.add');
+
+      expect(pluginText).toContain('projectStatusFile');
+
+      expect(pluginText).toContain('opencode-status.json');
     } finally {
       rmSync(root, {
         recursive: true,

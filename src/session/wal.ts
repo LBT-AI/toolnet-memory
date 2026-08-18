@@ -299,6 +299,8 @@ export class SessionWal {
 
         updatedAt: last.timestamp,
 
+        lastLocalEventAt: last.timestamp,
+
         lastSequence: last.sequence,
 
         recentEventIds,
@@ -363,6 +365,8 @@ export class SessionWal {
     this.withLock(() => {
       const state = this.loadStateUnsafe();
 
+      const now = new Date().toISOString();
+
       this.saveStateUnsafe({
         ...state,
 
@@ -370,7 +374,9 @@ export class SessionWal {
 
         remoteByteOffset: Math.max(state.remoteByteOffset, byteOffset),
 
-        updatedAt: new Date().toISOString(),
+        lastRemoteAt: now,
+
+        updatedAt: now,
       });
     });
   }
