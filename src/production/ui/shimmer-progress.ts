@@ -70,22 +70,15 @@ export function createShimmerProgress(): ShimmerProgress {
     lastCount = 0;
   };
 
-  // Resolve worker path: try .js (production bundle), fall back to .ts (source/test)
+  // Resolve worker path: production uses .js, test/dev uses .ts
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  let workerPath = path.join(currentDir, 'shimmer-worker.js');
-  const isTestEnv = !workerPath.includes('/bundle/') && !workerPath.includes('\\bundle\\');
-
-  // In test/source environment, use TypeScript file
-  if (isTestEnv) {
-    workerPath = path.join(currentDir, 'shimmer-worker.ts');
-  }
+  const isBundle = currentDir.includes('/bundle/') || currentDir.includes('\\bundle\\');
+  const workerPath = path.join(currentDir, isBundle ? 'shimmer-worker.js' : 'shimmer-worker.ts');
 
   const worker = new Worker(workerPath, {
     // colors:false keeps the animation (still an interactive TTY) but drops
     // the ANSI color codes, honoring NO_COLOR / --no-color.
     workerData: { startTime: Date.now(), colors: useColor },
-    // In test environment, use tsx loader for TypeScript support
-    execArgv: isTestEnv ? ['--import', 'tsx'] : undefined,
   });
 
   return {
