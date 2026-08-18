@@ -205,7 +205,7 @@ describe('shimmer-progress', () => {
       });
 
       const allOutput = writes.join('');
-      
+
       // Verify all stages are present
       expect(allOutput).toMatch(/Scanning files/);
       expect(allOutput).toMatch(/Parsing code/);

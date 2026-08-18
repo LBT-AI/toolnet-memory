@@ -66,6 +66,7 @@ describe('color', () => {
         configurable: true,
       });
       process.env.TERM = 'dumb';
+      delete process.env.CI;
       expect(ansiColorsEnabled()).toBe(false);
     });
 

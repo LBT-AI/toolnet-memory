@@ -116,7 +116,7 @@ export class IndexLiveUI {
     }
 
     const G = getGlyphs();
-    
+
     this.writeStatic(this.color('◇ Initializing ToolNet Index', ANSI.white));
     this.stream.write('\n');
 
@@ -209,9 +209,9 @@ export class IndexLiveUI {
       'type-resolution': 'type-resolution',
       'rich-graph': 'rich-graph',
       'semantic-index': 'semantic-index',
-      'architecture': 'architecture',
-      'analysis': 'graph-analysis',
-      'visualization': 'visualization',
+      architecture: 'architecture',
+      analysis: 'graph-analysis',
+      visualization: 'visualization',
     };
 
     const mappedStage = stageMap[id] || id;
@@ -310,7 +310,9 @@ export class IndexLiveUI {
       );
       this.writeStatic(`${this.color(G.phaseActive, ANSI.cyan)} Storage: ${result.storage}`);
       this.writeStatic(this.color(G.rail, ANSI.gray));
-      this.writeStatic(`${this.color(G.corner, ANSI.gray)} ${this.color(G.phaseDone, ANSI.green)} Done`);
+      this.writeStatic(
+        `${this.color(G.corner, ANSI.gray)} ${this.color(G.phaseDone, ANSI.green)} Done`
+      );
       this.stream.write('\n');
       return;
     }

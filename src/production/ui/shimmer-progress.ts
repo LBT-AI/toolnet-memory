@@ -9,14 +9,14 @@ import { getGlyphs } from './glyphs.js';
  * These must match the stages used in index-live-ui.ts
  */
 const STAGE_NAMES: Record<string, string> = {
-  'scan': 'Scanning files',
-  'parse': 'Parsing code',
+  scan: 'Scanning files',
+  parse: 'Parsing code',
   'type-resolution': 'Type Resolution',
   'rich-graph': 'Rich Graph',
   'semantic-index': 'Semantic Code Index',
-  'architecture': 'Architecture Intelligence',
+  architecture: 'Architecture Intelligence',
   'graph-analysis': 'Graph Analysis',
-  'visualization': '3D Visualization Dataset',
+  visualization: '3D Visualization Dataset',
 };
 
 export interface IndexProgress {
@@ -93,7 +93,7 @@ export function createShimmerProgress(): ShimmerProgress {
 
       let percent = -1;
       let count = 0;
-      
+
       // Only show % if we have real measurable progress (total > 0)
       // This ensures we never fake progress based on time
       if (progress.total > 0 && progress.current >= 0) {
@@ -105,7 +105,7 @@ export function createShimmerProgress(): ShimmerProgress {
         count = progress.current;
       }
       // If both percent === -1 and count === 0, worker shows shimmer-only animation
-      
+
       lastPercent = percent;
       lastCount = count;
 

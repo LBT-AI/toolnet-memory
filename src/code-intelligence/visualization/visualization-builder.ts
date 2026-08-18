@@ -72,7 +72,7 @@ export class VisualizationBuilder {
     }
 
     const nodes: VisualizationNode[] = [];
-    
+
     for (let i = 0; i < symbols.length; i++) {
       const symbol = symbols[i];
       const cluster = clusterByFile.get(symbol.filePath);
@@ -116,12 +116,12 @@ export class VisualizationBuilder {
     const symbolIds = new Set(nodes.map((node) => node.id));
 
     const validEdges = edges.filter((edge) => symbolIds.has(edge.from) && symbolIds.has(edge.to));
-    
+
     const links: VisualizationLink[] = [];
-    
+
     for (let i = 0; i < validEdges.length; i++) {
       const edge = validEdges[i];
-      
+
       links.push({
         source: edge.from,
 

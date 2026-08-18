@@ -52,16 +52,15 @@ export interface CodeGraphSnapshot {
   edges: GraphEdge[];
 }
 
-
 /**
  * Unified progress callback interface for all indexing engines.
- * 
+ *
  * CRITICAL: Progress must be REAL, based on actual work completed.
  * - current: actual units of work completed (files, symbols, chunks, etc.)
  * - total: total units of work to complete
  * - phase: optional sub-phase name for detailed tracking
  * - detail: optional human-readable detail (e.g., current file name)
- * 
+ *
  * DO NOT fake progress based on elapsed time or arbitrary percentages.
  * If an engine cannot measure progress accurately, do not provide current/total.
  */
@@ -73,4 +72,3 @@ export interface StageProgressEvent {
 }
 
 export type StageProgressCallback = (event: StageProgressEvent) => void;
-

@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getGlyphs, getRawWriteGlyphs, clearGlyphCache } from '../../../src/production/ui/glyphs.js';
+import {
+  getGlyphs,
+  getRawWriteGlyphs,
+  clearGlyphCache,
+} from '../../../src/production/ui/glyphs.js';
 
 describe('glyphs', () => {
   const originalEnv = process.env;
@@ -27,7 +31,7 @@ describe('glyphs', () => {
     it('should return ASCII glyphs when TOOLNET_ASCII=1', () => {
       process.env.TOOLNET_ASCII = '1';
       clearGlyphCache();
-      
+
       const glyphs = getGlyphs();
       expect(glyphs.barFilled).toBe('#');
       expect(glyphs.barEmpty).toBe('-');
@@ -38,7 +42,7 @@ describe('glyphs', () => {
     it('should return Unicode glyphs when TOOLNET_UNICODE=1', () => {
       process.env.TOOLNET_UNICODE = '1';
       clearGlyphCache();
-      
+
       const glyphs = getGlyphs();
       expect(glyphs.barFilled).toBe('█');
       expect(glyphs.barEmpty).toBe('░');
@@ -58,11 +62,11 @@ describe('glyphs', () => {
         configurable: true,
       });
       clearGlyphCache();
-      
+
       const glyphs = getRawWriteGlyphs();
       expect(glyphs.barFilled).toBe('#');
       expect(glyphs.barEmpty).toBe('-');
-      
+
       Object.defineProperty(process, 'platform', {
         value: originalPlatform,
         configurable: true,
@@ -75,11 +79,11 @@ describe('glyphs', () => {
         configurable: true,
       });
       clearGlyphCache();
-      
+
       const glyphs = getRawWriteGlyphs();
       expect(glyphs.barFilled).toBe('█');
       expect(glyphs.barEmpty).toBe('░');
-      
+
       Object.defineProperty(process, 'platform', {
         value: originalPlatform,
         configurable: true,

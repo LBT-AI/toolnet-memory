@@ -8,20 +8,20 @@
 export interface Glyphs {
   // Spinner animation glyphs
   spinner: string[];
-  
+
   // Progress bar glyphs
   barFilled: string;
   barEmpty: string;
-  
+
   // Status symbols
   phaseDone: string;
   phaseActive: string;
-  
+
   // Tree structure
   rail: string;
   branch: string;
   corner: string;
-  
+
   // Misc
   dash: string;
 }
@@ -52,7 +52,7 @@ const ASCII_GLYPHS: Glyphs = {
 
 /**
  * Detect if the terminal supports Unicode characters.
- * 
+ *
  * Environment variables:
  * - TOOLNET_ASCII=1 forces ASCII
  * - TOOLNET_UNICODE=1 forces Unicode
@@ -68,12 +68,12 @@ function supportsUnicode(): boolean {
     const wtSession = process.env.WT_SESSION;
     const vscode = process.env.VSCODE_PID;
     const conemu = process.env.ConEmuPID;
-    
+
     // Windows Terminal, VS Code, ConEmu support UTF-8
     if (wtSession || vscode || conemu || term === 'vscode') {
       return true;
     }
-    
+
     // Legacy Windows console: ASCII only
     return false;
   }
@@ -89,7 +89,7 @@ function supportsUnicode(): boolean {
 
 /**
  * Detect Unicode support for raw write operations (worker thread).
- * 
+ *
  * On Windows, raw fs.writeSync(1, ...) bypasses Node's TTY encoding
  * conversion, causing mojibake on OEM codepages. Always use ASCII
  * for raw writes on Windows.
@@ -98,7 +98,7 @@ function supportsUnicodeRawWrites(): boolean {
   if (process.platform === 'win32') {
     return false;
   }
-  
+
   return supportsUnicode();
 }
 
