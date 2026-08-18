@@ -1,5 +1,6 @@
 export * from './types.js';
 export * from './unified-event.js';
+export * from './local-checkpoint.js';
 export * from './identity.js';
 export * from './wal.js';
 export * from './store.js';

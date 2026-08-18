@@ -8,6 +8,14 @@ import { buildFastProjectContext, findProjectRoot } from '../../work-continuity/
 
 import { refreshFastHandoffFromCurrent } from '../../work-continuity/handoff-refresh.js';
 
+import { createSessionIdentity } from '../identity.js';
+
+import { SessionWal } from '../wal.js';
+
+import { checkpointLocalSession } from '../local-checkpoint.js';
+
+import { mapClaudeHookToSessionEvents } from './event-mapper.js';
+
 type JsonObject = Record<string, unknown>;
 
 type DetectedProject = NonNullable<ReturnType<ProjectManager['detect']>>;
@@ -52,6 +60,31 @@ function safeRelativeFile(project: DetectedProject, file: string): string {
   }
 
   return resolved;
+}
+
+function captureClaudeSession(project: DetectedProject, input: JsonObject): void {
+  const nativeSessionId =
+    typeof input.session_id === 'string' && input.session_id.trim()
+      ? input.session_id.trim()
+      : 'claude';
+
+  const events = mapClaudeHookToSessionEvents(input, project);
+
+  if (events.length === 0) {
+    return;
+  }
+
+  const identity = createSessionIdentity(project, 'claude', nativeSessionId);
+
+  const wal = new SessionWal(identity, {
+    source: 'claude',
+
+    cwd: typeof input.cwd === 'string' ? input.cwd : project.rootPath,
+  });
+
+  const recorded = wal.append(events);
+
+  checkpointLocalSession(project, identity, recorded);
 }
 
 function recordClaudeOrigin(project: DetectedProject, input: JsonObject): void {
@@ -146,6 +179,18 @@ export function handleClaudeHookInput(input: JsonObject): JsonObject {
   }
 
   try {
+    /*
+     * Local WAL first.
+     *
+     * If the rest of the hook or remote systems fail,
+     * the latest Claude activity is still recoverable.
+     */
+    try {
+      captureClaudeSession(project, input);
+    } catch {
+      // Fail open.
+    }
+
     if (event === 'SessionStart') {
       const context = buildFastProjectContext({
         projectPath: cwd,

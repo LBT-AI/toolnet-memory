@@ -96,6 +96,8 @@ async function main() {
 
     const compacted = has(args, '--compacted');
 
+    const localOnly = has(args, '--local-only');
+
     const result = await syncOpenCodeSession({
       project,
       storage,
@@ -105,9 +107,10 @@ async function main() {
       idle,
       error,
       compacted,
+      localOnly,
     });
 
-    if (idle || compacted || error) {
+    if (!localOnly && (idle || compacted || error)) {
       try {
         await refreshStartupBriefCache(project, storage, 800);
       } catch {
@@ -155,7 +158,7 @@ async function main() {
     `OpenCode Session Adapter
 
 Commands:
-  sync <session-id> [--project PATH] [--idle]
+  sync <session-id> [--project PATH] [--idle] [--local-only]
   recover [--project PATH] [--limit N]
   install-plugin [--bin PATH]
 `

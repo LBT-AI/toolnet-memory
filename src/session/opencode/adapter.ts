@@ -59,6 +59,13 @@ export interface OpenCodeSyncOptions {
   idle?: boolean;
   error?: boolean;
   compacted?: boolean;
+
+  /**
+   * Capture native events into the fsync'd local WAL
+   * and refresh local work state without waiting for
+   * remote storage.
+   */
+  localOnly?: boolean;
 }
 
 export interface OpenCodeSyncResult {
@@ -75,6 +82,8 @@ export interface OpenCodeSyncResult {
   chunkCount: number;
 
   status: string;
+
+  durability: 'local' | 'remote';
 }
 
 export interface OpenCodeRecoveryOptions {
@@ -838,6 +847,38 @@ export async function syncOpenCodeSession(
       }
     }
 
+    /*
+     * Fast crash-safe path.
+     *
+     * recordMany() has already:
+     * - written events to local WAL
+     * - fsync'd the WAL
+     * - updated local work/current state
+     *
+     * Do NOT wait for Hugging Face/S3 here.
+     */
+    if (options.localOnly) {
+      const localState = core.status();
+
+      return {
+        nativeSessionId: options.nativeSessionId,
+
+        importedMessages: messages.length,
+
+        importedParts: parts.length,
+
+        recordedEvents: recorded.length,
+
+        eventCount: localState.lastSequence,
+
+        chunkCount: 0,
+
+        status: localState.status,
+
+        durability: 'local',
+      };
+    }
+
     const flushed = await core.flush();
 
     return {
@@ -854,6 +895,8 @@ export async function syncOpenCodeSession(
       chunkCount: flushed.chunkCount,
 
       status: flushed.status,
+
+      durability: 'remote',
     };
   } finally {
     db.close();

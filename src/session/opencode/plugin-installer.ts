@@ -107,9 +107,15 @@ const CONTEXT_MAX_TOKENS = 700
 
 const CONTEXT_CACHE_MS = 5000
 
-const PERIODIC_SYNC_MS = 30000
+const LOCAL_CAPTURE_MS = 15000
 
-const SYNC_TIMEOUT_MS = 15000
+const REMOTE_SYNC_MS = 60000
+
+const EVENT_CAPTURE_DEBOUNCE_MS = 1200
+
+const CAPTURE_TIMEOUT_MS = 20000
+
+const REMOTE_TIMEOUT_MS = 120000
 
 const STATUS_FILE = path.join(
   os.homedir(),
@@ -257,7 +263,7 @@ async function runWithTimeout(
   {
     stdout = "ignore",
     timeout =
-      SYNC_TIMEOUT_MS,
+      REMOTE_TIMEOUT_MS,
   } = {}
 ) {
   const child =
@@ -359,8 +365,25 @@ export const ToolNetMemoryPlugin =
     let lastSessionId =
       null
 
-    let syncChain =
+    /*
+     * Two independent lanes:
+     *
+     * captureChain:
+     *   OpenCode DB -> local fsync WAL -> current work
+     *
+     * remoteInFlight:
+     *   WAL -> Hugging Face / S3
+     *
+     * A slow remote backend must never block local capture.
+     */
+    let captureChain =
       Promise.resolve()
+
+    let remoteInFlight =
+      null
+
+    let debounceTimer =
+      null
 
     let contextCache = {
       value: "",
@@ -438,8 +461,13 @@ export const ToolNetMemoryPlugin =
 
     async function syncNow(
       sessionId,
-      flag,
-      reason
+      {
+        flag = null,
+        reason = "unknown",
+        localOnly = false,
+        timeout =
+          REMOTE_TIMEOUT_MS,
+      } = {}
     ) {
       if (!sessionId) {
         return
@@ -459,9 +487,18 @@ export const ToolNetMemoryPlugin =
         )
       }
 
+      if (localOnly) {
+        args.push(
+          "--local-only"
+        )
+      }
+
       try {
         await runWithTimeout(
-          args
+          args,
+          {
+            timeout,
+          }
         )
 
         writeStatus({
@@ -469,8 +506,14 @@ export const ToolNetMemoryPlugin =
           projectRoot,
           sessionId,
           reason,
+          mode:
+            localOnly
+              ? "local"
+              : "remote",
           state:
-            "sync-success",
+            localOnly
+              ? "capture-success"
+              : "sync-success",
         })
       } catch (error) {
         writeStatus({
@@ -478,8 +521,14 @@ export const ToolNetMemoryPlugin =
           projectRoot,
           sessionId,
           reason,
+          mode:
+            localOnly
+              ? "local"
+              : "remote",
           state:
-            "sync-failed",
+            localOnly
+              ? "capture-failed"
+              : "sync-failed",
           error:
             error instanceof
             Error
@@ -493,20 +542,24 @@ export const ToolNetMemoryPlugin =
       }
     }
 
-    function queueSync(
+    function queueCapture(
       sessionId,
       flag,
       reason
     ) {
       if (!sessionId) {
-        return syncChain
+        return captureChain
       }
 
       lastSessionId =
         sessionId
 
-      syncChain =
-        syncChain
+      /*
+       * Local captures are serialized with each other,
+       * but completely independent from remote sync.
+       */
+      captureChain =
+        captureChain
           .catch(
             () =>
               undefined
@@ -515,46 +568,162 @@ export const ToolNetMemoryPlugin =
             () =>
               syncNow(
                 sessionId,
-                flag,
-                reason
+                {
+                  flag,
+                  reason,
+                  localOnly: true,
+                  timeout:
+                    CAPTURE_TIMEOUT_MS,
+                }
               )
           )
+          .catch(
+            () =>
+              undefined
+          )
 
-      return syncChain
+      return captureChain
+    }
+
+    function queueRemote(
+      sessionId,
+      flag,
+      reason
+    ) {
+      if (!sessionId) {
+        return Promise.resolve()
+      }
+
+      lastSessionId =
+        sessionId
+
+      /*
+       * Never build an endless remote backlog.
+       * One remote flush is enough because WAL keeps
+       * every pending local event until acknowledged.
+       */
+      if (remoteInFlight) {
+        return remoteInFlight
+      }
+
+      remoteInFlight =
+        syncNow(
+          sessionId,
+          {
+            flag,
+            reason,
+            localOnly: false,
+            timeout:
+              REMOTE_TIMEOUT_MS,
+          }
+        )
+          .catch(
+            () =>
+              undefined
+          )
+          .finally(
+            () => {
+              remoteInFlight =
+                null
+            }
+          )
+
+      return remoteInFlight
+    }
+
+    function scheduleCapture(
+      sessionId,
+      reason
+    ) {
+      if (!sessionId) {
+        return
+      }
+
+      if (debounceTimer) {
+        clearTimeout(
+          debounceTimer
+        )
+      }
+
+      debounceTimer =
+        setTimeout(
+          () => {
+            debounceTimer =
+              null
+
+            void queueCapture(
+              sessionId,
+              null,
+              reason
+            )
+          },
+          EVENT_CAPTURE_DEBOUNCE_MS
+        )
+
+      if (
+        typeof debounceTimer.unref ===
+        "function"
+      ) {
+        debounceTimer.unref()
+      }
     }
 
     /*
-     * Periodic durability checkpoint.
+     * Crash-safe LOCAL checkpoint.
      *
-     * This is intentionally independent
-     * from session.idle/dispose because
-     * abrupt SSH/process termination may
-     * skip shutdown hooks.
+     * Fast lane:
+     * OpenCode DB -> fsync WAL -> current work.
      *
-     * unref() prevents the timer itself
-     * from keeping OpenCode alive.
+     * No network dependency.
      */
-    const periodic =
+    const localPeriodic =
       setInterval(
         () => {
           if (
             lastSessionId
           ) {
-            void queueSync(
+            void queueCapture(
               lastSessionId,
               null,
-              "periodic"
+              "periodic-local"
             )
           }
         },
-        PERIODIC_SYNC_MS
+        LOCAL_CAPTURE_MS
       )
 
-    if (
-      typeof periodic.unref ===
-        "function"
+    /*
+     * Remote durability is deliberately slower
+     * and independent from the local lane.
+     */
+    const remotePeriodic =
+      setInterval(
+        () => {
+          if (
+            lastSessionId
+          ) {
+            void queueRemote(
+              lastSessionId,
+              null,
+              "periodic-remote"
+            )
+          }
+        },
+        REMOTE_SYNC_MS
+      )
+
+    for (
+      const timer of [
+        localPeriodic,
+        remotePeriodic,
+      ]
     ) {
-      periodic.unref()
+      if (
+        typeof timer.unref ===
+        "function"
+      ) {
+        timer.unref()
+      }
     }
 
     return {
@@ -571,14 +740,39 @@ export const ToolNetMemoryPlugin =
             sessionId
         }
 
+        const terminalEvent =
+          event.type ===
+            "session.idle" ||
+          event.type ===
+            "session.compacted" ||
+          event.type ===
+            "session.error"
+
+        if (
+          sessionId &&
+          !terminalEvent
+        ) {
+          scheduleCapture(
+            sessionId,
+            "event:" +
+              event.type
+          )
+        }
+
         if (
           event.type ===
           "session.idle"
         ) {
-          await queueSync(
+          await queueCapture(
             sessionId,
             "--idle",
-            "session.idle"
+            "session.idle:capture"
+          )
+
+          void queueRemote(
+            sessionId,
+            null,
+            "session.idle:remote"
           )
 
           return
@@ -588,10 +782,16 @@ export const ToolNetMemoryPlugin =
           event.type ===
           "session.compacted"
         ) {
-          await queueSync(
+          await queueCapture(
             sessionId,
             "--compacted",
-            "session.compacted"
+            "session.compacted:capture"
+          )
+
+          void queueRemote(
+            sessionId,
+            null,
+            "session.compacted:remote"
           )
 
           contextCache = {
@@ -606,10 +806,16 @@ export const ToolNetMemoryPlugin =
           event.type ===
           "session.error"
         ) {
-          await queueSync(
+          await queueCapture(
             sessionId,
             "--error",
-            "session.error"
+            "session.error:capture"
+          )
+
+          void queueRemote(
+            sessionId,
+            null,
+            "session.error:remote"
           )
 
           return
@@ -690,27 +896,40 @@ export const ToolNetMemoryPlugin =
        */
       dispose: async () => {
         clearInterval(
-          periodic
+          localPeriodic
         )
 
+        clearInterval(
+          remotePeriodic
+        )
+
+        if (debounceTimer) {
+          clearTimeout(
+            debounceTimer
+          )
+        }
+
+        /*
+         * On a clean exit we only REQUIRE the
+         * fast local fsync checkpoint.
+         *
+         * Never hold OpenCode shutdown hostage
+         * to a slow remote backend.
+         */
         if (
           lastSessionId
         ) {
-          try {
-            await queueSync(
-              lastSessionId,
-              "--idle",
-              "dispose"
-            )
-          } catch {
-            // Status already recorded.
-          }
+          await queueCapture(
+            lastSessionId,
+            "--idle",
+            "dispose:capture"
+          )
         }
 
         try {
-          await syncChain
+          await captureChain
         } catch {
-          // Do not block OpenCode shutdown.
+          // Fail open.
         }
       },
     }

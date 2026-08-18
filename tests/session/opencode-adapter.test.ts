@@ -340,6 +340,82 @@ describe('OpenCode adapter', () => {
     expect(remoteText).toContain('[REDACTED]');
   });
 
+  it('captures locally without waiting for remote storage, then flushes WAL later', async () => {
+    const project = createProject();
+
+    const storage = new MemoryStorage();
+
+    const { db, path } = createDatabase(project);
+
+    db.prepare(
+      `
+      INSERT INTO message
+      VALUES (?, ?, ?, ?, ?)
+      `
+    ).run(
+      'msg_local',
+      'ses_test',
+      1100,
+      1100,
+      JSON.stringify({
+        role: 'user',
+
+        content: ['TODO 1: Finish callback', 'TODO 1 đang làm', 'Next: run callback tests'].join(
+          '\n'
+        ),
+
+        path: {
+          cwd: project.rootPath,
+
+          root: project.rootPath,
+        },
+      })
+    );
+
+    db.close();
+
+    const local = await syncOpenCodeSession({
+      project,
+      storage,
+
+      nativeSessionId: 'ses_test',
+
+      dbPath: path,
+
+      localOnly: true,
+    });
+
+    expect(local.durability).toBe('local');
+
+    /*
+     * Local capture MUST NOT touch remote storage.
+     */
+    expect(storage.objects.size).toBe(0);
+
+    const current = JSON.parse(
+      readFileSync(join(project.rootPath, '.toolnet', 'work', 'current.json'), 'utf8')
+    );
+
+    expect(current.currentTask?.title).toContain('Finish callback');
+
+    /*
+     * A later normal sync sees no new OpenCode rows,
+     * but still flushes pending WAL events remotely.
+     */
+    const remote = await syncOpenCodeSession({
+      project,
+      storage,
+
+      nativeSessionId: 'ses_test',
+
+      dbPath: path,
+    });
+
+    expect(remote.durability).toBe('remote');
+
+    expect(storage.objects.size).toBeGreaterThan(0);
+  });
+
   it('refuses cross-project session capture', async () => {
     const project = createProject();
 

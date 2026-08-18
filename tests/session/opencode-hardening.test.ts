@@ -283,6 +283,22 @@ describe('OpenCode adapter hardening', () => {
       const agents = readFileSync(agentsFile, 'utf8');
 
       expect(agents.match(/TOOLNET_MEMORY_BOOTSTRAP_START/gu)).toHaveLength(1);
+
+      const pluginText = readFileSync(plugin, 'utf8');
+
+      expect(pluginText).toContain('const LOCAL_CAPTURE_MS = 15000');
+
+      expect(pluginText).toContain('const REMOTE_SYNC_MS = 60000');
+
+      expect(pluginText).toContain('const REMOTE_TIMEOUT_MS = 120000');
+
+      expect(pluginText).toContain('"--local-only"');
+
+      expect(pluginText).toContain('queueCapture');
+
+      expect(pluginText).toContain('queueRemote');
+
+      expect(pluginText).not.toContain('const SYNC_TIMEOUT_MS = 15000');
     } finally {
       rmSync(root, {
         recursive: true,

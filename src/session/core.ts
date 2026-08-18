@@ -2,6 +2,7 @@ import { Sanitizer } from '../security/sanitizer.js';
 
 import type {
   LocalSessionState,
+  NormalizedSessionEvent,
   SessionCoreOptions,
   SessionEventInput,
   SessionFlushResult,
@@ -21,6 +22,8 @@ import { SemanticWorkLearner } from '../work-continuity/semantic-learner.js';
 
 import { SmartHandoffManager } from '../work-continuity/handoff.js';
 
+import { checkpointLocalSession } from './local-checkpoint.js';
+
 export class SessionCore {
   readonly identity;
 
@@ -38,11 +41,15 @@ export class SessionCore {
 
   private readonly handoff: SmartHandoffManager;
 
+  private readonly project: SessionCoreOptions['project'];
+
   private readonly title?: string;
 
   private readonly metadata: Record<string, unknown>;
 
   constructor(options: SessionCoreOptions) {
+    this.project = options.project;
+
     this.identity = createSessionIdentity(options.project, options.agent, options.nativeSessionId);
 
     this.title = options.title;
@@ -115,6 +122,24 @@ export class SessionCore {
     };
   }
 
+  private checkpointLocal(events: NormalizedSessionEvent[]): void {
+    if (events.length === 0) {
+      return;
+    }
+
+    try {
+      checkpointLocalSession(this.project, this.identity, events);
+    } catch {
+      /*
+       * Local work-state is a projection.
+       *
+       * WAL durability always has priority.
+       * Never break session capture because
+       * current.json rendering failed.
+       */
+    }
+  }
+
   start(data: Record<string, unknown> = {}) {
     const state = this.wal.loadState();
 
@@ -130,11 +155,19 @@ export class SessionCore {
   }
 
   record(event: SessionEventInput) {
-    return this.wal.append([this.sanitizeEvent(event)])[0];
+    const recorded = this.wal.append([this.sanitizeEvent(event)]);
+
+    this.checkpointLocal(recorded);
+
+    return recorded[0];
   }
 
   recordMany(events: SessionEventInput[]) {
-    return this.wal.append(events.map((event) => this.sanitizeEvent(event)));
+    const recorded = this.wal.append(events.map((event) => this.sanitizeEvent(event)));
+
+    this.checkpointLocal(recorded);
+
+    return recorded;
   }
 
   setSourceCursor(source: string, value: string | number): void {
