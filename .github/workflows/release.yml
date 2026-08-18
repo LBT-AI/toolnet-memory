@@ -58,7 +58,19 @@ jobs:
           echo "TARBALL=$TARBALL" >> "$GITHUB_ENV"
           test -f "$TARBALL"
 
+      - name: Check npm release
+        id: npm_release
+        shell: bash
+        run: |
+          if npm view "toolnet-memory@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "toolnet-memory@$VERSION already exists on npm; skipping publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to npm with trusted publishing
+        if: steps.npm_release.outputs.exists != 'true'
         run: npm publish --access public
 
       - name: Create GitHub Release
