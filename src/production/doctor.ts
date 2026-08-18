@@ -70,64 +70,89 @@ function wantsJson(): boolean {
 }
 
 function printHuman(result: DoctorResult): void {
+  const colorEnabled =
+    process.stdout.isTTY === true &&
+    process.env.TERM !== 'dumb' &&
+    process.env.NO_COLOR === undefined;
+
+  const color = (code: string, value: string): string =>
+    colorEnabled ? `\x1b[${code}m${value}\x1b[0m` : value;
+
+  const green = (value: string): string => color('38;5;82', value);
+  const cyan = (value: string): string => color('38;5;51', value);
+  const amber = (value: string): string => color('38;5;214', value);
+  const red = (value: string): string => color('38;5;196', value);
+  const white = (value: string): string => color('38;5;255', value);
+  const dim = (value: string): string => color('2', value);
+  const bold = (value: string): string => color('1', value);
+
+  const pipe = dim('│');
+  const branch = dim('├');
+
   console.log('');
-  console.log('ToolNet Memory Doctor');
-  console.log('=====================');
+  console.log(`${cyan('◇')} ${bold(white('ToolNet Memory Doctor'))}`);
   console.log('');
 
   if (result.project) {
-    console.log(`Project: ${result.project}`);
-    console.log('');
+    console.log(`${green('◆')} Project    ${white(result.project)}`);
   }
 
-  if (result.storage) {
-    if (result.storage.ok) {
-      const provider =
-        typeof result.storage.provider === 'string' ? ` (${result.storage.provider})` : '';
+  console.log(pipe);
 
-      console.log(`✓ Storage${provider}`);
+  if (result.storage) {
+    const provider =
+      typeof result.storage.provider === 'string' ? ` — ${result.storage.provider}` : '';
+
+    if (result.storage.ok) {
+      console.log(`${branch} ${green('◆')} Storage${provider}`);
     } else {
-      console.log('✗ Storage');
+      console.log(`${branch} ${red('✗')} Storage${provider}`);
     }
   }
 
   if (result.llm) {
+    const details: string[] = [];
+
+    if (result.llm.provider) {
+      details.push(result.llm.provider);
+    }
+
+    if (result.llm.model) {
+      details.push(result.llm.model);
+    }
+
+    if (typeof result.llm.latencyMs === 'number') {
+      details.push(`${result.llm.latencyMs}ms`);
+    }
+
     if (result.llm.ok) {
-      const details: string[] = [];
-
-      if (result.llm.provider) {
-        details.push(result.llm.provider);
-      }
-
-      if (result.llm.model) {
-        details.push(result.llm.model);
-      }
-
-      if (typeof result.llm.latencyMs === 'number') {
-        details.push(`${result.llm.latencyMs} ms`);
-      }
-
-      console.log(`✓ LLM${details.length ? ` (${details.join(', ')})` : ''}`);
+      console.log(
+        `${branch} ${green('◆')} LLM${details.length ? ` — ${details.join(' · ')}` : ''}`
+      );
     } else {
-      console.log(`✗ LLM${result.llm.error ? ` (${result.llm.error})` : ''}`);
+      const error = result.llm.error ? ` — ${result.llm.error}` : '';
+
+      console.log(`${branch} ${red('✗')} LLM${error}`);
     }
   }
 
   if (result.embedding) {
+    const details: string[] = [];
+
+    if (typeof result.embedding.mode === 'string') {
+      details.push(result.embedding.mode);
+    }
+
+    if (typeof result.embedding.dimensions === 'number') {
+      details.push(`${result.embedding.dimensions}d`);
+    }
+
     if (result.embedding.ok) {
-      const details: string[] = [];
-
-      if (typeof result.embedding.mode === 'string') {
-        details.push(result.embedding.mode);
-      }
-
-      if (typeof result.embedding.dimensions === 'number') {
-        details.push(`${result.embedding.dimensions} dimensions`);
-      }
-
-      console.log(`✓ Embedding${details.length ? ` (${details.join(', ')})` : ''}`);
+      console.log(
+        `${branch} ${green('◆')} Embedding${details.length ? ` — ${details.join(' · ')}` : ''}`
+      );
     } else {
-      console.log('✗ Embedding');
+      console.log(`${branch} ${red('✗')} Embedding`);
     }
   }
 
@@ -136,73 +161,70 @@ function printHuman(result: DoctorResult): void {
     result.graphSymbols !== undefined ||
     result.codeChunks !== undefined
   ) {
-    console.log('');
-    console.log('Project data:');
+    console.log(pipe);
+    console.log(`${cyan('◇')} ${white('Project data')}`);
 
     if (result.memory !== undefined) {
-      console.log(`  Memories       ${result.memory}`);
+      console.log(`${branch} ${dim('Memories')}       ${white(String(result.memory))}`);
     }
 
     if (result.graphSymbols !== undefined) {
-      console.log(`  Graph symbols  ${result.graphSymbols}`);
+      console.log(`${branch} ${dim('Graph symbols')}  ${white(String(result.graphSymbols))}`);
     }
 
     if (result.graphEdges !== undefined) {
-      console.log(`  Graph edges    ${result.graphEdges}`);
+      console.log(`${branch} ${dim('Graph edges')}    ${white(String(result.graphEdges))}`);
     }
 
     if (result.memoryVectors !== undefined) {
-      console.log(`  Memory vectors ${result.memoryVectors}`);
+      console.log(`${branch} ${dim('Memory vectors')} ${white(String(result.memoryVectors))}`);
     }
 
     if (result.codeChunks !== undefined) {
-      console.log(`  Code chunks    ${result.codeChunks}`);
+      console.log(`${branch} ${dim('Code chunks')}    ${white(String(result.codeChunks))}`);
     }
 
     if (result.codeVectors !== undefined) {
-      console.log(`  Code vectors   ${result.codeVectors}`);
+      console.log(`${branch} ${dim('Code vectors')}   ${white(String(result.codeVectors))}`);
     }
 
     if (result.snapshots !== undefined) {
-      console.log(`  Snapshots      ${result.snapshots}`);
+      console.log(`${branch} ${dim('Snapshots')}      ${white(String(result.snapshots))}`);
     }
   }
 
   const errors = result.config?.errors ?? [];
 
   if (errors.length > 0) {
-    console.log('');
-    console.log('Configuration required:');
+    console.log(pipe);
+    console.log(`${red('✗')} ${white('Configuration required')}`);
 
     for (const error of errors) {
-      console.log(`  - ${error}`);
+      console.log(`${branch} ${red('•')} ${error}`);
     }
   }
 
   const warnings = [...(result.config?.warnings ?? []), ...(result.warnings ?? [])];
-
   const uniqueWarnings = [...new Set(warnings)];
 
   if (uniqueWarnings.length > 0) {
-    console.log('');
-    console.log('Warnings:');
+    console.log(pipe);
+    console.log(`${amber('◇')} ${white('Warnings')}`);
 
     for (const warning of uniqueWarnings) {
-      console.log(`  - ${warning}`);
+      console.log(`${branch} ${amber('!')} ${warning}`);
     }
   }
 
-  console.log('');
+  console.log(pipe);
 
   if (result.ok) {
-    console.log('✓ ToolNet Memory is ready');
+    console.log(`${green('└ ◆')} ${bold(white('ToolNet Memory is ready'))}`);
   } else {
-    console.log('✗ ToolNet Memory requires attention');
+    console.log(`${red('└ ✗')} ${bold(white('ToolNet Memory requires attention'))}`);
 
     if (errors.length > 0) {
-      console.log('');
-      console.log('Run:');
-      console.log('  toolnet-memory setup');
+      console.log(dim('    Run: toolnet-memory setup'));
     }
   }
 

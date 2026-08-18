@@ -33,7 +33,7 @@ if [ "$TTY" -eq 1 ] && [ -z "${NO_COLOR:-}" ]; then
   CYAN=$'\033[38;5;51m'
   WHITE=$'\033[38;5;255m'
   RED=$'\033[38;5;196m'
-  YELLOW=$'\033[38;5;220m'
+  AMBER=$'\033[38;5;214m'
 else
   RESET=""
   BOLD=""
@@ -42,7 +42,7 @@ else
   CYAN=""
   WHITE=""
   RED=""
-  YELLOW=""
+  AMBER=""
 fi
 
 cleanup() {
@@ -59,35 +59,9 @@ trap cleanup EXIT INT TERM
 
 header() {
   printf '\n'
-  printf "${CYAN}${BOLD}"
-  printf '╭──────────────────────────────────────────╮\n'
-  printf '│              TOOLNET MEMORY              │\n'
-  printf '╰──────────────────────────────────────────╯\n'
-  printf "${RESET}\n"
-}
-
-bar() {
-  percent="$1"
-  width=28
-
-  filled=$((percent * width / 100))
-  empty=$((width - filled))
-
-  left=""
-  right=""
-
-  if [ "$filled" -gt 0 ]; then
-    left="$(printf '%*s' "$filled" '' | tr ' ' '=')"
-  fi
-
-  if [ "$empty" -gt 0 ]; then
-    right="$(printf '%*s' "$empty" '' | tr ' ' '-')"
-  fi
-
-  printf '['
-  printf "${GREEN}%s${RESET}" "$left"
-  printf "${DIM}%s${RESET}" "$right"
-  printf '] %3d%%' "$percent"
+  printf "${CYAN}◇${RESET} ${BOLD}${WHITE}ToolNet Memory Installer${RESET}\n"
+  printf '\n'
+  printf "${DIM}│${RESET}\n"
 }
 
 format_duration() {
@@ -97,16 +71,75 @@ format_duration() {
   printf '%02d:%02d' "$mins" "$secs"
 }
 
-draw_stage() {
-  icon="$1"
-  title="$2"
-  percent="$3"
-  elapsed="$4"
+terminal_columns() {
+  cols="${COLUMNS:-}"
 
-  # Single-line redraw is much more reliable in Termius/mobile terminals.
+  if [ -z "$cols" ] && command -v tput >/dev/null 2>&1; then
+    cols="$(tput cols 2>/dev/null || true)"
+  fi
+
+  case "$cols" in
+    ''|*[!0-9]*) cols=80 ;;
+  esac
+
+  printf '%s' "$cols"
+}
+
+activity_bar() {
+  frame="$1"
+  width="$2"
+  pulse=4
+
+  if [ "$width" -lt "$pulse" ]; then
+    pulse="$width"
+  fi
+
+  travel=$((width - pulse + 1))
+
+  if [ "$travel" -lt 1 ]; then
+    travel=1
+  fi
+
+  pos=$((frame % travel))
+  i=0
+
+  while [ "$i" -lt "$width" ]; do
+    if [ "$i" -ge "$pos" ] && [ "$i" -lt $((pos + pulse)) ]; then
+      printf "${AMBER}━${RESET}"
+    else
+      printf "${DIM}─${RESET}"
+    fi
+
+    i=$((i + 1))
+  done
+}
+
+draw_stage() {
+  title="$1"
+  frame="$2"
+  elapsed="$3"
+
+  cols="$(terminal_columns)"
+
+  if [ "$cols" -lt 55 ]; then
+    label_width=18
+    bar_width=8
+  elif [ "$cols" -lt 75 ]; then
+    label_width=24
+    bar_width=12
+  else
+    label_width=28
+    bar_width=16
+  fi
+
+  short_title="$(printf '%s' "$title" | cut -c1-"$label_width")"
+
   printf '\r\033[2K'
-  printf "${CYAN}%s${RESET} ${WHITE}%-29s${RESET} " "$icon" "$title"
-  bar "$percent"
+  printf "${DIM}├${RESET} ${AMBER}◇${RESET} "
+  printf "${WHITE}%-*s${RESET} " "$label_width" "$short_title"
+
+  activity_bar "$frame" "$bar_width"
+
   printf " ${DIM}%s${RESET}" "$(format_duration "$elapsed")"
 }
 
@@ -115,9 +148,9 @@ finish_stage() {
   elapsed="$2"
 
   printf '\r\033[2K'
-  printf "${GREEN}✓${RESET} ${WHITE}%-29s${RESET} " "$title"
-  bar 100
-  printf " ${DIM}%s${RESET}\n\n" "$(format_duration "$elapsed")"
+  printf "${DIM}├${RESET} ${GREEN}◆${RESET} "
+  printf "${WHITE}%s${RESET}" "$title"
+  printf " ${DIM}— done %s${RESET}\n" "$(format_duration "$elapsed")"
 }
 
 plain_stage() {
@@ -125,18 +158,19 @@ plain_stage() {
   shift
 
   start="$(date +%s)"
-  printf '%s... ' "$title"
+
+  printf '→ %s\n' "$title"
 
   : >"$LOG"
 
   if "$@" >>"$LOG" 2>&1; then
     elapsed=$(( $(date +%s) - start ))
-    printf 'OK (%s)\n' "$(format_duration "$elapsed")"
+    printf '✓ %s — done (%s)\n' "$title" "$(format_duration "$elapsed")"
     return 0
   fi
 
   elapsed=$(( $(date +%s) - start ))
-  printf 'FAILED (%s)\n' "$(format_duration "$elapsed")"
+  printf '✗ %s — failed (%s)\n' "$title" "$(format_duration "$elapsed")"
   return 1
 }
 
@@ -155,54 +189,41 @@ run_stage() {
   pid=$!
 
   start="$(date +%s)"
-  percent=1
   frame=0
 
   while kill -0 "$pid" 2>/dev/null; do
-    case "$frame" in
-      0) icon="○" ;;
-      1) icon="◔" ;;
-      2) icon="◑" ;;
-      *) icon="●" ;;
-    esac
-
     elapsed=$(( $(date +%s) - start ))
-    draw_stage "$icon" "$title" "$percent" "$elapsed"
 
-    frame=$(( (frame + 1) % 4 ))
+    draw_stage "$title" "$frame" "$elapsed"
 
-    # Progress is intentionally capped below 100 until the real command exits.
-    # The elapsed timer continues changing, so slow installs never look frozen.
-    if [ "$percent" -lt 70 ]; then
-      percent=$((percent + 2))
-    elif [ "$percent" -lt 90 ]; then
-      percent=$((percent + 1))
-    elif [ "$percent" -lt 95 ]; then
-      percent=$((percent + 1))
-    fi
+    frame=$((frame + 1))
 
-    sleep 0.15
+    sleep 0.18
   done
 
   wait "$pid"
   rc=$?
+
   elapsed=$(( $(date +%s) - start ))
 
   if [ "$rc" -ne 0 ]; then
     printf '\r\033[2K'
-    printf "${RED}✗${RESET} ${WHITE}%s${RESET} ${DIM}(%s)${RESET}\n" \
-      "$title" "$(format_duration "$elapsed")"
+    printf "${DIM}├${RESET} ${RED}✗${RESET} "
+    printf "${WHITE}%s${RESET}" "$title"
+    printf " ${DIM}— failed %s${RESET}\n" "$(format_duration "$elapsed")"
     return "$rc"
   fi
 
   finish_stage "$title" "$elapsed"
+
   return 0
 }
 
 fail() {
   message="$1"
 
-  printf "\n${RED}✗ %s${RESET}\n" "$message"
+  printf "${DIM}│${RESET}\n"
+  printf "${RED}└ ✗ %s${RESET}\n" "$message"
 
   if [ -s "$LOG" ]; then
     printf "\n${DIM}Last installer output:${RESET}\n"
@@ -210,6 +231,7 @@ fail() {
   fi
 
   printf "\n${DIM}Log: %s${RESET}\n" "$LOG"
+
   exit 1
 }
 
@@ -413,7 +435,8 @@ if [ "$TTY" -eq 1 ]; then
   printf '\033[?25h'
 fi
 
-printf "${WHITE}Configuring ToolNet Memory${RESET}\n\n"
+printf "${DIM}│${RESET}\n"
+printf "${CYAN}◇${RESET} ${WHITE}Configuring ToolNet Memory${RESET}\n\n"
 
 if [ -r /dev/tty ] && [ -w /dev/tty ] && [ -t 0 ]; then
   "$TOOLNET_BIN" setup </dev/tty >/dev/tty 2>/dev/tty || true
@@ -428,8 +451,8 @@ fi
 VERSION="$("$TOOLNET_BIN" --version 2>/dev/null || printf 'unknown')"
 
 printf '\n'
-printf "${GREEN}✓${RESET} ${BOLD}${WHITE}TOOLNET MEMORY installed successfully${RESET}\n"
-printf "${CYAN}${BOLD}%s${RESET}\n" "$VERSION"
+printf "${DIM}│${RESET}\n"
+printf "${GREEN}└ ◆ Installed ToolNet Memory %s${RESET}\n" "$VERSION"
 
 printf "\n${WHITE}Executable:${RESET}\n"
 printf '  %s\n' "$TOOLNET_BIN"

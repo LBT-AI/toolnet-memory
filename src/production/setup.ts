@@ -2706,19 +2706,22 @@ function printFinalSetupSummary(values: Map<string, string>): void {
   const embeddingModel = values.get('TOOLNET_EMBEDDING_MODEL');
   const fallback1 = values.get('TOOLNET_LLM_FALLBACK_1_PROVIDER');
   const fallback2 = values.get('TOOLNET_LLM_FALLBACK_2_PROVIDER');
+
   console.log('');
-  console.log('TOOLNET MEMORY READY');
-  console.log('══════════════════════════════════════');
-  console.log(`Storage    : ${storage}`);
+  console.log('◇ ToolNet Memory Setup');
+  console.log('');
+  console.log('◆ Configuration');
+  console.log('│');
+  console.log(`├ ◆ Storage    — ${storage}`);
   console.log(
-    `LLM        : ${
+    `├ ◆ LLM        — ${
       llmProvider
         ? `${aiProviderLabel(llmProvider)} / ${setupSummaryValue(llmModel)}`
         : 'not configured'
     }`
   );
   console.log(
-    `Fallback 1 : ${
+    `├ ◇ Fallback 1 — ${
       fallback1
         ? `${aiProviderLabel(fallback1)} / ${setupSummaryValue(
             values.get('TOOLNET_LLM_FALLBACK_1_MODEL')
@@ -2727,7 +2730,7 @@ function printFinalSetupSummary(values: Map<string, string>): void {
     }`
   );
   console.log(
-    `Fallback 2 : ${
+    `├ ◇ Fallback 2 — ${
       fallback2
         ? `${aiProviderLabel(fallback2)} / ${setupSummaryValue(
             values.get('TOOLNET_LLM_FALLBACK_2_MODEL')
@@ -2736,7 +2739,7 @@ function printFinalSetupSummary(values: Map<string, string>): void {
     }`
   );
   console.log(
-    `Embedding  : ${
+    `├ ◆ Embedding  — ${
       embeddingProvider
         ? `${
             embeddingProvider === 'local'
@@ -2749,13 +2752,13 @@ function printFinalSetupSummary(values: Map<string, string>): void {
         : 'legacy/default'
     }`
   );
-  console.log('');
-  console.log(`Config     : ${ENV_FILE}`);
-  console.log(`Permissions: ${fs.statSync(ENV_FILE).mode.toString(8).slice(-3)}`);
-  console.log('');
-  console.log('Secrets    : hidden');
-  console.log('Config mode: canonical TOOLNET_*');
-  console.log('══════════════════════════════════════');
+  console.log('│');
+  console.log(`├ ◆ Config      — ${ENV_FILE}`);
+  console.log(`├ ◆ Permissions — ${fs.statSync(ENV_FILE).mode.toString(8).slice(-3)}`);
+  console.log('├ ◆ Secrets     — hidden');
+  console.log('├ ◆ Config mode — canonical TOOLNET_*');
+  console.log('│');
+  console.log('└ ◆ Setup complete');
 }
 function ensureDefaults(values: Map<string, string>): void {
   migrateLegacyAiConfig(values);
@@ -2830,14 +2833,15 @@ async function nonInteractiveSetup(values: Map<string, string>, exists: boolean)
     saveEnv(values);
   }
 
-  console.log('TOOLNET MEMORY SETUP');
   console.log('');
-  console.log('Interactive terminal not detected.');
-  console.log(`Config: ${ENV_FILE}`);
-  console.log(`Storage: ${providerLabel(providerFrom(values))}`);
+  console.log('◇ ToolNet Memory Setup');
   console.log('');
-  console.log('Run from an interactive terminal to configure providers:');
-  console.log('  toolnet-memory setup');
+  console.log('◆ Non-interactive mode');
+  console.log('│');
+  console.log(`├ ◆ Config   — ${ENV_FILE}`);
+  console.log(`├ ◆ Storage  — ${providerLabel(providerFrom(values))}`);
+  console.log('│');
+  console.log('└ ◇ Run toolnet-memory setup from an interactive terminal');
 }
 
 async function main(): Promise<void> {

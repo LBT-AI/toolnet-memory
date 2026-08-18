@@ -94,11 +94,15 @@ async function main() {
   const current = readVersion(root);
 
   console.log('');
-  console.log('ToolNet Memory Update');
-  console.log('=====================');
+  console.log('◇ ToolNet Memory Update');
   console.log('');
+  console.log('│');
 
-  const check = new CliProgress('Checking npm registry').start();
+  const check = new CliProgress('Checking npm registry', {
+    stream: process.stdout,
+    display: 'bar',
+    intervalMs: 180,
+  }).start();
 
   let latestResult: RunResult;
 
@@ -124,16 +128,15 @@ async function main() {
 
   const latest = latestResult.stdout.trim();
 
-  check.succeed(`Latest version: v${latest}`);
+  check.succeed(`Checking registry — done`);
 
-  console.log('');
-  console.log(`Current: v${current}`);
-  console.log(`Latest : v${latest}`);
-  console.log('');
+  console.log('│');
+  console.log(`◆ Current   v${current}`);
+  console.log(`◆ Latest    v${latest}`);
+  console.log('│');
 
   if (current === latest) {
-    console.log('✓ ToolNet Memory is already up to date');
-
+    console.log('└ ◆ Already up to date');
     console.log('');
 
     return;
@@ -161,7 +164,11 @@ async function main() {
     return;
   }
 
-  const install = new CliProgress(`Installing ToolNet Memory v${latest}`).start();
+  const install = new CliProgress('Downloading & installing', {
+    stream: process.stdout,
+    display: 'bar',
+    intervalMs: 180,
+  }).start();
 
   let result: RunResult;
 
@@ -206,11 +213,10 @@ async function main() {
     return;
   }
 
-  install.succeed(`Installed ToolNet Memory v${latest}`);
+  install.succeed(`Downloading & installing — done`);
 
-  console.log('');
-  console.log(`✓ ToolNet Memory updated to v${latest}`);
-
+  console.log('│');
+  console.log(`└ ◆ Updated to v${latest}`);
   console.log('');
 }
 

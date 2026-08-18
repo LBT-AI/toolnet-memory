@@ -72,14 +72,17 @@ async function status(json: boolean): Promise<void> {
     }
 
     console.log('');
-    console.log('ToolNet Memory Service');
-    console.log('======================');
+    console.log('◇ ToolNet Memory Service');
     console.log('');
-    console.log('State: running');
-    console.log(`PID: ${response.stats.pid}`);
-    console.log(`Cache entries: ${response.stats.cacheEntries}`);
-    console.log(`Cache hits: ${response.stats.cacheHits}`);
-    console.log(`Cache misses: ${response.stats.cacheMisses}`);
+    console.log('◆ Daemon');
+    console.log('│');
+    console.log('├ ◆ Status        — running');
+    console.log(`├ ◆ PID           — ${response.stats.pid}`);
+    console.log(`├ ◆ Cache entries — ${response.stats.cacheEntries}`);
+    console.log(`├ ◆ Cache hits    — ${response.stats.cacheHits}`);
+    console.log(`├ ◆ Cache misses  — ${response.stats.cacheMisses}`);
+    console.log('│');
+    console.log('└ ◆ Service healthy');
     console.log('');
   } catch {
     if (json) {
@@ -97,10 +100,11 @@ async function status(json: boolean): Promise<void> {
     }
 
     console.log('');
-    console.log('ToolNet Memory Service');
-    console.log('======================');
+    console.log('◇ ToolNet Memory Service');
     console.log('');
-    console.log('State: stopped');
+    console.log('◆ Daemon');
+    console.log('│');
+    console.log('└ ◇ Status — stopped');
     console.log('');
   }
 }
@@ -119,31 +123,23 @@ async function main(): Promise<void> {
 
   if (command === 'install') {
     if (installedInPm2()) {
-      const result = runPm2(['restart', PM2_NAME, '--update-env']);
+      const result = runPm2(['restart', PM2_NAME, '--update-env'], true);
 
       if (result.status !== 0) {
         throw new Error('PM2 restart failed');
       }
     } else {
-      const result = runPm2([
-        'start',
-        serviceBundle(),
-
-        '--name',
-        PM2_NAME,
-
-        '--interpreter',
-        process.execPath,
-
-        '--time',
-      ]);
+      const result = runPm2(
+        ['start', serviceBundle(), '--name', PM2_NAME, '--interpreter', process.execPath, '--time'],
+        true
+      );
 
       if (result.status !== 0) {
         throw new Error('PM2 install failed');
       }
     }
 
-    runPm2(['save']);
+    runPm2(['save'], true);
 
     await status(false);
 
@@ -151,7 +147,7 @@ async function main(): Promise<void> {
   }
 
   if (command === 'start') {
-    const result = runPm2(['start', PM2_NAME]);
+    const result = runPm2(['start', PM2_NAME], true);
 
     if (result.status !== 0) {
       throw new Error('Service is not installed. Run toolnet-memory service:install');
@@ -161,7 +157,7 @@ async function main(): Promise<void> {
   }
 
   if (command === 'stop') {
-    const result = runPm2(['stop', PM2_NAME]);
+    const result = runPm2(['stop', PM2_NAME], true);
 
     if (result.status !== 0) {
       throw new Error('PM2 stop failed');
@@ -171,7 +167,7 @@ async function main(): Promise<void> {
   }
 
   if (command === 'restart') {
-    const result = runPm2(['restart', PM2_NAME, '--update-env']);
+    const result = runPm2(['restart', PM2_NAME, '--update-env'], true);
 
     if (result.status !== 0) {
       throw new Error('PM2 restart failed');
@@ -181,13 +177,13 @@ async function main(): Promise<void> {
   }
 
   if (command === 'remove') {
-    const result = runPm2(['delete', PM2_NAME]);
+    const result = runPm2(['delete', PM2_NAME], true);
 
     if (result.status !== 0) {
       throw new Error('PM2 delete failed');
     }
 
-    runPm2(['save']);
+    runPm2(['save'], true);
 
     return;
   }

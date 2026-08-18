@@ -8,6 +8,8 @@ import { AI_PROVIDER_DEFINITIONS } from './registry.js';
 
 import { createEmbeddingProvider } from '../embeddings/index.js';
 
+import { CliProgress } from '../production/cli-progress.js';
+
 function masked(value: string | undefined): string {
   if (!value) {
     return 'not configured';
@@ -57,73 +59,59 @@ function printStatus(): void {
   const config = loadAiConfig();
 
   console.log('');
-  console.log('ToolNet Provider Status');
-
-  console.log('=======================');
-
+  console.log('◇ ToolNet AI Providers');
   console.log('');
-
-  console.log('LLM');
-
-  console.log(`  Provider : ${config.llm.provider}`);
-
-  console.log(`  Model    : ${config.llm.model ?? 'not configured'}`);
-
-  console.log(`  Base URL : ${config.llm.baseUrl ?? 'default/provider native'}`);
-
-  console.log(`  API Key  : ${masked(config.llm.apiKey)}`);
+  console.log('◆ Configuration');
+  console.log('│');
+  console.log(`├ ◆ LLM       — ${config.llm.provider}`);
+  console.log(`│  Model      — ${config.llm.model ?? 'not configured'}`);
+  console.log(`│  Base URL   — ${config.llm.baseUrl ?? 'default/provider native'}`);
+  console.log(`│  API Key    — ${masked(config.llm.apiKey)}`);
 
   if (config.llm.accountId) {
-    console.log(`  Account  : ${config.llm.accountId}`);
+    console.log(`│  Account    — ${config.llm.accountId}`);
   }
 
-  console.log(`  Legacy   : ${config.legacy.llm ? 'yes' : 'no'}`);
+  console.log(`│  Legacy     — ${config.legacy.llm ? 'yes' : 'no'}`);
+  console.log('│');
 
-  console.log('');
-
-  console.log('Embedding');
-
-  console.log(`  Provider : ${config.embedding.provider}`);
-
+  console.log(`├ ◆ Embedding — ${config.embedding.provider}`);
   console.log(
-    `  Model    : ${
+    `│  Model      — ${
       config.embedding.model ??
       (config.embedding.provider === 'local' ? 'local hash' : 'not configured')
     }`
   );
-
   console.log(
-    `  Base URL : ${
+    `│  Base URL   — ${
       config.embedding.baseUrl ??
       (config.embedding.provider === 'local' ? 'local' : 'default/provider native')
     }`
   );
-
   console.log(
-    `  API Key  : ${
+    `│  API Key    — ${
       config.embedding.provider === 'local' ? 'not required' : masked(config.embedding.apiKey)
     }`
   );
 
   if (config.embedding.accountId) {
-    console.log(`  Account  : ${config.embedding.accountId}`);
+    console.log(`│  Account    — ${config.embedding.accountId}`);
   }
 
-  console.log(`  Legacy   : ${config.legacy.embedding ? 'yes' : 'no'}`);
-
+  console.log(`│  Legacy     — ${config.legacy.embedding ? 'yes' : 'no'}`);
+  console.log('│');
+  console.log('└ ◆ Configuration loaded');
   console.log('');
 }
 
 async function testLlm(): Promise<boolean> {
   const config = loadAiConfig().llm;
 
-  console.log('');
-  console.log('Testing LLM');
-  console.log('-----------');
-
-  console.log(`Provider : ${config.provider}`);
-
-  console.log(`Model    : ${config.model ?? 'not configured'}`);
+  const progress = new CliProgress(`Testing LLM — ${config.provider}`, {
+    stream: process.stdout,
+    display: 'bar',
+    intervalMs: 180,
+  }).start();
 
   try {
     const provider = createAiProvider({
@@ -137,23 +125,23 @@ async function testLlm(): Promise<boolean> {
     const result = await provider.healthCheck();
 
     if (!result.ok) {
-      console.log(`✗ ${result.message}`);
+      progress.fail(`LLM — ${result.message}`);
 
       return false;
     }
 
-    console.log(`✓ Provider reachable`);
+    const details = [
+      config.provider,
+      result.model ?? config.model,
+      result.latencyMs !== undefined ? `${result.latencyMs}ms` : undefined,
+    ].filter(Boolean);
 
-    if (result.latencyMs !== undefined) {
-      console.log(`✓ Latency: ${result.latencyMs} ms`);
-    }
+    progress.succeed(`LLM — ${details.join(' · ')}`);
 
-    console.log('');
     return true;
   } catch (error) {
-    console.log(`✗ ${error instanceof Error ? error.message : String(error)}`);
+    progress.fail(`LLM — ${error instanceof Error ? error.message : String(error)}`);
 
-    console.log('');
     return false;
   }
 }
@@ -161,53 +149,52 @@ async function testLlm(): Promise<boolean> {
 async function testEmbedding(): Promise<boolean> {
   const config = loadAiConfig().embedding;
 
-  console.log('');
-  console.log('Testing Embedding');
-
-  console.log('-----------------');
-
-  console.log(`Provider : ${config.provider}`);
-
-  console.log(
-    `Model    : ${config.model ?? (config.provider === 'local' ? 'local hash' : 'not configured')}`
-  );
+  const progress = new CliProgress(`Testing embedding — ${config.provider}`, {
+    stream: process.stdout,
+    display: 'bar',
+    intervalMs: 180,
+  }).start();
 
   try {
     const provider = createEmbeddingProvider();
 
+    const startedAt = Date.now();
+
     const vector = await provider.embed('ToolNet Memory provider health check');
+
+    const latencyMs = Date.now() - startedAt;
 
     if (!Array.isArray(vector) || vector.length === 0) {
       throw new Error('Empty embedding vector');
     }
 
-    console.log('✓ Embedding ready');
+    progress.succeed(`Embedding — ${config.provider} · ${vector.length}d · ${latencyMs}ms`);
 
-    console.log(`✓ Dimensions: ${vector.length}`);
-
-    console.log('');
     return true;
   } catch (error) {
-    console.log(`✗ ${error instanceof Error ? error.message : String(error)}`);
+    progress.fail(`Embedding — ${error instanceof Error ? error.message : String(error)}`);
 
-    console.log('');
     return false;
   }
 }
 
 async function testAll(): Promise<boolean> {
-  const llm = await testLlm();
+  console.log('');
+  console.log('◇ ToolNet AI Providers');
+  console.log('');
+  console.log('◆ Health check');
+  console.log('│');
 
+  const llm = await testLlm();
   const embedding = await testEmbedding();
 
-  console.log('');
-  console.log('Provider Test Summary');
+  console.log('│');
 
-  console.log('=====================');
-
-  console.log(`LLM       : ${llm ? 'READY' : 'FAILED'}`);
-
-  console.log(`Embedding : ${embedding ? 'READY' : 'FAILED'}`);
+  if (llm && embedding) {
+    console.log('└ ◆ Providers ready');
+  } else {
+    console.log('└ ✗ Provider check failed');
+  }
 
   console.log('');
 

@@ -14,6 +14,8 @@ export interface CliProgressOptions {
   color?: boolean;
 
   intervalMs?: number;
+
+  display?: 'spinner' | 'bar';
 }
 
 const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -29,10 +31,26 @@ const ANSI = {
 
   yellow: '\x1b[33m',
 
+  amber: '\x1b[38;5;214m',
+
   dim: '\x1b[2m',
 
   reset: '\x1b[0m',
 };
+
+function activityBar(frame: number, width = 16): string {
+  const pulseWidth = 4;
+
+  const travel = Math.max(1, width - pulseWidth + 1);
+
+  const position = frame % travel;
+
+  return (
+    '─'.repeat(position) +
+    '━'.repeat(pulseWidth) +
+    '─'.repeat(Math.max(0, width - position - pulseWidth))
+  );
+}
 
 function elapsedText(startedAt: number): string {
   const elapsed = Date.now() - startedAt;
@@ -58,6 +76,8 @@ export class CliProgress {
   private readonly color: boolean;
 
   private readonly intervalMs: number;
+
+  private readonly display: 'spinner' | 'bar';
 
   private label: string;
 
@@ -85,6 +105,8 @@ export class CliProgress {
     this.color = options.color ?? (this.interactive && process.env.NO_COLOR === undefined);
 
     this.intervalMs = Math.max(40, options.intervalMs ?? 80);
+
+    this.display = options.display ?? 'spinner';
   }
 
   start(): this {
@@ -105,7 +127,7 @@ export class CliProgress {
     this.render();
 
     this.timer = setInterval(() => {
-      this.frame = (this.frame + 1) % FRAMES.length;
+      this.frame = (this.frame + 1) % 10000;
 
       this.render();
     }, this.intervalMs);
@@ -160,15 +182,22 @@ export class CliProgress {
       return;
     }
 
-    const frame = FRAMES[this.frame];
+    const spinnerFrame = FRAMES[this.frame % FRAMES.length];
 
-    const spinner = this.color ? `${ANSI.cyan}${frame}${ANSI.reset}` : frame;
+    const indicator =
+      this.display === 'bar'
+        ? this.color
+          ? `${ANSI.amber}${activityBar(this.frame)}${ANSI.reset}`
+          : activityBar(this.frame)
+        : this.color
+          ? `${ANSI.cyan}${spinnerFrame}${ANSI.reset}`
+          : spinnerFrame;
 
     const elapsed = elapsedText(this.startedAt);
 
     const duration = this.color ? `${ANSI.dim}${elapsed}${ANSI.reset}` : elapsed;
 
-    this.stream.write(`${ANSI.clear}${spinner} ${this.label} ${duration}`);
+    this.stream.write(`${ANSI.clear}${indicator} ${this.label} ${duration}`);
   }
 
   private finish(
