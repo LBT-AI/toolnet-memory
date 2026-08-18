@@ -136,6 +136,16 @@ try {
         project,
       });
     },
+
+    onStageProgress: (event) => {
+      ui.stageProgress({
+        stage: event.stage,
+        current: event.current,
+        total: event.total,
+        phase: event.phase,
+        detail: event.detail,
+      });
+    },
   });
 
   writeStatus({

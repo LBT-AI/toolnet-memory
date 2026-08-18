@@ -10,6 +10,8 @@ import type { CodeGraphStore } from '../graph/graph-store.js';
 
 import type { TypeResolutionSnapshot } from '../resolution/types.js';
 
+import type { StageProgressCallback } from '../types.js';
+
 function normalize(value: string): string {
   return value.replaceAll('\\', '/').replace(/^\.\//, '');
 }
@@ -51,7 +53,8 @@ export class RichGraphEnricher {
   enrich(
     projectId: string,
     rootPath: string,
-    resolution?: TypeResolutionSnapshot | null
+    resolution?: TypeResolutionSnapshot | null,
+    onProgress?: StageProgressCallback
   ): RichGraphStats {
     const stats: RichGraphStats = {
       routes: 0,
@@ -72,16 +75,25 @@ export class RichGraphEnricher {
 
     const checker = program.getTypeChecker();
 
-    for (const source of program.getSourceFiles()) {
+    // Collect valid source files first for accurate total
+    const validSources = program.getSourceFiles().filter((source) => {
       if (source.isDeclarationFile) {
-        continue;
+        return false;
       }
 
       const filePath = normalize(relative(rootPath, resolve(source.fileName)));
 
       if (filePath.startsWith('../') || filePath.includes('node_modules/')) {
-        continue;
+        return false;
       }
+
+      return true;
+    });
+
+    let processedFiles = 0;
+
+    for (const source of validSources) {
+      const filePath = normalize(relative(rootPath, resolve(source.fileName)));
 
       const fileNode = this.fileNode(projectId, filePath);
 
@@ -134,6 +146,13 @@ export class RichGraphEnricher {
       };
 
       visit(source);
+
+      processedFiles++;
+      onProgress?.({
+        current: processedFiles,
+        total: validSources.length,
+        detail: filePath,
+      });
     }
 
     stats.tests += this.addTestEdges(projectId);

@@ -12,6 +12,8 @@ import type { CodeSymbol } from '../../core/types.js';
 
 import type { TypeResolution, TypeResolutionSnapshot } from './types.js';
 
+import type { StageProgressCallback } from '../types.js';
+
 function normalize(value: string): string {
   return value.replaceAll('\\', '/').replace(/^\.\//, '');
 }
@@ -44,7 +46,9 @@ export class TypeScriptTypeResolver {
   async resolveProject(
     projectId: string,
 
-    rootPath: string
+    rootPath: string,
+
+    onProgress?: StageProgressCallback
   ): Promise<TypeResolutionSnapshot> {
     const config = this.loadConfig(rootPath);
 
@@ -58,21 +62,27 @@ export class TypeScriptTypeResolver {
 
     const output: TypeResolution[] = [];
 
-    for (const source of program.getSourceFiles()) {
+    // Collect all valid source files first to get accurate total
+    const validSources = program.getSourceFiles().filter((source) => {
       if (source.isDeclarationFile) {
-        continue;
+        return false;
       }
 
       const absolute = resolve(source.fileName);
-
       const relativePath = normalize(relative(rootPath, absolute));
 
-      /*
-       * Không index node_modules hoặc file ngoài project.
-       */
       if (relativePath.startsWith('../') || relativePath.includes('node_modules/')) {
-        continue;
+        return false;
       }
+
+      return true;
+    });
+
+    let processedFiles = 0;
+
+    for (const source of validSources) {
+      const absolute = resolve(source.fileName);
+      const relativePath = normalize(relative(rootPath, absolute));
 
       const visit = (node: ts.Node) => {
         if (ts.isCallExpression(node)) {
@@ -105,6 +115,13 @@ export class TypeScriptTypeResolver {
       };
 
       visit(source);
+
+      processedFiles++;
+      onProgress?.({
+        current: processedFiles,
+        total: validSources.length,
+        detail: relativePath,
+      });
     }
 
     return {

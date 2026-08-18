@@ -50,6 +50,9 @@ const entries = {
   'memory-agent': 'src/work-continuity/memory-agent-cli.ts',
   context: 'src/work-continuity/context-cli.ts',
   'context-runtime': 'src/work-continuity/context-runtime-cli.ts',
+
+  // Shimmer progress worker (must be separate entry for Worker thread)
+  'shimmer-worker': 'src/production/ui/shimmer-worker.ts',
 };
 
 await build({

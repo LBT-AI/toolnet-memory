@@ -4,6 +4,8 @@ import type { CodeGraphStore } from '../graph/graph-store.js';
 
 import type { StorageProvider } from '../../storage/types.js';
 
+import type { StageProgressCallback } from '../types.js';
+
 import { PersistentCodeChunkStore } from '../../storage/code-chunk-store.js';
 
 import { PersistentCodeVectorStore } from '../../storage/code-vector-store.js';
@@ -60,7 +62,7 @@ export class SemanticCodeEngine {
     }
   ) {}
 
-  async initialize(): Promise<CodeSemanticStats> {
+  async initialize(onProgress?: StageProgressCallback): Promise<CodeSemanticStats> {
     const { projectId, rootPath, storage, embeddings, graph, model } = this.options;
 
     const chunkStore = new PersistentCodeChunkStore(storage);
@@ -137,6 +139,9 @@ export class SemanticCodeEngine {
 
     let targetDimensions = this.vectors.exportProject(projectId)[0]?.vector.length;
 
+    const totalBatches = Math.ceil(pending.length / batchSize);
+    let completedBatches = 0;
+
     for (let offset = 0; offset < pending.length; offset += batchSize) {
       const batch = pending.slice(offset, offset + batchSize);
 
@@ -205,6 +210,13 @@ export class SemanticCodeEngine {
 
         vectorsIndexed++;
       }
+
+      completedBatches++;
+      onProgress?.({
+        current: completedBatches,
+        total: totalBatches,
+        phase: 'embedding',
+      });
     }
 
     const records = this.vectors.exportProject(projectId);
@@ -216,6 +228,12 @@ export class SemanticCodeEngine {
       previousVectors.model !== model;
 
     if (shouldSaveVectors) {
+      onProgress?.({
+        current: totalBatches,
+        total: totalBatches,
+        phase: 'saving',
+      });
+
       await vectorStore.save({
         version: 1,
 

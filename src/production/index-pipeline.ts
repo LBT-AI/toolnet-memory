@@ -54,10 +54,20 @@ export interface SourceIndexProgressEvent {
   file?: string;
 }
 
+export interface StageProgressEvent {
+  stage: IndexStageId;
+  current: number;
+  total: number;
+  phase?: string;
+  detail?: string;
+}
+
 export interface ProductionIndexOptions {
   onStage?: (event: IndexStageEvent) => void | Promise<void>;
 
   onSourceProgress?: (event: SourceIndexProgressEvent) => void;
+
+  onStageProgress?: (event: StageProgressEvent) => void;
 }
 
 export interface ProductionIndexResult {
@@ -177,7 +187,16 @@ export async function runProductionIndex(
   const resolution = await stage('type-resolution', 'Type Resolution', async () => {
     const result = await new TypeScriptTypeResolver(graph).resolveProject(
       project.id,
-      project.rootPath
+      project.rootPath,
+      (progress) => {
+        options.onStageProgress?.({
+          stage: 'type-resolution',
+          current: progress.current,
+          total: progress.total,
+          phase: progress.phase,
+          detail: progress.detail,
+        });
+      }
     );
 
     await new PersistentTypeResolutionStore(storage).save(result);
@@ -189,7 +208,20 @@ export async function runProductionIndex(
    * 3. RICH GRAPH
    */
   await stage('rich-graph', 'Rich Graph', async () => {
-    const stats = new RichGraphEnricher(graph).enrich(project.id, project.rootPath, resolution);
+    const stats = new RichGraphEnricher(graph).enrich(
+      project.id,
+      project.rootPath,
+      resolution,
+      (progress) => {
+        options.onStageProgress?.({
+          stage: 'rich-graph',
+          current: progress.current,
+          total: progress.total,
+          phase: progress.phase,
+          detail: progress.detail,
+        });
+      }
+    );
 
     const symbols = graph.allSymbols(project.id);
 
@@ -229,7 +261,15 @@ export async function runProductionIndex(
       graph,
     });
 
-    return engine.initialize();
+    return engine.initialize((progress) => {
+      options.onStageProgress?.({
+        stage: 'semantic-index',
+        current: progress.current,
+        total: progress.total,
+        phase: progress.phase,
+        detail: progress.detail,
+      });
+    });
   });
 
   /*
@@ -258,7 +298,20 @@ export async function runProductionIndex(
    * 7. VISUALIZATION
    */
   const visualization = await stage('visualization', '3D Visualization Dataset', async () => {
-    const result = new VisualizationBuilder(graph).build(project.id, architecture, analysis);
+    const result = new VisualizationBuilder(graph).build(
+      project.id,
+      architecture,
+      analysis,
+      (progress) => {
+        options.onStageProgress?.({
+          stage: 'visualization',
+          current: progress.current,
+          total: progress.total,
+          phase: progress.phase,
+          detail: progress.detail,
+        });
+      }
+    );
 
     await new PersistentVisualizationStore(storage).save(result);
 
