@@ -868,7 +868,7 @@ export async function syncOpenCodeSession(
     core.setSourceCursor('opencode.part', encodeCursor(nextPartCursor));
 
     // Extract session memory (summary + durable facts)
-    if (options.idle && filteredTimed.length > 0) {
+    if (filteredTimed.length > 0) {
       try {
         const messages = filteredTimed.map((item) => JSON.stringify(item.event.data));
         const extraction = extractSessionMemory(messages, options.nativeSessionId);

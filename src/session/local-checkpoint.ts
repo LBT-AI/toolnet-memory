@@ -10,6 +10,10 @@ import { writeStableWorkStateToCurrent } from '../work-continuity/work-state-cur
 
 import { writeSessionOrigin } from '../work-continuity/session-origin.js';
 
+import { captureLocalSmartHandoff } from '../work-continuity/handoff.js';
+
+import { writeDurableMemoryCheckpoint } from './durable-checkpoint.js';
+
 export interface LocalCheckpointResult {
   updated: boolean;
 
@@ -63,6 +67,38 @@ export function checkpointLocalSession(
 
     workState,
   });
+
+  /*
+   * Important conversations / rules / decisions / fixes
+   * are checkpointed locally immediately.
+   *
+   * This is independent from idle and remote storage.
+   */
+  try {
+    writeDurableMemoryCheckpoint(project, identity, events, workState);
+  } catch {
+    // WAL + current work remain authoritative.
+  }
+
+  /*
+   * Local Smart Handoff is refreshed after every
+   * meaningful event batch, not only remote flush.
+   */
+  try {
+    captureLocalSmartHandoff({
+      project,
+
+      identity,
+
+      state: workState,
+
+      reason: 'continuous-checkpoint',
+
+      sequence: events.at(-1)?.sequence ?? 0,
+    });
+  } catch {
+    // Never break WAL capture.
+  }
 
   return {
     updated: true,

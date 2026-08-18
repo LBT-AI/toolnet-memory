@@ -42,15 +42,34 @@ export class Sanitizer {
       const output: Record<string, unknown> = {};
 
       for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-        const normalized = key.toLowerCase();
+        /*
+         * Normalize separators so all of these map consistently:
+         *
+         * api_key
+         * api-key
+         * apiKey
+         * API_KEY
+         */
+        const normalized = key
+          .normalize('NFKC')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '');
 
-        if (
+        const sensitiveKey =
           normalized.includes('password') ||
+          normalized.includes('passwd') ||
+          normalized === 'pwd' ||
           normalized.includes('secret') ||
           normalized.includes('token') ||
           normalized.includes('cookie') ||
-          normalized.includes('authorization')
-        ) {
+          normalized.includes('authorization') ||
+          normalized.includes('apikey') ||
+          normalized.includes('accesskey') ||
+          normalized.includes('privatekey') ||
+          normalized.includes('clientsecret') ||
+          normalized.includes('credential');
+
+        if (sensitiveKey) {
           output[key] = '[REDACTED]';
         } else {
           output[key] = this.sanitizeValue(item);

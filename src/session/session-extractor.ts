@@ -5,6 +5,8 @@
 
 // Removed filterEventData import - we do our own filtering
 import { estimateTokens, truncateByTokens } from '../work-continuity/token-budget.js';
+
+import { Sanitizer } from '../security/sanitizer.js';
 import {
   loadSessionMemoryPolicy,
   maxFactsPerSession,
@@ -36,13 +38,65 @@ export interface SessionExtraction {
 /**
  * Redact sensitive information from text
  */
+const extractionSanitizer = new Sanitizer();
+
+/**
+ * Session extraction is itself a persistence boundary.
+ *
+ * Adapters may call the extractor before SessionCore's sanitized
+ * WAL representation is available, therefore extraction must never
+ * assume its input is already safe.
+ */
 function redactSensitive(text: string): string {
-  return text
-    .replace(/\b[A-Za-z0-9_-]{20,}\b/g, '[REDACTED]') // Long tokens
-    .replace(/api[_-]?key[:\s=]+[^\s]+/gi, 'api_key=[REDACTED]')
-    .replace(/token[:\s=]+[^\s]+/gi, 'token=[REDACTED]')
-    .replace(/secret[:\s=]+[^\s]+/gi, 'secret=[REDACTED]')
-    .replace(/password[:\s=]+[^\s]+/gi, 'password=[REDACTED]');
+  const trimmed = text.trim();
+
+  /*
+   * Most adapter extraction payloads are JSON.stringify(event.data).
+   *
+   * Parse them whenever possible so nested keys such as:
+   *
+   *   token
+   *   cookie
+   *   password
+   *   authorization
+   *
+   * are redacted structurally rather than with fragile text regexes.
+   */
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
+    try {
+      const parsed = JSON.parse(trimmed);
+
+      return JSON.stringify(extractionSanitizer.sanitizeValue(parsed));
+    } catch {
+      // Fall through to text sanitization.
+    }
+  }
+
+  let result = extractionSanitizer.sanitize(text).text;
+
+  /*
+   * Defense-in-depth for JSON fragments or mixed log lines
+   * that are not valid standalone JSON.
+   */
+  result = result
+    .replace(
+      /("(?:api[_-]?key|token|secret|password|cookie|authorization)"\s*:\s*)"[^"]*"/gi,
+      '$1"[REDACTED]"'
+    )
+    .replace(
+      /('(?:api[_-]?key|token|secret|password|cookie|authorization)'\s*:\s*)'[^']*'/gi,
+      "$1'[REDACTED]'"
+    )
+    .replace(
+      /\b(api[_-]?key|token|secret|password|cookie|authorization)\b\s*[:=]\s*[^\s,;]+/gi,
+      '$1=[REDACTED]'
+    )
+    .replace(/\bbearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]');
+
+  return result;
 }
 
 /**
@@ -201,9 +255,12 @@ function generateSummary(messages: string[]): string {
     );
   });
 
-  const summary = lines.slice(0, 20).join('\n');
+  const summary = lines
+    .slice(0, 20)
+    .map((line) => redactSensitive(line))
+    .join('\n');
 
-  // Enforce token budget
+  // Enforce token budget only after security sanitization.
   return truncateByTokens(summary, maxTokens);
 }
 

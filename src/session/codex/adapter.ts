@@ -193,7 +193,7 @@ export async function syncCodexSession(options: CodexSyncOptions) {
    * - no remote storage
    * - no embedding
    */
-  if (options.idle && filteredEvents.length > 0) {
+  if (filteredEvents.length > 0) {
     try {
       const identity = {
         projectId: options.project.id,

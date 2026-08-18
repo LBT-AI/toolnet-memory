@@ -11,11 +11,15 @@ export interface RetrievedLocalMemoryAnswer {
 
   answer: string;
 
-  source: 'handoff' | 'session-origin' | 'work-state' | 'none';
+  source: 'checkpoint' | 'handoff' | 'session-origin' | 'work-state' | 'none';
 }
 
 const LABELS: Record<MemoryFactKind, string> = {
   previous_agent: 'Agent trước',
+
+  request: 'Yêu cầu hiện tại',
+
+  activity: 'Đang làm',
 
   goal: 'Mục tiêu',
 
@@ -33,6 +37,12 @@ const LABELS: Record<MemoryFactKind, string> = {
 
   decision: 'Quyết định',
 
+  rule: 'Quy tắc',
+
+  architecture: 'Kiến trúc',
+
+  fix: 'Đã sửa',
+
   completed: 'Đã hoàn thành',
 
   test: 'Test',
@@ -42,6 +52,8 @@ const LABELS: Record<MemoryFactKind, string> = {
 
 const SUMMARY_ORDER: MemoryFactKind[] = [
   'previous_agent',
+  'request',
+  'activity',
   'phase',
   'task',
   'file',
@@ -49,6 +61,9 @@ const SUMMARY_ORDER: MemoryFactKind[] = [
   'next_action',
   'blocker',
   'decision',
+  'rule',
+  'architecture',
+  'fix',
   'completed',
   'test',
   'progress',
@@ -58,7 +73,7 @@ const SUMMARY_ORDER: MemoryFactKind[] = [
 const INTENT_ORDER: Record<string, MemoryFactKind[]> = {
   previous_agent: ['previous_agent'],
 
-  current_task: ['task', 'file', 'next_action'],
+  current_task: ['request', 'activity', 'task', 'file', 'next_action'],
 
   next_action: ['next_action', 'task', 'file', 'todo'],
 
@@ -93,7 +108,20 @@ function selectCanonicalFacts(facts: RankedMemoryFact[]): RankedMemoryFact[] {
    */
   const handoff = facts.filter((fact) => fact.source === 'handoff');
 
-  return handoff.length > 0 ? handoff : facts;
+  if (handoff.length === 0) {
+    return facts;
+  }
+
+  /*
+   * Handoff remains authoritative for current work.
+   * Stable rules/architecture/fixes from the durable
+   * checkpoint are additive project knowledge.
+   */
+  const durable = facts.filter(
+    (fact) => fact.source === 'checkpoint' && ['rule', 'architecture', 'fix'].includes(fact.kind)
+  );
+
+  return [...handoff, ...durable];
 }
 
 function uniqueFacts(facts: RankedMemoryFact[]): RankedMemoryFact[] {

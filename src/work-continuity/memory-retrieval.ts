@@ -12,8 +12,12 @@ import { loadLocalWorkState } from './local-work-state.js';
 
 import { readSessionOrigin } from './session-origin.js';
 
+import { readLatestDurableCheckpoint } from '../session/durable-checkpoint.js';
+
 export type MemoryFactKind =
   | 'previous_agent'
+  | 'request'
+  | 'activity'
   | 'goal'
   | 'phase'
   | 'task'
@@ -21,12 +25,15 @@ export type MemoryFactKind =
   | 'next_action'
   | 'blocker'
   | 'decision'
+  | 'rule'
+  | 'architecture'
+  | 'fix'
   | 'completed'
   | 'todo'
   | 'test'
   | 'progress';
 
-export type MemoryFactSource = 'handoff' | 'session-origin' | 'work-state';
+export type MemoryFactSource = 'checkpoint' | 'handoff' | 'session-origin' | 'work-state';
 
 export interface RankedMemoryFact {
   kind: MemoryFactKind;
@@ -83,6 +90,8 @@ const INTENT_WEIGHT: Record<MemoryQueryIntent, Partial<Record<MemoryFactKind, nu
 
   current_task: {
     task: 100,
+    request: 95,
+    activity: 90,
     phase: 75,
     file: 65,
     next_action: 55,
@@ -112,6 +121,8 @@ const INTENT_WEIGHT: Record<MemoryQueryIntent, Partial<Record<MemoryFactKind, nu
 
   decision: {
     decision: 100,
+    rule: 85,
+    architecture: 80,
     task: 45,
     file: 30,
   },
@@ -132,6 +143,8 @@ const INTENT_WEIGHT: Record<MemoryQueryIntent, Partial<Record<MemoryFactKind, nu
 
   summary: {
     task: 100,
+    request: 98,
+    activity: 96,
     next_action: 95,
     file: 90,
     blocker: 85,
@@ -140,6 +153,9 @@ const INTENT_WEIGHT: Record<MemoryQueryIntent, Partial<Record<MemoryFactKind, nu
     completed: 60,
     todo: 60,
     decision: 55,
+    rule: 54,
+    architecture: 53,
+    fix: 52,
     progress: 50,
     test: 45,
     goal: 35,
@@ -147,6 +163,8 @@ const INTENT_WEIGHT: Record<MemoryQueryIntent, Partial<Record<MemoryFactKind, nu
 };
 
 const SOURCE_WEIGHT: Record<MemoryFactSource, number> = {
+  checkpoint: 20,
+
   handoff: 18,
 
   'session-origin': 14,
@@ -196,6 +214,120 @@ function readLocalHandoff(project: ProjectManifest): HandoffStateV2 | null {
   }
 }
 
+function checkpointFacts(project: ProjectManifest): RankedMemoryFact[] {
+  const checkpoint = readLatestDurableCheckpoint(project);
+
+  if (!checkpoint) {
+    return [];
+  }
+
+  const facts: RankedMemoryFact[] = [];
+
+  if (checkpoint.request) {
+    addFact(facts, {
+      kind: 'request',
+
+      value: checkpoint.request,
+
+      source: 'checkpoint',
+    });
+  }
+
+  if (checkpoint.activity) {
+    addFact(facts, {
+      kind: 'activity',
+
+      value: checkpoint.activity,
+
+      source: 'checkpoint',
+    });
+  }
+
+  if (checkpoint.current.phase) {
+    addFact(facts, {
+      kind: 'phase',
+
+      value: checkpoint.current.phase.title,
+
+      source: 'checkpoint',
+    });
+  }
+
+  if (checkpoint.current.task) {
+    addFact(facts, {
+      kind: 'task',
+
+      value: checkpoint.current.task.title,
+
+      source: 'checkpoint',
+    });
+  }
+
+  const currentFile = checkpoint.files.active.at(-1);
+
+  if (currentFile) {
+    addFact(facts, {
+      kind: 'file',
+
+      value: currentFile,
+
+      source: 'checkpoint',
+    });
+  }
+
+  for (const action of checkpoint.nextActions) {
+    addFact(facts, {
+      kind: 'next_action',
+
+      value: action,
+
+      source: 'checkpoint',
+    });
+  }
+
+  for (const blocker of checkpoint.blockers) {
+    addFact(facts, {
+      kind: 'blocker',
+
+      value: blocker,
+
+      source: 'checkpoint',
+    });
+  }
+
+  for (const item of checkpoint.completed.tasks) {
+    addFact(facts, {
+      kind: 'completed',
+
+      value: item,
+
+      source: 'checkpoint',
+    });
+  }
+
+  for (const item of checkpoint.remaining.tasks) {
+    addFact(facts, {
+      kind: 'todo',
+
+      value: item,
+
+      source: 'checkpoint',
+    });
+  }
+
+  for (const fact of checkpoint.durableFacts) {
+    addFact(facts, {
+      kind: fact.kind,
+
+      value: fact.content,
+
+      source: 'checkpoint',
+    });
+  }
+
+  return facts;
+}
+
 function handoffFacts(project: ProjectManifest): RankedMemoryFact[] {
   const handoff = readLocalHandoff(project);
 
@@ -212,6 +344,26 @@ function handoffFacts(project: ProjectManifest): RankedMemoryFact[] {
 
     source: 'handoff',
   });
+
+  if (handoff.request) {
+    addFact(facts, {
+      kind: 'request',
+
+      value: handoff.request,
+
+      source: 'handoff',
+    });
+  }
+
+  if (handoff.activity) {
+    addFact(facts, {
+      kind: 'activity',
+
+      value: handoff.activity,
+
+      source: 'handoff',
+    });
+  }
 
   if (handoff.goal) {
     addFact(facts, {
@@ -411,6 +563,26 @@ function stateFacts(project: ProjectManifest): RankedMemoryFact[] {
 
   const facts: RankedMemoryFact[] = [];
 
+  if (state.currentRequest) {
+    addFact(facts, {
+      kind: 'request',
+
+      value: state.currentRequest,
+
+      source: 'work-state',
+    });
+  }
+
+  if (state.currentActivity) {
+    addFact(facts, {
+      kind: 'activity',
+
+      value: state.currentActivity,
+
+      source: 'work-state',
+    });
+  }
+
   if (state.goal) {
     addFact(facts, {
       kind: 'goal',
@@ -441,7 +613,7 @@ function stateFacts(project: ProjectManifest): RankedMemoryFact[] {
     });
   }
 
-  const latestFile = state.filesTouched.at(-1);
+  const latestFile = state.activeFiles?.at(-1) ?? state.filesTouched.at(-1);
 
   if (latestFile) {
     addFact(facts, {
@@ -563,7 +735,12 @@ export function retrieveMemoryContext(
 ): MemoryRetrievalResult {
   const intent = detectMemoryQueryIntent(question);
 
-  const candidates = [...handoffFacts(project), ...originFacts(project), ...stateFacts(project)];
+  const candidates = [
+    ...checkpointFacts(project),
+    ...handoffFacts(project),
+    ...originFacts(project),
+    ...stateFacts(project),
+  ];
 
   const ranked = dedupeFacts(scoreFacts(intent, candidates)).sort(
     (left, right) => right.score - left.score

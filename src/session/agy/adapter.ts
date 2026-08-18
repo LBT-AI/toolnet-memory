@@ -233,7 +233,7 @@ export async function syncAgySession(options: AgySyncOptions): Promise<AgySyncRe
   }
 
   // Extract session memory (summary + durable facts)
-  if (options.phase === 'stop' && filteredEvents.length > 0) {
+  if (filteredEvents.length > 0) {
     try {
       const messages = filteredEvents.map((e) => JSON.stringify(e.data));
       const extraction = extractSessionMemory(messages, conversationId);

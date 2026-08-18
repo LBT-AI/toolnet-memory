@@ -43,6 +43,10 @@ export interface HandoffStateV2 {
 
   goal?: string;
 
+  request?: string;
+
+  activity?: string;
+
   current: {
     phase?: HandoffWorkItem;
 
@@ -75,12 +79,28 @@ export interface HandoffStateV2 {
     current?: string;
 
     recent: string[];
+
+    active?: string[];
+
+    modified?: string[];
+
+    created?: string[];
+
+    deleted?: string[];
   };
 
   tests: {
     status: HandoffTestStatus;
 
     recent: string[];
+
+    checks?: Array<{
+      kind: string;
+
+      status: string;
+
+      command: string;
+    }>;
   };
 
   attention: string[];
@@ -134,7 +154,17 @@ function workItem(item: WorkItem | undefined): HandoffWorkItem | undefined {
   };
 }
 
-function inferTestStatus(tests: string[]): HandoffTestStatus {
+function inferTestStatus(tests: string[], checks: WorkState['checks'] = []): HandoffTestStatus {
+  const recentChecks = checks.slice(-10);
+
+  if (recentChecks.some((item) => item.status === 'failed')) {
+    return 'failing';
+  }
+
+  if (recentChecks.some((item) => item.status === 'passed')) {
+    return 'passing';
+  }
+
   const recent = tests.slice(-10).join('\n').toLowerCase();
 
   if (/(?:failed|failing|failure|error|✗|❌)/u.test(recent)) {
@@ -169,7 +199,7 @@ export function buildHandoffStateV2(options: {
 }): HandoffStateV2 {
   const { project, identity, state } = options;
 
-  const currentFile = state.filesTouched.at(-1);
+  const currentFile = state.activeFiles?.at(-1) ?? state.filesTouched.at(-1);
 
   const completedPhases = state.phases
     .filter((item) => item.status === 'completed')
@@ -187,13 +217,28 @@ export function buildHandoffStateV2(options: {
     .filter((item) => item.status !== 'completed' && item.status !== 'cancelled')
     .map((item) => item.title);
 
-  const nextActions = compact(state.nextActions, 10);
+  const completedTaskKeys = new Set(
+    state.tasks
+      .filter((item) => item.status === 'completed')
+      .map((item) => item.title.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim())
+  );
+
+  const nextActions = compact(
+    state.nextActions.filter(
+      (value) =>
+        !completedTaskKeys.has(value.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim())
+    ),
+    10
+  );
 
   const todos = compact([...remainingTasks, ...nextActions], 15);
 
   const recentTests = compact(state.tests.slice().reverse(), 10);
 
-  const recentFiles = compact(state.filesTouched.slice().reverse(), 20);
+  const recentFiles = compact(
+    [...(state.activeFiles ?? []).slice().reverse(), ...state.filesTouched.slice().reverse()],
+    20
+  );
 
   const withoutDigest: Omit<HandoffStateV2, 'stateDigest'> = {
     schema: 'toolnet.handoff.v2',
@@ -221,6 +266,10 @@ export function buildHandoffStateV2(options: {
     capturedAt: options.capturedAt ?? new Date().toISOString(),
 
     goal: state.goal,
+
+    request: state.currentRequest,
+
+    activity: state.currentActivity,
 
     current: {
       phase: workItem(state.currentPhase),
@@ -254,12 +303,28 @@ export function buildHandoffStateV2(options: {
       current: currentFile,
 
       recent: recentFiles,
+
+      active: compact(state.activeFiles ?? [], 10),
+
+      modified: compact(state.modifiedFiles ?? [], 20),
+
+      created: compact(state.createdFiles ?? [], 20),
+
+      deleted: compact(state.deletedFiles ?? [], 20),
     },
 
     tests: {
-      status: inferTestStatus(state.tests),
+      status: inferTestStatus(state.tests, state.checks),
 
       recent: recentTests,
+
+      checks: (state.checks ?? []).slice(-10).map((item) => ({
+        kind: item.kind,
+
+        status: item.status,
+
+        command: item.command,
+      })),
     },
 
     attention: compact(options.attention ?? [], 20),
