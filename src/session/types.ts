@@ -1,6 +1,6 @@
 import type { ProjectManifest } from '../core/types.js';
 
-export type SessionAgent = 'opencode' | 'agy' | 'codex' | string;
+export type SessionAgent = 'opencode' | 'agy' | 'codex' | 'claude' | string;
 
 export type SessionStatus = 'active' | 'idle' | 'error';
 
@@ -28,6 +28,7 @@ export type SessionEventType =
   | 'error'
   | 'artifact'
   | 'summary'
+  | 'checkpoint'
   | 'custom';
 
 export interface SessionIdentity {
@@ -78,12 +79,36 @@ export interface SessionProvenance {
   metadata?: Record<string, unknown>;
 }
 
+export interface SessionEventContext {
+  /**
+   * Normalized agent source:
+   * opencode / codex / agy / claude.
+   */
+  source?: string;
+
+  /**
+   * Native agent turn when the source exposes one.
+   */
+  turnId?: string;
+
+  /**
+   * Working directory associated with this event.
+   */
+  cwd?: string;
+}
+
 export interface SessionEventInput {
   type: SessionEventType;
 
   timestamp?: string;
 
   role?: string;
+
+  source?: string;
+
+  turnId?: string;
+
+  cwd?: string;
 
   /**
    * Stable event ID from the source agent.
@@ -113,11 +138,23 @@ export interface NormalizedSessionEvent {
   agent: SessionAgent;
   nativeSessionId: string;
 
+  /**
+   * Unified alias. New events always write this field.
+   * nativeSessionId remains for backwards compatibility.
+   */
+  sessionId?: string;
+
   type: SessionEventType;
 
   timestamp: string;
 
   role?: string;
+
+  source?: string;
+
+  turnId?: string;
+
+  cwd?: string;
 
   sourceEventId?: string;
 
@@ -239,6 +276,11 @@ export interface SessionCoreOptions {
   title?: string;
 
   metadata?: Record<string, unknown>;
+
+  /**
+   * Defaults applied by the unified event boundary.
+   */
+  eventContext?: SessionEventContext;
 
   maxEventsPerChunk?: number;
 

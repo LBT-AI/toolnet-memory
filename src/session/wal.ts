@@ -18,10 +18,13 @@ import type {
   LocalSessionState,
   NormalizedSessionEvent,
   PendingSessionEvents,
+  SessionEventContext,
   SessionEventInput,
   SessionIdentity,
   SessionStatus,
 } from './types.js';
+
+import { canonicalizeSessionEventInput } from './unified-event.js';
 
 import { readJsonFile, sha256, stableStringify, writeJsonAtomic } from './utils.js';
 
@@ -42,7 +45,10 @@ export class SessionWal {
 
   readonly lockFile: string;
 
-  constructor(readonly identity: SessionIdentity) {
+  constructor(
+    readonly identity: SessionIdentity,
+    private readonly eventContext: SessionEventContext = {}
+  ) {
     mkdirSync(identity.localDirectory, {
       recursive: true,
     });
@@ -156,7 +162,9 @@ export class SessionWal {
 
       const normalized: NormalizedSessionEvent[] = [];
 
-      for (const input of inputs) {
+      for (const rawInput of inputs) {
+        const input = canonicalizeSessionEventInput(rawInput, this.eventContext);
+
         const timestamp = input.timestamp ?? new Date().toISOString();
 
         const data = input.data ?? {};
@@ -214,9 +222,13 @@ export class SessionWal {
 
           nativeSessionId: this.identity.nativeSessionId,
 
+          sessionId: this.identity.nativeSessionId,
+
           type: input.type,
 
           timestamp,
+
+          source: input.source ?? input.provenance?.source ?? this.identity.agent,
 
           data,
 
@@ -229,6 +241,14 @@ export class SessionWal {
 
         if (input.role !== undefined) {
           event.role = input.role;
+        }
+
+        if (input.turnId !== undefined) {
+          event.turnId = input.turnId;
+        }
+
+        if (input.cwd !== undefined) {
+          event.cwd = input.cwd;
         }
 
         if (input.sourceEventId !== undefined) {

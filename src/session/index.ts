@@ -1,4 +1,5 @@
 export * from './types.js';
+export * from './unified-event.js';
 export * from './identity.js';
 export * from './wal.js';
 export * from './store.js';
@@ -6,4 +7,5 @@ export * from './core.js';
 export * from './opencode/index.js';
 export * from './agy/index.js';
 export * from './codex/index.js';
+export * from './claude/index.js';
 export * from './learner/index.js';

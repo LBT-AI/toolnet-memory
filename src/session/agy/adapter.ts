@@ -97,6 +97,12 @@ export async function syncAgySession(options: AgySyncOptions): Promise<AgySyncRe
 
       modelName: options.modelName,
     },
+
+    eventContext: {
+      source: 'agy',
+
+      cwd: options.workspacePaths?.[0] ?? options.project.rootPath,
+    },
   });
 
   const state = core.status();

@@ -665,6 +665,12 @@ export async function syncOpenCodeSession(
 
         directory: valueString(session.directory) || undefined,
       },
+
+      eventContext: {
+        source: 'opencode',
+
+        cwd: valueString(session.directory) || options.project.rootPath,
+      },
     });
 
     const state = core.status();

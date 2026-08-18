@@ -49,7 +49,7 @@ export class SessionCore {
 
     this.metadata = this.sanitizer.sanitizeValue(options.metadata ?? {}) as Record<string, unknown>;
 
-    this.wal = new SessionWal(this.identity);
+    this.wal = new SessionWal(this.identity, options.eventContext);
 
     this.remote = new RemoteSessionStore(
       options.storage,

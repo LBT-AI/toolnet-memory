@@ -72,6 +72,14 @@ export async function syncCodexSession(options: CodexSyncOptions) {
 
       client: options.client,
     },
+
+    eventContext: {
+      source: 'codex',
+
+      cwd: cwd ?? options.project.rootPath,
+
+      turnId: options.turnId,
+    },
   });
 
   const state = core.status();
