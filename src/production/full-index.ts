@@ -167,7 +167,7 @@ try {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
   } else {
-    ui.finish({
+    await ui.finish({
       files: result.files,
 
       symbols: result.graph.symbols,

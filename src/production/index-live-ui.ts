@@ -259,31 +259,33 @@ export class IndexLiveUI {
       return;
     }
 
-    // For interactive mode, the shimmer progress worker handles stage completion
-    // when the next stage starts or when stop() is called
+    // For interactive mode, write persistent "done" line to stream
+    // (shimmer worker's transient animation goes to stdout fd 1)
+    const G = getGlyphs();
+    this.writeStatic(
+      `${this.color(G.rail, ANSI.gray)}  ${this.color(G.phaseDone, ANSI.green)} ${title} ${this.color(G.dash, ANSI.gray)} done`
+    );
   }
 
-  finish(result: {
+  async finish(result: {
     files: number;
     symbols: number;
     edges: number;
     durationMs: number;
     storage: string;
-  }): void {
+  }): Promise<void> {
     this.finished = true;
 
     if (!this.enabled) {
       return;
     }
 
-    // Stop shimmer progress and wait for cleanup
+    // Stop shimmer progress and wait for cleanup before printing summary
     if (this.shimmerProgress && this.interactive) {
-      this.shimmerProgress.stop().then(() => {
-        this.printFinishSummary(result);
-      });
-    } else {
-      this.printFinishSummary(result);
+      await this.shimmerProgress.stop();
     }
+
+    this.printFinishSummary(result);
   }
 
   private printFinishSummary(result: {

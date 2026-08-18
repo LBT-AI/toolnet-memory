@@ -1,5 +1,8 @@
 import { parentPort, workerData } from 'worker_threads';
 import { writeSync } from 'fs';
+// Use .js extension (TypeScript/Node ESM convention)
+// tsx/vitest resolves .js imports to .ts in test environment
+// Production bundle has actual .js files
 import { getRawWriteGlyphs } from './glyphs.js';
 
 // Write directly to fd 1 (stdout) instead of process.stdout.
