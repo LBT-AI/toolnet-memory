@@ -2,7 +2,16 @@ import type { NormalizedSessionEvent, SessionIdentity } from '../session/types.j
 
 import { sha256 } from '../session/utils.js';
 
-import type { WorkItemStatus, WorkObservation, WorkObservationKind } from './types.js';
+import type {
+  FileWorkAction,
+  WorkCheckKind,
+  WorkCheckStatus,
+  WorkItemStatus,
+  WorkObservation,
+  WorkObservationKind,
+} from './types.js';
+
+import { inferToolWorkSignals } from './tool-intelligence.js';
 
 const TEXT_KEYS = new Set([
   'content',
@@ -112,6 +121,12 @@ function makeObservation(
 
     status?: WorkItemStatus;
 
+    fileAction?: FileWorkAction;
+
+    checkKind?: WorkCheckKind;
+
+    checkStatus?: WorkCheckStatus;
+
     order?: number;
 
     confidence?: number;
@@ -141,6 +156,9 @@ function makeObservation(
       event.id,
       clean,
       options.status ?? '',
+      options.fileAction ?? '',
+      options.checkKind ?? '',
+      options.checkStatus ?? '',
       options.order ?? '',
     ].join('|')
   ).slice(0, 32);
@@ -159,6 +177,12 @@ function makeObservation(
     text: clean,
 
     status: options.status,
+
+    fileAction: options.fileAction,
+
+    checkKind: options.checkKind,
+
+    checkStatus: options.checkStatus,
 
     order: options.order,
 
@@ -358,6 +382,23 @@ function extractFromLine(
     );
   }
 
+  /*
+   * Capture explicit active work even when the agent
+   * did not formalize it as TODO/Phase.
+   */
+  if (
+    line.length <= 300 &&
+    /^(?:đang\s+(?:sửa|cập nhật|triển khai|xử lý|làm|refactor|fix)|(?:i(?:'m| am)\s+)?(?:working on|implementing|fixing|refactoring|updating|editing)\b)/iu.test(
+      line
+    )
+  ) {
+    result.push(
+      makeObservation(identity, event, 'activity', line, {
+        confidence: 0.86,
+      })
+    );
+  }
+
   return result;
 }
 
@@ -385,6 +426,58 @@ export function extractWorkObservations(
   }
 
   for (const event of events) {
+    /*
+     * Latest meaningful user request is a first-class
+     * continuity signal.
+     */
+    if (event.type === 'user_prompt' || event.role === 'user') {
+      const raw: string[] = [];
+
+      collectStrings(event.data, raw);
+
+      const request = raw
+        .map((value) => normalize(value))
+        .find(
+          (value) => value.length >= 8 && value.length <= 1200 && !/^\[?toolnet\b/iu.test(value)
+        );
+
+      if (request) {
+        push(
+          makeObservation(identity, event, 'request', request, {
+            confidence: 0.96,
+          })
+        );
+      }
+    }
+
+    /*
+     * Adapter-independent semantic tool inference.
+     *
+     * OpenCode / Codex / Agy / Claude may expose very
+     * different native tool payloads. Work State only sees
+     * normalized file / command / check signals.
+     */
+    for (const signal of inferToolWorkSignals(event)) {
+      push(
+        makeObservation(identity, event, signal.kind, signal.text, {
+          fileAction: signal.fileAction,
+          checkKind: signal.checkKind,
+          checkStatus: signal.checkStatus,
+          status:
+            signal.kind === 'test'
+              ? signal.checkStatus === 'passed'
+                ? 'completed'
+                : signal.checkStatus === 'failed'
+                  ? 'blocked'
+                  : signal.checkStatus === 'running'
+                    ? 'in_progress'
+                    : 'pending'
+              : undefined,
+          confidence: signal.confidence,
+        })
+      );
+    }
+
     if (event.type === 'decision') {
       const raw: string[] = [];
 
@@ -422,6 +515,7 @@ export function extractWorkObservations(
         if (typeof value === 'string' && value) {
           push(
             makeObservation(identity, event, 'file', value, {
+              fileAction: 'modified',
               confidence: 1,
             })
           );

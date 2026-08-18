@@ -1,5 +1,6 @@
 export * from './types.js';
 export * from './extractor.js';
+export * from './tool-intelligence.js';
 export * from './journal.js';
 export * from './reducer.js';
 export * from './learner.js';

@@ -2,8 +2,16 @@ import type { SessionAgent } from '../session/types.js';
 
 export type WorkItemStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
 
+export type FileWorkAction = 'active' | 'modified' | 'created' | 'deleted';
+
+export type WorkCheckKind = 'test' | 'build' | 'lint' | 'typecheck';
+
+export type WorkCheckStatus = 'running' | 'passed' | 'failed' | 'unknown';
+
 export type WorkObservationKind =
   | 'session'
+  | 'request'
+  | 'activity'
   | 'goal'
   | 'plan'
   | 'phase'
@@ -13,6 +21,7 @@ export type WorkObservationKind =
   | 'warning'
   | 'next_action'
   | 'file'
+  | 'command'
   | 'test';
 
 export interface WorkObservation {
@@ -29,6 +38,12 @@ export interface WorkObservation {
   text: string;
 
   status?: WorkItemStatus;
+
+  fileAction?: FileWorkAction;
+
+  checkKind?: WorkCheckKind;
+
+  checkStatus?: WorkCheckStatus;
 
   order?: number;
 
@@ -91,11 +106,29 @@ export interface WorkItem {
   };
 }
 
+export interface WorkCheck {
+  kind: WorkCheckKind;
+
+  command: string;
+
+  status: WorkCheckStatus;
+
+  updatedAt: string;
+
+  agent: SessionAgent;
+
+  nativeSessionId: string;
+}
+
 export interface WorkState {
   version: 1;
 
   projectId: string;
   projectName: string;
+
+  currentRequest?: string;
+
+  currentActivity?: string;
 
   goal?: string;
 
@@ -115,7 +148,23 @@ export interface WorkState {
 
   filesTouched: string[];
 
+  /**
+   * Most recently edited/created files which are still
+   * relevant to current work.
+   */
+  activeFiles?: string[];
+
+  modifiedFiles?: string[];
+
+  createdFiles?: string[];
+
+  deletedFiles?: string[];
+
+  commands?: string[];
+
   tests: string[];
+
+  checks?: WorkCheck[];
 
   currentPhase?: WorkItem;
 

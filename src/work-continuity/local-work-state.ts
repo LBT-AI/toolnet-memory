@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 
 import type { ProjectManifest } from '../core/types.js';
 
-import type { WorkItem, WorkObservation, WorkState } from './types.js';
+import type { WorkCheck, WorkItem, WorkObservation, WorkState } from './types.js';
 
 function atomicWriteJson(file: string, value: unknown): void {
   mkdirSync(dirname(file), {
@@ -75,6 +75,19 @@ function recentUnique(existing: string[], incoming: string[], limit: number): st
   }
 
   return output.reverse();
+}
+
+function recentChecks(existing: WorkCheck[], incoming: WorkCheck[], limit = 20): WorkCheck[] {
+  const map = new Map<string, WorkCheck>();
+
+  for (const item of [...existing, ...incoming]) {
+    const key = `${item.kind}|${normalizedKey(item.command)}`;
+
+    map.delete(key);
+    map.set(key, item);
+  }
+
+  return Array.from(map.values()).slice(-limit);
 }
 
 function placeholder(observation: WorkObservation): boolean {
@@ -207,6 +220,10 @@ export function applyObservationsToLocalWorkState(
 
   const tasks = itemMap(previous?.tasks ?? []);
 
+  let currentRequest = previous?.currentRequest;
+
+  let currentActivity = previous?.currentActivity;
+
   let goal = previous?.goal;
 
   let plan = previous?.plan;
@@ -217,8 +234,22 @@ export function applyObservationsToLocalWorkState(
   const blockers: string[] = [];
   const warnings: string[] = [];
   const nextActions: string[] = [];
+
   const files: string[] = [];
+
+  const activeFiles = [...(previous?.activeFiles ?? [])];
+
+  const modifiedFiles: string[] = [];
+
+  const createdFiles: string[] = [];
+
+  const deletedFiles: string[] = [];
+
+  const commands: string[] = [];
+
   const tests: string[] = [];
+
+  const checks: WorkCheck[] = [];
 
   const ordered = [...observations].sort((left, right) => {
     const time = left.occurredAt.localeCompare(right.occurredAt);
@@ -232,6 +263,14 @@ export function applyObservationsToLocalWorkState(
 
   for (const observation of ordered) {
     switch (observation.kind) {
+      case 'request':
+        currentRequest = observation.text;
+        break;
+
+      case 'activity':
+        currentActivity = observation.text;
+        break;
+
       case 'goal':
         goal = observation.text;
         break;
@@ -272,12 +311,55 @@ export function applyObservationsToLocalWorkState(
         nextActions.push(observation.text);
         break;
 
-      case 'file':
+      case 'file': {
         files.push(observation.text);
+
+        const action = observation.fileAction ?? 'active';
+
+        const existingIndex = activeFiles.indexOf(observation.text);
+
+        if (existingIndex >= 0) {
+          activeFiles.splice(existingIndex, 1);
+        }
+
+        if (action !== 'deleted') {
+          activeFiles.push(observation.text);
+        }
+
+        if (action === 'modified') {
+          modifiedFiles.push(observation.text);
+        } else if (action === 'created') {
+          createdFiles.push(observation.text);
+        } else if (action === 'deleted') {
+          deletedFiles.push(observation.text);
+        }
+
+        break;
+      }
+
+      case 'command':
+        commands.push(observation.text);
         break;
 
       case 'test':
         tests.push(observation.text);
+
+        if (observation.checkKind) {
+          checks.push({
+            kind: observation.checkKind,
+
+            command: observation.text,
+
+            status: observation.checkStatus ?? 'unknown',
+
+            updatedAt: observation.occurredAt,
+
+            agent: observation.agent,
+
+            nativeSessionId: observation.nativeSessionId,
+          });
+        }
+
         break;
 
       case 'session':
@@ -343,6 +425,10 @@ export function applyObservationsToLocalWorkState(
 
     projectName: project.name,
 
+    currentRequest,
+
+    currentActivity,
+
     goal,
 
     plan,
@@ -361,7 +447,19 @@ export function applyObservationsToLocalWorkState(
 
     filesTouched: recentUnique(previous?.filesTouched ?? [], files, 30),
 
+    activeFiles: recentUnique([], activeFiles, 5),
+
+    modifiedFiles: recentUnique(previous?.modifiedFiles ?? [], modifiedFiles, 30),
+
+    createdFiles: recentUnique(previous?.createdFiles ?? [], createdFiles, 30),
+
+    deletedFiles: recentUnique(previous?.deletedFiles ?? [], deletedFiles, 30),
+
+    commands: recentUnique(previous?.commands ?? [], commands, 20),
+
     tests: recentUnique(previous?.tests ?? [], tests, 20),
+
+    checks: recentChecks(previous?.checks ?? [], checks, 20),
 
     currentPhase,
 

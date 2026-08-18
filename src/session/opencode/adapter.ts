@@ -576,7 +576,40 @@ function compactToolPartData(data: Record<string, unknown>): Record<string, unkn
   return result;
 }
 
+function partMessageRole(db: DatabaseSync, row: OpenCodeRow): string | undefined {
+  const messageId = valueString(row.message_id);
+
+  if (!messageId) {
+    return undefined;
+  }
+
+  try {
+    const message = db
+      .prepare(
+        `
+        SELECT data
+        FROM "message"
+        WHERE id = ?
+        LIMIT 1
+        `
+      )
+      .get(messageId) as OpenCodeRow | undefined;
+
+    if (!message) {
+      return undefined;
+    }
+
+    const data = jsonObject(message.data);
+
+    return valueString(data.role) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function partEvent(
+  db: DatabaseSync,
+
   dbPath: string,
 
   row: OpenCodeRow
@@ -590,6 +623,8 @@ function partEvent(
   const id = valueString(row.id);
 
   const messageId = valueString(row.message_id);
+
+  const role = partMessageRole(db, row);
 
   let type: SessionEventInput['type'] = 'message_part';
 
@@ -607,6 +642,8 @@ function partEvent(
       type,
 
       timestamp: toIso(clock),
+
+      role,
 
       sourceEventId: `part:${id}:${clock}`,
 
@@ -732,7 +769,7 @@ export async function syncOpenCodeSession(
 
     timed.push(...messages.map((row) => messageEvent(dbPath, row)));
 
-    timed.push(...parts.map((row) => partEvent(dbPath, row)));
+    timed.push(...parts.map((row) => partEvent(db, dbPath, row)));
 
     const updated = valueNumber(session.time_updated) || valueNumber(session.time_created);
 

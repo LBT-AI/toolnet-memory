@@ -8,7 +8,13 @@ import type { StorageProvider } from '../storage/types.js';
 
 import { sha256, writeJsonAtomic } from '../session/utils.js';
 
-import type { WorkItem, WorkObservation, WorkObservationBatch, WorkState } from './types.js';
+import type {
+  WorkCheck,
+  WorkItem,
+  WorkObservation,
+  WorkObservationBatch,
+  WorkState,
+} from './types.js';
 
 function normalizedKey(value: string): string {
   return value
@@ -45,6 +51,19 @@ function uniqueRecent(
   }
 
   return output.reverse();
+}
+
+function recentChecks(values: WorkCheck[], limit = 20): WorkCheck[] {
+  const map = new Map<string, WorkCheck>();
+
+  for (const item of values) {
+    const key = `${item.kind}|${normalizedKey(item.command)}`;
+
+    map.delete(key);
+    map.set(key, item);
+  }
+
+  return Array.from(map.values()).slice(-limit);
 }
 
 function isPlaceholderTitle(observation: WorkObservation): boolean {
@@ -193,6 +212,10 @@ export async function reconcileWorkState(
 
   const tasks = new Map<string, WorkItem>();
 
+  let currentRequest: string | undefined;
+
+  let currentActivity: string | undefined;
+
   let goal: string | undefined;
 
   let plan: string | undefined;
@@ -209,10 +232,30 @@ export async function reconcileWorkState(
 
   const files: string[] = [];
 
+  const fileState = new Map<string, string>();
+
+  const modifiedFiles: string[] = [];
+
+  const createdFiles: string[] = [];
+
+  const deletedFiles: string[] = [];
+
+  const commands: string[] = [];
+
   const tests: string[] = [];
+
+  const checks: WorkCheck[] = [];
 
   for (const observation of observations) {
     switch (observation.kind) {
+      case 'request':
+        currentRequest = observation.text;
+        break;
+
+      case 'activity':
+        currentActivity = observation.text;
+        break;
+
       case 'goal':
         goal = observation.text;
         break;
@@ -245,12 +288,48 @@ export async function reconcileWorkState(
         explicitNext.push(observation.text);
         break;
 
-      case 'file':
+      case 'file': {
         files.push(observation.text);
+
+        const action = observation.fileAction ?? 'active';
+
+        fileState.delete(observation.text);
+        fileState.set(observation.text, action);
+
+        if (action === 'modified') {
+          modifiedFiles.push(observation.text);
+        } else if (action === 'created') {
+          createdFiles.push(observation.text);
+        } else if (action === 'deleted') {
+          deletedFiles.push(observation.text);
+        }
+
+        break;
+      }
+
+      case 'command':
+        commands.push(observation.text);
         break;
 
       case 'test':
         tests.push(observation.text);
+
+        if (observation.checkKind) {
+          checks.push({
+            kind: observation.checkKind,
+
+            command: observation.text,
+
+            status: observation.checkStatus ?? 'unknown',
+
+            updatedAt: observation.occurredAt,
+
+            agent: observation.agent,
+
+            nativeSessionId: observation.nativeSessionId,
+          });
+        }
+
         break;
 
       case 'session':
@@ -321,6 +400,10 @@ export async function reconcileWorkState(
 
     projectName: project.name,
 
+    currentRequest,
+
+    currentActivity,
+
     goal,
 
     plan,
@@ -339,7 +422,22 @@ export async function reconcileWorkState(
 
     filesTouched: uniqueRecent(files, 30),
 
+    activeFiles: Array.from(fileState.entries())
+      .filter(([, action]) => action !== 'deleted')
+      .map(([file]) => file)
+      .slice(-5),
+
+    modifiedFiles: uniqueRecent(modifiedFiles, 30),
+
+    createdFiles: uniqueRecent(createdFiles, 30),
+
+    deletedFiles: uniqueRecent(deletedFiles, 30),
+
+    commands: uniqueRecent(commands, 20),
+
     tests: uniqueRecent(tests, 20),
+
+    checks: recentChecks(checks, 20),
 
     currentPhase,
 

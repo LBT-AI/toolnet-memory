@@ -55,6 +55,14 @@ export function renderStableWorkState(state: WorkState): string {
     );
   }
 
+  if (state.currentRequest) {
+    lines.push('', 'Current request:', state.currentRequest);
+  }
+
+  if (state.currentActivity) {
+    lines.push('', 'Current activity:', state.currentActivity);
+  }
+
   if (state.goal) {
     lines.push('', 'Goal:', state.goal);
   }
@@ -81,7 +89,24 @@ export function renderStableWorkState(state: WorkState): string {
 
   lines.push(...section('Important decisions', state.decisions));
 
+  lines.push(...section('Active files', state.activeFiles ?? []));
+
+  lines.push(...section('Modified files', state.modifiedFiles ?? []));
+
+  lines.push(...section('Created files', state.createdFiles ?? []));
+
+  lines.push(...section('Deleted files', state.deletedFiles ?? []));
+
   lines.push(...section('Files touched', state.filesTouched));
+
+  lines.push(...section('Recent commands', state.commands ?? []));
+
+  lines.push(
+    ...section(
+      'Checks',
+      (state.checks ?? []).map((item) => `[${item.status}] ${item.kind}: ${item.command}`)
+    )
+  );
 
   lines.push(
     '',

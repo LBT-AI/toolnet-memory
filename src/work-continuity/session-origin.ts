@@ -17,6 +17,10 @@ export interface SessionOrigin {
 
   updatedAt: string;
 
+  currentRequest?: string;
+
+  currentActivity?: string;
+
   currentTask?: string;
 
   currentPhase?: string;
@@ -98,11 +102,16 @@ export function writeSessionOrigin(
 
     updatedAt: options.workState.updatedAt,
 
+    currentRequest: options.workState.currentRequest,
+
+    currentActivity: options.workState.currentActivity,
+
     currentTask: options.workState.currentTask?.title,
 
     currentPhase: options.workState.currentPhase?.title,
 
-    lastTouchedFile: file?.text ?? options.workState.filesTouched.at(-1),
+    lastTouchedFile:
+      file?.text ?? options.workState.activeFiles?.at(-1) ?? options.workState.filesTouched.at(-1),
 
     latestNextAction: next?.text ?? options.workState.nextActions.at(-1),
 
@@ -148,6 +157,14 @@ export function formatSessionOrigin(project: ProjectManifest): string | null {
     `- Agent: ${origin.agent}`,
     `- Session: ${origin.nativeSessionId}`,
   ];
+
+  if (origin.currentRequest) {
+    lines.push(`- Current request: ${origin.currentRequest}`);
+  }
+
+  if (origin.currentActivity) {
+    lines.push(`- Current activity: ${origin.currentActivity}`);
+  }
 
   if (origin.currentPhase) {
     lines.push(`- Current phase: ${origin.currentPhase}`);
