@@ -4,6 +4,15 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.3.7]
+
+- Redesigned the CLI help system with a compact default view, full advanced help, and per-command help.
+- Added friendly context, work, provider, model, status, and graph command UX while preserving existing commands.
+- Added packaged `toolnet-memory graph` production support with the existing ToolNet Code Graph UI and required web assets.
+- Optimized the Graph UI for large projects using persisted visualization data and Overview → Files → Symbols drill-down.
+- Reduced default mobile graph rendering from full symbol/relationship graphs to lightweight subsystem views.
+- Preserved project isolation and real ToolNet indexed graph data.
+
 ## [0.2.17]
 
 - Added Codex fast local-only SessionStart context and dedicated fast handoff cache.
@@ -115,3 +124,4 @@ Earlier `0.2.x` releases introduced and expanded:
 [0.2.12]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.12
 [0.2.11]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.11
 [0.2.10]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.10
+[0.3.7]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.3.7

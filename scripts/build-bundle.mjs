@@ -11,6 +11,11 @@ const entries = {
   init: 'src/production/init.ts',
   update: 'src/production/update.ts',
   config: 'src/production/config-cli.ts',
+  'model-cli': 'src/production/model-cli.ts',
+  'status-cli': 'src/production/status-cli.ts',
+  'graph-cli': 'src/production/graph-cli.ts',
+  'help-cli': 'src/production/help-cli.ts',
+  'graph-ui': 'src/visualization/server.ts',
 
   runtime: 'src/index.ts',
   'graph-index': 'src/code-intelligence/test-index.ts',
@@ -67,5 +72,21 @@ await build({
   minify: true,
   legalComments: 'none',
 });
+
+// Package the existing ToolNet Graph UI with the production bundle.
+// package.json already publishes the complete `bundle` directory.
+const graphPublicDir = path.join(out, 'public');
+const graphVendorDir = path.join(graphPublicDir, 'vendor');
+
+fs.mkdirSync(graphVendorDir, {
+  recursive: true,
+});
+
+fs.copyFileSync('src/visualization/public/index.html', path.join(graphPublicDir, 'index.html'));
+
+fs.copyFileSync(
+  'node_modules/3d-force-graph/dist/3d-force-graph.min.js',
+  path.join(graphVendorDir, '3d-force-graph.min.js')
+);
 
 console.log('✓ production bundles created');

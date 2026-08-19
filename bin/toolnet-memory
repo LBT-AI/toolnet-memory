@@ -595,119 +595,52 @@ case "$COMMAND" in
     ;;
 
   help|--help|-h)
-    cat <<'HELP'
-ToolNet Memory - Project Context & Memory System
-
-INTEGRATIONS:
-  toolnet-memory integrate:detect         Detect Agy, Codex and OpenCode
-  toolnet-memory integrate:auto           Detect and enable integrations
-
-PROJECT SETUP:
-  toolnet-memory init [path]             Initialize ToolNet for a project
-  toolnet-memory init --project <path>   Initialize an explicit project
-  toolnet-memory init --json             Print machine-readable result
-  toolnet-memory init --no-integrate     Skip automatic agent integration
-
-FAST CONTEXT (default):
-  toolnet-memory                          Print fast project context (default)
-  toolnet-memory context:print            Print fast project context
-  toolnet-memory context:sync             Show context hash/size
-  toolnet-memory profile:show             Show .toolnet/profile.md
-  toolnet-memory profile:sync             Sync profile to GEMINI.md/AGENTS.md/CLAUDE.md
-
-MANUAL DEEP RECOVERY (do not run automatically):
-  toolnet-memory context:refresh          Rebuild deep startup brief cache
-  toolnet-memory brief [--tokens N]       Show full project brief
-  toolnet-memory handoff:latest           Show latest session handoff
-  toolnet-memory session:agy-recover [--limit N]      Recover Agy sessions
-  toolnet-memory session:codex-recover [--limit N]    Recover Codex sessions
-  toolnet-memory session:opencode-recover [--limit N] Recover OpenCode sessions
-
-MEMORY OPERATIONS:
-  toolnet-memory memory:review [--project PATH] [--session ID]
-  toolnet-memory memory:reconcile [--project PATH]
-
-GUARD (Architecture & Rule Checking):
-  toolnet-memory guard:check                    Check project rules and evidence
-  toolnet-memory guard:check --file <path>      Check if file violates rules
-  toolnet-memory guard:check --command "<cmd>"  Check if command is dangerous
-  toolnet-memory guard:explain                  Show rules and evidence
-  toolnet-memory guard:json                     Output guard result as JSON
-
-NOTE: Raw transcripts are not injected into prompts.
-      Durable memory is promoted selectively based on importance scoring.
-      Guard mode: warn (default), strict, or off (TOOLNET_GUARD_MODE)
-
-PROJECT MANUAL:
-  toolnet-memory project:manual-init [--project PATH]
-  toolnet-memory project:manual-show [--project PATH]
-  toolnet-memory project:manual-sync [--project PATH]
-
-MEMORY AGENT QUERY:
-  toolnet-memory ask "<question>"                 Ask concise project-memory questions
-
-WORK CONTINUITY:
-  toolnet-memory work:status [--project PATH]
-  toolnet-memory work:json [--project PATH]
-  toolnet-memory work:reconcile [--project PATH]
-
-CODE INTELLIGENCE:
-  toolnet-memory index
-  toolnet-memory index:graph
-  toolnet-memory incremental
-  toolnet-memory semantic "query"
-  toolnet-memory impact [file]
-
-SETUP & INTEGRATION:
-  toolnet-memory --version
-  toolnet-memory doctor
-  toolnet-memory provider:list
-  toolnet-memory provider:status
-  toolnet-memory provider:test [llm|embedding]
-  toolnet-memory setup
-  toolnet-memory update
-  toolnet-memory config get KEY
-  toolnet-memory config set KEY VALUE
-  toolnet-memory config open
-  toolnet-memory integrate:auto
-  toolnet-memory integrate:opencode
-  toolnet-memory integrate:agy
-  toolnet-memory integrate:codex
-  toolnet-memory mcp
-  toolnet-memory api
-
-OPTIONAL BACKGROUND SERVICE:
-  toolnet-memory service:install        Install/start daemon in PM2
-  toolnet-memory service:start          Start installed daemon
-  toolnet-memory service:stop           Stop daemon
-  toolnet-memory service:restart        Restart daemon after ToolNet updates
-  toolnet-memory service:status         Show daemon/cache status
-  toolnet-memory service:remove         Remove daemon from PM2
-  toolnet-memory service                Run daemon in foreground
-
-PRODUCTION:
-  toolnet-memory production:certify             Verify packaged production runtime
-
-SNAPSHOTS:
-  toolnet-memory snapshot:list
-  toolnet-memory snapshot:create "reason"
-  toolnet-memory snapshot:restore <id>
-  toolnet-memory recover
-
-SESSION SYNC (manual):
-  toolnet-memory session:agy-sync <conversation-id> --transcript <path>
-  toolnet-memory session:codex-sync <thread-id>
-  toolnet-memory session:opencode-sync <session-id>
-
-IMPORTANT:
-Deep recovery commands (brief, handoff:latest, session:*-recover) are manual only.
-Do not run them automatically at startup. Use fast context commands instead.
-HELP
+    shift
+    run bundle/help-cli.js src/production/help-cli.ts "$@"
     ;;
+
+  # Aliases
+  context)
+    shift
+    run bundle/context-runtime.js src/work-continuity/context-runtime-cli.ts print "$@"
+    ;;
+
+  work)
+    shift
+    if [ -f "$ROOT/bundle/work-continuity.js" ]; then
+      exec node "$ROOT/bundle/work-continuity.js" status "$@"
+    fi
+    exec "$TSX" "$ROOT/src/work-continuity/cli.ts" status "$@"
+    ;;
+
+  graph)
+    shift
+    run bundle/graph-cli.js src/production/graph-cli.ts "$@"
+    ;;
+
+  graph:ui)
+    shift
+    run bundle/graph-cli.js src/production/graph-cli.ts "$@"
+    ;;
+
+  model)
+    shift
+    run bundle/model-cli.js src/production/model-cli.ts "$@"
+    ;;
+
+  provider)
+    shift
+    run bundle/provider.js src/ai/provider-cli.ts status "$@"
+    ;;
+
+  status)
+    shift
+    run bundle/status-cli.js src/production/status-cli.ts "$@"
+    ;;
+
 
   *)
-    echo "Unknown command: $COMMAND"
-    echo "Run: toolnet-memory help"
-    exit 1
+    run bundle/help-cli.js src/production/help-cli.ts --unknown "$COMMAND"
     ;;
+
 esac
