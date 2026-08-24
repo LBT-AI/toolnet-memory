@@ -182,10 +182,11 @@ Detect integrations without modifying configuration:
 toolnet-memory integrate:detect
 ```
 
-
 ### Kiro CLI
+
 ToolNet Memory integrates with Kiro through MCP and lifecycle hooks.
-```bash
+
+````bash
 toolnet-memory integrate:kiro
 toolnet-memory integrate:kiro --status
 
@@ -197,7 +198,7 @@ ToolNet Memory also exposes an MCP server:
 
 ```bash
 toolnet-memory mcp
-```
+````
 
 ---
 
