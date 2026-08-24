@@ -277,6 +277,12 @@ export const COMMANDS: CommandMetadata[] = [
     description: 'Install Claude Code integration',
     category: 'integration',
   },
+  {
+    name: 'integrate:kiro',
+    description: 'Install Kiro CLI integration',
+    usage: 'toolnet-memory integrate:kiro [--status] [--json]',
+    category: 'integration',
+  },
 
   // Sessions
   {
@@ -330,6 +336,12 @@ export const COMMANDS: CommandMetadata[] = [
   {
     name: 'session:claude-hook',
     description: 'Claude session hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:kiro-hook',
+    description: 'Kiro lifecycle hook',
     category: 'session',
     hidden: true,
   },

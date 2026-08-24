@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -23,7 +23,9 @@
     "opencode",
     "codex",
     "antigravity",
-    "code-intelligence"
+    "code-intelligence",
+    "kiro",
+    "kiro-cli"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -72,7 +74,11 @@
     "build:bundle": "npm run build && node scripts/build-bundle.mjs",
     "build:release": "npm run build:prod && node scripts/build-bundle.mjs",
     "api": "tsx src/api/bootstrap.ts",
-    "build:sdk": "tsc -p tsconfig.sdk.json"
+    "build:sdk": "tsc -p tsconfig.sdk.json",
+    "session:kiro-mcp:test": "vitest run tests/session/kiro-mcp-installer.test.ts",
+    "session:kiro:test": "vitest run tests/session/kiro-event-mapper.test.ts tests/session/kiro-hook-installer.test.ts tests/session/kiro-runtime.test.ts",
+    "session:kiro-continuity:test": "vitest run tests/session/kiro-continuity.test.ts",
+    "session:kiro-integration:test": "vitest run tests/session/kiro-integration.test.ts tests/production/kiro-auto-integrate.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

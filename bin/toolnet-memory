@@ -322,6 +322,20 @@ case "$COMMAND" in
     exit 0
     ;;
 
+  session:kiro-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/kiro-hook.js" ]; then
+      exec node "$ROOT/bundle/kiro-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/kiro/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/kiro/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
   integrate:claude)
     shift
 
@@ -334,6 +348,21 @@ case "$COMMAND" in
     fi
 
     echo "Claude Code integration installer not found."
+    exit 1
+    ;;
+
+  integrate:kiro)
+    shift
+
+    if [ -f "$ROOT/bundle/kiro.js" ]; then
+      exec node "$ROOT/bundle/kiro.js" install "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/kiro/cli.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/kiro/cli.ts" install "$@"
+    fi
+
+    echo "Kiro CLI integration installer not found."
     exit 1
     ;;
 

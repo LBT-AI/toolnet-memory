@@ -72,18 +72,19 @@ afterEach(() => {
 });
 
 describe('Multi-agent continuity certification', () => {
-  it('continues one project across four agents without idle', () => {
+  it('continues one project across five agents without idle', () => {
     const project = createProject('multi-agent-project');
 
     const storage = new OfflineStorage();
 
-    const agents = ['opencode', 'codex', 'agy', 'claude'] as const;
+    const agents = ['opencode', 'codex', 'agy', 'claude', 'kiro'] as const;
 
     const files = [
       'src/auth/opencode.ts',
       'src/auth/codex.ts',
       'src/auth/agy.ts',
       'src/auth/claude.ts',
+      'src/auth/kiro.ts',
     ];
 
     for (const [index, agent] of agents.entries()) {
@@ -163,7 +164,7 @@ describe('Multi-agent continuity certification', () => {
 
     expect(text).toContain('OAuth callback');
 
-    expect(text).toContain('src/auth/claude.ts');
+    expect(text).toContain('src/auth/kiro.ts');
   });
 
   it('does not mix different projects', () => {

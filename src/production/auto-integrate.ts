@@ -14,8 +14,13 @@ import { installCodexMcp } from '../session/codex/mcp-installer.js';
 
 import { installClaudeIntegration } from '../session/claude/installer.js';
 
+import {
+  installKiroIntegration,
+  type InstallKiroIntegrationOptions,
+} from '../session/kiro/installer.js';
+
 export interface AutoIntegrationResult {
-  agent: 'agy' | 'opencode' | 'codex' | 'claude';
+  agent: 'agy' | 'opencode' | 'codex' | 'claude' | 'kiro';
 
   detected: boolean;
 
@@ -34,13 +39,24 @@ export function installAutoIntegrations(
   options: {
     binary?: string;
     force?: boolean;
+
+    /**
+     * Optional deterministic detections for tests/embedders.
+     * Normal CLI usage leaves this undefined.
+     */
+    detections?: AgentDetection[];
+
+    /**
+     * Optional Kiro path overrides for tests/custom deployments.
+     */
+    kiro?: Omit<InstallKiroIntegrationOptions, 'binary'>;
   } = {}
 ): AutoIntegrationResult[] {
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
 
   const results: AutoIntegrationResult[] = [];
 
-  const detections = detectAutoIntegrations();
+  const detections = options.detections ?? detectAutoIntegrations();
 
   const detected = new Map(detections.map((item) => [item.agent, item.detected]));
 
@@ -194,6 +210,55 @@ export function installAutoIntegrations(
   }
 
   /*
+   * Kiro CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('kiro') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'kiro',
+
+        detected: false,
+
+        installed: false,
+
+        targets: [],
+      });
+    } else {
+      try {
+        const kiro = installKiroIntegration({
+          ...(options.kiro ?? {}),
+
+          binary,
+        });
+
+        results.push({
+          agent: 'kiro',
+
+          detected: true,
+
+          installed: true,
+
+          targets: [kiro.mcp.configFile, `mcp:${kiro.mcp.serverName}`, kiro.hooks.hooksFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'kiro',
+
+          detected: true,
+
+          installed: false,
+
+          targets: [],
+
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
    * Codex
    */
   {
@@ -261,6 +326,25 @@ export function installAutoIntegrations(
   return results;
 }
 
+function integrationDisplayName(agent: AutoIntegrationResult['agent']): string {
+  switch (agent) {
+    case 'agy':
+      return 'Agy / Antigravity';
+
+    case 'opencode':
+      return 'OpenCode';
+
+    case 'claude':
+      return 'Claude Code';
+
+    case 'kiro':
+      return 'Kiro CLI';
+
+    case 'codex':
+      return 'Codex';
+  }
+}
+
 function printDetections(detections: AgentDetection[]): void {
   console.log('');
   console.log('ToolNet Memory Integration Detection');
@@ -268,14 +352,7 @@ function printDetections(detections: AgentDetection[]): void {
   console.log('');
 
   for (const item of detections) {
-    const name =
-      item.agent === 'agy'
-        ? 'Agy / Antigravity'
-        : item.agent === 'opencode'
-          ? 'OpenCode'
-          : item.agent === 'claude'
-            ? 'Claude Code'
-            : 'Codex';
+    const name = integrationDisplayName(item.agent);
 
     if (!item.detected) {
       console.log(`○ ${name}: not detected`);
@@ -300,12 +377,7 @@ function printResults(results: AutoIntegrationResult[]): void {
   console.log('');
 
   for (const result of results) {
-    const name =
-      result.agent === 'agy'
-        ? 'Agy / Antigravity'
-        : result.agent === 'opencode'
-          ? 'OpenCode'
-          : 'Codex';
+    const name = integrationDisplayName(result.agent);
 
     if (!result.detected) {
       console.log(`- ${name}: not detected`);

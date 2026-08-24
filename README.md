@@ -145,7 +145,7 @@ The default startup context is intentionally small and local. Deep recovery is r
 ToolNet Memory is designed for workflows such as:
 
 ```text
-OpenCode → Agy / Antigravity → Codex → Claude Code
+OpenCode → Agy / Antigravity → Codex → Claude Code → Kiro CLI
 ```
 
 The next agent should receive the same project continuity instead of starting from zero.
@@ -173,6 +173,7 @@ toolnet-memory integrate:agy
 toolnet-memory integrate:opencode
 toolnet-memory integrate:codex
 toolnet-memory integrate:claude
+toolnet-memory integrate:kiro
 ```
 
 Detect integrations without modifying configuration:
@@ -180,6 +181,17 @@ Detect integrations without modifying configuration:
 ```bash
 toolnet-memory integrate:detect
 ```
+
+
+### Kiro CLI
+ToolNet Memory integrates with Kiro through MCP and lifecycle hooks.
+```bash
+toolnet-memory integrate:kiro
+toolnet-memory integrate:kiro --status
+
+Kiro receives compact ToolNet startup context, cross-agent continuity through memory_agent_ask, local WAL capture, final Stop flush, and raw-session-history protection through PreToolUse.
+
+Kiro uses the shared ToolNet continuity core and does not maintain a separate memory database.
 
 ToolNet Memory also exposes an MCP server:
 

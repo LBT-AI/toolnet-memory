@@ -12,7 +12,9 @@ import { openCodeConfigDirectory } from '../session/opencode/config-paths.js';
 
 import { claudeConfigDirectory } from '../session/claude/config-paths.js';
 
-export type AgentIntegrationId = 'agy' | 'opencode' | 'codex' | 'claude';
+import { kiroDetectionPaths } from '../session/kiro/config-paths.js';
+
+export type AgentIntegrationId = 'agy' | 'opencode' | 'codex' | 'claude' | 'kiro';
 
 export interface AgentDetection {
   agent: AgentIntegrationId;
@@ -30,6 +32,8 @@ export interface DetectAgentIntegrationOptions {
   home?: string;
 
   codexHome?: string;
+
+  kiroHome?: string;
 
   xdgConfigHome?: string;
 
@@ -132,6 +136,20 @@ export function detectAgentIntegrations(
           home,
         }),
       ],
+    }),
+
+    detectOne({
+      agent: 'kiro',
+
+      command: 'kiro-cli',
+
+      commandExists,
+
+      configPaths: kiroDetectionPaths({
+        home,
+
+        kiroHome: options.kiroHome,
+      }),
     }),
 
     detectOne({

@@ -1,0 +1,183 @@
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+
+import { dirname } from 'node:path';
+
+import { kiroMcpConfigFile } from './config-paths.js';
+
+export interface InstallKiroMcpOptions {
+  configFile?: string;
+
+  binary?: string;
+
+  serverName?: string;
+}
+
+export interface InstallKiroMcpResult {
+  installed: boolean;
+
+  changed: boolean;
+
+  configFile: string;
+
+  serverName: string;
+
+  command: string;
+
+  args: string[];
+}
+
+type JsonObject = Record<string, unknown>;
+
+function isObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readConfig(file: string): JsonObject {
+  if (!existsSync(file)) {
+    return {};
+  }
+
+  const raw = readFileSync(file, 'utf8').trim();
+
+  if (!raw) {
+    return {};
+  }
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `Invalid existing Kiro MCP config: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
+  if (!isObject(parsed)) {
+    throw new Error('Invalid existing Kiro MCP config: root must be a JSON object.');
+  }
+
+  return parsed;
+}
+
+function sameServer(value: unknown, binary: string): boolean {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    value.command === binary &&
+    Array.isArray(value.args) &&
+    value.args.length === 1 &&
+    value.args[0] === 'mcp' &&
+    value.disabled === false
+  );
+}
+
+function atomicWriteJson(file: string, value: unknown): void {
+  mkdirSync(dirname(file), {
+    recursive: true,
+
+    mode: 0o700,
+  });
+
+  const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
+
+  try {
+    writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, {
+      encoding: 'utf8',
+
+      mode: 0o600,
+    });
+
+    renameSync(temp, file);
+  } finally {
+    rmSync(temp, {
+      force: true,
+    });
+  }
+}
+
+export function installKiroMcp(options: InstallKiroMcpOptions = {}): InstallKiroMcpResult {
+  const configFile = options.configFile ?? kiroMcpConfigFile();
+
+  const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
+
+  const serverName = options.serverName ?? 'toolnet-memory';
+
+  const root = readConfig(configFile);
+
+  const currentServers = root.mcpServers;
+
+  if (currentServers !== undefined && !isObject(currentServers)) {
+    throw new Error('Invalid existing Kiro MCP config: mcpServers must be an object.');
+  }
+
+  const mcpServers: JsonObject = isObject(currentServers)
+    ? {
+        ...currentServers,
+      }
+    : {};
+
+  const existing = mcpServers[serverName];
+
+  if (sameServer(existing, binary)) {
+    return {
+      installed: true,
+
+      changed: false,
+
+      configFile,
+
+      serverName,
+
+      command: binary,
+
+      args: ['mcp'],
+    };
+  }
+
+  /*
+   * ToolNet owns only the "toolnet-memory" MCP entry.
+   *
+   * Preserve all unrelated Kiro settings and MCP servers.
+   * Workspace/user precedence remains Kiro's responsibility.
+   */
+  mcpServers[serverName] = {
+    command: binary,
+
+    args: ['mcp'],
+
+    disabled: false,
+  };
+
+  const next = {
+    ...root,
+
+    mcpServers,
+  };
+
+  atomicWriteJson(configFile, next);
+
+  const verify = readConfig(configFile);
+
+  const verifyServers = verify.mcpServers;
+
+  if (!isObject(verifyServers) || !sameServer(verifyServers[serverName], binary)) {
+    throw new Error('Kiro MCP configuration was written but verification failed.');
+  }
+
+  return {
+    installed: true,
+
+    changed: true,
+
+    configFile,
+
+    serverName,
+
+    command: binary,
+
+    args: ['mcp'],
+  };
+}

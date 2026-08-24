@@ -8,7 +8,7 @@ import { memoryAgentAsk } from '../mcp/tools/memory-agent-ask.js';
 
 import { retrieveMemoryContext } from '../work-continuity/memory-retrieval.js';
 
-export type CertifiedAgent = 'agy' | 'codex' | 'opencode' | 'claude';
+export type CertifiedAgent = 'agy' | 'codex' | 'opencode' | 'claude' | 'kiro';
 
 export interface ContinuityCertificationChecks {
   canonicalHandoffPreferred: boolean;
@@ -340,7 +340,7 @@ async function certifyPair(
 /**
  * Canonical cross-agent ring:
  *
- * Agy -> Codex -> OpenCode -> Claude -> Agy
+ * Agy -> Codex -> OpenCode -> Claude -> Kiro -> Agy
  *
  * X3 will later certify real installed adapters/hooks.
  * X1 certifies the shared continuity contract itself.
@@ -353,7 +353,9 @@ export async function certifyCrossAgentContinuity(): Promise<ContinuityCertifica
 
     ['opencode', 'claude'],
 
-    ['claude', 'agy'],
+    ['claude', 'kiro'],
+
+    ['kiro', 'agy'],
   ];
 
   const cases: ContinuityCertificationCase[] = [];

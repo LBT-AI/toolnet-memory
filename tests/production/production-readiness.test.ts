@@ -20,6 +20,12 @@ describe('X3 Production Readiness', () => {
     expect(result.sourceFiles).toEqual([]);
   });
 
+  test('requires Kiro runtime entries in the production package', () => {
+    expect(PRODUCTION_PACK_REQUIRED_FILES).toContain('bundle/kiro.js');
+
+    expect(PRODUCTION_PACK_REQUIRED_FILES).toContain('bundle/kiro-hook.js');
+  });
+
   test('rejects source-tree dependency in the npm package', () => {
     const result = validatePackedRuntimeFiles([...PRODUCTION_PACK_REQUIRED_FILES, 'src/index.ts']);
 

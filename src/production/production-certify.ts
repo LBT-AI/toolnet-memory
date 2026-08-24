@@ -43,6 +43,8 @@ export const PRODUCTION_PACK_REQUIRED_FILES = [
   'bin/toolnet-memory',
   'bundle/init.js',
   'bundle/auto-integrate.js',
+  'bundle/kiro.js',
+  'bundle/kiro-hook.js',
   'bundle/mcp.js',
   'bundle/continuity-certify.js',
   'bundle/recovery-certify.js',
@@ -52,6 +54,8 @@ export const PRODUCTION_PACK_REQUIRED_FILES = [
 const PRODUCTION_BUNDLE_REQUIRED_FILES = [
   'init.js',
   'auto-integrate.js',
+  'kiro.js',
+  'kiro-hook.js',
   'mcp.js',
   'continuity-certify.js',
   'recovery-certify.js',
@@ -507,6 +511,20 @@ export async function certifyProductionReadiness(
       existsSync(join(bundleRoot, 'auto-integrate.js')) &&
         binText.includes('bundle/auto-integrate.js'),
       'auto-integrate production bundle or CLI routing is missing.'
+    )
+  );
+
+  checks.push(
+    check(
+      'kiro-integration',
+      'Kiro CLI production integration available',
+      existsSync(join(bundleRoot, 'kiro.js')) &&
+        existsSync(join(bundleRoot, 'kiro-hook.js')) &&
+        binText.includes('integrate:kiro)') &&
+        binText.includes('session:kiro-hook)') &&
+        binText.includes('bundle/kiro.js') &&
+        binText.includes('bundle/kiro-hook.js'),
+      'Kiro production bundle or CLI routing is missing.'
     )
   );
 

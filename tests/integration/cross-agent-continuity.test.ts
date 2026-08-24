@@ -3,12 +3,12 @@ import { describe, expect, test } from 'vitest';
 import { certifyCrossAgentContinuity } from '../../src/production/continuity-certify.js';
 
 describe('X1 cross-agent continuity E2E', () => {
-  test('recovers canonical work across the four-agent continuity ring', async () => {
+  test('recovers canonical work across the five-agent continuity ring', async () => {
     const result = await certifyCrossAgentContinuity();
 
-    expect(result.total).toBe(4);
+    expect(result.total).toBe(5);
 
-    expect(result.passedCount).toBe(4);
+    expect(result.passedCount).toBe(5);
 
     expect(result.passed).toBe(true);
 
@@ -19,7 +19,9 @@ describe('X1 cross-agent continuity E2E', () => {
 
       ['opencode', 'claude'],
 
-      ['claude', 'agy'],
+      ['claude', 'kiro'],
+
+      ['kiro', 'agy'],
     ]);
 
     for (const item of result.cases) {

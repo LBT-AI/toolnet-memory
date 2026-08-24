@@ -12,6 +12,8 @@ import {
   ProjectScopedStorageProvider,
 } from '../storage/index.js';
 import { inspectSessionCaptureHealth } from './session-capture-health.js';
+import { detectAgentIntegrations } from './integration-detection.js';
+import { inspectKiroIntegrationStatus } from '../session/kiro/status.js';
 import {
   renderHeader,
   renderSectionTitle,
@@ -96,6 +98,27 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
     console.log(renderKeyValue('Provider', aiConfig.llm.provider, 8, uiOpts));
     console.log(renderKeyValue('Model', aiConfig.llm.model ?? 'not set', 8, uiOpts));
     console.log('');
+
+    const integrations = detectAgentIntegrations();
+
+    const detectedAgents = integrations.filter((item) => item.detected).map((item) => item.agent);
+
+    if (detectedAgents.length > 0) {
+      console.log(renderSectionTitle('INTEGRATIONS', uiOpts));
+      console.log(renderKeyValue('Detected', detectedAgents.join(', '), 8, uiOpts));
+
+      const kiro = integrations.find((item) => item.agent === 'kiro');
+
+      if (kiro?.detected) {
+        const kiroStatus = inspectKiroIntegrationStatus();
+
+        console.log(
+          renderKeyValue('Kiro', kiroStatus.installed ? 'ready' : kiroStatus.state, 8, uiOpts)
+        );
+      }
+
+      console.log('');
+    }
 
     // Service status (optional)
     const capture = inspectSessionCaptureHealth(project);
