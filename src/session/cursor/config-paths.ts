@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export interface CursorConfigPathOptions {
   home?: string;
@@ -13,13 +13,6 @@ export interface CursorConfigPathOptions {
 
 /**
  * Cursor's user-level directory used by MCP and hooks.
- *
- * Cursor documents:
- *   ~/.cursor/hooks.json
- * and shares MCP configuration between editor and CLI.
- *
- * cursorHome is intentionally an explicit ToolNet override for tests/callers;
- * Cursor itself documents CURSOR_CONFIG_DIR for CLI configuration.
  */
 export function cursorHomeDirectory(options: CursorConfigPathOptions = {}): string {
   return options.cursorHome ?? join(options.home ?? homedir(), '.cursor');
@@ -61,11 +54,26 @@ export function cursorHooksDirectory(options: CursorConfigPathOptions = {}): str
   return join(cursorHomeDirectory(options), 'hooks');
 }
 
-/**
- * Detect global Cursor state only.
- *
- * Project-level .cursor/ detection belongs to later integration phases.
- */
+export function cursorProjectDirectory(projectRoot: string): string {
+  return join(resolve(projectRoot), '.cursor');
+}
+
+export function cursorProjectMcpConfigFile(projectRoot: string): string {
+  return join(cursorProjectDirectory(projectRoot), 'mcp.json');
+}
+
+export function cursorProjectHooksFile(projectRoot: string): string {
+  return join(cursorProjectDirectory(projectRoot), 'hooks.json');
+}
+
+export function cursorProjectRulesDirectory(projectRoot: string): string {
+  return join(cursorProjectDirectory(projectRoot), 'rules');
+}
+
+export function cursorToolnetProjectRuleFile(projectRoot: string): string {
+  return join(cursorProjectRulesDirectory(projectRoot), 'toolnet-memory.mdc');
+}
+
 export function cursorDetectionPaths(options: CursorConfigPathOptions = {}): string[] {
   return Array.from(new Set([cursorHomeDirectory(options), cursorCliConfigDirectory(options)]));
 }

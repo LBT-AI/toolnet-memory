@@ -2,6 +2,8 @@ import { buildGrokPreToolGuard, grokDeniedOutput, grokHookEvent } from './contin
 
 import { handleGrokHookInput } from './runtime.js';
 
+import { claimHookEvent } from '../integration-scope/index.js';
+
 async function readInput(): Promise<Record<string, unknown>> {
   let raw = '';
 
@@ -24,6 +26,10 @@ async function main(): Promise<void> {
   const input = await readInput();
   const event = grokHookEvent(input);
 
+  /*
+   * Policy enforcement must run for every native Grok hook source.
+   * Do not dedupe PreToolUse policy checks.
+   */
   if (event === 'PreToolUse' || event === 'preToolUse' || event === 'pre_tool_use') {
     const guard = buildGrokPreToolGuard(input);
 
@@ -39,15 +45,29 @@ async function main(): Promise<void> {
   }
 
   /*
-   * Grok command hooks for SessionStart/UserPromptSubmit are passive;
-   * stdout is ignored by the native runner. Phase 04 therefore uses
-   * a global ToolNet continuity skill for resume routing while this
-   * hook remains the local-first capture lane.
+   * Grok can load hook definitions from global and project layers.
+   * Claim the raw native event across processes before capture.
+   *
+   * SessionStart/UserPromptSubmit command hooks remain passive: ToolNet
+   * does not attempt model-context injection through their stdout.
    */
+  if (event) {
+    const claim = claimHookEvent({
+      agent: 'grok',
+      event,
+      input,
+      directory: process.env.TOOLNET_HOOK_DEDUPE_DIR,
+    });
+
+    if (claim.duplicate) {
+      return;
+    }
+  }
+
   await handleGrokHookInput(input);
 }
 
 main().catch(() => {
-  // Grok hook failures should remain fail-open.
+  // Grok hook failures remain fail-open.
   process.exitCode = 0;
 });

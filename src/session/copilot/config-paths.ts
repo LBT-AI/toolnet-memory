@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+
+import { join, resolve } from 'node:path';
 
 export interface CopilotConfigPathOptions {
   home?: string;
@@ -33,9 +34,39 @@ export function copilotToolnetHookFile(options: CopilotConfigPathOptions = {}): 
   return join(copilotHooksDirectory(options), 'toolnet-memory.json');
 }
 
+export function copilotProjectGithubDirectory(projectRoot: string): string {
+  return join(resolve(projectRoot), '.github');
+}
+
 /**
- * Phase 01 only detects global Copilot CLI state.
+ * ToolNet uses .github/mcp.json as the canonical project MCP location.
+ * Copilot also supports repository .mcp.json; ToolNet leaves that file
+ * untouched and reports conflicts separately.
  */
+export function copilotProjectMcpConfigFile(projectRoot: string): string {
+  return join(copilotProjectGithubDirectory(projectRoot), 'mcp.json');
+}
+
+export function copilotAlternateProjectMcpConfigFile(projectRoot: string): string {
+  return join(resolve(projectRoot), '.mcp.json');
+}
+
+export function copilotProjectHooksDirectory(projectRoot: string): string {
+  return join(copilotProjectGithubDirectory(projectRoot), 'hooks');
+}
+
+export function copilotProjectToolnetHookFile(projectRoot: string): string {
+  return join(copilotProjectHooksDirectory(projectRoot), 'toolnet-memory.json');
+}
+
+export function copilotProjectInstructionsDirectory(projectRoot: string): string {
+  return join(copilotProjectGithubDirectory(projectRoot), 'instructions');
+}
+
+export function copilotToolnetProjectInstructionFile(projectRoot: string): string {
+  return join(copilotProjectInstructionsDirectory(projectRoot), 'toolnet-memory.instructions.md');
+}
+
 export function copilotDetectionPaths(options: CopilotConfigPathOptions = {}): string[] {
   return [copilotHomeDirectory(options)];
 }

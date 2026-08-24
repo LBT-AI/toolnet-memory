@@ -38,6 +38,16 @@ import {
   type InstallGrokIntegrationOptions,
 } from '../session/grok/installer.js';
 
+import {
+  resolveAutoIntegrationScope,
+  type AutoIntegrationScopeResolution,
+} from './auto-integration-scope.js';
+
+import {
+  parseIntegrationScope,
+  type IntegrationScope,
+} from '../session/integration-scope/index.js';
+
 export interface AutoIntegrationResult {
   agent: AgentIntegrationId;
 
@@ -46,6 +56,13 @@ export interface AutoIntegrationResult {
   installed: boolean;
 
   targets: string[];
+
+  /**
+   * Present for scoped Cursor/Copilot/Grok integrations.
+   */
+  scope?: IntegrationScope;
+
+  projectRoot?: string;
 
   error?: string;
 }
@@ -58,6 +75,23 @@ export function installAutoIntegrations(
   options: {
     binary?: string;
     force?: boolean;
+
+    /**
+     * Cursor/Copilot/Grok scoped policy.
+     * Undefined = both only inside an initialized ToolNet project,
+     * otherwise global.
+     */
+    scope?: IntegrationScope;
+
+    /**
+     * Explicit target project for auto integration.
+     */
+    projectRoot?: string;
+
+    /**
+     * Deterministic cwd override for tests/embedders.
+     */
+    cwd?: string;
 
     /**
      * Optional deterministic detections for tests/embedders.
@@ -84,6 +118,12 @@ export function installAutoIntegrations(
   const detections = options.detections ?? detectAutoIntegrations();
 
   const detected = new Map(detections.map((item) => [item.agent, item.detected]));
+
+  const scopedPolicy: AutoIntegrationScopeResolution = resolveAutoIntegrationScope({
+    scope: options.scope,
+    projectRoot: options.projectRoot,
+    cwd: options.cwd,
+  });
 
   /*
    * Agy / Antigravity
@@ -298,16 +338,22 @@ export function installAutoIntegrations(
       });
     } else {
       try {
+        const cursorOptions = options.cursor ?? {};
+
         const cursor = installCursorIntegration({
-          ...(options.cursor ?? {}),
+          ...cursorOptions,
           binary,
+          scope: cursorOptions.scope ?? scopedPolicy.scope,
+          projectRoot: cursorOptions.projectRoot ?? scopedPolicy.project?.root,
         });
 
         results.push({
           agent: 'cursor',
           detected: true,
           installed: true,
-          targets: [cursor.mcp.configFile, `mcp:${cursor.mcp.serverName}`, cursor.hooks.hooksFile],
+          scope: cursor.scope,
+          projectRoot: cursor.project?.root,
+          targets: [...cursor.files, `mcp:${cursor.mcp.serverName}`],
         });
       } catch (error) {
         results.push({
@@ -336,20 +382,22 @@ export function installAutoIntegrations(
       });
     } else {
       try {
+        const copilotOptions = options.copilot ?? {};
+
         const copilot = installCopilotIntegration({
-          ...(options.copilot ?? {}),
+          ...copilotOptions,
           binary,
+          scope: copilotOptions.scope ?? scopedPolicy.scope,
+          projectRoot: copilotOptions.projectRoot ?? scopedPolicy.project?.root,
         });
 
         results.push({
           agent: 'copilot',
           detected: true,
           installed: true,
-          targets: [
-            copilot.mcp.configFile,
-            `mcp:${copilot.mcp.serverName}`,
-            copilot.hooks.hooksFile,
-          ],
+          scope: copilot.scope,
+          projectRoot: copilot.project?.root,
+          targets: [...copilot.files, `mcp:${copilot.mcp.serverName}`],
         });
       } catch (error) {
         results.push({
@@ -378,21 +426,22 @@ export function installAutoIntegrations(
       });
     } else {
       try {
+        const grokOptions = options.grok ?? {};
+
         const grok = installGrokIntegration({
-          ...(options.grok ?? {}),
+          ...grokOptions,
           binary,
+          scope: grokOptions.scope ?? scopedPolicy.scope,
+          projectRoot: grokOptions.projectRoot ?? scopedPolicy.project?.root,
         });
 
         results.push({
           agent: 'grok',
           detected: true,
           installed: true,
-          targets: [
-            grok.mcp.configFile,
-            `mcp:${grok.mcp.serverName}`,
-            grok.hooks.hooksFile,
-            grok.skill.skillFile,
-          ],
+          scope: grok.scope,
+          projectRoot: grok.project?.root,
+          targets: [...grok.files, `mcp:${grok.mcp.serverName}`],
         });
       } catch (error) {
         results.push({
@@ -543,7 +592,13 @@ function printResults(results: AutoIntegrationResult[]): void {
     }
 
     if (result.installed) {
-      console.log(`✓ ${name}: automatic memory enabled`);
+      const scope = result.scope ? ` [scope=${result.scope}]` : '';
+
+      console.log(`✓ ${name}: automatic memory enabled${scope}`);
+
+      if (result.projectRoot) {
+        console.log(`  project: ${result.projectRoot}`);
+      }
 
       continue;
     }
@@ -558,6 +613,19 @@ function printResults(results: AutoIntegrationResult[]): void {
   console.log('');
 }
 
+function valueAfter(args: string[], flag: string): string | undefined {
+  const index = args.indexOf(flag);
+
+  return index >= 0 ? args[index + 1] : undefined;
+}
+
+function explicitIntegrationScope(args: string[]): IntegrationScope | undefined {
+  const hasExplicitScope =
+    args.includes('--scope') || args.includes('--global') || args.includes('--both');
+
+  return hasExplicitScope ? parseIntegrationScope(args) : undefined;
+}
+
 async function main() {
   const args = process.argv.slice(2);
 
@@ -566,6 +634,10 @@ async function main() {
   const json = args.includes('--json');
 
   const detectOnly = args.includes('--detect-only');
+
+  const scope = explicitIntegrationScope(args);
+
+  const projectRoot = valueAfter(args, '--project');
 
   if (detectOnly) {
     const detections = detectAutoIntegrations();
@@ -583,6 +655,8 @@ async function main() {
 
   const results = installAutoIntegrations({
     force,
+    scope,
+    projectRoot,
   });
 
   if (json) {

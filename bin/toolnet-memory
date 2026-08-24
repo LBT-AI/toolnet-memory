@@ -414,6 +414,11 @@ case "$COMMAND" in
     run bundle/grok.js src/session/grok/cli.ts "$@"
     ;;
 
+  integrate:status)
+    shift
+    run bundle/integration-status.js src/session/new-agents/scoped-status-cli.ts "$@"
+    ;;
+
   session:codex-notify)
     shift
 

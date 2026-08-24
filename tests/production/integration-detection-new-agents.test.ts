@@ -63,6 +63,28 @@ describe('Phase 01: Cursor + Copilot + Grok detection', () => {
     expect(cursor?.evidence).toContain('command:agent');
   });
 
+  it('detects Cursor CLI from legacy cursor-agent executable alias', () => {
+    const home = mkdtempSync(join(tmpdir(), 'toolnet-detect-cursor-alias-'));
+    roots.push(home);
+
+    const result = detectAgentIntegrations({
+      home,
+      cursorHome: join(home, 'missing-cursor-home'),
+      cursorConfigDir: join(home, 'missing-cursor-config'),
+      copilotHome: join(home, 'missing-copilot-home'),
+      grokHome: join(home, 'missing-grok-home'),
+      kiroHome: join(home, 'missing-kiro-home'),
+      commandExists: (command) => command === 'cursor-agent',
+    });
+
+    const cursor = result.find((item) => item.agent === 'cursor');
+
+    expect(cursor?.detected).toBe(true);
+    expect(cursor?.commandDetected).toBe(true);
+    expect(cursor?.configDetected).toBe(false);
+    expect(cursor?.evidence).toContain('command:cursor-agent');
+  });
+
   it('detects Cursor from ~/.cursor', () => {
     const home = mkdtempSync(join(tmpdir(), 'toolnet-detect-cursor-config-'));
     roots.push(home);

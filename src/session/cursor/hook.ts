@@ -8,6 +8,8 @@ import {
 
 import { handleCursorHookInput } from './runtime.js';
 
+import { claimHookEvent } from '../integration-scope/index.js';
+
 async function readInput(): Promise<Record<string, unknown>> {
   let raw = '';
 
@@ -31,7 +33,8 @@ async function main(): Promise<void> {
   const event = cursorHookEvent(input);
 
   /*
-   * Phase 04 guard. Cursor honors native deny JSON and exit code 2.
+   * PreToolUse policy must run for every native hook source.
+   * If global + project hooks both fire, both independently enforce policy.
    */
   if (event === 'preToolUse' || event === 'PreToolUse') {
     const guard = buildCursorPreToolGuard(input);
@@ -50,8 +53,22 @@ async function main(): Promise<void> {
   }
 
   /*
-   * Phase 03 capture stays authoritative.
+   * Cursor loads global and project hooks additively.
+   * Claim the raw native event across processes before capture/context output.
    */
+  if (event) {
+    const claim = claimHookEvent({
+      agent: 'cursor',
+      event,
+      input,
+      directory: process.env.TOOLNET_HOOK_DEDUPE_DIR,
+    });
+
+    if (claim.duplicate) {
+      return;
+    }
+  }
+
   await handleCursorHookInput(input);
 
   if (event === 'sessionStart' || event === 'SessionStart') {
@@ -62,9 +79,8 @@ async function main(): Promise<void> {
 
   /*
    * beforeSubmitPrompt cannot inject context in Cursor's command-hook
-   * protocol. We still evaluate resume intent here so tests/diagnostics
-   * can verify routing; the persistent sessionStart directive tells Cursor
-   * how to handle resume requests.
+   * protocol. The persistent SessionStart directive plus project ToolNet
+   * rule tell Cursor how to handle resume requests.
    */
   if (event === 'beforeSubmitPrompt' || event === 'UserPromptSubmit') {
     void buildCursorResumeContext(input);

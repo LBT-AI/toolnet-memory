@@ -254,8 +254,16 @@ export const COMMANDS: CommandMetadata[] = [
   },
   {
     name: 'integrate:auto',
-    description: 'Auto-enable integrations',
+    description: 'Auto-enable integrations with safe project scope policy',
+    usage:
+      'toolnet-memory integrate:auto [--all] [--scope global|project|both] [--project <path>] [--json]',
     category: 'integration',
+    examples: [
+      'toolnet-memory integrate:auto',
+      'toolnet-memory integrate:auto --project /path/to/toolnet-project',
+      'toolnet-memory integrate:auto --scope global',
+      'toolnet-memory integrate:auto --scope both --project /path/to/project',
+    ],
   },
   {
     name: 'integrate:agy',
@@ -286,20 +294,50 @@ export const COMMANDS: CommandMetadata[] = [
   {
     name: 'integrate:cursor',
     description: 'Install Cursor CLI integration',
-    usage: 'toolnet-memory integrate:cursor [--status] [--json]',
+    usage:
+      'toolnet-memory integrate:cursor [--scope global|project|both] [--project <path>] [--status] [--json]',
     category: 'integration',
+    examples: [
+      'toolnet-memory integrate:cursor --scope global',
+      'toolnet-memory integrate:cursor --scope project --project /path/to/project',
+      'toolnet-memory integrate:cursor --scope both --project /path/to/project',
+    ],
   },
   {
     name: 'integrate:copilot',
     description: 'Install GitHub Copilot CLI integration',
-    usage: 'toolnet-memory integrate:copilot [--status] [--json]',
+    usage:
+      'toolnet-memory integrate:copilot [--scope global|project|both] [--project <path>] [--status] [--json]',
     category: 'integration',
+    examples: [
+      'toolnet-memory integrate:copilot --scope global',
+      'toolnet-memory integrate:copilot --scope project --project /path/to/project',
+      'toolnet-memory integrate:copilot --scope both --project /path/to/project',
+    ],
   },
   {
     name: 'integrate:grok',
     description: 'Install Grok Build integration',
-    usage: 'toolnet-memory integrate:grok [--status] [--json]',
+    usage:
+      'toolnet-memory integrate:grok [--scope global|project|both] [--project <path>] [--status] [--json]',
     category: 'integration',
+    examples: [
+      'toolnet-memory integrate:grok --scope global',
+      'toolnet-memory integrate:grok --scope project --project /path/to/project',
+      'toolnet-memory integrate:grok --scope both --project /path/to/project',
+    ],
+  },
+  {
+    name: 'integrate:status',
+    description: 'Show unified Cursor/Copilot/Grok scoped integration status',
+    usage:
+      'toolnet-memory integrate:status [--scope global|project|both] [--project <path>] [--agent cursor|copilot|grok] [--json]',
+    category: 'integration',
+    examples: [
+      'toolnet-memory integrate:status --scope global',
+      'toolnet-memory integrate:status --scope both --project /path/to/project',
+      'toolnet-memory integrate:status --scope both --project /path/to/project --agent cursor',
+    ],
   },
 
   // Sessions

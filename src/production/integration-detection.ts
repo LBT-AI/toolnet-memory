@@ -98,6 +98,41 @@ function detectOne(options: {
   };
 }
 
+function detectOneWithCommandAliases(options: {
+  agent: AgentIntegrationId;
+
+  commands: string[];
+
+  configPaths: string[];
+
+  commandExists: (command: string) => boolean;
+}): AgentDetection {
+  const detectedCommands = options.commands.filter((command) => options.commandExists(command));
+
+  const existingConfigs = options.configPaths.filter((path) => existsSync(path));
+
+  const commandDetected = detectedCommands.length > 0;
+
+  const configDetected = existingConfigs.length > 0;
+
+  const evidence = [
+    ...detectedCommands.map((command) => `command:${command}`),
+    ...existingConfigs.map((path) => `config:${path}`),
+  ];
+
+  return {
+    agent: options.agent,
+
+    detected: commandDetected || configDetected,
+
+    commandDetected,
+
+    configDetected,
+
+    evidence,
+  };
+}
+
 export function detectAgentIntegrations(
   options: DetectAgentIntegrationOptions = {}
 ): AgentDetection[] {
@@ -164,10 +199,10 @@ export function detectAgentIntegrations(
       }),
     }),
 
-    detectOne({
+    detectOneWithCommandAliases({
       agent: 'cursor',
 
-      command: 'agent',
+      commands: ['agent', 'cursor-agent'],
 
       commandExists,
 

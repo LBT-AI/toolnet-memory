@@ -41,6 +41,7 @@ describe('Phase 05 new-agent auto-integrate', () => {
 
     const results = installAutoIntegrations({
       detections,
+      cwd: root,
       cursor: {
         configFile: join(root, '.cursor', 'mcp.json'),
         hooksFile: join(root, '.cursor', 'hooks.json'),

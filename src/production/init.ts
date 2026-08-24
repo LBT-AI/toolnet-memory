@@ -111,7 +111,10 @@ async function main(): Promise<void> {
   if (autoIntegrate) {
     integrations = await withProgress(
       'Detecting AI coding agents',
-      () => installAutoIntegrations(),
+      () =>
+        installAutoIntegrations({
+          projectRoot: result.project.rootPath,
+        }),
       {
         enabled: !json,
       }

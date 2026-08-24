@@ -48,6 +48,7 @@ const entries = {
   'copilot-hook': 'src/session/copilot/hook.ts',
   grok: 'src/session/grok/cli.ts',
   'grok-hook': 'src/session/grok/hook.ts',
+  'integration-status': 'src/session/new-agents/scoped-status-cli.ts',
   'continuity-certify': 'src/production/continuity-certify-cli.ts',
   'recovery-certify': 'src/production/recovery-certify-cli.ts',
   'production-certify': 'src/production/production-certify-cli.ts',

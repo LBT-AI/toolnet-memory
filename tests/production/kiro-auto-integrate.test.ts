@@ -54,6 +54,8 @@ describe('Kiro auto integration wiring', () => {
 
       detections,
 
+      cwd: root,
+
       kiro: {
         configFile,
 

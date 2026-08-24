@@ -8,6 +8,8 @@ import {
 
 import { handleCopilotHookInput } from './runtime.js';
 
+import { claimHookEvent } from '../integration-scope/index.js';
+
 async function readInput(): Promise<Record<string, unknown>> {
   let raw = '';
 
@@ -30,15 +32,13 @@ async function main(): Promise<void> {
   const input = await readInput();
   const event = copilotHookEvent(input);
 
+  /*
+   * Policy guard runs for every hook source. Do not dedupe policy enforcement.
+   */
   if (event === 'preToolUse' || event === 'PreToolUse') {
     const guard = buildCopilotPreToolGuard(input);
 
     if (guard.blocked) {
-      /*
-       * Copilot command preToolUse parses this JSON and denies while
-       * keeping exit code 0, so ToolNet's own unexpected errors remain
-       * fail-open rather than becoming accidental policy denials.
-       */
       process.stdout.write(
         JSON.stringify(
           copilotDeniedOutput(guard.reason ?? 'ToolNet continuity guard blocked this tool.')
@@ -47,6 +47,23 @@ async function main(): Promise<void> {
     }
 
     return;
+  }
+
+  /*
+   * User and repository hooks are additive in Copilot CLI.
+   * Claim the native event before capture or model-facing output.
+   */
+  if (event) {
+    const claim = claimHookEvent({
+      agent: 'copilot',
+      event,
+      input,
+      directory: process.env.TOOLNET_HOOK_DEDUPE_DIR,
+    });
+
+    if (claim.duplicate) {
+      return;
+    }
   }
 
   if (event === 'userPromptTransformed' || event === 'UserPromptTransformed') {
@@ -65,7 +82,7 @@ async function main(): Promise<void> {
 main().catch(() => {
   /*
    * Copilot preToolUse command hooks are fail-closed for non-zero exits.
-   * Therefore ToolNet intentionally exits 0 for unexpected runtime errors.
+   * ToolNet therefore fails open for unexpected non-policy errors.
    */
   process.exitCode = 0;
 });
