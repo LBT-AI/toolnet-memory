@@ -15,75 +15,32 @@
 
 ---
 
-## What it does
+## What is ToolNet Memory?
 
-ToolNet Memory is a persistent memory layer for AI coding workflows. It keeps project knowledge outside any single agent session so Agy / Antigravity, OpenCode, Codex, and MCP-compatible tools can continue work without rebuilding context from zero.
+ToolNet Memory is a persistent project-memory and code-intelligence layer for AI coding agents.
 
-It stores durable working context such as:
+It keeps project knowledge outside a single chat/session so supported agents can move between sessions without rebuilding project context from zero.
 
-- project mission and current objective,
-- decisions, rules, blockers, warnings, and next actions,
-- completed and active work,
-- structured session handoff state,
-- semantic project/code context,
-- source symbols, dependencies, architecture, and impact relationships.
+ToolNet Memory combines four layers:
 
-ToolNet Memory is **not a raw transcript dump**. Session history and durable project memory are treated separately, and only useful project context should be promoted into long-term memory.
+- **Fast project context** — local startup context with no deep recovery.
+- **Work continuity** — current goal, task, phase, blockers, decisions, and next actions.
+- **Durable memory** — filtered project knowledge that survives agent/session changes.
+- **Code intelligence** — symbols, dependencies, call relationships, architecture, impact analysis, semantic search, and graph visualization.
 
-## Quick Start
-
-```bash
-# Install globally (once per VPS/user)
-curl -fsSL https://memory.toolnet.tech/install | bash
-
-# Initialize project
-cd /path/to/project
-toolnet-memory init
-
-# View fast startup context
-toolnet-memory
-```
-
-**Fast Context Output:**
-
-```text
-# Profile
-
-Your development preferences and coding style.
+ToolNet Memory is **not a raw transcript dump**. Session history and durable project memory are kept separate, filtered, bounded, and selectively promoted.
 
 ---
 
-# Current Work
+## Quick Start
 
-Mission: Build authentication system
-Objective: Implement OAuth2 flow
-Phase: Implementation
-Task: Add token refresh logic
-
-Next Actions:
-- [ ] Implement refresh token endpoint
-- [ ] Add token expiry validation
-```
-
-The default command (`toolnet-memory` with no arguments) prints fast startup context from local files only (~150ms, no network/storage access). This provides AI agents with immediate project context at session start.
-
-## Installation
-
-ToolNet Memory is installed **once per VPS/user account**, not once per project.
-
-Recommended installer:
+### 1. Install once per VPS / user
 
 ```bash
 curl -fsSL https://memory.toolnet.tech/install | bash
 ```
 
-Alternative installer:
-
-```bash
-npx toolnet-memory-install
-```
-
-Or install directly from npm:
+Or:
 
 ```bash
 npm install -g toolnet-memory@latest
@@ -98,306 +55,301 @@ toolnet-memory --version
 toolnet-memory doctor
 ```
 
-## Storage Configuration
-
-ToolNet Memory supports multiple storage backends.
-**Cloudflare R2 is the default and recommended provider**, but ToolNet Memory does not require Cloudflare or Hugging Face. You can also use any supported S3-compatible backend or run fully local without any cloud storage.
-
-### Cloudflare R2 — default
-
-````bash
-# ~/.config/toolnet-memory/.env
-MEMORY_STORAGE_PROVIDER=r2
-R2_ACCOUNT_ID=your-account-id
-R2_BUCKET=toolnet-memory
-R2_ACCESS_KEY_ID=your-access-key
-R2_SECRET_ACCESS_KEY=your-secret-key
-
-Generic S3 / S3-compatible
-
-Works with AWS S3 and compatible services such as MinIO, Backblaze B2 S3, Wasabi, and similar providers.
-
-MEMORY_STORAGE_PROVIDER=s3
-# Leave empty for AWS S3.
-S3_ENDPOINT=
-S3_REGION=us-east-1
-S3_BUCKET=toolnet-memory
-S3_ACCESS_KEY_ID=your-access-key
-S3_SECRET_ACCESS_KEY=your-secret-key
-S3_FORCE_PATH_STYLE=false
-
-Local storage — no cloud required
-
-ToolNet Memory can run completely locally.
-
-MEMORY_STORAGE_PROVIDER=local
-MEMORY_LOCAL_STORAGE_PATH=/path/to/toolnet-memory-storage
-MEMORY_LOCAL_CACHE_MB=200
-
-Local mode is useful for:
-
-* offline development,
-* private projects that must not use remote storage,
-* testing,
-* single-machine workflows.
-
-No R2, S3, or Hugging Face account is required.
-
-Hugging Face S3 — legacy compatibility
-
-Existing installations can continue using the Hugging Face S3-compatible backend.
-
-MEMORY_STORAGE_PROVIDER=huggingface
-HF_NAMESPACE=your-namespace
-HF_BUCKET=toolnet-memory
-HF_S3_ACCESS_KEY_ID=your-access-key
-HF_S3_SECRET_ACCESS_KEY=your-secret-key
-
-Hugging Face remains supported for compatibility, but new installations should normally prefer R2, generic S3, or local storage.
-
-Embedding provider
-
-The current Hugging Face embedding configuration is independent from the storage provider.
-
-For example, you can use:
-
-Cloudflare R2 storage + Hugging Face embeddings
-Local storage + Hugging Face embeddings
-Generic S3 storage + Hugging Face embeddings
-
-Embedding configuration:
-
-HF_TOKEN=
-HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-
-See docs/STORAGE.md⁠ for detailed provider setup.
-
-
-## One-time VPS setup
-
-Global configuration is stored at:
-
-```text
-~/.config/toolnet-memory/.env
-````
-
-Run setup once on a new VPS/user account:
+### 2. Configure ToolNet once
 
 ```bash
 toolnet-memory setup
 ```
 
-The setup flow can configure storage backend and detect supported coding agents. Credentials stay outside project repositories and must never be committed.
+Global configuration is stored outside project repositories:
 
-## Per-project setup
+```text
+~/.config/toolnet-memory/.env
+```
 
-Each source project gets a stable identity and isolated remote namespace.
+### 3. Initialize a project
 
 ```bash
 cd /path/to/project
-
-# Initialize project and create agent instruction files
 toolnet-memory init
+```
 
-# Or manually:
-toolnet-memory project:manual-init --project "$PWD"
-toolnet-memory profile:sync
+### 4. Build project intelligence once
+
+```bash
 toolnet-memory index
 ```
 
-ToolNet creates project metadata under:
+The full index builds:
 
 ```text
-.toolnet/
-├── profile.md      # Your development preferences
-└── current.md      # Current work state
+Scanning files
+    ↓
+Parsing code
+    ↓
+Type Resolution
+    ↓
+Rich Graph
+    ↓
+Semantic Code Index
+    ↓
+Architecture Intelligence
+    ↓
+Graph Analysis
+    ↓
+3D Visualization Dataset
 ```
 
-And agent instruction files in the project root:
+After the first full index, use incremental indexing for normal changes:
+
+```bash
+toolnet-memory incremental
+```
+
+---
+
+## Normal Daily Workflow
+
+In normal use, users should not need to manually load large session histories.
 
 ```text
-GEMINI.md           # Instructions for Gemini/Agy
-AGENTS.md           # Standard agent instructions
-CLAUDE.md           # Instructions for Claude/Codex
+Open project
+    ↓
+Agent detects ToolNet project
+    ↓
+Fast local context loads
+    ↓
+Agent continues current work
+    ↓
+ToolNet captures meaningful continuity
 ```
 
-These files provide fast startup context to AI agents without requiring network access or deep memory recovery.
+Fast context can be viewed manually with:
 
-A stable project identity prevents memory from being mixed merely because folders are renamed or moved.
+```bash
+toolnet-memory
+```
 
-Remote storage is scoped by project:
+or:
+
+```bash
+toolnet-memory context
+```
+
+The default startup context is intentionally small and local. Deep recovery is reserved for cases where fast context is insufficient.
+
+---
+
+## Switching Between Coding Agents
+
+ToolNet Memory is designed for workflows such as:
 
 ```text
-projects/<project-remote>/
-├── memory/         # Persistent project memory
-├── code/           # Code intelligence index
-├── sessions/       # Session transcripts (filtered)
-├── work/           # Work continuity state
-└── snapshots/      # Project snapshots
+OpenCode → Agy / Antigravity → Codex → Claude Code
 ```
 
-## Agent integration
+The next agent should receive the same project continuity instead of starting from zero.
 
-Automatic integration can detect supported agents installed for the current user:
+Typical continuity includes:
+
+```text
+Last agent
+Last session
+Current request
+Current activity
+Goal
+Plan
+Current phase
+Blockers
+Decisions
+Next actions
+```
+
+Supported integrations currently include:
 
 ```bash
 toolnet-memory integrate:auto
-```
-
-Or integrate individually:
-
-```bash
 toolnet-memory integrate:agy
 toolnet-memory integrate:opencode
 toolnet-memory integrate:codex
+toolnet-memory integrate:claude
 ```
 
-Integration is normally a **one-time user/VPS operation**. Project selection remains automatic through the project's ToolNet identity.
+Detect integrations without modifying configuration:
 
-After setup, use your coding agent normally:
+```bash
+toolnet-memory integrate:detect
+```
+
+ToolNet Memory also exposes an MCP server:
+
+```bash
+toolnet-memory mcp
+```
+
+---
+
+## Project Operating Manual
+
+Every project can define persistent mandatory rules in:
 
 ```text
-Agy / Antigravity ─┐
-OpenCode            ├──> ToolNet Memory ──> Project-scoped context
-Codex               ┘
+.toolnet/PROJECT.md
 ```
 
-The intended normal workflow does not require users to manually say "save memory" or "load memory". Agent/session hooks capture meaningful activity and restore relevant project context at the next session.
-
-## Fast Context vs Deep Recovery
-
-ToolNet Memory provides two levels of context:
-
-### Fast Context (Default)
-
-Fast context reads only local files (`.toolnet/profile.md`, `.toolnet/current.md`) and completes in ~150ms without network or storage access. This is the default behavior and provides immediate startup context.
+Create it with:
 
 ```bash
-# Fast context (default command)
-toolnet-memory
-toolnet-memory context:print
-
-# Sync profile and current work to local files
-toolnet-memory profile:sync
+toolnet-memory project:manual-init
 ```
 
-### Deep Recovery (Manual Only)
+Example:
 
-Deep memory recovery fetches full session history and project memory from remote storage. This is **manual only** and not run automatically at agent startup to avoid noise and latency.
+```md
+# ToolNet Project Operating Manual
 
-```bash
-# Recover last 10 sessions (default limit)
-toolnet-memory session:agy-recover
+## Critical Rules
 
-# Get latest handoff brief
-toolnet-memory handoff:latest
-
-# Full brief with memory
-toolnet-memory brief
+- [enforce] Only edit source code inside /root/project/source.
+- [enforce] Never modify production files directly.
+- [enforce] Deploy only with /root/project/deploy.sh --apply.
+- [advisory] Prefer small focused changes.
 ```
 
-Session transcripts are filtered to remove:
+ToolNet recognizes:
 
-- System messages and tool logs
-- npm install/build noise
-- Sensitive data patterns
-- Redundant context
+- `[enforce]` — mandatory project rule.
+- `[advisory]` — project recommendation.
 
-## Memory retrieval and automation
-
-ToolNet Memory exposes retrieval and automation controls through the global environment configuration.
-
-These settings are optional. The defaults are designed to work without manual tuning.
-
-Automatic memory behavior
-
-MEMORY_AUTO_CAPTURE=true
-MEMORY_AUTO_RETRIEVE=true
-MEMORY_AUTO_SUMMARIZE=true
-MEMORY_AUTO_SYNC=true
-
-- MEMORY_AUTO_CAPTURE — capture meaningful project activity.
-- MEMORY_AUTO_RETRIEVE — allow relevant memory retrieval.
-- MEMORY_AUTO_SUMMARIZE — generate compact summaries instead of persisting raw conversational noise.
-- MEMORY_AUTO_SYNC — sync eligible project state to the configured storage backend.
-
-Retrieval limits
-
-MEMORY_MAX_CANDIDATES=50
-MEMORY_RERANK_TOP=10
-MEMORY_FINAL_CONTEXT=5
-MEMORY_TOKEN_BUDGET=2000
-
-The retrieval pipeline is intentionally bounded:
-
-candidate search
-↓
-max 50 candidates
-↓
-rerank top 10
-↓
-select up to 5 final context items
-↓
-enforce token budget
-
-Remote storage can contain a large project history, but ToolNet Memory should never dump the entire history into an agent prompt.
-
-Session continuity
-
-TOOLNET_SESSION_LEARNING=1
-TOOLNET_WORK_CONTINUITY=1
-TOOLNET_SEMANTIC_CONTINUITY=1
-TOOLNET_SMART_HANDOFF=1
-
-These flags control automatic session learning, work-state continuity, semantic continuity, and compact handoff generation.
-
-Session history is filtered and selectively promoted. Raw transcript content is not intended to be injected into normal startup context.
-
-Context modes
-
-Normal agent startup uses a small local context budget.
-
-minimal → project rules + current task
-focused → minimal + a small number of relevant memories
-deep → manual recovery only
-
-Use deep recovery only when older session history is genuinely required.
-
-## Example Workflow
+Show or sync the manual:
 
 ```bash
-# 1. Initialize project
-cd /path/to/project
-toolnet-memory init
+toolnet-memory project:manual-show
+toolnet-memory project:manual-sync
+```
 
-# 2. Start coding with your agent
-agy "implement user authentication"
+This is the correct place for rules such as:
 
-# 3. Fast context is automatically injected at session start
-# Agent sees profile.md + current.md (~150ms)
+- allowed source path,
+- development vs production environment,
+- deployment commands,
+- files that must not be edited,
+- verification requirements,
+- architecture constraints.
 
-# 4. Work continues across sessions
-codex "add password reset flow"
+Secrets and credentials should remain in `.env` or another secret store, not in `PROJECT.md`.
 
-# 5. Query semantic code context
-toolnet-memory semantic "auth flow"
+---
 
-# 6. Check change impact
+## Code Intelligence
+
+ToolNet Memory builds a persistent structural model of the project so coding agents can understand relationships before changing code.
+
+Capabilities include:
+
+- source symbol indexing,
+- imports and dependencies,
+- callers and callees,
+- type relationships,
+- architecture layers,
+- subsystem clustering,
+- hotspots,
+- dead-code candidates,
+- semantic code search,
+- dependency paths,
+- change-impact analysis,
+- visualization datasets.
+
+Useful commands:
+
+```bash
+# Full index
+toolnet-memory index
+
+# Incremental update
+toolnet-memory incremental
+
+# Semantic search
+toolnet-memory semantic "authentication flow"
+
+# Change impact
 toolnet-memory impact src/auth.ts
-
-# 7. Manual deep recovery if needed
-toolnet-memory session:agy-recover --limit 5
 ```
 
-## Core capabilities
+The goal is not only to find code, but to help an agent understand **what may break if a file, symbol, or dependency changes**.
 
-### Persistent project memory
+---
 
-Durable memory can preserve decisions, rules, todos, fixes, blockers, warnings, architecture changes, and next actions while avoiding unnecessary transcript noise.
+## Code Graph UI
 
-### Work continuity
+ToolNet Memory includes a project graph visualization UI.
 
-Structured continuity can track:
+Start it with:
+
+```bash
+toolnet-memory graph
+```
+
+The graph uses real indexed ToolNet project data.
+
+For large projects, the UI uses a lightweight drill-down flow instead of rendering the complete symbol graph at once:
+
+```text
+Overview
+  ↓
+Subsystems
+  ↓
+Files
+  ↓
+Symbols + relationships
+```
+
+This keeps the graph usable on large projects and mobile browsers while preserving access to detailed relationships when needed.
+
+The graph server defaults to:
+
+```text
+127.0.0.1:9749
+```
+
+To expose it temporarily on a VPS network interface:
+
+```bash
+TOOLNET_GRAPH_HOST=0.0.0.0 \
+TOOLNET_GRAPH_PORT=9749 \
+toolnet-memory graph
+```
+
+---
+
+## Memory and Work Continuity
+
+View the current work state:
+
+```bash
+toolnet-memory work
+```
+
+or:
+
+```bash
+toolnet-memory work:status
+```
+
+Ask project memory directly:
+
+```bash
+toolnet-memory ask "What was changed in the authentication flow?"
+```
+
+Review or reconcile durable memory:
+
+```bash
+toolnet-memory memory:review
+toolnet-memory memory:reconcile
+```
+
+ToolNet tracks structured continuity such as:
 
 ```text
 Mission
@@ -413,71 +365,230 @@ Warnings
 Next Actions
 ```
 
-Useful commands:
+---
+
+## Fast Context vs Deep Recovery
+
+### Fast Context — default
+
+Fast context is local, bounded, and intended for normal agent startup.
 
 ```bash
-toolnet-memory work:status
+toolnet-memory
+toolnet-memory context:print
+```
+
+It uses project-local ToolNet files and does not automatically dump remote history into the prompt.
+
+### Deep Recovery — manual only
+
+Use deep recovery only when the normal fast context is not enough.
+
+```bash
 toolnet-memory brief
 toolnet-memory handoff:latest
+toolnet-memory session:agy-recover
+toolnet-memory session:codex-recover
+toolnet-memory session:opencode-recover
 ```
 
-### Code intelligence
+These commands are intentionally **not** meant to run automatically on every agent startup.
 
-A full index can build:
+---
+
+## AI Providers and Models
+
+ToolNet separates the reasoning model from the embedding model.
+
+Run interactive setup:
+
+```bash
+toolnet-memory setup
+```
+
+View provider state:
+
+```bash
+toolnet-memory provider
+toolnet-memory provider:list
+toolnet-memory provider:status
+toolnet-memory provider:test llm
+toolnet-memory provider:test embedding
+```
+
+View or change the active model:
+
+```bash
+toolnet-memory model
+toolnet-memory model status
+toolnet-memory model list
+toolnet-memory model set <model>
+```
+
+Canonical configuration uses:
 
 ```text
-Source Index
-  ↓
-Type Resolution
-  ↓
-Rich Graph
-  ↓
-Semantic Code Index
-  ↓
-Architecture Intelligence
-  ↓
-Graph Analysis
-  ↓
-Visualization Dataset
+TOOLNET_LLM_PROVIDER
+TOOLNET_LLM_API_KEY
+TOOLNET_LLM_BASE_URL
+TOOLNET_LLM_MODEL
+
+TOOLNET_EMBEDDING_PROVIDER
+TOOLNET_EMBEDDING_API_KEY
+TOOLNET_EMBEDDING_BASE_URL
+TOOLNET_EMBEDDING_MODEL
 ```
 
-Capabilities include symbol indexing, callers/callees, imports, type resolution, architecture layers, subsystem clusters, hotspots, dead-code candidates, semantic search, dependency analysis, and change-impact analysis.
+Optional LLM fallbacks are supported for transient failures such as timeouts, HTTP 408, 429, and 5xx responses.
 
-Examples:
+---
+
+## Storage
+
+Supported storage modes include:
+
+- Cloudflare R2,
+- generic S3 / S3-compatible storage,
+- local storage,
+- Hugging Face S3 compatibility mode.
+
+Projects remain isolated by stable ToolNet project identity.
+
+A typical remote layout is:
+
+```text
+projects/<project>/
+├── memory/
+├── code/
+├── sessions/
+├── work/
+└── snapshots/
+```
+
+Project identity is stored locally under:
+
+```text
+.toolnet/project.json
+```
+
+Renaming or moving a project directory should not cause unrelated projects to share memory.
+
+---
+
+## Snapshots and Recovery
+
+Create and restore project-scoped snapshots:
 
 ```bash
-toolnet-memory semantic "authentication flow"
-toolnet-memory impact src/path/to/file.ts
-toolnet-memory incremental
+toolnet-memory snapshot:list
+toolnet-memory snapshot:create "before refactor"
+toolnet-memory snapshot:restore <id>
+toolnet-memory recover
 ```
 
-### MCP
+---
 
-Expose memory and code intelligence through MCP:
+## Architecture Guard
+
+ToolNet can evaluate project rules and potentially dangerous changes.
 
 ```bash
-toolnet-memory mcp
+toolnet-memory guard:check
+toolnet-memory guard:check --file src/path.ts
+toolnet-memory guard:check --command "rm -rf ..."
+toolnet-memory guard:explain
 ```
 
-### Snapshots and recovery
+The project manual and guard system are intended to reduce accidental violations of important project constraints.
 
-ToolNet supports project-scoped snapshots and recovery workflows without merging state across projects.
+---
 
-## Health and configuration
+## Background Service
 
-Human-readable health check:
+ToolNet can optionally run a background daemon:
+
+```bash
+toolnet-memory service:install
+toolnet-memory service:start
+toolnet-memory service:status
+toolnet-memory service:restart
+toolnet-memory service:stop
+toolnet-memory service:remove
+```
+
+The background service is optional; the core CLI does not require a permanent daemon for every workflow.
+
+---
+
+## CLI Help
+
+The default help is intentionally compact:
+
+```bash
+toolnet-memory help
+```
+
+Show every command:
+
+```bash
+toolnet-memory help --all
+```
+
+Show help for one command:
+
+```bash
+toolnet-memory help index
+toolnet-memory help model
+toolnet-memory help graph
+```
+
+Main user-facing commands:
+
+```text
+GET STARTED
+  setup
+  init
+  doctor
+
+MEMORY
+  ask
+  context
+  work
+
+CODE
+  index
+  semantic
+  impact
+  graph
+
+AI
+  model
+  provider
+
+SYSTEM
+  status
+  update
+```
+
+Advanced, recovery, service, session, and production commands remain available through `help --all`.
+
+---
+
+## Health and Status
+
+Quick status:
+
+```bash
+toolnet-memory status
+```
+
+Deeper diagnostics:
 
 ```bash
 toolnet-memory doctor
 ```
 
-Machine-readable health check:
-
-```bash
-toolnet-memory doctor --json
-```
-
-Read or update global configuration:
+Configuration:
 
 ```bash
 toolnet-memory config get KEY
@@ -487,26 +598,39 @@ toolnet-memory config open
 
 Secret values are masked in normal CLI output.
 
+---
+
 ## Updating
 
 ```bash
 toolnet-memory update
 ```
 
-The updater checks the latest npm release and updates the global installation.
+Or reinstall the latest npm release:
 
-## Security model
+```bash
+npm install -g toolnet-memory@latest
+```
 
-ToolNet Memory processes source-code metadata, coding-agent activity, and project memory, so project isolation and secret handling are core requirements.
+---
+
+## Security Model
+
+ToolNet Memory processes source-code metadata, project instructions, agent activity, and durable memory.
+
+Important rules:
 
 - Never commit `.env` files or credentials.
+- Keep VPS passwords, API keys, and tokens out of `PROJECT.md`.
 - Sanitize secrets before durable persistence.
-- Never silently inject memory from another project.
-- Avoid placing full authentication tokens in logs or diagnostics.
-- Treat raw agent transcripts as potentially sensitive.
-- Storage credentials are stored in `~/.config/toolnet-memory/.env` (never in project repos).
+- Never inject memory from another project.
+- Treat raw coding-agent transcripts as sensitive.
+- Keep deep recovery manual and bounded.
+- Store global ToolNet credentials outside project repositories.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
+---
 
 ## Development
 
@@ -514,6 +638,7 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 git clone https://github.com/LBT-AI/toolnet-memory.git
 cd toolnet-memory
 npm ci
+
 npm run lint
 npm run format:check
 npm run typecheck
@@ -522,101 +647,38 @@ npm run build:release
 npm pack --dry-run
 ```
 
-Installer validation:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution rules.
 
-```bash
-bash -n scripts/install.sh
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for repository rules and pull-request requirements.
+---
 
 ## Releases
 
-CI validates pushes and pull requests. Version tags trigger the release workflow, which validates the package, publishes through npm Trusted Publishing (OIDC), creates the GitHub Release, and attaches the npm tarball.
+ToolNet Memory uses GitHub Actions for CI and npm releases.
 
-The release tag must match `package.json` exactly:
+Before a release, the repository validates:
 
 ```text
-package.json: 0.2.10
-Git tag:      v0.2.10
+lint
+format
+TypeScript
+unit/integration tests
+production build
+npm package contents
+```
+
+Version tags trigger the release workflow and npm Trusted Publishing.
+
+The tag must match `package.json`:
+
+```text
+package.json: 0.3.x
+Git tag:      v0.3.x
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
+---
+
 ## License
 
 MIT © 2026 LBT-AI. See [LICENSE](LICENSE).
-
-## Multi-provider AI setup
-
-Run:
-
-```bash
-toolnet-memory setup
-
-ToolNet Memory separates AI configuration into independent roles:
-
-* LLM — reasoning, summarization, classification, and memory intelligence.
-* Embedding — semantic indexing and retrieval.
-* LLM Fallbacks — optional secondary providers for transient failures.
-
-Supported LLM providers include:
-
-* OpenAI-compatible
-* Alibaba / DashScope
-* OpenRouter
-* Groq
-* DeepSeek
-* NVIDIA NIM
-* Gemini
-* Hugging Face
-* Ollama / Local
-* Cloudflare Workers AI
-* Custom endpoints
-
-Canonical configuration:
-
-TOOLNET_LLM_PROVIDER=
-TOOLNET_LLM_API_KEY=
-TOOLNET_LLM_BASE_URL=
-TOOLNET_LLM_MODEL=
-TOOLNET_EMBEDDING_PROVIDER=
-TOOLNET_EMBEDDING_API_KEY=
-TOOLNET_EMBEDDING_BASE_URL=
-TOOLNET_EMBEDDING_MODEL=
-
-Optional resilient LLM chain:
-
-TOOLNET_LLM_FALLBACK_1_PROVIDER=
-TOOLNET_LLM_FALLBACK_1_API_KEY=
-TOOLNET_LLM_FALLBACK_1_BASE_URL=
-TOOLNET_LLM_FALLBACK_1_MODEL=
-TOOLNET_LLM_FALLBACK_2_PROVIDER=
-TOOLNET_LLM_FALLBACK_2_API_KEY=
-TOOLNET_LLM_FALLBACK_2_BASE_URL=
-TOOLNET_LLM_FALLBACK_2_MODEL=
-TOOLNET_LLM_FALLBACK_COOLDOWN_MS=60000
-TOOLNET_LLM_MAX_RETRIES=1
-
-Fallback is used only for transient failures such as:
-
-* timeout / network failure
-* HTTP 408
-* HTTP 429
-* HTTP 5xx
-
-HTTP 400, 401, and 403 are surfaced instead of silently switching providers.
-
-Legacy provider environment variables remain readable for backward compatibility. The setup wizard can migrate recognized legacy values into canonical TOOLNET_* configuration without deleting the original variables.
-
-Diagnostics:
-
-toolnet-memory provider:list
-toolnet-memory provider:status
-toolnet-memory provider:test
-toolnet-memory provider:test llm
-toolnet-memory provider:test embedding
-toolnet-memory doctor
-
-Provider status masks API keys and secrets.
-```
