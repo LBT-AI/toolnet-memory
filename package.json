@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -25,7 +25,13 @@
     "antigravity",
     "code-intelligence",
     "kiro",
-    "kiro-cli"
+    "kiro-cli",
+    "cursor",
+    "cursor-cli",
+    "github-copilot",
+    "copilot-cli",
+    "grok",
+    "grok-build"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -78,7 +84,14 @@
     "session:kiro-mcp:test": "vitest run tests/session/kiro-mcp-installer.test.ts",
     "session:kiro:test": "vitest run tests/session/kiro-event-mapper.test.ts tests/session/kiro-hook-installer.test.ts tests/session/kiro-runtime.test.ts",
     "session:kiro-continuity:test": "vitest run tests/session/kiro-continuity.test.ts",
-    "session:kiro-integration:test": "vitest run tests/session/kiro-integration.test.ts tests/production/kiro-auto-integrate.test.ts"
+    "session:kiro-integration:test": "vitest run tests/session/kiro-integration.test.ts tests/production/kiro-auto-integrate.test.ts",
+    "session:cursor-mcp:test": "vitest run tests/session/cursor-mcp-installer.test.ts",
+    "session:copilot-mcp:test": "vitest run tests/session/copilot-mcp-installer.test.ts",
+    "session:grok-mcp:test": "vitest run tests/session/grok-mcp-installer.test.ts",
+    "session:new-agents:test": "vitest run tests/session/new-agent-event-mappers.test.ts tests/session/new-agent-hook-installers.test.ts tests/session/new-agent-runtime.test.ts",
+    "session:new-agents-continuity:test": "vitest run tests/session/new-agent-continuity.test.ts tests/session/new-agent-continuity-installers.test.ts",
+    "session:new-agents-integration:test": "vitest run tests/session/new-agent-integrations.test.ts tests/production/new-agent-auto-integrate.test.ts tests/production/new-agent-production-wiring.test.ts",
+    "release:certify:8": "vitest run tests/integration/cross-agent-continuity.test.ts tests/production/eight-agent-release-contract.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

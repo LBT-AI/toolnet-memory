@@ -145,7 +145,7 @@ The default startup context is intentionally small and local. Deep recovery is r
 ToolNet Memory is designed for workflows such as:
 
 ```text
-OpenCode → Agy / Antigravity → Codex → Claude Code → Kiro CLI
+OpenCode → Agy / Antigravity → Codex → Claude Code → Kiro CLI → Cursor CLI → GitHub Copilot CLI → Grok Build
 ```
 
 The next agent should receive the same project continuity instead of starting from zero.
@@ -174,7 +174,14 @@ toolnet-memory integrate:opencode
 toolnet-memory integrate:codex
 toolnet-memory integrate:claude
 toolnet-memory integrate:kiro
+toolnet-memory integrate:cursor
+toolnet-memory integrate:copilot
+toolnet-memory integrate:grok
 ```
+
+Cursor CLI, GitHub Copilot CLI, and Grok Build use the same shared ToolNet
+continuity layer. Their integrations register ToolNet MCP plus lifecycle capture/
+continuity guards; Grok also installs the ToolNet continuity skill.
 
 Detect integrations without modifying configuration:
 

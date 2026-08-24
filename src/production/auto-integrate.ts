@@ -1,4 +1,8 @@
-import { detectAgentIntegrations, type AgentDetection } from './integration-detection.js';
+import {
+  detectAgentIntegrations,
+  type AgentDetection,
+  type AgentIntegrationId,
+} from './integration-detection.js';
 
 import { installAgyPlugin } from '../session/agy/plugin-installer.js';
 
@@ -19,8 +23,23 @@ import {
   type InstallKiroIntegrationOptions,
 } from '../session/kiro/installer.js';
 
+import {
+  installCursorIntegration,
+  type InstallCursorIntegrationOptions,
+} from '../session/cursor/installer.js';
+
+import {
+  installCopilotIntegration,
+  type InstallCopilotIntegrationOptions,
+} from '../session/copilot/installer.js';
+
+import {
+  installGrokIntegration,
+  type InstallGrokIntegrationOptions,
+} from '../session/grok/installer.js';
+
 export interface AutoIntegrationResult {
-  agent: 'agy' | 'opencode' | 'codex' | 'claude' | 'kiro';
+  agent: AgentIntegrationId;
 
   detected: boolean;
 
@@ -50,6 +69,12 @@ export function installAutoIntegrations(
      * Optional Kiro path overrides for tests/custom deployments.
      */
     kiro?: Omit<InstallKiroIntegrationOptions, 'binary'>;
+
+    cursor?: Omit<InstallCursorIntegrationOptions, 'binary'>;
+
+    copilot?: Omit<InstallCopilotIntegrationOptions, 'binary'>;
+
+    grok?: Omit<InstallGrokIntegrationOptions, 'binary'>;
   } = {}
 ): AutoIntegrationResult[] {
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
@@ -259,6 +284,129 @@ export function installAutoIntegrations(
   }
 
   /*
+   * Cursor CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('cursor') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'cursor',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const cursor = installCursorIntegration({
+          ...(options.cursor ?? {}),
+          binary,
+        });
+
+        results.push({
+          agent: 'cursor',
+          detected: true,
+          installed: true,
+          targets: [cursor.mcp.configFile, `mcp:${cursor.mcp.serverName}`, cursor.hooks.hooksFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'cursor',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * GitHub Copilot CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('copilot') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'copilot',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const copilot = installCopilotIntegration({
+          ...(options.copilot ?? {}),
+          binary,
+        });
+
+        results.push({
+          agent: 'copilot',
+          detected: true,
+          installed: true,
+          targets: [
+            copilot.mcp.configFile,
+            `mcp:${copilot.mcp.serverName}`,
+            copilot.hooks.hooksFile,
+          ],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'copilot',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Grok Build
+   */
+  {
+    const isDetected = options.force === true || detected.get('grok') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'grok',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const grok = installGrokIntegration({
+          ...(options.grok ?? {}),
+          binary,
+        });
+
+        results.push({
+          agent: 'grok',
+          detected: true,
+          installed: true,
+          targets: [
+            grok.mcp.configFile,
+            `mcp:${grok.mcp.serverName}`,
+            grok.hooks.hooksFile,
+            grok.skill.skillFile,
+          ],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'grok',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
    * Codex
    */
   {
@@ -326,7 +474,7 @@ export function installAutoIntegrations(
   return results;
 }
 
-function integrationDisplayName(agent: AutoIntegrationResult['agent']): string {
+function integrationDisplayName(agent: AgentIntegrationId): string {
   switch (agent) {
     case 'agy':
       return 'Agy / Antigravity';
@@ -339,6 +487,15 @@ function integrationDisplayName(agent: AutoIntegrationResult['agent']): string {
 
     case 'kiro':
       return 'Kiro CLI';
+
+    case 'cursor':
+      return 'Cursor CLI';
+
+    case 'copilot':
+      return 'GitHub Copilot CLI';
+
+    case 'grok':
+      return 'Grok Build';
 
     case 'codex':
       return 'Codex';

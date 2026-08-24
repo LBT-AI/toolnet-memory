@@ -1,0 +1,137 @@
+import { cursorHooksFile } from './config-paths.js';
+
+import {
+  atomicWriteHooks,
+  isJsonObject,
+  readHooksRoot,
+  shellQuote,
+  type JsonObject,
+} from '../hook-capture/json-hooks.js';
+
+export interface InstallCursorHooksOptions {
+  hooksFile?: string;
+
+  binary?: string;
+}
+
+export interface InstallCursorHooksResult {
+  hooksFile: string;
+
+  changed: boolean;
+
+  hookCount: number;
+}
+
+const EVENTS = [
+  ['sessionStart', 10],
+  ['beforeSubmitPrompt', 10],
+  ['preToolUse', 10],
+  ['postToolUse', 15],
+  ['afterAgentResponse', 15],
+  ['stop', 30],
+] as const;
+
+function isManagedEntry(value: unknown): boolean {
+  return (
+    isJsonObject(value) &&
+    typeof value.command === 'string' &&
+    value.command.includes('session:cursor-hook')
+  );
+}
+
+function desiredEntry(event: string, binary: string, timeout: number): JsonObject {
+  const command =
+    `TOOLNET_HOOK_EVENT=${shellQuote(event)} ` + `${shellQuote(binary)} session:cursor-hook`;
+
+  const entry: JsonObject = {
+    type: 'command',
+    command,
+    timeout,
+  };
+
+  if (event === 'preToolUse') {
+    entry.matcher = '.*';
+  }
+
+  return entry;
+}
+
+export function installCursorHooks(
+  options: InstallCursorHooksOptions = {}
+): InstallCursorHooksResult {
+  const hooksFile = options.hooksFile ?? cursorHooksFile();
+
+  const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
+
+  const root = readHooksRoot(hooksFile, 'Cursor');
+
+  if (root.version !== undefined && root.version !== 1) {
+    throw new Error(`Unsupported existing Cursor hooks version: ${String(root.version)}`);
+  }
+
+  const currentHooks = root.hooks;
+
+  if (currentHooks !== undefined && !isJsonObject(currentHooks)) {
+    throw new Error('Invalid existing Cursor hooks file: hooks must be an object.');
+  }
+
+  const hooks: JsonObject = isJsonObject(currentHooks) ? { ...currentHooks } : {};
+
+  for (const [event, timeout] of EVENTS) {
+    const existing = hooks[event];
+
+    if (existing !== undefined && !Array.isArray(existing)) {
+      throw new Error(`Invalid existing Cursor hooks file: hooks.${event} must be an array.`);
+    }
+
+    const preserved = Array.isArray(existing)
+      ? existing.filter((item) => !isManagedEntry(item))
+      : [];
+
+    hooks[event] = [...preserved, desiredEntry(event, binary, timeout)];
+  }
+
+  const next: JsonObject = {
+    ...root,
+    version: 1,
+    hooks,
+  };
+
+  if (JSON.stringify(root) === JSON.stringify(next)) {
+    return {
+      hooksFile,
+      changed: false,
+      hookCount: EVENTS.length,
+    };
+  }
+
+  atomicWriteHooks(hooksFile, next);
+
+  const verify = readHooksRoot(hooksFile, 'Cursor');
+
+  if (verify.version !== 1 || !isJsonObject(verify.hooks)) {
+    throw new Error('Cursor hooks were written but verification failed.');
+  }
+
+  let managedCount = 0;
+
+  for (const [event] of EVENTS) {
+    const entries = verify.hooks[event];
+
+    if (!Array.isArray(entries)) {
+      throw new Error('Cursor hooks were written but verification failed.');
+    }
+
+    managedCount += entries.filter(isManagedEntry).length;
+  }
+
+  if (managedCount !== EVENTS.length) {
+    throw new Error('Cursor hooks were written but verification failed.');
+  }
+
+  return {
+    hooksFile,
+    changed: true,
+    hookCount: EVENTS.length,
+  };
+}

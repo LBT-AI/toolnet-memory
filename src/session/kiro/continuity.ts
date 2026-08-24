@@ -13,14 +13,14 @@ const RESUME_PATTERNS: RegExp[] = [
   /\bwhere\s+(?:did\s+we|were\s+we)\b/i,
   /\bwhat\s+was\s+(?:the\s+)?(?:last|previous)\b/i,
 
-  /\btiếp\s+tục\b/iu,
-  /\blàm\s+tiếp\b/iu,
-  /\blàm\s+nốt\b/iu,
-  /\btiếp\s+phần\b/iu,
-  /\bphần\s+đang\s+dở\b/iu,
-  /\bđang\s+làm\s+(?:gì|đến\s+đâu)\b/iu,
-  /\bdừng\s+(?:ở|tại)\s+đâu\b/iu,
-  /\btask\s+(?:lúc\s+nãy|trước|đang\s+dở)\b/iu,
+  /(?:^|[\s,.;:!?])tiếp\s+tục(?:$|[\s,.;:!?])/iu,
+  /(?:^|[\s,.;:!?])làm\s+tiếp(?:$|[\s,.;:!?])/iu,
+  /(?:^|[\s,.;:!?])làm\s+nốt(?:$|[\s,.;:!?])/iu,
+  /(?:^|[\s,.;:!?])tiếp\s+phần(?:$|[\s,.;:!?])/iu,
+  /(?:^|[\s,.;:!?])phần\s+đang\s+dở(?:$|[\s,.;:!?])/iu,
+  /(?:^|[\s,.;:!?])đang\s+làm\s+(?:gì|đến\s+đâu)(?:$|[\s,.;:!?])/iu,
+  /(?:^|[\s,.;:!?])dừng\s+(?:ở|tại)\s+đâu(?:$|[\s,.;:!?])/iu,
+  /(?:^|[\s,.;:!?])task\s+(?:lúc\s+nãy|trước|đang\s+dở)(?:$|[\s,.;:!?])/iu,
 ];
 
 const FORBIDDEN_MARKERS = [

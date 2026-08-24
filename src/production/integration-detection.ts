@@ -13,8 +13,12 @@ import { openCodeConfigDirectory } from '../session/opencode/config-paths.js';
 import { claudeConfigDirectory } from '../session/claude/config-paths.js';
 
 import { kiroDetectionPaths } from '../session/kiro/config-paths.js';
+import { cursorDetectionPaths } from '../session/cursor/config-paths.js';
+import { copilotDetectionPaths } from '../session/copilot/config-paths.js';
+import { grokDetectionPaths } from '../session/grok/config-paths.js';
 
-export type AgentIntegrationId = 'agy' | 'opencode' | 'codex' | 'claude' | 'kiro';
+export type AgentIntegrationId =
+  'agy' | 'opencode' | 'codex' | 'claude' | 'kiro' | 'cursor' | 'copilot' | 'grok';
 
 export interface AgentDetection {
   agent: AgentIntegrationId;
@@ -34,6 +38,14 @@ export interface DetectAgentIntegrationOptions {
   codexHome?: string;
 
   kiroHome?: string;
+
+  cursorHome?: string;
+
+  cursorConfigDir?: string;
+
+  copilotHome?: string;
+
+  grokHome?: string;
 
   xdgConfigHome?: string;
 
@@ -149,6 +161,52 @@ export function detectAgentIntegrations(
         home,
 
         kiroHome: options.kiroHome,
+      }),
+    }),
+
+    detectOne({
+      agent: 'cursor',
+
+      command: 'agent',
+
+      commandExists,
+
+      configPaths: cursorDetectionPaths({
+        home,
+
+        cursorHome: options.cursorHome,
+
+        cursorConfigDir: options.cursorConfigDir,
+
+        xdgConfigHome: options.xdgConfigHome,
+      }),
+    }),
+
+    detectOne({
+      agent: 'copilot',
+
+      command: 'copilot',
+
+      commandExists,
+
+      configPaths: copilotDetectionPaths({
+        home,
+
+        copilotHome: options.copilotHome,
+      }),
+    }),
+
+    detectOne({
+      agent: 'grok',
+
+      command: 'grok',
+
+      commandExists,
+
+      configPaths: grokDetectionPaths({
+        home,
+
+        grokHome: options.grokHome,
       }),
     }),
 

@@ -336,6 +336,39 @@ case "$COMMAND" in
     exit 0
     ;;
 
+  session:cursor-hook)
+    shift
+    if [ -f "$ROOT/bundle/cursor-hook.js" ]; then
+      exec node "$ROOT/bundle/cursor-hook.js" "$@"
+    fi
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/cursor/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/cursor/hook.ts" "$@"
+    fi
+    exit 0
+    ;;
+
+  session:copilot-hook)
+    shift
+    if [ -f "$ROOT/bundle/copilot-hook.js" ]; then
+      exec node "$ROOT/bundle/copilot-hook.js" "$@"
+    fi
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/copilot/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/copilot/hook.ts" "$@"
+    fi
+    exit 0
+    ;;
+
+  session:grok-hook)
+    shift
+    if [ -f "$ROOT/bundle/grok-hook.js" ]; then
+      exec node "$ROOT/bundle/grok-hook.js" "$@"
+    fi
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/grok/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/grok/hook.ts" "$@"
+    fi
+    exit 0
+    ;;
+
   integrate:claude)
     shift
 
@@ -364,6 +397,21 @@ case "$COMMAND" in
 
     echo "Kiro CLI integration installer not found."
     exit 1
+    ;;
+
+  integrate:cursor)
+    shift
+    run bundle/cursor.js src/session/cursor/cli.ts "$@"
+    ;;
+
+  integrate:copilot)
+    shift
+    run bundle/copilot.js src/session/copilot/cli.ts "$@"
+    ;;
+
+  integrate:grok)
+    shift
+    run bundle/grok.js src/session/grok/cli.ts "$@"
     ;;
 
   session:codex-notify)

@@ -200,7 +200,7 @@ describe('automatic integration detection', () => {
       commandExists: () => false,
     });
 
-    expect(result).toHaveLength(5);
+    expect(result).toHaveLength(8);
 
     expect(result.every((item) => !item.detected)).toBe(true);
   });

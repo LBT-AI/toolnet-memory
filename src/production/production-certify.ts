@@ -45,6 +45,12 @@ export const PRODUCTION_PACK_REQUIRED_FILES = [
   'bundle/auto-integrate.js',
   'bundle/kiro.js',
   'bundle/kiro-hook.js',
+  'bundle/cursor.js',
+  'bundle/cursor-hook.js',
+  'bundle/copilot.js',
+  'bundle/copilot-hook.js',
+  'bundle/grok.js',
+  'bundle/grok-hook.js',
   'bundle/mcp.js',
   'bundle/continuity-certify.js',
   'bundle/recovery-certify.js',
@@ -56,6 +62,12 @@ const PRODUCTION_BUNDLE_REQUIRED_FILES = [
   'auto-integrate.js',
   'kiro.js',
   'kiro-hook.js',
+  'cursor.js',
+  'cursor-hook.js',
+  'copilot.js',
+  'copilot-hook.js',
+  'grok.js',
+  'grok-hook.js',
   'mcp.js',
   'continuity-certify.js',
   'recovery-certify.js',
@@ -525,6 +537,32 @@ export async function certifyProductionReadiness(
         binText.includes('bundle/kiro.js') &&
         binText.includes('bundle/kiro-hook.js'),
       'Kiro production bundle or CLI routing is missing.'
+    )
+  );
+
+  checks.push(
+    check(
+      'cursor-copilot-grok-integrations',
+      'Cursor, Copilot and Grok production integrations available',
+      existsSync(join(bundleRoot, 'cursor.js')) &&
+        existsSync(join(bundleRoot, 'cursor-hook.js')) &&
+        existsSync(join(bundleRoot, 'copilot.js')) &&
+        existsSync(join(bundleRoot, 'copilot-hook.js')) &&
+        existsSync(join(bundleRoot, 'grok.js')) &&
+        existsSync(join(bundleRoot, 'grok-hook.js')) &&
+        binText.includes('integrate:cursor)') &&
+        binText.includes('session:cursor-hook)') &&
+        binText.includes('integrate:copilot)') &&
+        binText.includes('session:copilot-hook)') &&
+        binText.includes('integrate:grok)') &&
+        binText.includes('session:grok-hook)') &&
+        binText.includes('bundle/cursor.js') &&
+        binText.includes('bundle/cursor-hook.js') &&
+        binText.includes('bundle/copilot.js') &&
+        binText.includes('bundle/copilot-hook.js') &&
+        binText.includes('bundle/grok.js') &&
+        binText.includes('bundle/grok-hook.js'),
+      'Cursor/Copilot/Grok production bundle or CLI routing is missing.'
     )
   );
 

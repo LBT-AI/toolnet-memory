@@ -283,6 +283,24 @@ export const COMMANDS: CommandMetadata[] = [
     usage: 'toolnet-memory integrate:kiro [--status] [--json]',
     category: 'integration',
   },
+  {
+    name: 'integrate:cursor',
+    description: 'Install Cursor CLI integration',
+    usage: 'toolnet-memory integrate:cursor [--status] [--json]',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:copilot',
+    description: 'Install GitHub Copilot CLI integration',
+    usage: 'toolnet-memory integrate:copilot [--status] [--json]',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:grok',
+    description: 'Install Grok Build integration',
+    usage: 'toolnet-memory integrate:grok [--status] [--json]',
+    category: 'integration',
+  },
 
   // Sessions
   {
@@ -342,6 +360,24 @@ export const COMMANDS: CommandMetadata[] = [
   {
     name: 'session:kiro-hook',
     description: 'Kiro lifecycle hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:cursor-hook',
+    description: 'Cursor lifecycle hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:copilot-hook',
+    description: 'Copilot lifecycle hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:grok-hook',
+    description: 'Grok lifecycle hook',
     category: 'session',
     hidden: true,
   },

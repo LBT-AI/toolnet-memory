@@ -41,6 +41,13 @@ const entries = {
   'claude-hook': 'src/session/claude/hook.ts',
   kiro: 'src/session/kiro/cli.ts',
   'kiro-hook': 'src/session/kiro/hook.ts',
+
+  cursor: 'src/session/cursor/cli.ts',
+  'cursor-hook': 'src/session/cursor/hook.ts',
+  copilot: 'src/session/copilot/cli.ts',
+  'copilot-hook': 'src/session/copilot/hook.ts',
+  grok: 'src/session/grok/cli.ts',
+  'grok-hook': 'src/session/grok/hook.ts',
   'continuity-certify': 'src/production/continuity-certify-cli.ts',
   'recovery-certify': 'src/production/recovery-certify-cli.ts',
   'production-certify': 'src/production/production-certify-cli.ts',
