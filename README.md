@@ -11,30 +11,65 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
+Current release: **v0.3.11**
+
 </div>
 
 ---
 
 ## What is ToolNet Memory?
 
-ToolNet Memory is a persistent project-memory and code-intelligence layer for AI coding agents.
+ToolNet Memory is a persistent memory, continuity, and code-intelligence layer for AI coding agents.
 
-It keeps project knowledge outside a single chat/session so supported agents can move between sessions without rebuilding project context from zero.
+It keeps project knowledge outside a single chat or session so supported coding agents can continue the same work without rebuilding context from zero.
 
 ToolNet Memory combines four layers:
 
-- **Fast project context** — local startup context with no deep recovery.
-- **Work continuity** — current goal, task, phase, blockers, decisions, and next actions.
+- **Fast project context** — small local startup context for normal work.
+- **Work continuity** — current goal, phase, blockers, decisions, and next actions.
 - **Durable memory** — filtered project knowledge that survives agent/session changes.
-- **Code intelligence** — symbols, dependencies, call relationships, architecture, impact analysis, semantic search, and graph visualization.
+- **Code intelligence** — symbols, dependencies, call graphs, architecture, semantic search, impact analysis, and graph visualization.
 
-ToolNet Memory is **not a raw transcript dump**. Session history and durable project memory are kept separate, filtered, bounded, and selectively promoted.
+ToolNet Memory is **not a raw transcript dump**. Raw session history is kept separate from durable project memory and is protected from normal agent reads.
+
+---
+
+## Supported Coding Agents
+
+ToolNet Memory currently supports an 8-agent continuity ring:
+
+```text
+Agy / Antigravity
+OpenCode
+Codex
+Claude Code
+Kiro CLI
+Cursor CLI
+GitHub Copilot CLI
+Grok Build
+```
+
+A project can move between agents while keeping the same ToolNet work state and memory.
+
+Typical continuity data includes:
+
+```text
+Current request
+Current goal
+Current task
+Current phase
+Recent decisions
+Blockers
+Warnings
+Next actions
+Last agent/session
+```
 
 ---
 
 ## Quick Start
 
-### 1. Install once per VPS / user
+### 1. Install
 
 ```bash
 curl -fsSL https://memory.toolnet.tech/install | bash
@@ -55,7 +90,7 @@ toolnet-memory --version
 toolnet-memory doctor
 ```
 
-### 2. Configure ToolNet once
+### 2. Configure
 
 ```bash
 toolnet-memory setup
@@ -74,13 +109,19 @@ cd /path/to/project
 toolnet-memory init
 ```
 
-### 4. Build project intelligence once
+Project identity is stored in:
+
+```text
+.toolnet/project.json
+```
+
+### 4. Build project intelligence
 
 ```bash
 toolnet-memory index
 ```
 
-The full index builds:
+The full index pipeline includes:
 
 ```text
 Scanning files
@@ -100,7 +141,7 @@ Graph Analysis
 3D Visualization Dataset
 ```
 
-After the first full index, use incremental indexing for normal changes:
+After the first full index, normal code changes can use:
 
 ```bash
 toolnet-memory incremental
@@ -108,67 +149,59 @@ toolnet-memory incremental
 
 ---
 
-## Normal Daily Workflow
+## Daily Workflow
 
-In normal use, users should not need to manually load large session histories.
+Normal startup is intentionally lightweight:
 
 ```text
 Open project
     ↓
-Agent detects ToolNet project
+Agent loads ToolNet integration
     ↓
-Fast local context loads
+Fast local context is available
     ↓
 Agent continues current work
     ↓
-ToolNet captures meaningful continuity
+Meaningful continuity is captured
 ```
 
-Fast context can be viewed manually with:
+Useful commands:
 
 ```bash
-toolnet-memory
-```
-
-or:
-
-```bash
+# Fast project context
 toolnet-memory context
+
+# Current work state
+toolnet-memory work
+
+# Ask project memory
+toolnet-memory ask "What changed in the authentication flow?"
+
+# Project status
+toolnet-memory status
 ```
 
-The default startup context is intentionally small and local. Deep recovery is reserved for cases where fast context is insufficient.
+Deep recovery is separate and is not automatically dumped into every prompt.
 
 ---
 
-## Switching Between Coding Agents
+# Agent Integrations
 
-ToolNet Memory is designed for workflows such as:
+Detect installed/supported coding agents:
 
-```text
-OpenCode → Agy / Antigravity → Codex → Claude Code → Kiro CLI → Cursor CLI → GitHub Copilot CLI → Grok Build
+```bash
+toolnet-memory integrate:detect
 ```
 
-The next agent should receive the same project continuity instead of starting from zero.
-
-Typical continuity includes:
-
-```text
-Last agent
-Last session
-Current request
-Current activity
-Goal
-Plan
-Current phase
-Blockers
-Decisions
-Next actions
-```
-
-Supported integrations currently include:
+Automatically configure detected integrations:
 
 ```bash
 toolnet-memory integrate:auto
+```
+
+Manual integration commands:
+
+```bash
 toolnet-memory integrate:agy
 toolnet-memory integrate:opencode
 toolnet-memory integrate:codex
@@ -179,39 +212,310 @@ toolnet-memory integrate:copilot
 toolnet-memory integrate:grok
 ```
 
-Cursor CLI, GitHub Copilot CLI, and Grok Build use the same shared ToolNet
-continuity layer. Their integrations register ToolNet MCP plus lifecycle capture/
-continuity guards; Grok also installs the ToolNet continuity skill.
+---
 
-Detect integrations without modifying configuration:
+## v0.3.11: Dual-Scope Integrations
 
-```bash
-toolnet-memory integrate:detect
+Cursor CLI, GitHub Copilot CLI, and Grok Build support three explicit scopes:
+
+```text
+global
+project
+both
 ```
 
-### Kiro CLI
+Examples:
 
-ToolNet Memory integrates with Kiro through MCP and lifecycle hooks.
+```bash
+# Global only
+toolnet-memory integrate:cursor --scope global
 
-````bash
+# Project only
+toolnet-memory integrate:cursor \
+  --scope project \
+  --project /path/to/project
+
+# Global + project
+toolnet-memory integrate:cursor \
+  --scope both \
+  --project /path/to/project
+```
+
+The same scope syntax is supported by:
+
+```bash
+toolnet-memory integrate:copilot ...
+toolnet-memory integrate:grok ...
+```
+
+### Scope policy
+
+`integrate:auto` uses a conservative policy:
+
+| Current location | Automatic scope |
+| --- | --- |
+| Ordinary directory | `global` |
+| Git repository without ToolNet initialization | `global` |
+| Existing ToolNet project with `.toolnet/project.json` | `both` |
+
+ToolNet does **not** create `.cursor/`, `.github/`, or `.grok/` project configuration just because the current directory is a Git repository.
+
+Explicit scope always wins:
+
+```bash
+toolnet-memory integrate:auto --scope global
+
+toolnet-memory integrate:auto \
+  --scope project \
+  --project /path/to/project
+
+toolnet-memory integrate:auto \
+  --scope both \
+  --project /path/to/project
+```
+
+---
+
+## Cursor CLI
+
+Install:
+
+```bash
+toolnet-memory integrate:cursor --scope global
+```
+
+Or for an initialized ToolNet project:
+
+```bash
+toolnet-memory integrate:cursor \
+  --scope both \
+  --project /path/to/project
+```
+
+ToolNet surfaces:
+
+```text
+Global MCP
+  ~/.cursor/mcp.json
+
+Project MCP
+  <project>/.cursor/mcp.json
+
+Global Hooks
+  ~/.cursor/hooks.json
+
+Project Hooks
+  <project>/.cursor/hooks.json
+
+Project Rule
+  <project>/.cursor/rules/toolnet-memory.mdc
+```
+
+Project and global hook layers can both be active. ToolNet uses cross-process event deduplication to prevent duplicate capture.
+
+---
+
+## GitHub Copilot CLI
+
+Install:
+
+```bash
+toolnet-memory integrate:copilot --scope global
+```
+
+Or:
+
+```bash
+toolnet-memory integrate:copilot \
+  --scope both \
+  --project /path/to/project
+```
+
+ToolNet surfaces:
+
+```text
+Global MCP
+  ~/.copilot/mcp-config.json
+
+Project MCP
+  <project>/.github/mcp.json
+
+Global Hooks
+  ~/.copilot/hooks/toolnet-memory.json
+
+Project Hooks
+  <project>/.github/hooks/toolnet-memory.json
+
+Project Instruction
+  <project>/.github/instructions/toolnet-memory.instructions.md
+```
+
+ToolNet does not overwrite `.github/copilot-instructions.md`.
+
+If both global and project MCP entries exist, the project ToolNet MCP is treated as the effective project-scoped configuration.
+
+---
+
+## Grok Build
+
+Install:
+
+```bash
+toolnet-memory integrate:grok --scope global
+```
+
+Or:
+
+```bash
+toolnet-memory integrate:grok \
+  --scope both \
+  --project /path/to/project
+```
+
+ToolNet surfaces:
+
+```text
+Global MCP
+  ~/.grok/config.toml
+
+Project MCP
+  <project>/.grok/config.toml
+
+Global Hooks
+  ~/.grok/hooks/toolnet-memory.json
+
+Project Hooks
+  <project>/.grok/hooks/toolnet-memory.json
+
+Global Continuity Skill
+  ~/.grok/skills/toolnet-continuity/SKILL.md
+
+Project Continuity Skill
+  <project>/.grok/skills/toolnet-continuity/SKILL.md
+```
+
+In a project, the project ToolNet MCP and project continuity skill are the effective project-scoped versions.
+
+Grok command hooks for lifecycle events remain passive; continuity is provided through the ToolNet MCP and `toolnet-continuity` skill rather than pretending hook stdout is hidden model context.
+
+---
+
+## Unified Integration Status
+
+Show Cursor, Copilot, and Grok scope state together:
+
+```bash
+toolnet-memory integrate:status --scope global
+```
+
+For a project:
+
+```bash
+toolnet-memory integrate:status \
+  --scope both \
+  --project /path/to/project
+```
+
+Filter one agent:
+
+```bash
+toolnet-memory integrate:status \
+  --scope both \
+  --project /path/to/project \
+  --agent cursor
+```
+
+JSON output:
+
+```bash
+toolnet-memory integrate:status \
+  --scope both \
+  --project /path/to/project \
+  --json
+```
+
+Status reports:
+
+```text
+Global configuration
+Project configuration
+Effective MCP scope
+Effective hook scope
+Effective rule/instruction/skill scope
+Dedupe readiness
+Trust requirement
+Precedence/shadowing risk
+Warnings
+```
+
+ToolNet does not claim that a workspace is natively trusted unless the host application proves it. Project trust is therefore reported conservatively as required/unverified when applicable.
+
+---
+
+## Cross-Process Hook Deduplication
+
+When both global and project hooks are loaded by a host, the same native event may arrive through two hook processes.
+
+ToolNet prevents double capture with a short-lived cross-process event claim keyed by agent, session, event, and stable native identity.
+
+Examples of deduplicated events include lifecycle and prompt events.
+
+Security enforcement such as raw-session-history protection is evaluated before deduplication so a second hook source cannot bypass policy checks.
+
+---
+
+## Kiro CLI
+
+Kiro integrates through MCP and lifecycle hooks:
+
+```bash
 toolnet-memory integrate:kiro
 toolnet-memory integrate:kiro --status
+```
 
-Kiro receives compact ToolNet startup context, cross-agent continuity through memory_agent_ask, local WAL capture, final Stop flush, and raw-session-history protection through PreToolUse.
+Kiro receives ToolNet continuity through the shared memory core and does not maintain a separate memory database.
 
-Kiro uses the shared ToolNet continuity core and does not maintain a separate memory database.
+---
 
-ToolNet Memory also exposes an MCP server:
+## MCP Server
+
+Run the ToolNet MCP server directly:
 
 ```bash
 toolnet-memory mcp
-````
+```
+
+Core MCP capabilities include:
+
+```text
+memory_search
+memory_save
+memory_forget
+project_context
+code_search
+semantic_code_search
+find_symbol
+find_callers
+trace_calls
+find_dependencies
+analyze_impact
+get_architecture
+graph_path
+graph_neighborhood
+dead_code
+snapshot_create
+snapshot_list
+snapshot_restore
+memory_agent_ask
+```
+
+`memory_agent_ask` is the continuity-facing agent entry point used when an agent needs to recover or continue prior project work.
 
 ---
 
 ## Project Operating Manual
 
-Every project can define persistent mandatory rules in:
+Projects can define persistent rules in:
 
 ```text
 .toolnet/PROJECT.md
@@ -248,26 +552,17 @@ toolnet-memory project:manual-show
 toolnet-memory project:manual-sync
 ```
 
-This is the correct place for rules such as:
-
-- allowed source path,
-- development vs production environment,
-- deployment commands,
-- files that must not be edited,
-- verification requirements,
-- architecture constraints.
-
 Secrets and credentials should remain in `.env` or another secret store, not in `PROJECT.md`.
 
 ---
 
 ## Code Intelligence
 
-ToolNet Memory builds a persistent structural model of the project so coding agents can understand relationships before changing code.
+ToolNet builds a persistent structural model of the codebase.
 
 Capabilities include:
 
-- source symbol indexing,
+- symbol indexing,
 - imports and dependencies,
 - callers and callees,
 - type relationships,
@@ -296,23 +591,17 @@ toolnet-memory semantic "authentication flow"
 toolnet-memory impact src/auth.ts
 ```
 
-The goal is not only to find code, but to help an agent understand **what may break if a file, symbol, or dependency changes**.
-
 ---
 
 ## Code Graph UI
 
-ToolNet Memory includes a project graph visualization UI.
-
-Start it with:
+Open the project graph:
 
 ```bash
 toolnet-memory graph
 ```
 
-The graph uses real indexed ToolNet project data.
-
-For large projects, the UI uses a lightweight drill-down flow instead of rendering the complete symbol graph at once:
+For large projects the UI uses drill-down navigation:
 
 ```text
 Overview
@@ -324,15 +613,13 @@ Files
 Symbols + relationships
 ```
 
-This keeps the graph usable on large projects and mobile browsers while preserving access to detailed relationships when needed.
-
-The graph server defaults to:
+Default address:
 
 ```text
 127.0.0.1:9749
 ```
 
-To expose it temporarily on a VPS network interface:
+Optional VPS exposure:
 
 ```bash
 TOOLNET_GRAPH_HOST=0.0.0.0 \
@@ -344,19 +631,14 @@ toolnet-memory graph
 
 ## Memory and Work Continuity
 
-View the current work state:
+View current work:
 
 ```bash
 toolnet-memory work
-```
-
-or:
-
-```bash
 toolnet-memory work:status
 ```
 
-Ask project memory directly:
+Ask memory:
 
 ```bash
 toolnet-memory ask "What was changed in the authentication flow?"
@@ -369,7 +651,7 @@ toolnet-memory memory:review
 toolnet-memory memory:reconcile
 ```
 
-ToolNet tracks structured continuity such as:
+Structured continuity can include:
 
 ```text
 Mission
@@ -389,20 +671,20 @@ Next Actions
 
 ## Fast Context vs Deep Recovery
 
-### Fast Context — default
+### Fast context
 
-Fast context is local, bounded, and intended for normal agent startup.
+Used for normal startup:
 
 ```bash
-toolnet-memory
+toolnet-memory context
 toolnet-memory context:print
 ```
 
-It uses project-local ToolNet files and does not automatically dump remote history into the prompt.
+It is local and bounded.
 
-### Deep Recovery — manual only
+### Deep recovery
 
-Use deep recovery only when the normal fast context is not enough.
+Use only when fast context is insufficient:
 
 ```bash
 toolnet-memory brief
@@ -412,21 +694,19 @@ toolnet-memory session:codex-recover
 toolnet-memory session:opencode-recover
 ```
 
-These commands are intentionally **not** meant to run automatically on every agent startup.
+Deep recovery is intentionally not run automatically on every startup.
 
 ---
 
 ## AI Providers and Models
 
-ToolNet separates the reasoning model from the embedding model.
-
-Run interactive setup:
+Configure interactively:
 
 ```bash
 toolnet-memory setup
 ```
 
-View provider state:
+Provider commands:
 
 ```bash
 toolnet-memory provider
@@ -436,7 +716,7 @@ toolnet-memory provider:test llm
 toolnet-memory provider:test embedding
 ```
 
-View or change the active model:
+Model commands:
 
 ```bash
 toolnet-memory model
@@ -445,7 +725,7 @@ toolnet-memory model list
 toolnet-memory model set <model>
 ```
 
-Canonical configuration uses:
+Canonical environment configuration:
 
 ```text
 TOOLNET_LLM_PROVIDER
@@ -459,20 +739,16 @@ TOOLNET_EMBEDDING_BASE_URL
 TOOLNET_EMBEDDING_MODEL
 ```
 
-Optional LLM fallbacks are supported for transient failures such as timeouts, HTTP 408, 429, and 5xx responses.
-
 ---
 
 ## Storage
 
-Supported storage modes include:
+Supported modes include:
 
 - Cloudflare R2,
 - generic S3 / S3-compatible storage,
 - local storage,
 - Hugging Face S3 compatibility mode.
-
-Projects remain isolated by stable ToolNet project identity.
 
 A typical remote layout is:
 
@@ -485,19 +761,11 @@ projects/<project>/
 └── snapshots/
 ```
 
-Project identity is stored locally under:
-
-```text
-.toolnet/project.json
-```
-
-Renaming or moving a project directory should not cause unrelated projects to share memory.
+Projects remain isolated by stable ToolNet project identity.
 
 ---
 
 ## Snapshots and Recovery
-
-Create and restore project-scoped snapshots:
 
 ```bash
 toolnet-memory snapshot:list
@@ -510,7 +778,7 @@ toolnet-memory recover
 
 ## Architecture Guard
 
-ToolNet can evaluate project rules and potentially dangerous changes.
+Evaluate project rules and potentially dangerous changes:
 
 ```bash
 toolnet-memory guard:check
@@ -519,13 +787,11 @@ toolnet-memory guard:check --command "rm -rf ..."
 toolnet-memory guard:explain
 ```
 
-The project manual and guard system are intended to reduce accidental violations of important project constraints.
-
 ---
 
 ## Background Service
 
-ToolNet can optionally run a background daemon:
+Optional daemon commands:
 
 ```bash
 toolnet-memory service:install
@@ -536,33 +802,33 @@ toolnet-memory service:stop
 toolnet-memory service:remove
 ```
 
-The background service is optional; the core CLI does not require a permanent daemon for every workflow.
+The daemon is optional; the core CLI does not require a permanent background service.
 
 ---
 
 ## CLI Help
 
-The default help is intentionally compact:
+Compact help:
 
 ```bash
 toolnet-memory help
 ```
 
-Show every command:
+All commands:
 
 ```bash
 toolnet-memory help --all
 ```
 
-Show help for one command:
+One command:
 
 ```bash
 toolnet-memory help index
 toolnet-memory help model
-toolnet-memory help graph
+toolnet-memory help integrate:cursor
 ```
 
-Main user-facing commands:
+Main commands:
 
 ```text
 GET STARTED
@@ -585,38 +851,18 @@ AI
   model
   provider
 
+INTEGRATIONS
+  integrate:detect
+  integrate:auto
+  integrate:status
+  integrate:cursor
+  integrate:copilot
+  integrate:grok
+
 SYSTEM
   status
   update
 ```
-
-Advanced, recovery, service, session, and production commands remain available through `help --all`.
-
----
-
-## Health and Status
-
-Quick status:
-
-```bash
-toolnet-memory status
-```
-
-Deeper diagnostics:
-
-```bash
-toolnet-memory doctor
-```
-
-Configuration:
-
-```bash
-toolnet-memory config get KEY
-toolnet-memory config set KEY VALUE
-toolnet-memory config open
-```
-
-Secret values are masked in normal CLI output.
 
 ---
 
@@ -626,7 +872,7 @@ Secret values are masked in normal CLI output.
 toolnet-memory update
 ```
 
-Or reinstall the latest npm release:
+Or:
 
 ```bash
 npm install -g toolnet-memory@latest
@@ -641,12 +887,13 @@ ToolNet Memory processes source-code metadata, project instructions, agent activ
 Important rules:
 
 - Never commit `.env` files or credentials.
-- Keep VPS passwords, API keys, and tokens out of `PROJECT.md`.
+- Keep passwords, API keys, and tokens out of `PROJECT.md`.
 - Sanitize secrets before durable persistence.
 - Never inject memory from another project.
 - Treat raw coding-agent transcripts as sensitive.
 - Keep deep recovery manual and bounded.
 - Store global ToolNet credentials outside project repositories.
+- Raw ToolNet session/history files are protected from normal agent access.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
@@ -667,6 +914,26 @@ npm run build:release
 npm pack --dry-run
 ```
 
+Phase 07 integration certification:
+
+```bash
+npm run release:certify:phase07
+```
+
+8-agent continuity certification:
+
+```bash
+npm run release:certify:8
+```
+
+Optional native CLI E2E certification:
+
+```bash
+npm run release:certify:native:optional
+```
+
+Native Cursor/Copilot/Grok binaries are not required for normal package release certification.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution rules.
 
 ---
@@ -675,25 +942,27 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution rules.
 
 ToolNet Memory uses GitHub Actions for CI and npm releases.
 
-Before a release, the repository validates:
+The current release line is:
+
+```text
+npm package: toolnet-memory@0.3.11
+Git tag:     v0.3.11
+```
+
+Before release, the repository validates:
 
 ```text
 lint
 format
 TypeScript
 unit/integration tests
+8-agent continuity
+Phase 07 integration contracts
 production build
 npm package contents
 ```
 
-Version tags trigger the release workflow and npm Trusted Publishing.
-
-The tag must match `package.json`:
-
-```text
-package.json: 0.3.x
-Git tag:      v0.3.x
-```
+Version tags trigger the Release workflow and npm Trusted Publishing.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
