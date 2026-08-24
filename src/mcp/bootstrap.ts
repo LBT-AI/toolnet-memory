@@ -15,8 +15,6 @@ import { hydrateMCPContext } from './hydration.js';
 
 import { createMCPRuntimeState, markMCPConnected, markRuntimeFailed } from './runtime-state.js';
 
-import { ProjectLock } from '../production/project-lock.js';
-
 function degradedRetryDelay(): number {
   const configured = Number(process.env.TOOLNET_MCP_DEGRADED_RETRY_MS ?? 30_000);
 
@@ -32,17 +30,15 @@ async function main() {
    */
   const project = new ProjectManager().detect();
 
-  const processLock = new ProjectLock(project.id);
-
-  await processLock.acquire();
-
-  const stop = () => {
-    void processLock.release().finally(() => process.exit(0));
-  };
-
-  process.once('SIGINT', stop);
-  process.once('SIGTERM', stop);
-
+  /*
+   * MCP servers are client-scoped, not project-singletons.
+   *
+   * OpenCode, Codex, Agy, Claude and Kiro may all connect to the same
+   * ToolNet project concurrently. Do not hold a project-wide process lock
+   * for the lifetime of an MCP stdio server.
+   *
+   * Exclusive locks belong only around specific mutating/indexing operations.
+   */
   const memory = new MemoryEngine();
   const retrieval = new RetrievalEngine(memory);
 
