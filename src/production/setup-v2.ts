@@ -259,7 +259,12 @@ function parseEnv(text: string): Values {
 
 function currentStorage(values: Values): StorageProvider {
   const provider = values.get('MEMORY_STORAGE_PROVIDER');
-  if (provider === 'r2' || provider === 's3' || provider === 'huggingface' || provider === 'local') {
+  if (
+    provider === 'r2' ||
+    provider === 's3' ||
+    provider === 'huggingface' ||
+    provider === 'local'
+  ) {
     return provider;
   }
   if (values.get('HF_BUCKET') && values.get('HF_S3_ACCESS_KEY_ID')) return 'huggingface';
@@ -295,7 +300,8 @@ function applyDefaults(values: Values): void {
   for (const [key, value] of Object.entries(DEFAULTS)) {
     if (!values.has(key)) values.set(key, value);
   }
-  if (!values.has('MEMORY_STORAGE_PROVIDER')) values.set('MEMORY_STORAGE_PROVIDER', currentStorage(values));
+  if (!values.has('MEMORY_STORAGE_PROVIDER'))
+    values.set('MEMORY_STORAGE_PROVIDER', currentStorage(values));
   if (!values.has('MEMORY_LOCAL_CACHE_MB')) values.set('MEMORY_LOCAL_CACHE_MB', '200');
 }
 
@@ -548,7 +554,8 @@ async function testLlm(values: Values, quiet = false): Promise<boolean> {
   try {
     const result = await createAiProvider(config).healthCheck();
     if (!quiet) {
-      if (result.ok) console.log(`✓ Model ready${result.latencyMs ? ` — ${result.latencyMs}ms` : ''}`);
+      if (result.ok)
+        console.log(`✓ Model ready${result.latencyMs ? ` — ${result.latencyMs}ms` : ''}`);
       else console.log(`✗ ${result.message}`);
       console.log('');
     }
@@ -565,9 +572,16 @@ async function testLlm(values: Values, quiet = false): Promise<boolean> {
 async function modelWizard(rl: readline.Interface, values: Values): Promise<boolean> {
   const original = new Map(values);
   while (true) {
-    const current = LLM_PROVIDERS.findIndex((item) => item.id === values.get('TOOLNET_LLM_PROVIDER'));
+    const current = LLM_PROVIDERS.findIndex(
+      (item) => item.id === values.get('TOOLNET_LLM_PROVIDER')
+    );
     console.log('');
-    const definition = await choose(rl, 'Model provider', LLM_PROVIDERS, current >= 0 ? current : undefined);
+    const definition = await choose(
+      rl,
+      'Model provider',
+      LLM_PROVIDERS,
+      current >= 0 ? current : undefined
+    );
     if (!definition) return false;
 
     if (values.get('TOOLNET_LLM_PROVIDER') !== definition.id) clearLlm(values);
@@ -579,7 +593,9 @@ async function modelWizard(rl: readline.Interface, values: Values): Promise<bool
 
     if (definition.accountIdRequired) {
       const currentAccount = values.get('TOOLNET_LLM_ACCOUNT_ID');
-      const account = await rl.question(currentAccount ? `Account ID [${currentAccount}]: ` : 'Account ID: ');
+      const account = await rl.question(
+        currentAccount ? `Account ID [${currentAccount}]: ` : 'Account ID: '
+      );
       setIfEntered(values, 'TOOLNET_LLM_ACCOUNT_ID', account);
     } else {
       values.delete('TOOLNET_LLM_ACCOUNT_ID');
@@ -724,7 +740,12 @@ async function embeddingWizard(rl: readline.Interface, values: Values): Promise<
       (item) => item.id === (values.get('TOOLNET_EMBEDDING_PROVIDER') || 'local')
     );
     console.log('');
-    const definition = await choose(rl, 'Embedding', EMBEDDING_PROVIDERS, current >= 0 ? current : 0);
+    const definition = await choose(
+      rl,
+      'Embedding',
+      EMBEDDING_PROVIDERS,
+      current >= 0 ? current : 0
+    );
     if (!definition) return false;
 
     if (values.get('TOOLNET_EMBEDDING_PROVIDER') !== definition.id) clearEmbedding(values);
@@ -767,7 +788,11 @@ async function embeddingWizard(rl: readline.Interface, values: Values): Promise<
 
     if (definition.id === 'cloudflare') {
       const account = values.get('TOOLNET_EMBEDDING_ACCOUNT_ID');
-      if (account) values.set('TOOLNET_EMBEDDING_BASE_URL', `https://api.cloudflare.com/client/v4/accounts/${account}/ai/v1`);
+      if (account)
+        values.set(
+          'TOOLNET_EMBEDDING_BASE_URL',
+          `https://api.cloudflare.com/client/v4/accounts/${account}/ai/v1`
+        );
     } else {
       const existing = values.get('TOOLNET_EMBEDDING_BASE_URL');
       const fallback = existing || definition.baseUrl || '';
@@ -852,7 +877,9 @@ async function storageWizard(rl: readline.Interface, values: Values): Promise<bo
   console.log('────────────────────────────────────────');
 
   if (selected.id === 'local') {
-    const fallback = values.get('MEMORY_LOCAL_STORAGE_PATH') || path.join(os.homedir(), '.local', 'share', 'toolnet-memory');
+    const fallback =
+      values.get('MEMORY_LOCAL_STORAGE_PATH') ||
+      path.join(os.homedir(), '.local', 'share', 'toolnet-memory');
     const entered = await rl.question(`Path [${fallback}]: `);
     values.set('MEMORY_LOCAL_STORAGE_PATH', entered.trim() || fallback);
     save(values);
@@ -865,12 +892,21 @@ async function storageWizard(rl: readline.Interface, values: Values): Promise<bo
     setIfEntered(values, 'R2_ACCOUNT_ID', account);
     const bucket = await rl.question(`Bucket [${values.get('R2_BUCKET') || 'toolnet-memory'}]: `);
     setIfEntered(values, 'R2_BUCKET', bucket, 'toolnet-memory');
-    const access = await rl.question(`Access key ID [${values.get('R2_ACCESS_KEY_ID') ? 'configured' : ''}]: `);
+    const access = await rl.question(
+      `Access key ID [${values.get('R2_ACCESS_KEY_ID') ? 'configured' : ''}]: `
+    );
     setIfEntered(values, 'R2_ACCESS_KEY_ID', access);
-    const secret = await secretQuestion(rl, values.get('R2_SECRET_ACCESS_KEY') ? 'Secret access key [configured, Enter = keep]: ' : 'Secret access key: ');
+    const secret = await secretQuestion(
+      rl,
+      values.get('R2_SECRET_ACCESS_KEY')
+        ? 'Secret access key [configured, Enter = keep]: '
+        : 'Secret access key: '
+    );
     if (secret.trim()) values.set('R2_SECRET_ACCESS_KEY', secret.trim());
     const ok = await testS3({
-      endpoint: values.get('R2_ACCOUNT_ID') ? `https://${values.get('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com` : undefined,
+      endpoint: values.get('R2_ACCOUNT_ID')
+        ? `https://${values.get('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`
+        : undefined,
       region: 'auto',
       bucket: values.get('R2_BUCKET') || 'toolnet-memory',
       accessKeyId: values.get('R2_ACCESS_KEY_ID') || '',
@@ -878,15 +914,24 @@ async function storageWizard(rl: readline.Interface, values: Values): Promise<bo
     });
     if (!ok) return false;
   } else if (selected.id === 's3') {
-    const endpoint = await rl.question(`Endpoint [${values.get('S3_ENDPOINT') || 'AWS default'}]: `);
+    const endpoint = await rl.question(
+      `Endpoint [${values.get('S3_ENDPOINT') || 'AWS default'}]: `
+    );
     if (endpoint.trim()) values.set('S3_ENDPOINT', normalizeEndpoint(endpoint));
     const region = await rl.question(`Region [${values.get('S3_REGION') || 'us-east-1'}]: `);
     setIfEntered(values, 'S3_REGION', region, 'us-east-1');
     const bucket = await rl.question(`Bucket [${values.get('S3_BUCKET') || 'toolnet-memory'}]: `);
     setIfEntered(values, 'S3_BUCKET', bucket, 'toolnet-memory');
-    const access = await rl.question(`Access key ID [${values.get('S3_ACCESS_KEY_ID') ? 'configured' : ''}]: `);
+    const access = await rl.question(
+      `Access key ID [${values.get('S3_ACCESS_KEY_ID') ? 'configured' : ''}]: `
+    );
     setIfEntered(values, 'S3_ACCESS_KEY_ID', access);
-    const secret = await secretQuestion(rl, values.get('S3_SECRET_ACCESS_KEY') ? 'Secret access key [configured, Enter = keep]: ' : 'Secret access key: ');
+    const secret = await secretQuestion(
+      rl,
+      values.get('S3_SECRET_ACCESS_KEY')
+        ? 'Secret access key [configured, Enter = keep]: '
+        : 'Secret access key: '
+    );
     if (secret.trim()) values.set('S3_SECRET_ACCESS_KEY', secret.trim());
     const ok = await testS3({
       endpoint: values.get('S3_ENDPOINT') || undefined,
@@ -904,9 +949,16 @@ async function storageWizard(rl: readline.Interface, values: Values): Promise<bo
     setIfEntered(values, 'HF_BUCKET', bucket, 'toolnet-memory');
     const url = await rl.question(`S3 endpoint [${values.get('HF_URL') || ''}]: `);
     setIfEntered(values, 'HF_URL', url);
-    const access = await rl.question(`Access key ID [${values.get('HF_S3_ACCESS_KEY_ID') ? 'configured' : ''}]: `);
+    const access = await rl.question(
+      `Access key ID [${values.get('HF_S3_ACCESS_KEY_ID') ? 'configured' : ''}]: `
+    );
     setIfEntered(values, 'HF_S3_ACCESS_KEY_ID', access);
-    const secret = await secretQuestion(rl, values.get('HF_S3_SECRET_ACCESS_KEY') ? 'Secret access key [configured, Enter = keep]: ' : 'Secret access key: ');
+    const secret = await secretQuestion(
+      rl,
+      values.get('HF_S3_SECRET_ACCESS_KEY')
+        ? 'Secret access key [configured, Enter = keep]: '
+        : 'Secret access key: '
+    );
     if (secret.trim()) values.set('HF_S3_SECRET_ACCESS_KEY', secret.trim());
     const ok = await testS3({
       endpoint: values.get('HF_URL') || undefined,
@@ -980,7 +1032,14 @@ async function configuredMenu(rl: readline.Interface, values: Values): Promise<v
 function parseSection(args: string[]): Section | undefined {
   const index = args.indexOf('--section');
   const value = index >= 0 ? args[index + 1] : undefined;
-  if (value === 'model' || value === 'embedding' || value === 'storage' || value === 'integrations' || value === 'health') return value;
+  if (
+    value === 'model' ||
+    value === 'embedding' ||
+    value === 'storage' ||
+    value === 'integrations' ||
+    value === 'health'
+  )
+    return value;
   return undefined;
 }
 
@@ -1073,7 +1132,9 @@ async function main(): Promise<void> {
       return;
     }
 
-    const configured = Boolean(values.get('TOOLNET_LLM_PROVIDER') && values.get('TOOLNET_LLM_MODEL'));
+    const configured = Boolean(
+      values.get('TOOLNET_LLM_PROVIDER') && values.get('TOOLNET_LLM_MODEL')
+    );
     if (!exists || !configured) await firstRun(rl, values);
     else await existingRun(rl, values);
   } finally {
