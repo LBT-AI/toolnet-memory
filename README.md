@@ -252,11 +252,11 @@ toolnet-memory integrate:grok ...
 
 `integrate:auto` uses a conservative policy:
 
-| Current location | Automatic scope |
-| --- | --- |
-| Ordinary directory | `global` |
-| Git repository without ToolNet initialization | `global` |
-| Existing ToolNet project with `.toolnet/project.json` | `both` |
+| Current location                                      | Automatic scope |
+| ----------------------------------------------------- | --------------- |
+| Ordinary directory                                    | `global`        |
+| Git repository without ToolNet initialization         | `global`        |
+| Existing ToolNet project with `.toolnet/project.json` | `both`          |
 
 ToolNet does **not** create `.cursor/`, `.github/`, or `.grok/` project configuration just because the current directory is a Git repository.
 
