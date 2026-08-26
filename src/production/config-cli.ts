@@ -1,140 +1,173 @@
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'toolnet-memory');
-
 const ENV_FILE = path.join(CONFIG_DIR, '.env');
-
 const SECRET_PATTERN = /(SECRET|TOKEN|PASSWORD|ACCESS_KEY|API_KEY|PRIVATE_KEY)/i;
 
-function ensureConfig() {
-  fs.mkdirSync(CONFIG_DIR, {
-    recursive: true,
-    mode: 0o700,
-  });
-
+function ensureConfig(): void {
+  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   if (!fs.existsSync(ENV_FILE)) {
-    fs.writeFileSync(ENV_FILE, '', {
-      encoding: 'utf8',
-      mode: 0o600,
-    });
+    fs.writeFileSync(ENV_FILE, '', { encoding: 'utf8', mode: 0o600 });
   }
-
   fs.chmodSync(CONFIG_DIR, 0o700);
-
   fs.chmodSync(ENV_FILE, 0o600);
 }
 
-function parseLines() {
+function parseLines(): string[] {
   ensureConfig();
-
   return fs.readFileSync(ENV_FILE, 'utf8').split(/\r?\n/);
 }
 
-function parseValues() {
+function parseValues(): Map<string, string> {
   const values = new Map<string, string>();
-
   for (const raw of parseLines()) {
     const line = raw.trim();
-
-    if (!line || line.startsWith('#')) {
-      continue;
-    }
-
+    if (!line || line.startsWith('#')) continue;
     const index = line.indexOf('=');
-
-    if (index < 1) {
-      continue;
-    }
-
+    if (index < 1) continue;
     values.set(line.slice(0, index).trim(), line.slice(index + 1).trim());
   }
-
   return values;
 }
 
-function validKey(key: string) {
+function validKey(key: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key);
 }
 
-function masked(key: string, value: string) {
-  if (!SECRET_PATTERN.test(key)) {
-    return value;
-  }
-
-  if (!value) {
-    return '';
-  }
-
-  if (value.length <= 8) {
-    return '********';
-  }
-
-  return value.slice(0, 4) + '…' + value.slice(-4);
+function masked(key: string, value: string): string {
+  if (!SECRET_PATTERN.test(key)) return value;
+  if (!value) return '';
+  if (value.length <= 8) return '********';
+  return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 
-function setValue(key: string, value: string) {
-  if (!validKey(key)) {
-    throw new Error(`Invalid config key: ${key}`);
-  }
-
-  const lines = parseLines();
-
-  let replaced = false;
-
-  const updated = lines.map((line) => {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith(`${key}=`)) {
-      replaced = true;
-
-      return `${key}=${value}`;
-    }
-
-    return line;
-  });
-
-  if (!replaced) {
-    if (updated.length && updated[updated.length - 1] !== '') {
-      updated.push('');
-    }
-
-    updated.push(`${key}=${value}`);
-  }
-
-  fs.writeFileSync(ENV_FILE, updated.join('\n'), {
+function writeLines(lines: string[]): void {
+  ensureConfig();
+  fs.writeFileSync(ENV_FILE, `${lines.join('\n').replace(/\n+$/, '')}\n`, {
     encoding: 'utf8',
     mode: 0o600,
   });
-
   fs.chmodSync(ENV_FILE, 0o600);
 }
 
-function usage() {
-  console.log(
-    `ToolNet Memory Config
-
-Commands:
-  toolnet-memory config path
-  toolnet-memory config list
-  toolnet-memory config get KEY
-  toolnet-memory config get KEY --reveal
-  toolnet-memory config set KEY VALUE
-  toolnet-memory config open
-
-Examples:
-  toolnet-memory config get HF_NAMESPACE
-  toolnet-memory config set HF_BUCKET toolnet-memory
-  toolnet-memory config open`
-  );
+function setValue(key: string, value: string): void {
+  if (!validKey(key)) throw new Error(`Invalid config key: ${key}`);
+  const lines = parseLines();
+  let replaced = false;
+  const updated = lines.map((line) => {
+    if (line.trim().startsWith(`${key}=`)) {
+      replaced = true;
+      return `${key}=${value}`;
+    }
+    return line;
+  });
+  if (!replaced) {
+    if (updated.length && updated.at(-1) !== '') updated.push('');
+    updated.push(`${key}=${value}`);
+  }
+  writeLines(updated);
 }
 
-function main() {
-  const [command = 'help', ...args] = process.argv.slice(2);
+function unsetValue(key: string): boolean {
+  if (!validKey(key)) throw new Error(`Invalid config key: ${key}`);
+  const lines = parseLines();
+  const updated = lines.filter((line) => !line.trim().startsWith(`${key}=`));
+  if (updated.length === lines.length) return false;
+  writeLines(updated);
+  return true;
+}
 
-  if (command === 'path') {
+function showSummary(): void {
+  const values = parseValues();
+  const storage = values.get('MEMORY_STORAGE_PROVIDER') || 'not configured';
+  const llmProvider = values.get('TOOLNET_LLM_PROVIDER') || 'not configured';
+  const llmModel = values.get('TOOLNET_LLM_MODEL');
+  const embedding = values.get('TOOLNET_EMBEDDING_PROVIDER') || 'local';
+  const embeddingModel = values.get('TOOLNET_EMBEDDING_MODEL');
+
+  console.log('');
+  console.log('◇ ToolNet Memory Config');
+  console.log('');
+  console.log(`Storage    ${storage}`);
+  console.log(`LLM        ${llmProvider}${llmModel ? ` / ${llmModel}` : ''}`);
+  console.log(`Embedding  ${embedding}${embeddingModel ? ` / ${embeddingModel}` : ''}`);
+  console.log(`File       ${ENV_FILE}`);
+  console.log('Secrets    hidden');
+  console.log('');
+}
+
+function validate(): boolean {
+  const values = parseValues();
+  const errors: string[] = [];
+  if (!values.get('MEMORY_STORAGE_PROVIDER')) errors.push('Storage provider is missing');
+  if (!values.get('TOOLNET_LLM_PROVIDER')) errors.push('LLM provider is missing');
+  if (!values.get('TOOLNET_LLM_MODEL')) errors.push('LLM model is missing');
+  if (!values.get('TOOLNET_EMBEDDING_PROVIDER')) errors.push('Embedding provider is missing');
+
+  if (errors.length) {
+    console.log('Config needs attention:');
+    for (const error of errors) console.log(`  ✗ ${error}`);
+    return false;
+  }
+  console.log('✓ Config structure looks valid');
+  return true;
+}
+
+function launchSetup(): void {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const bundledSetup = path.join(here, 'setup.js');
+
+  if (fs.existsSync(bundledSetup)) {
+    const result = spawnSync(process.execPath, [bundledSetup, 'setup'], { stdio: 'inherit' });
+    process.exitCode = result.status ?? 0;
+    return;
+  }
+
+  const result = spawnSync('toolnet-memory', ['setup'], { stdio: 'inherit' });
+  process.exitCode = result.status ?? 0;
+}
+
+function usage(): void {
+  console.log(`ToolNet Memory Config
+
+Commands:
+  toolnet-memory config                 Guided configuration
+  toolnet-memory config show            Friendly summary
+  toolnet-memory config file            Print config path
+  toolnet-memory config list            List active keys (secrets masked)
+  toolnet-memory config get KEY          Read one value (masked if secret)
+  toolnet-memory config get KEY --reveal Read one value including secret
+  toolnet-memory config set KEY VALUE    Set one value
+  toolnet-memory config unset KEY        Remove one value
+  toolnet-memory config validate         Validate required fields
+  toolnet-memory config open             Open config in editor
+
+Targeted setup:
+  toolnet-memory setup --section model
+  toolnet-memory setup --section embedding
+  toolnet-memory setup --section storage
+  toolnet-memory setup --section integrations
+  toolnet-memory setup --section health`);
+}
+
+function main(): void {
+  const [command, ...args] = process.argv.slice(2);
+
+  if (!command || command === 'configure') {
+    launchSetup();
+    return;
+  }
+
+  if (command === 'show') {
+    showSummary();
+    return;
+  }
+
+  if (command === 'path' || command === 'file') {
     ensureConfig();
     console.log(ENV_FILE);
     return;
@@ -142,72 +175,50 @@ function main() {
 
   if (command === 'list') {
     const values = parseValues();
-
-    for (const [key, value] of values) {
-      console.log(`${key}=${masked(key, value)}`);
-    }
-
+    for (const [key, value] of values) console.log(`${key}=${masked(key, value)}`);
     return;
   }
 
   if (command === 'get') {
     const key = args[0];
-
-    if (!key) {
-      console.error('Usage: toolnet-memory config get KEY');
-      process.exit(1);
-    }
-
+    if (!key) throw new Error('Usage: toolnet-memory config get KEY');
     const values = parseValues();
-
-    if (!values.has(key)) {
-      console.error(`Config key not found: ${key}`);
-      process.exit(1);
-    }
-
+    if (!values.has(key)) throw new Error(`Config key not found: ${key}`);
     const value = values.get(key) ?? '';
-
-    const reveal = args.includes('--reveal');
-
-    console.log(reveal ? value : masked(key, value));
-
+    console.log(args.includes('--reveal') ? value : masked(key, value));
     return;
   }
 
   if (command === 'set') {
     const key = args[0];
-
     const value = args[1];
-
-    if (!key || value === undefined) {
-      console.error('Usage: toolnet-memory config set KEY VALUE');
-      process.exit(1);
-    }
-
+    if (!key || value === undefined) throw new Error('Usage: toolnet-memory config set KEY VALUE');
     setValue(key, value);
-
     console.log(`✓ ${key} updated`);
+    return;
+  }
 
+  if (command === 'unset') {
+    const key = args[0];
+    if (!key) throw new Error('Usage: toolnet-memory config unset KEY');
+    console.log(unsetValue(key) ? `✓ ${key} removed` : `· ${key} was not set`);
+    return;
+  }
+
+  if (command === 'validate') {
+    if (!validate()) process.exitCode = 1;
     return;
   }
 
   if (command === 'open') {
     ensureConfig();
-
     if (!process.stdin.isTTY) {
       console.log(ENV_FILE);
       return;
     }
-
     const editor = process.env.VISUAL || process.env.EDITOR || 'vi';
-
-    const result = spawnSync(editor, [ENV_FILE], {
-      stdio: 'inherit',
-      shell: true,
-    });
-
+    const result = spawnSync(editor, [ENV_FILE], { stdio: 'inherit', shell: true });
     process.exitCode = result.status ?? 0;
-
     return;
   }
 
@@ -218,6 +229,5 @@ try {
   main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-
   process.exit(1);
 }
