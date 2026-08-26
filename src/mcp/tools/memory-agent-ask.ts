@@ -11,6 +11,14 @@ import {
   prepareMemoryConversation,
 } from '../../work-continuity/memory-conversation.js';
 
+import {
+  detectStructuredHandoffDetail,
+  loadLatestStructuredHandoff,
+  type StructuredHandoffDetail,
+} from '../../work-continuity/structured-handoff.js';
+
+import { shouldUseStructuredHandoff } from '../../work-continuity/structured-handoff-intent.js';
+
 export const memoryAgentAskSchema = {
   question: z
     .string()
@@ -26,12 +34,59 @@ export const memoryAgentAskSchema = {
     .describe(
       'ai uses ToolNet Memory Agent with configured LLM fallback chain. local returns deterministic local memory only.'
     ),
+
+  detail: z
+    .enum(['compact', 'normal', 'benchmark'])
+    .optional()
+    .describe(
+      'Handoff detail level. compact=minimal, normal=standard, benchmark=deep evidence/files/tests for agent takeover.'
+    ),
 };
 
 export interface MemoryAgentAskInput {
   question: string;
 
   mode?: 'ai' | 'local';
+
+  detail?: StructuredHandoffDetail;
+}
+
+function structuredLocalHandoff(
+  ctx: Pick<MCPContext, 'project'>,
+  question: string,
+  intent: string,
+  fallbackAnswer: string,
+  requestedDetail?: StructuredHandoffDetail
+) {
+  if (!shouldUseStructuredHandoff(question, intent)) {
+    return {
+      answer: fallbackAnswer,
+    };
+  }
+
+  const detail = detectStructuredHandoffDetail(question, requestedDetail);
+
+  const handoff = loadLatestStructuredHandoff(ctx.project, detail);
+
+  if (!handoff) {
+    return {
+      answer: fallbackAnswer,
+    };
+  }
+
+  return {
+    answer: handoff.text,
+
+    handoff: handoff.data,
+
+    detail: handoff.detail,
+
+    confidence: handoff.quality.confidence,
+
+    missingContext: handoff.quality.missingContext,
+
+    quality: handoff.quality,
+  };
 }
 
 export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: MemoryAgentAskInput) {
@@ -39,16 +94,22 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
 
   /*
    * Local mode:
-   * deterministic and zero external AI calls.
-   *
-   * Useful for agents that only need direct state facts.
+   * deterministic, canonical and zero external AI calls.
    */
   if (input.mode === 'local') {
     const followUp = answerMemoryConversationFollowUp(conversation);
 
     if (followUp) {
+      const structured = structuredLocalHandoff(
+        ctx,
+        conversation.originalQuestion,
+        String(followUp.intent),
+        followUp.answer,
+        input.detail
+      );
+
       return {
-        answer: followUp.answer,
+        ...structured,
 
         mode: 'local' as const,
 
@@ -61,16 +122,21 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
     }
 
     /*
-     * Direct deterministic questions must use only the
+     * Direct deterministic questions must use only
      * original user text for intent detection.
-     *
-     * Compact prior focus must never influence the regex
-     * intent classifier.
      */
     const result = answerRetrievedMemoryQuestion(ctx.project, conversation.originalQuestion);
 
+    const structured = structuredLocalHandoff(
+      ctx,
+      conversation.originalQuestion,
+      String(result.intent),
+      result.answer,
+      input.detail
+    );
+
     return {
-      answer: result.answer,
+      ...structured,
 
       mode: 'local' as const,
 
@@ -83,13 +149,45 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
   }
 
   /*
-   * Default mode = AI.
+   * Structured continuity/takeover questions must prefer
+   * canonical deterministic handoff before invoking AI.
    *
-   * Memory Agent receives only selected ToolNet context,
+   * Benefits:
+   * - no LLM paraphrase can drop evidence/files/next action
+   * - zero external AI cost for handoff retrieval
+   * - same result across Codex/Agy/Kiro/OpenCode/etc.
+   */
+  const direct = answerRetrievedMemoryQuestion(ctx.project, conversation.originalQuestion);
+
+  const deterministicHandoff = structuredLocalHandoff(
+    ctx,
+    conversation.originalQuestion,
+    String(direct.intent),
+    direct.answer,
+    input.detail
+  );
+
+  if ('handoff' in deterministicHandoff) {
+    return {
+      ...deterministicHandoff,
+
+      mode: 'ai' as const,
+
+      usedAi: false,
+
+      source: direct.source,
+
+      intent: direct.intent,
+
+      routing: 'deterministic-handoff' as const,
+    };
+  }
+
+  /*
+   * Ordinary memory questions can still use Memory Agent AI.
+   *
+   * Memory Agent receives selected ToolNet context,
    * never the raw full transcript.
-   *
-   * askMemoryAgent() already falls back to the local
-   * deterministic answer if all AI providers fail.
    */
   const result = await askMemoryAgent(ctx.project, conversation.question);
 
@@ -97,8 +195,16 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
     const followUp = answerMemoryConversationFollowUp(conversation);
 
     if (followUp) {
+      const structured = structuredLocalHandoff(
+        ctx,
+        conversation.originalQuestion,
+        String(followUp.intent),
+        followUp.answer,
+        input.detail
+      );
+
       return {
-        answer: followUp.answer,
+        ...structured,
 
         mode: 'ai' as const,
 

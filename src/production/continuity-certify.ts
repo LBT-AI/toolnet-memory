@@ -29,6 +29,16 @@ export interface ContinuityCertificationChecks {
   rawTranscriptIsolated: boolean;
 
   compact: boolean;
+
+  structuredTakeoverRecovered: boolean;
+
+  benchmarkDetailRecovered: boolean;
+
+  highConfidence: boolean;
+
+  evidenceRecovered: boolean;
+
+  deterministicTakeover: boolean;
 }
 
 export interface ContinuityCertificationCase {
@@ -61,6 +71,7 @@ function createCanonicalHandoff(
   projectId: string,
   projectName: string,
   from: CertifiedAgent,
+  to: CertifiedAgent,
   task: string,
   currentFile: string,
   todo: string,
@@ -91,6 +102,12 @@ function createCanonicalHandoff(
       },
 
       capturedAt: '2026-08-13T05:30:00.000Z',
+
+      goal: `Continue ${projectName} safely across agents`,
+
+      request: `Recover ${task} with exact evidence and next action`,
+
+      activity: `Preparing ${to} takeover from ${from}`,
 
       current: {
         phase: {
@@ -145,6 +162,22 @@ function createCanonicalHandoff(
         status: 'passing',
 
         recent: ['A1-A3 adapter tests passed'],
+
+        checks: [
+          {
+            kind: 'test',
+
+            status: 'passed',
+
+            command: `node scripts/${from}-to-${to}-verify.mjs`,
+          },
+        ],
+      },
+
+      evidence: {
+        commands: [`node scripts/${from}-to-${to}-verify.mjs`],
+
+        references: [`https://example.test/${from}/${to}/continuity-report`],
       },
 
       attention: [],
@@ -236,7 +269,7 @@ async function certifyPair(
      */
     writeJson(
       join(workDirectory, 'handoff-latest.json'),
-      createCanonicalHandoff(projectId, projectName, from, task, currentFile, todo, nextAction)
+      createCanonicalHandoff(projectId, projectName, from, to, task, currentFile, todo, nextAction)
     );
 
     /*
@@ -291,11 +324,51 @@ async function certifyPair(
 
     const nextAnswer = await askLocal(project, 'Tôi phải làm gì tiếp?');
 
+    /*
+     * Code 7:
+     *
+     * Simulate a real new coding agent asking for a deep takeover.
+     * mode=ai is intentional: Code 6 must route this to the
+     * deterministic structured handoff without calling an LLM.
+     */
+    const takeoverAnswer = await memoryAgentAsk(
+      {
+        project,
+      } as unknown as Parameters<typeof memoryAgentAsk>[0],
+      {
+        mode: 'ai',
+
+        detail: 'benchmark',
+
+        question:
+          'Summarize current state, completed work, evidence, files, tests, blockers and exact next action for benchmark agent takeover.',
+      }
+    );
+
+    const takeoverMeta = takeoverAnswer as unknown as {
+      answer: string;
+
+      usedAi: boolean;
+
+      routing?: string;
+
+      detail?: string;
+
+      confidence?: string;
+
+      missingContext?: string[];
+    };
+
+    const expectedCommand = `node scripts/${from}-to-${to}-verify.mjs`;
+
+    const expectedReference = `https://example.test/${from}/${to}/continuity-report`;
+
     const allAnswers = [
       taskAnswer.answer,
       fileAnswer.answer,
       todoAnswer.answer,
       nextAnswer.answer,
+      takeoverAnswer.answer,
     ].join('\n');
 
     const responses = [taskAnswer, fileAnswer, todoAnswer, nextAnswer];
@@ -318,6 +391,30 @@ async function certifyPair(
       rawTranscriptIsolated: !allAnswers.includes(RAW_TRANSCRIPT_SENTINEL),
 
       compact: responses.every((response) => response.answer.length < 1600),
+
+      structuredTakeoverRecovered:
+        takeoverAnswer.answer.includes('CURRENT_STATE') &&
+        takeoverAnswer.answer.includes('COMPLETED') &&
+        takeoverAnswer.answer.includes('EVIDENCE') &&
+        takeoverAnswer.answer.includes('FILES_TOUCHED') &&
+        takeoverAnswer.answer.includes('BLOCKERS') &&
+        takeoverAnswer.answer.includes('NEXT_ACTION'),
+
+      benchmarkDetailRecovered:
+        takeoverMeta.detail === 'benchmark' &&
+        takeoverAnswer.answer.includes('HANDOFF_DETAIL: benchmark'),
+
+      highConfidence:
+        takeoverMeta.confidence === 'high' &&
+        Array.isArray(takeoverMeta.missingContext) &&
+        takeoverMeta.missingContext.length === 0,
+
+      evidenceRecovered:
+        takeoverAnswer.answer.includes(expectedCommand) &&
+        takeoverAnswer.answer.includes(expectedReference),
+
+      deterministicTakeover:
+        takeoverAnswer.usedAi === false && takeoverMeta.routing === 'deterministic-handoff',
     };
 
     return {

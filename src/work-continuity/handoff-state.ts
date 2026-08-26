@@ -103,6 +103,17 @@ export interface HandoffStateV2 {
     }>;
   };
 
+  /**
+   * Deterministic evidence captured from actual work state.
+   *
+   * No generated/inferred values belong here.
+   */
+  evidence?: {
+    commands: string[];
+
+    references: string[];
+  };
+
   attention: string[];
 
   progress: WorkState['progress'];
@@ -180,6 +191,28 @@ function inferTestStatus(tests: string[], checks: WorkState['checks'] = []): Han
 
 function digestPayload(value: unknown): string {
   return sha256(JSON.stringify(value));
+}
+
+function extractReferences(values: Array<string | undefined>): string[] {
+  const references: string[] = [];
+
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+
+    const matches = value.match(/https?:\/\/[^\s<>"'`)\]}]+/giu) ?? [];
+
+    for (const raw of matches) {
+      const reference = raw.replace(/[.,;:!?]+$/gu, '').trim();
+
+      if (reference) {
+        references.push(reference);
+      }
+    }
+  }
+
+  return compact(references, 30);
 }
 
 export function buildHandoffStateV2(options: {
@@ -325,6 +358,26 @@ export function buildHandoffStateV2(options: {
 
         command: item.command,
       })),
+    },
+
+    evidence: {
+      commands: compact((state.commands ?? []).slice().reverse(), 20),
+
+      references: extractReferences([
+        state.currentRequest,
+        state.currentActivity,
+        state.goal,
+        state.plan,
+
+        ...state.decisions,
+        ...state.blockers,
+        ...state.warnings,
+        ...state.nextActions,
+        ...state.filesTouched,
+        ...(state.commands ?? []),
+        ...state.tests,
+        ...(state.checks ?? []).map((item) => item.command),
+      ]),
     },
 
     attention: compact(options.attention ?? [], 20),
