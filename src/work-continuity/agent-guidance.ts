@@ -47,7 +47,7 @@ Rules:
 - Never invent previous work.
 - Current repository evidence overrides stale memory.
 - NEVER reconstruct previous work by reading ToolNet internal session files.
-- NEVER read/list/search .toolnet/sessions/**, session state.json,
+- NEVER read/list/search .toolnet/runtime/sources/** and legacy .toolnet/sessions/**, session state.json,
   events.jsonl, or raw transcripts to discover previous-agent state.
 - Do not search the filesystem for the implementation/schema of
   memory_agent_ask. Invoke the MCP tool directly when deeper
@@ -81,7 +81,7 @@ For resume/continue requests:
 2. If the handoff is missing or ambiguous, invoke
    ${MEMORY_AGENT_TOOL} directly BEFORE repository/history exploration.
 3. NEVER reconstruct prior work from:
-   - .toolnet/sessions/**
+   - .toolnet/runtime/sources/** and legacy .toolnet/sessions/**
    - state.json
    - events.jsonl
    - raw transcripts

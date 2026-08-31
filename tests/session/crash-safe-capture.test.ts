@@ -141,7 +141,7 @@ describe('Crash-safe continuous capture', () => {
     const walFile = join(
       p.rootPath,
       '.toolnet',
-      'sessions',
+      'runtime', 'sources',
       'opencode',
       'ses-crash-test',
       'events.jsonl'

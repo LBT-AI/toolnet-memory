@@ -26,6 +26,8 @@ import type {
 
 import { canonicalizeSessionEventInput } from './unified-event.js';
 
+import { appendSharedProjectJournal } from './shared-project-journal.js';
+
 import { readJsonFile, sha256, stableStringify, writeJsonAtomic } from './utils.js';
 
 const LOCK_STALE_MS = 120_000;
@@ -278,6 +280,22 @@ export class SessionWal {
         fsyncSync(fd);
       } finally {
         closeSync(fd);
+      }
+
+      /*
+       * Project journal is shared across Codex / OpenCode /
+       * AGY / Kiro / Kilo / ToolNet CLI / Grok.
+       *
+       * Per-source WAL remains only for crash recovery,
+       * native cursor and dedupe.
+       */
+      try {
+        appendSharedProjectJournal(this.identity.projectRoot, normalized);
+      } catch {
+        /*
+         * Per-source fsync'd WAL remains authoritative.
+         * Shared projection failure must not break the agent.
+         */
       }
 
       const last = normalized[normalized.length - 1];

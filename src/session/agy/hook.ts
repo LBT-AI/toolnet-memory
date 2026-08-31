@@ -174,11 +174,15 @@ export function buildAgyPreToolUseOutput(input: Record<string, unknown>): Record
     serialized = '';
   }
 
-  if (serialized.includes('.toolnet/sessions')) {
+  if (
+    serialized.includes('.toolnet/runtime/sources') ||
+    serialized.includes('.toolnet/sessions')
+  ) {
     return {
       decision: 'deny',
       reason:
-        'ToolNet continuity guard: do not replay raw .toolnet/sessions history. ' +
+        'ToolNet continuity guard: do not replay raw .toolnet/runtime/sources ' +
+        'or legacy .toolnet/sessions history. ' +
         'Use the injected continuity handoff. If deeper history is required, ' +
         'invoke memory_agent_ask directly.',
     };

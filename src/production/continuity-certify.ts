@@ -242,7 +242,14 @@ async function certifyPair(
 
     const contextDirectory = join(root, '.toolnet', 'context');
 
-    const rawSessionDirectory = join(root, '.toolnet', 'sessions', from, 'raw-session-x1');
+    const rawSessionDirectory = join(
+      root,
+      '.toolnet',
+      'runtime',
+      'sources',
+      from,
+      'raw-session-x1'
+    );
 
     mkdirSync(workDirectory, {
       recursive: true,

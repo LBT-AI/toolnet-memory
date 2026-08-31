@@ -143,7 +143,7 @@ function renderCompactAgyHandoff(project: ProjectManifest, state: WorkState): st
     '',
     'CONTINUATION CONTRACT:',
     '- Continue from this compact handoff; do not reconstruct the prior session.',
-    '- NEVER inspect .toolnet/sessions/**, state.json, events.jsonl, or raw transcripts.',
+    '- NEVER inspect .toolnet/sessions/** (legacy) or .toolnet/runtime/sources/**, state.json, events.jsonl, or raw transcripts.',
     '- If this handoff is insufficient, invoke memory_agent_ask directly.',
     '- Do not search for memory_agent_ask implementation/schema.',
     '- Inspect git/source only to validate current code after continuity is resolved.'

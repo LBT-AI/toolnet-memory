@@ -4,6 +4,8 @@ import type { StorageProvider } from '../../storage/types.js';
 
 import { SessionCore } from '../core.js';
 
+import { createSessionIdentity } from '../identity.js';
+
 import { inspectCodexRollout, pathBelongsToProject } from './discovery.js';
 
 import { readCodexRollout } from './rollout.js';
@@ -195,23 +197,17 @@ export async function syncCodexSession(options: CodexSyncOptions) {
    */
   if (filteredEvents.length > 0) {
     try {
-      const identity = {
-        projectId: options.project.id,
-
-        projectName: options.project.name,
-
-        projectRoot: options.project.rootPath,
-
-        agent: 'codex',
-
-        nativeSessionId: threadId,
-
-        sessionKey: `codex:${threadId}`,
-
-        remotePrefix: `projects/${options.project.id}/sessions/codex/${threadId}`,
-
-        localDirectory: '',
-      };
+      /*
+       * Use the canonical identity builder.
+       *
+       * Codex session/thread identity is provenance/runtime metadata only.
+       * It must never create a separate project-memory partition.
+       */
+      const identity = createSessionIdentity(
+        options.project,
+        'codex',
+        threadId
+      );
 
       const normalizedForWork = filteredEvents.map((event, index) => ({
         version: 1 as const,

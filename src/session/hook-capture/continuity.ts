@@ -77,7 +77,12 @@ function flattenStrings(value: unknown, output: string[], depth = 0): void {
 function isForbiddenRawHistoryReference(value: string): boolean {
   const normalized = normalizeSlashes(value);
 
-  if (normalized.includes('.toolnet/sessions/') || normalized.endsWith('.toolnet/sessions')) {
+  if (
+    normalized.includes('.toolnet/runtime/sources/') ||
+    normalized.endsWith('.toolnet/runtime/sources') ||
+    normalized.includes('.toolnet/sessions/') ||
+    normalized.endsWith('.toolnet/sessions')
+  ) {
     return true;
   }
 

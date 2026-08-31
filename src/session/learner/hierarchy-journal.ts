@@ -39,7 +39,7 @@ function digest(value: string): string {
 }
 
 function hierarchyPrefix(identity: SessionIdentity): string {
-  return identity.remotePrefix.replace('/sessions/', '/memory/hierarchy/');
+  return `projects/${identity.projectId}/memory/hierarchy`;
 }
 
 export class SessionMemoryHierarchyJournal {
@@ -86,12 +86,18 @@ export class SessionMemoryHierarchyJournal {
         .join('|')
     ).slice(0, 16);
 
+    /*
+     * Same shared hierarchy directory for every agent.
+     * Source hash prevents same-sequence provenance collision.
+     */
+    const sourceDigest = digest(identity.sessionKey).slice(0, 12);
+
     const key = [
       hierarchyPrefix(identity),
 
       'batches',
 
-      `${pad(firstSequence)}-${pad(lastSequence)}-${fingerprint}.json`,
+      `${pad(firstSequence)}-${pad(lastSequence)}-${sourceDigest}-${fingerprint}.json`,
     ].join('/');
 
     if (!(await this.storage.exists(key))) {

@@ -68,7 +68,7 @@ function ensureProjectDirectories(root: string): void {
     mode: 0o700,
   });
 
-  mkdirSync(join(root, '.toolnet', 'sessions'), {
+  mkdirSync(join(root, '.toolnet', 'runtime', 'sources'), {
     recursive: true,
     mode: 0o700,
   });
@@ -663,7 +663,13 @@ export async function certifyRecoveryResilience(): Promise<RecoveryCertification
         const sentinel = 'X2_SECRET_RAW_TRANSCRIPT_MUST_NEVER_ENTER_CONTINUITY';
 
         writeFileSync(
-          join(root, '.toolnet', 'sessions', 'raw-transcript.json'),
+          join(
+            root,
+            '.toolnet',
+            'runtime',
+            'sources',
+            'raw-transcript.json'
+          ),
           JSON.stringify({
             transcript: sentinel,
           }),
@@ -671,7 +677,13 @@ export async function certifyRecoveryResilience(): Promise<RecoveryCertification
         );
 
         writeFileSync(
-          join(root, '.toolnet', 'sessions', 'events.jsonl'),
+          join(
+            root,
+            '.toolnet',
+            'runtime',
+            'sources',
+            'events.jsonl'
+          ),
           JSON.stringify({
             text: sentinel,
           }) + '\n',

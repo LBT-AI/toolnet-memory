@@ -95,7 +95,7 @@ export const TOOLNET_MCP_SERVER_INSTRUCTIONS = [
   '3. Use mode="ai" only when the continuity question is ambiguous or requires synthesis.',
   '',
   '4. NEVER reconstruct previous work by reading or searching raw agent/session history, including:',
-  '   - .toolnet/sessions/**',
+  '   - .toolnet/runtime/sources/** and legacy .toolnet/sessions/**',
   '   - state.json',
   '   - events.jsonl',
   '   - raw transcripts',

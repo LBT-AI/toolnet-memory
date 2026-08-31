@@ -53,14 +53,18 @@ export class SemanticObservationJournal {
         .join('|')
     ).slice(0, 16);
 
+    /*
+     * Shared semantic work journal.
+     * Source hash is provenance only, not memory isolation.
+     */
+    const sourceDigest = sha256(identity.sessionKey).slice(0, 12);
+
     const key = [
       `projects/${identity.projectId}`,
       'work',
       'semantic',
       'observations',
-      identity.agent,
-      identity.nativeSessionId,
-      `${pad(firstSequence)}-${pad(lastSequence)}-${digest}.json`,
+      `${pad(firstSequence)}-${pad(lastSequence)}-${sourceDigest}-${digest}.json`,
     ].join('/');
 
     if (!(await this.storage.exists(key))) {

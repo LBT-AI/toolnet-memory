@@ -70,8 +70,26 @@ export function createSessionIdentity(
 
     sessionKey: `${cleanAgent}:${cleanSessionId}`,
 
-    remotePrefix: ['projects', project.id, 'sessions', agentFolder, sessionFolder].join('/'),
+    /*
+     * Native agent/session data is runtime metadata only.
+     * It is NOT the project memory partition.
+     */
+    remotePrefix: [
+      'projects',
+      project.id,
+      'runtime',
+      'sources',
+      agentFolder,
+      sessionFolder,
+    ].join('/'),
 
-    localDirectory: join(project.rootPath, '.toolnet', 'sessions', agentFolder, sessionFolder),
+    localDirectory: join(
+      project.rootPath,
+      '.toolnet',
+      'runtime',
+      'sources',
+      agentFolder,
+      sessionFolder
+    ),
   };
 }

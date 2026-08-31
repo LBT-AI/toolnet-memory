@@ -128,7 +128,7 @@ describe('Kiro hook runtime', () => {
 
     expect(flushCalls).toBe(0);
 
-    const eventsFile = join(root, '.toolnet', 'sessions', 'kiro', 'kiro-session-1', 'events.jsonl');
+    const eventsFile = join(root, '.toolnet', 'runtime', 'sources', 'kiro', 'kiro-session-1', 'events.jsonl');
 
     expect(existsSync(eventsFile)).toBe(true);
 
@@ -195,7 +195,7 @@ describe('Kiro hook runtime', () => {
     const eventsFile = join(
       root,
       '.toolnet',
-      'sessions',
+      'runtime', 'sources',
       'kiro',
       'kiro-session-failed-flush',
       'events.jsonl'

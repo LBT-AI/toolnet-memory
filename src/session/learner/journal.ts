@@ -17,7 +17,7 @@ function pad(value: number): string {
 }
 
 function journalPrefix(identity: SessionIdentity): string {
-  return identity.remotePrefix.replace('/sessions/', '/memory/learned/');
+  return `projects/${identity.projectId}/memory/learned`;
 }
 
 export class SessionMemoryJournal {
@@ -68,12 +68,20 @@ export class SessionMemoryJournal {
         .join('|')
     ).slice(0, 16);
 
+    /*
+     * Shared project memory must retain every source batch.
+     *
+     * sourceDigest is provenance/uniqueness only.
+     * It does NOT partition memory by agent.
+     */
+    const sourceDigest = sha256(identity.sessionKey).slice(0, 12);
+
     const key = [
       journalPrefix(identity),
 
       'batches',
 
-      `${pad(firstSequence)}-${pad(lastSequence)}-${digest}.json`,
+      `${pad(firstSequence)}-${pad(lastSequence)}-${sourceDigest}-${digest}.json`,
     ].join('/');
 
     if (!(await this.storage.exists(key))) {

@@ -55,13 +55,17 @@ export class WorkObservationJournal {
         .join('|')
     ).slice(0, 16);
 
+    /*
+     * Shared project work journal.
+     * Source hash prevents filename collision only.
+     */
+    const sourceDigest = sha256(identity.sessionKey).slice(0, 12);
+
     const key = [
       `projects/${identity.projectId}`,
       'work',
       'observations',
-      identity.agent,
-      identity.nativeSessionId,
-      `${pad(firstSequence)}-${pad(lastSequence)}-${digest}.json`,
+      `${pad(firstSequence)}-${pad(lastSequence)}-${sourceDigest}-${digest}.json`,
     ].join('/');
 
     if (!(await this.storage.exists(key))) {

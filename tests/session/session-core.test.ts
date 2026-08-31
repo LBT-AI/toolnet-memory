@@ -96,7 +96,9 @@ describe('Session Core', () => {
 
     expect(first.sessionKey).toBe('opencode:ses_04ff0d26fffeQoqiRrE0S8ap2b');
 
-    expect(first.remotePrefix).toContain('/sessions/opencode/ses_04ff0d26fffeQoqiRrE0S8ap2b');
+    expect(first.remotePrefix).toContain(
+      '/runtime/sources/opencode/ses_04ff0d26fffeQoqiRrE0S8ap2b'
+    );
 
     expect(first.remotePrefix).not.toBe(second.remotePrefix);
 

@@ -60,7 +60,7 @@ Whenever the user asks to continue, resume, finish, pick up, return to, or compl
 
 Do NOT reconstruct previous work by reading, listing, searching, or shelling into:
 
-- \`.toolnet/sessions/**\`
+- \`.toolnet/runtime/sources/** and legacy .toolnet/sessions/**\`
 - \`state.json\`
 - \`events.jsonl\`
 - raw transcripts

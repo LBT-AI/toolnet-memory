@@ -61,9 +61,10 @@ function readJson<T>(file: string): T | null {
   }
 }
 
-function sessionStates(project: ProjectManifest): LocalSessionState[] {
-  const root = join(project.rootPath, '.toolnet', 'sessions');
-
+function scanSessionStates(
+  root: string,
+  project: ProjectManifest
+): LocalSessionState[] {
   if (!existsSync(root)) {
     return [];
   }
@@ -82,9 +83,19 @@ function sessionStates(project: ProjectManifest): LocalSessionState[] {
         continue;
       }
 
-      const state = readJson<LocalSessionState>(join(agentRoot, sessionEntry.name, 'state.json'));
+      const state = readJson<LocalSessionState>(
+        join(agentRoot, sessionEntry.name, 'state.json')
+      );
 
-      if (!state || state.version !== 1 || state.projectId !== project.id) {
+      if (!state) {
+        continue;
+      }
+
+      if (state.version !== 1) {
+        continue;
+      }
+
+      if (state.projectId !== project.id) {
         continue;
       }
 
@@ -93,6 +104,61 @@ function sessionStates(project: ProjectManifest): LocalSessionState[] {
   }
 
   return output;
+}
+
+function sessionStates(project: ProjectManifest): LocalSessionState[] {
+  /*
+   * Current runtime source metadata.
+   *
+   * These files are NOT separate memories.
+   * They only hold native-session cursor / WAL / recovery state.
+   */
+  const currentRoot = join(
+    project.rootPath,
+    '.toolnet',
+    'runtime',
+    'sources'
+  );
+
+  /*
+   * Backward-compatible READ ONLY source.
+   *
+   * Existing projects may still contain pre-shared-memory
+   * .toolnet/sessions/<agent>/<session>/state.json.
+   *
+   * Never write new state there.
+   */
+  const legacyRoot = join(
+    project.rootPath,
+    '.toolnet',
+    'sessions'
+  );
+
+  const current = scanSessionStates(currentRoot, project);
+
+  const legacy = scanSessionStates(legacyRoot, project);
+
+  /*
+   * Prefer current runtime state when the same native
+   * agent/session exists in both layouts.
+   */
+  const merged = new Map<string, LocalSessionState>();
+
+  for (const state of legacy) {
+    merged.set(
+      `${state.agent}:${state.nativeSessionId}`,
+      state
+    );
+  }
+
+  for (const state of current) {
+    merged.set(
+      `${state.agent}:${state.nativeSessionId}`,
+      state
+    );
+  }
+
+  return Array.from(merged.values());
 }
 
 function latestTimestamp(values: Array<string | undefined>): string | undefined {
