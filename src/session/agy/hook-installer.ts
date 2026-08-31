@@ -73,8 +73,7 @@ export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
   const pluginName = options.pluginName ?? 'toolnet-memory';
 
   // Write to plugin's hooks.json (official plugin location)
-  const pluginHooksFile =
-    options.hooksFile ?? join(agyPluginRoot(pluginName), 'hooks.json');
+  const pluginHooksFile = options.hooksFile ?? join(agyPluginRoot(pluginName), 'hooks.json');
 
   const root = readJsonFile(pluginHooksFile);
 

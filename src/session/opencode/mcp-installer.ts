@@ -69,9 +69,7 @@ function readConfig(file: string): JsonObject {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(
-      `Invalid existing OpenCode config at ${file}: parse error. Not overwriting.`
-    );
+    throw new Error(`Invalid existing OpenCode config at ${file}: parse error. Not overwriting.`);
   }
 
   if (!isObject(parsed)) {
@@ -149,7 +147,9 @@ function installToSingleFile(
   const verify = readConfig(configFile);
 
   if (!isObject(verify.mcp) || !sameServer(verify.mcp[serverName], binary)) {
-    throw new Error(`OpenCode MCP configuration was written but verification failed for ${configFile}.`);
+    throw new Error(
+      `OpenCode MCP configuration was written but verification failed for ${configFile}.`
+    );
   }
 
   return {
@@ -187,7 +187,12 @@ export function installOpenCodeMcp(
   const scope = options.scope ?? 'global';
 
   if (options.configFile) {
-    const result = installToSingleFile(options.configFile, binary, serverName, options.force ?? false);
+    const result = installToSingleFile(
+      options.configFile,
+      binary,
+      serverName,
+      options.force ?? false
+    );
     return {
       ...result,
       configFile: options.configFile,
@@ -200,8 +205,18 @@ export function installOpenCodeMcp(
     const globalFile = openCodeGlobalConfigFile();
     const projectFile = openCodeProjectConfigFile({ cwd: options.cwd });
 
-    const globalResult = installToSingleFile(globalFile, binary, serverName, options.force ?? false);
-    const projectResult = installToSingleFile(projectFile, binary, serverName, options.force ?? false);
+    const globalResult = installToSingleFile(
+      globalFile,
+      binary,
+      serverName,
+      options.force ?? false
+    );
+    const projectResult = installToSingleFile(
+      projectFile,
+      binary,
+      serverName,
+      options.force ?? false
+    );
 
     return {
       installed: true,

@@ -17,7 +17,7 @@ Use ToolNet Memory as the continuity source for this repository.
   completed work, and next action.
 - Use \`mode="ai"\` only when continuity needs synthesis.
 - Do not reconstruct continuity by reading:
-  - \`.toolnet/sessions/**\`
+  - \`.toolnet/runtime/sources/** and legacy .toolnet/sessions/**\`
   - ToolNet raw \`events.jsonl\`
   - ToolNet raw \`state.json\`
   - another coding agent's private transcript/history files.

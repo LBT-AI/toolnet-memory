@@ -61,10 +61,7 @@ function readJson<T>(file: string): T | null {
   }
 }
 
-function scanSessionStates(
-  root: string,
-  project: ProjectManifest
-): LocalSessionState[] {
+function scanSessionStates(root: string, project: ProjectManifest): LocalSessionState[] {
   if (!existsSync(root)) {
     return [];
   }
@@ -83,9 +80,7 @@ function scanSessionStates(
         continue;
       }
 
-      const state = readJson<LocalSessionState>(
-        join(agentRoot, sessionEntry.name, 'state.json')
-      );
+      const state = readJson<LocalSessionState>(join(agentRoot, sessionEntry.name, 'state.json'));
 
       if (!state) {
         continue;
@@ -113,12 +108,7 @@ function sessionStates(project: ProjectManifest): LocalSessionState[] {
    * These files are NOT separate memories.
    * They only hold native-session cursor / WAL / recovery state.
    */
-  const currentRoot = join(
-    project.rootPath,
-    '.toolnet',
-    'runtime',
-    'sources'
-  );
+  const currentRoot = join(project.rootPath, '.toolnet', 'runtime', 'sources');
 
   /*
    * Backward-compatible READ ONLY source.
@@ -128,11 +118,7 @@ function sessionStates(project: ProjectManifest): LocalSessionState[] {
    *
    * Never write new state there.
    */
-  const legacyRoot = join(
-    project.rootPath,
-    '.toolnet',
-    'sessions'
-  );
+  const legacyRoot = join(project.rootPath, '.toolnet', 'sessions');
 
   const current = scanSessionStates(currentRoot, project);
 
@@ -145,17 +131,11 @@ function sessionStates(project: ProjectManifest): LocalSessionState[] {
   const merged = new Map<string, LocalSessionState>();
 
   for (const state of legacy) {
-    merged.set(
-      `${state.agent}:${state.nativeSessionId}`,
-      state
-    );
+    merged.set(`${state.agent}:${state.nativeSessionId}`, state);
   }
 
   for (const state of current) {
-    merged.set(
-      `${state.agent}:${state.nativeSessionId}`,
-      state
-    );
+    merged.set(`${state.agent}:${state.nativeSessionId}`, state);
   }
 
   return Array.from(merged.values());

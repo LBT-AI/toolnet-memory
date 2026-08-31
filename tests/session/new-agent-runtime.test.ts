@@ -108,7 +108,15 @@ describe('Cursor/Copilot/Grok hook runtime', () => {
 
     expect(flushCalls).toBe(0);
 
-    const eventsFile = join(root, '.toolnet', 'runtime', 'sources', 'cursor', 'cursor-1', 'events.jsonl');
+    const eventsFile = join(
+      root,
+      '.toolnet',
+      'runtime',
+      'sources',
+      'cursor',
+      'cursor-1',
+      'events.jsonl'
+    );
 
     expect(existsSync(eventsFile)).toBe(true);
 
@@ -169,7 +177,15 @@ describe('Cursor/Copilot/Grok hook runtime', () => {
     expect(stop.flushed).toBe(false);
     expect(stop.error).toContain('remote unavailable');
 
-    const eventsFile = join(root, '.toolnet', 'runtime', 'sources', 'copilot', 'copilot-1', 'events.jsonl');
+    const eventsFile = join(
+      root,
+      '.toolnet',
+      'runtime',
+      'sources',
+      'copilot',
+      'copilot-1',
+      'events.jsonl'
+    );
 
     expect(existsSync(eventsFile)).toBe(true);
 
@@ -195,7 +211,15 @@ describe('Cursor/Copilot/Grok hook runtime', () => {
     expect(tool.active).toBe(true);
     expect(tool.captured).toBe(1);
 
-    const eventsFile = join(root, '.toolnet', 'runtime', 'sources', 'grok', 'grok-1', 'events.jsonl');
+    const eventsFile = join(
+      root,
+      '.toolnet',
+      'runtime',
+      'sources',
+      'grok',
+      'grok-1',
+      'events.jsonl'
+    );
 
     expect(readFileSync(eventsFile, 'utf8')).toContain('"type":"command"');
 

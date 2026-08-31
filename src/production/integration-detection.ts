@@ -256,7 +256,8 @@ export function detectAgentIntegrations(
 
         grokHome: options.grokHome,
       }),
-    }),    detectOne({
+    }),
+    detectOne({
       agent: 'toolnet-cli',
 
       command: 'toolnet',
@@ -264,7 +265,6 @@ export function detectAgentIntegrations(
       commandExists,
 
       configPaths: toolnetCliDetectionPaths({
-
         home,
       }),
     }),

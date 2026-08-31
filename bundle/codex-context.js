@@ -26,7 +26,7 @@ For resume/continue requests:
 2. If the handoff is missing or ambiguous, invoke
    ${C} directly BEFORE repository/history exploration.
 3. NEVER reconstruct prior work from:
-   - .toolnet/sessions/**
+   - .toolnet/runtime/sources/** and legacy .toolnet/sessions/**
    - state.json
    - events.jsonl
    - raw transcripts

@@ -72,8 +72,5 @@ export function kiroProjectHooksFile(options: KiroConfigPathOptions = {}): strin
  * - ~/.kiro/settings/mcp.json (global MCP)
  */
 export function kiroDetectionPaths(options: KiroConfigPathOptions = {}): string[] {
-  return [
-    kiroHomeDirectory(options),
-    kiroMcpConfigFile(options),
-  ];
+  return [kiroHomeDirectory(options), kiroMcpConfigFile(options)];
 }

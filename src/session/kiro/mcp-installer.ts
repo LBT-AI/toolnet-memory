@@ -54,9 +54,7 @@ function readConfig(file: string): JsonObject {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(
-      `Invalid existing Kiro MCP config at ${file}: parse error. Not overwriting.`
-    );
+    throw new Error(`Invalid existing Kiro MCP config at ${file}: parse error. Not overwriting.`);
   }
 
   if (!isObject(parsed)) {
@@ -115,7 +113,9 @@ function installToSingleFile(
   const currentServers = root.mcpServers;
 
   if (currentServers !== undefined && !isObject(currentServers)) {
-    throw new Error(`Invalid existing Kiro MCP config: mcpServers must be an object in ${configFile}.`);
+    throw new Error(
+      `Invalid existing Kiro MCP config: mcpServers must be an object in ${configFile}.`
+    );
   }
 
   const mcpServers: JsonObject = isObject(currentServers)
@@ -151,7 +151,9 @@ function installToSingleFile(
   const verifyServers = verify.mcpServers;
 
   if (!isObject(verifyServers) || !sameServer(verifyServers[serverName], binary)) {
-    throw new Error(`Kiro MCP configuration was written but verification failed for ${configFile}.`);
+    throw new Error(
+      `Kiro MCP configuration was written but verification failed for ${configFile}.`
+    );
   }
 
   return {
@@ -180,9 +182,7 @@ function installToSingleFile(
  * Preserves all other MCP servers.
  * Stops on invalid JSON (never overwrites corrupt config).
  */
-export function installKiroMcp(
-  options: InstallKiroMcpOptions = {}
-): InstallKiroMcpResult {
+export function installKiroMcp(options: InstallKiroMcpOptions = {}): InstallKiroMcpResult {
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
 
   const serverName = options.serverName ?? 'toolnet-memory';
@@ -190,7 +190,12 @@ export function installKiroMcp(
   const scope = options.scope ?? 'global';
 
   if (options.configFile) {
-    const result = installToSingleFile(options.configFile, binary, serverName, options.force ?? false);
+    const result = installToSingleFile(
+      options.configFile,
+      binary,
+      serverName,
+      options.force ?? false
+    );
     return {
       ...result,
       configFile: options.configFile,
@@ -204,8 +209,18 @@ export function installKiroMcp(
     const globalFile = kiroMcpConfigFile();
     const projectFile = kiroProjectMcpConfigFile({ cwd: options.cwd });
 
-    const globalResult = installToSingleFile(globalFile, binary, serverName, options.force ?? false);
-    const projectResult = installToSingleFile(projectFile, binary, serverName, options.force ?? false);
+    const globalResult = installToSingleFile(
+      globalFile,
+      binary,
+      serverName,
+      options.force ?? false
+    );
+    const projectResult = installToSingleFile(
+      projectFile,
+      binary,
+      serverName,
+      options.force ?? false
+    );
 
     return {
       installed: true,
@@ -218,9 +233,7 @@ export function installKiroMcp(
   }
 
   const configFile =
-    scope === 'project'
-      ? kiroProjectMcpConfigFile({ cwd: options.cwd })
-      : kiroMcpConfigFile();
+    scope === 'project' ? kiroProjectMcpConfigFile({ cwd: options.cwd }) : kiroMcpConfigFile();
 
   const result = installToSingleFile(configFile, binary, serverName, options.force ?? false);
 

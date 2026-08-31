@@ -697,13 +697,15 @@ export async function syncOpenCodeSession(
       });
 
       if (core.status().lastSequence === 0) {
-        core.recordMany([{
-          type: 'custom' as const,
-          timestamp: new Date().toISOString(),
-          sourceEventId: `session:${options.nativeSessionId}:deleted`,
-          data: { event: 'session_deleted' },
-          provenance: { source: 'opencode' },
-        }]);
+        core.recordMany([
+          {
+            type: 'custom' as const,
+            timestamp: new Date().toISOString(),
+            sourceEventId: `session:${options.nativeSessionId}:deleted`,
+            data: { event: 'session_deleted' },
+            provenance: { source: 'opencode' },
+          },
+        ]);
       }
 
       const flushed = await core.flush();

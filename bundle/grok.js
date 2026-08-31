@@ -15,7 +15,7 @@ When the user asks to continue or resume previous work:
    work, TODOs, and next action.
 4. Use \`mode="ai"\` only when continuity requires synthesis.
 5. Do not reconstruct previous work from:
-   - \`.toolnet/sessions/**\`
+   - \`.toolnet/runtime/sources/** and legacy .toolnet/sessions/**\`
    - ToolNet \`events.jsonl\` or \`state.json\`
    - raw transcripts
    - another coding agent's private session/history files

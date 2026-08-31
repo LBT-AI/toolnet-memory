@@ -70,9 +70,7 @@ function readConfig(file: string): JsonObject {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(
-      `Invalid existing Agy MCP config at ${file}: parse error. Not overwriting.`
-    );
+    throw new Error(`Invalid existing Agy MCP config at ${file}: parse error. Not overwriting.`);
   }
 
   if (!isObject(parsed)) {
@@ -108,7 +106,9 @@ function installToSingleFile(
   const currentServers = root.mcpServers;
 
   if (currentServers !== undefined && !isObject(currentServers)) {
-    throw new Error(`Invalid existing Agy MCP config: mcpServers must be an object in ${configFile}.`);
+    throw new Error(
+      `Invalid existing Agy MCP config: mcpServers must be an object in ${configFile}.`
+    );
   }
 
   const mcpServers: JsonObject = isObject(currentServers)
@@ -171,7 +171,12 @@ export function installAgyMcp(options: InstallAgyMcpOptions = {}): InstallAgyMcp
 
   if (options.configFile) {
     // Explicit file overrides scope
-    const result = installToSingleFile(options.configFile, binary, serverName, options.force ?? false);
+    const result = installToSingleFile(
+      options.configFile,
+      binary,
+      serverName,
+      options.force ?? false
+    );
     return {
       ...result,
       configFile: options.configFile,
@@ -185,8 +190,18 @@ export function installAgyMcp(options: InstallAgyMcpOptions = {}): InstallAgyMcp
     const globalFile = agyGlobalMcpConfigFile();
     const workspaceFile = agyWorkspaceMcpConfigFile({ cwd: options.cwd });
 
-    const globalResult = installToSingleFile(globalFile, binary, serverName, options.force ?? false);
-    const workspaceResult = installToSingleFile(workspaceFile, binary, serverName, options.force ?? false);
+    const globalResult = installToSingleFile(
+      globalFile,
+      binary,
+      serverName,
+      options.force ?? false
+    );
+    const workspaceResult = installToSingleFile(
+      workspaceFile,
+      binary,
+      serverName,
+      options.force ?? false
+    );
 
     return {
       installed: true,

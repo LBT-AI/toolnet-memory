@@ -1,8 +1,4 @@
-import {
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -43,33 +39,17 @@ describe('shared project memory journal', () => {
 
     const manifest = project(root);
 
-    const openCode = createSessionIdentity(
-      manifest,
-      'opencode',
-      'opencode-session-1'
-    );
+    const openCode = createSessionIdentity(manifest, 'opencode', 'opencode-session-1');
 
-    const agy = createSessionIdentity(
-      manifest,
-      'agy',
-      'agy-conversation-1'
-    );
+    const agy = createSessionIdentity(manifest, 'agy', 'agy-conversation-1');
 
-    expect(openCode.localDirectory).toContain(
-      join('.toolnet', 'runtime', 'sources', 'opencode')
-    );
+    expect(openCode.localDirectory).toContain(join('.toolnet', 'runtime', 'sources', 'opencode'));
 
-    expect(agy.localDirectory).toContain(
-      join('.toolnet', 'runtime', 'sources', 'agy')
-    );
+    expect(agy.localDirectory).toContain(join('.toolnet', 'runtime', 'sources', 'agy'));
 
-    expect(openCode.localDirectory).not.toContain(
-      join('.toolnet', 'sessions')
-    );
+    expect(openCode.localDirectory).not.toContain(join('.toolnet', 'sessions'));
 
-    expect(agy.localDirectory).not.toContain(
-      join('.toolnet', 'sessions')
-    );
+    expect(agy.localDirectory).not.toContain(join('.toolnet', 'sessions'));
 
     const openCodeWal = new SessionWal(openCode, {
       source: 'opencode',
@@ -101,24 +81,21 @@ describe('shared project memory journal', () => {
       },
     ]);
 
-    const journal = readFileSync(
-      sharedProjectJournalFile(root),
-      'utf8'
-    )
+    const journal = readFileSync(sharedProjectJournalFile(root), 'utf8')
       .trim()
       .split('\n')
-      .map((line) => JSON.parse(line) as {
-        agent: string;
-        nativeSessionId: string;
-        data: Record<string, unknown>;
-      });
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            agent: string;
+            nativeSessionId: string;
+            data: Record<string, unknown>;
+          }
+      );
 
     expect(journal).toHaveLength(2);
 
-    expect(journal.map((event) => event.agent)).toEqual([
-      'opencode',
-      'agy',
-    ]);
+    expect(journal.map((event) => event.agent)).toEqual(['opencode', 'agy']);
 
     expect(journal[0].nativeSessionId).toBe('opencode-session-1');
     expect(journal[1].nativeSessionId).toBe('agy-conversation-1');
@@ -126,9 +103,7 @@ describe('shared project memory journal', () => {
     /*
      * Different native sessions, same project journal.
      */
-    expect(sharedProjectJournalFile(root)).toBe(
-      join(root, '.toolnet', 'journal', 'events.jsonl')
-    );
+    expect(sharedProjectJournalFile(root)).toBe(join(root, '.toolnet', 'journal', 'events.jsonl'));
   });
 
   it('uses shared remote memory paths while preserving provenance metadata', () => {
@@ -141,13 +116,9 @@ describe('shared project memory journal', () => {
     const openCode = createSessionIdentity(manifest, 'opencode', 's1');
     const agy = createSessionIdentity(manifest, 'agy', 's2');
 
-    expect(openCode.remotePrefix).toContain(
-      'runtime/sources/opencode/s1'
-    );
+    expect(openCode.remotePrefix).toContain('runtime/sources/opencode/s1');
 
-    expect(agy.remotePrefix).toContain(
-      'runtime/sources/agy/s2'
-    );
+    expect(agy.remotePrefix).toContain('runtime/sources/agy/s2');
 
     expect(openCode.remotePrefix).not.toContain('/sessions/');
     expect(agy.remotePrefix).not.toContain('/sessions/');

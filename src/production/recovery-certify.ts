@@ -663,13 +663,7 @@ export async function certifyRecoveryResilience(): Promise<RecoveryCertification
         const sentinel = 'X2_SECRET_RAW_TRANSCRIPT_MUST_NEVER_ENTER_CONTINUITY';
 
         writeFileSync(
-          join(
-            root,
-            '.toolnet',
-            'runtime',
-            'sources',
-            'raw-transcript.json'
-          ),
+          join(root, '.toolnet', 'runtime', 'sources', 'raw-transcript.json'),
           JSON.stringify({
             transcript: sentinel,
           }),
@@ -677,13 +671,7 @@ export async function certifyRecoveryResilience(): Promise<RecoveryCertification
         );
 
         writeFileSync(
-          join(
-            root,
-            '.toolnet',
-            'runtime',
-            'sources',
-            'events.jsonl'
-          ),
+          join(root, '.toolnet', 'runtime', 'sources', 'events.jsonl'),
           JSON.stringify({
             text: sentinel,
           }) + '\n',

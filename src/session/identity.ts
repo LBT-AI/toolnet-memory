@@ -74,14 +74,9 @@ export function createSessionIdentity(
      * Native agent/session data is runtime metadata only.
      * It is NOT the project memory partition.
      */
-    remotePrefix: [
-      'projects',
-      project.id,
-      'runtime',
-      'sources',
-      agentFolder,
-      sessionFolder,
-    ].join('/'),
+    remotePrefix: ['projects', project.id, 'runtime', 'sources', agentFolder, sessionFolder].join(
+      '/'
+    ),
 
     localDirectory: join(
       project.rootPath,

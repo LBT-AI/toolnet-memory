@@ -56,9 +56,7 @@ function readRoot(file: string): JsonObject {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(
-      `Invalid existing Kiro hooks file at ${file}: parse error. Not overwriting.`
-    );
+    throw new Error(`Invalid existing Kiro hooks file at ${file}: parse error. Not overwriting.`);
   }
 
   if (!isObject(parsed)) {
@@ -121,7 +119,8 @@ function desiredHooks(command: string): JsonObject[] {
     },
     {
       name: `${MANAGED_PREFIX}Raw History Guard`,
-      description: 'Prevent Kiro from reconstructing continuity from raw ToolNet/agent session history.',
+      description:
+        'Prevent Kiro from reconstructing continuity from raw ToolNet/agent session history.',
       trigger: 'PreToolUse',
       matcher: '*',
       action: commandAction(command),
@@ -268,9 +267,7 @@ export function installKiroHooks(options: InstallKiroHooksOptions = {}): Install
   }
 
   const hooksFile =
-    scope === 'project'
-      ? kiroProjectHooksFile({ cwd: options.cwd })
-      : kiroGlobalHooksFile();
+    scope === 'project' ? kiroProjectHooksFile({ cwd: options.cwd }) : kiroGlobalHooksFile();
 
   const result = installToSingleFile(hooksFile, command, options.force ?? false);
 

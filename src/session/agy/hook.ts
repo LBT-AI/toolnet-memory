@@ -174,10 +174,7 @@ export function buildAgyPreToolUseOutput(input: Record<string, unknown>): Record
     serialized = '';
   }
 
-  if (
-    serialized.includes('.toolnet/runtime/sources') ||
-    serialized.includes('.toolnet/sessions')
-  ) {
+  if (serialized.includes('.toolnet/runtime/sources') || serialized.includes('.toolnet/sessions')) {
     return {
       decision: 'deny',
       reason:

@@ -203,11 +203,7 @@ export async function syncCodexSession(options: CodexSyncOptions) {
        * Codex session/thread identity is provenance/runtime metadata only.
        * It must never create a separate project-memory partition.
        */
-      const identity = createSessionIdentity(
-        options.project,
-        'codex',
-        threadId
-      );
+      const identity = createSessionIdentity(options.project, 'codex', threadId);
 
       const normalizedForWork = filteredEvents.map((event, index) => ({
         version: 1 as const,
