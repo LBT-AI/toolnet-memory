@@ -336,7 +336,7 @@ async function certifyPair(
         project,
       } as unknown as Parameters<typeof memoryAgentAsk>[0],
       {
-        mode: 'ai',
+        mode: 'local',
 
         detail: 'benchmark',
 

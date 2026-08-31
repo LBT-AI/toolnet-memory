@@ -8,7 +8,7 @@ async function main(): Promise<void> {
   const question = process.argv.slice(2).join(' ').trim();
 
   if (!question) {
-    console.error('Usage: toolnet-memory ask-ai "<question>"');
+    console.error('Usage: toolnet-memory ask "<question>"');
 
     process.exitCode = 1;
 
@@ -41,12 +41,7 @@ async function main(): Promise<void> {
 
   if (process.env.TOOLNET_MEMORY_AGENT_DEBUG === '1') {
     process.stderr.write(
-      [
-        '',
-        `[ToolNet Memory Agent] AI: ${result.usedAi ? 'yes' : 'fallback'}`,
-        result.provider ? `Provider: ${result.provider}` : '',
-        result.model ? `Model: ${result.model}` : '',
-      ]
+      ['', `[ToolNet Memory Agent] AI: ${result.usedAi ? 'yes' : 'fallback'}`]
         .filter(Boolean)
         .join('\n') + '\n'
     );

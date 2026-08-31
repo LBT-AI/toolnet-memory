@@ -8,19 +8,15 @@ import { MemoryConsolidator } from '../memory/consolidator.js';
 
 import { RetrievalEngine } from '../retrieval/retrieval-engine.js';
 
-import { createEmbeddingProvider } from '../embeddings/index.js';
-
 import { CodeGraphStore, ReferenceResolver } from '../code-intelligence/index.js';
 
 import { IncrementalRepositoryIndexer } from '../code-intelligence/incremental/incremental-indexer.js';
 
 import { ImpactGuard } from '../code-intelligence/impact/impact-guard.js';
 
-import { VectorStore, VectorPersistenceManager } from '../retrieval/vector/index.js';
-
 import { HookRuntime, AutoContextBuilder, AutoRetrieval, AutoImpactGuard } from '../hooks/index.js';
 
-import { MemoryStore, PersistentCodeGraphStore, PersistentVectorStore } from '../storage/index.js';
+import { MemoryStore, PersistentCodeGraphStore } from '../storage/index.js';
 
 import type { StorageProvider } from '../storage/types.js';
 
@@ -33,15 +29,12 @@ import { ProjectLock } from '../production/project-lock.js';
 export interface ToolNetMemoryRuntimeOptions {
   project: ProjectManifest;
   storage: StorageProvider;
-  embeddingModel: string;
 }
 
 export class ToolNetMemoryRuntime {
   readonly memory = new MemoryEngine();
 
   readonly graph = new CodeGraphStore();
-
-  readonly vectors = new VectorStore();
 
   readonly retrieval: RetrievalEngine;
 
@@ -59,16 +52,12 @@ export class ToolNetMemoryRuntime {
 
   private readonly graphStore: PersistentCodeGraphStore;
 
-  private readonly vectorStore: PersistentVectorStore;
-
   private readonly processLock: ProjectLock;
 
   constructor(readonly options: ToolNetMemoryRuntimeOptions) {
     this.memoryStore = new MemoryStore(options.storage);
 
     this.graphStore = new PersistentCodeGraphStore(options.storage);
-
-    this.vectorStore = new PersistentVectorStore(options.storage);
 
     this.processLock = new ProjectLock(options.project.id);
 
@@ -126,19 +115,6 @@ export class ToolNetMemoryRuntime {
       this.graph.import(graphSnapshot.symbols, graphSnapshot.edges);
     }
 
-    // Load / update vectors.
-    const embeddings = createEmbeddingProvider();
-
-    const vectorManager = new VectorPersistenceManager(
-      project.id,
-      this.options.embeddingModel,
-      embeddings,
-      this.vectors,
-      this.vectorStore
-    );
-
-    const vectorStats = await vectorManager.initialize(this.memory.list(project.id));
-
     await this.hooks.sessionStart();
 
     return {
@@ -147,10 +123,6 @@ export class ToolNetMemoryRuntime {
       graphSymbols: this.graph.allSymbols(project.id).length,
 
       graphEdges: this.graph.allEdges(project.id).length,
-
-      vectors: vectorStats.total,
-
-      vectorsIndexed: vectorStats.indexed,
     };
   }
 
@@ -175,7 +147,7 @@ export class ToolNetMemoryRuntime {
   }
 
   async stop() {
-    const { project, storage, embeddingModel } = this.options;
+    const { project, storage } = this.options;
 
     // Snapshot persistent state before changing it.
     const snapshotManager = new SnapshotManager(storage);
@@ -209,23 +181,8 @@ export class ToolNetMemoryRuntime {
       this.graph.import(graphSnapshot.symbols, graphSnapshot.edges);
     }
 
-    // Persist only missing/new memory vectors.
-    const embeddings = createEmbeddingProvider();
-
-    const vectorManager = new VectorPersistenceManager(
-      project.id,
-      embeddingModel,
-      embeddings,
-      this.vectors,
-      this.vectorStore
-    );
-
-    const vectorStats = await vectorManager.initialize(this.memory.list(project.id));
-
     const result = {
       code: codeStats,
-
-      vectors: vectorStats,
 
       consolidation,
 

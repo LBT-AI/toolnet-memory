@@ -24,6 +24,16 @@ import {
 } from '../session/kiro/installer.js';
 
 import {
+  installToolNetCliIntegration,
+  type InstallToolNetCliIntegrationOptions,
+} from '../session/toolnet-cli/installer.js';
+
+import {
+  installKiloIntegration,
+  type InstallKiloIntegrationOptions,
+} from '../session/kilo/installer.js';
+
+import {
   installCursorIntegration,
   type InstallCursorIntegrationOptions,
 } from '../session/cursor/installer.js';
@@ -109,6 +119,10 @@ export function installAutoIntegrations(
     copilot?: Omit<InstallCopilotIntegrationOptions, 'binary'>;
 
     grok?: Omit<InstallGrokIntegrationOptions, 'binary'>;
+
+    toolnetCli?: Omit<InstallToolNetCliIntegrationOptions, 'binary'>;
+
+    kilo?: Omit<InstallKiloIntegrationOptions, 'binary'>;
   } = {}
 ): AutoIntegrationResult[] {
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
@@ -456,6 +470,108 @@ export function installAutoIntegrations(
   }
 
   /*
+   * ToolNet CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('toolnet-cli') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'toolnet-cli',
+
+        detected: false,
+
+        installed: false,
+
+        targets: [],
+      });
+    } else {
+      try {
+        const toolnetCliOptions = options.toolnetCli ?? {};
+
+        const toolnetCli = installToolNetCliIntegration({
+          ...toolnetCliOptions,
+
+          binary,
+        });
+
+        results.push({
+          agent: 'toolnet-cli',
+
+          detected: true,
+
+          installed: true,
+
+          targets: [toolnetCli.mcp.configFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'toolnet-cli',
+
+          detected: true,
+
+          installed: false,
+
+          targets: [],
+
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Kilo
+   */
+  {
+    const isDetected = options.force === true || detected.get('kilo') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'kilo',
+
+        detected: false,
+
+        installed: false,
+
+        targets: [],
+      });
+    } else {
+      try {
+        const kiloOptions = options.kilo ?? {};
+
+        const kilo = installKiloIntegration({
+          ...kiloOptions,
+
+          binary,
+        });
+
+        results.push({
+          agent: 'kilo',
+
+          detected: true,
+
+          installed: true,
+
+          targets: [kilo.mcp.configFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'kilo',
+
+          detected: true,
+
+          installed: false,
+
+          targets: [],
+
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
    * Codex
    */
   {
@@ -548,6 +664,9 @@ function integrationDisplayName(agent: AgentIntegrationId): string {
 
     case 'codex':
       return 'Codex';
+
+    default:
+      return agent;
   }
 }
 

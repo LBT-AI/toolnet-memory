@@ -139,7 +139,7 @@ describe('memory_agent_ask structured routing', () => {
           project,
         } as any,
         {
-          mode: 'ai',
+          mode: 'local',
 
           detail: 'benchmark',
 

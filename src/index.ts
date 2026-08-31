@@ -22,8 +22,6 @@ async function main() {
     memories: shutdown.memories,
 
     codeParsed: shutdown.code.parsed,
-
-    vectorsIndexed: shutdown.vectors.indexed,
   });
 }
 

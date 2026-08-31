@@ -245,7 +245,7 @@ describe('Phase 01: Cursor + Copilot + Grok detection', () => {
     expect(grokDetectionPaths(options)).toEqual([grokHome]);
   });
 
-  it('returns 8 clean agent results when none are present', () => {
+  it('returns 10 clean agent results when none are present', () => {
     const home = mkdtempSync(join(tmpdir(), 'toolnet-detect-eight-empty-'));
     roots.push(home);
 
@@ -261,7 +261,7 @@ describe('Phase 01: Cursor + Copilot + Grok detection', () => {
       commandExists: () => false,
     });
 
-    expect(result).toHaveLength(8);
+    expect(result).toHaveLength(10);
     expect(result.every((item) => !item.detected)).toBe(true);
   });
 });

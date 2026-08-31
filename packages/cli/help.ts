@@ -43,11 +43,6 @@ export interface CommandMetadata {
 export const COMMANDS: CommandMetadata[] = [
   // Core / Get Started
   {
-    name: 'setup',
-    description: 'Configure ToolNet',
-    category: 'core',
-  },
-  {
     name: 'init',
     description: 'Initialize current project',
     usage: 'toolnet-memory init [path]',
@@ -117,19 +112,6 @@ export const COMMANDS: CommandMetadata[] = [
     description: 'Open code graph UI',
     category: 'code',
     hidden: true,
-  },
-
-  // AI
-  {
-    name: 'model',
-    description: 'View/change AI model',
-    category: 'ai',
-  },
-  {
-    name: 'provider',
-    description: 'Manage AI providers',
-    category: 'ai',
-    aliases: ['provider:status'],
   },
 
   // System
@@ -222,31 +204,13 @@ export const COMMANDS: CommandMetadata[] = [
     category: 'code',
   },
 
-  // AI / Providers (Advanced)
+  // Agent Integrations
   {
     name: 'config',
     description: 'Manage configuration',
     usage: 'toolnet-memory config <get|set|list|open>',
-    category: 'ai',
+    category: 'system',
   },
-  {
-    name: 'provider:list',
-    description: 'List available AI providers',
-    category: 'ai',
-  },
-  {
-    name: 'provider:status',
-    description: 'Show AI provider status',
-    category: 'ai',
-    hidden: true,
-  },
-  {
-    name: 'provider:test',
-    description: 'Test AI provider connection',
-    category: 'ai',
-  },
-
-  // Agent Integrations
   {
     name: 'integrate:detect',
     description: 'Detect agent integrations',
@@ -326,6 +290,32 @@ export const COMMANDS: CommandMetadata[] = [
       'toolnet-memory integrate:grok --scope project --project /path/to/project',
       'toolnet-memory integrate:grok --scope both --project /path/to/project',
     ],
+  },
+  {
+    name: 'integrate:toolnet-cli',
+    description: 'Install ToolNet CLI MCP integration',
+    usage: 'toolnet-memory integrate:toolnet-cli [--status] [--json] [--force]',
+    category: 'integration',
+    examples: [
+      'toolnet-memory integrate:toolnet-cli',
+      'toolnet-memory integrate:toolnet-cli --status',
+    ],
+  },
+  {
+    name: 'integrate:kilo',
+    description: 'Install Kilo CLI MCP integration',
+    usage: 'toolnet-memory integrate:kilo [--status] [--json] [--force]',
+    category: 'integration',
+    examples: [
+      'toolnet-memory integrate:kilo',
+      'toolnet-memory integrate:kilo --status',
+    ],
+  },
+  {
+    name: 'integrate:all',
+    description: 'Auto-enable all detected integrations',
+    usage: 'toolnet-memory integrate:all [--json]',
+    category: 'integration',
   },
   {
     name: 'integrate:status',
@@ -551,12 +541,6 @@ export const COMMANDS: CommandMetadata[] = [
     description: 'Certify work continuity',
     category: 'advanced',
   },
-  {
-    name: 'ask-ai',
-    description: 'Ask AI agent (advanced)',
-    category: 'advanced',
-    hidden: true,
-  },
 ];
 
 export interface HelpOptions {
@@ -590,7 +574,6 @@ export function generateDefaultHelp(options: HelpOptions): string {
     { key: 'core', title: 'GET STARTED' },
     { key: 'memory', title: 'MEMORY' },
     { key: 'code', title: 'CODE' },
-    { key: 'ai', title: 'AI' },
     { key: 'system', title: 'SYSTEM' },
   ] as const;
 
@@ -635,7 +618,6 @@ export function generateFullHelp(options: HelpOptions): string {
     { key: 'core', title: 'PROJECT SETUP' },
     { key: 'memory', title: 'MEMORY' },
     { key: 'code', title: 'CODE INTELLIGENCE' },
-    { key: 'ai', title: 'AI / PROVIDERS' },
     { key: 'system', title: 'SYSTEM' },
     { key: 'context', title: 'CONTEXT & MEMORY' },
     { key: 'work', title: 'WORK CONTINUITY' },

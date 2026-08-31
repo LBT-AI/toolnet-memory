@@ -8,8 +8,6 @@ import { describe, expect, it } from 'vitest';
 
 import { RepositoryIndexer, SemanticCodeEngine } from '../../src/code-intelligence/index.js';
 
-import { HashEmbeddingProvider } from '../../src/embeddings/local.js';
-
 import { LocalStorageProvider } from '../../src/storage/local/client.js';
 
 describe('Semantic Code Search', () => {
@@ -56,11 +54,7 @@ export function uploadBackup() {
 
         rootPath: repo,
 
-        model: 'hash-test',
-
         storage,
-
-        embeddings: new HashEmbeddingProvider(),
 
         graph: indexed.graph,
       });
@@ -78,27 +72,23 @@ export function uploadBackup() {
       expect(results[0].chunk.filePath).toBe('auth.ts');
 
       /*
-       * Lần 2 không embed lại.
+       * FTS5 index is rebuilt from chunks on every initialize().
        */
       const secondEngine = new SemanticCodeEngine({
         projectId: 'test',
 
         rootPath: repo,
 
-        model: 'hash-test',
-
         storage,
-
-        embeddings: new HashEmbeddingProvider(),
 
         graph: indexed.graph,
       });
 
       const second = await secondEngine.initialize();
 
-      expect(second.vectorsLoaded).toBeGreaterThan(0);
+      expect(second.vectorsLoaded).toBe(0);
 
-      expect(second.vectorsIndexed).toBe(0);
+      expect(second.vectorsIndexed).toBeGreaterThan(0);
     } finally {
       await rm(dir, {
         recursive: true,

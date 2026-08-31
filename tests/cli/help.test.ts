@@ -28,7 +28,6 @@ describe('CLI Help System', () => {
     it('should include core commands', () => {
       const help = generateDefaultHelp({ version: '0.3.6', tty: false });
 
-      expect(help).toContain('setup');
       expect(help).toContain('init');
       expect(help).toContain('doctor');
     });
@@ -50,11 +49,13 @@ describe('CLI Help System', () => {
       expect(help).toContain('graph');
     });
 
-    it('should include AI commands', () => {
+    it('should not include removed AI/model/provider commands', () => {
       const help = generateDefaultHelp({ version: '0.3.6', tty: false });
 
-      expect(help).toContain('model');
-      expect(help).toContain('provider');
+      expect(help).not.toContain('model');
+      expect(help).not.toContain('provider');
+      expect(help).not.toContain('setup');
+      expect(help).not.toContain('ask-ai');
     });
 
     it('should include system commands', () => {
@@ -274,9 +275,7 @@ describe('CLI Help System', () => {
     it('should include all original commands', () => {
       const help = generateFullHelp({ version: '0.3.6', tty: false });
 
-      // Core commands
       expect(help).toContain('init');
-      expect(help).toContain('setup');
       expect(help).toContain('doctor');
 
       // Memory commands
@@ -289,10 +288,6 @@ describe('CLI Help System', () => {
 
       // Config
       expect(help).toContain('config');
-
-      // Providers
-      expect(help).toContain('provider:list');
-      expect(help).toContain('provider:test');
 
       // Integrations
       expect(help).toContain('integrate:detect');

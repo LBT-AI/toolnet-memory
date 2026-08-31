@@ -10,8 +10,6 @@ import {
 
 import { CodeGraphStore, SemanticCodeEngine } from './index.js';
 
-import { createEmbeddingProvider } from '../embeddings/index.js';
-
 async function main() {
   const config = loadConfig();
 
@@ -47,11 +45,7 @@ async function main() {
 
     rootPath: project.rootPath,
 
-    model: process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2',
-
     storage,
-
-    embeddings: createEmbeddingProvider(),
 
     graph,
   });

@@ -121,7 +121,7 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 
 function parseMemoryAskInput(value: unknown): {
   question: string;
-  mode?: 'ai' | 'local';
+  mode?: 'local';
 } | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null;
@@ -137,7 +137,7 @@ function parseMemoryAskInput(value: unknown): {
     return null;
   }
 
-  if (input.mode !== undefined && input.mode !== 'ai' && input.mode !== 'local') {
+  if (input.mode !== undefined && input.mode !== 'local') {
     return null;
   }
 

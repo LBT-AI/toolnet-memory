@@ -5,7 +5,6 @@
  */
 
 import { ProjectManager, loadConfig } from '../core/index.js';
-import { loadAiConfig } from '../ai/config.js';
 import {
   createStorageProvider,
   withStorageRetry,
@@ -47,7 +46,6 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
   try {
     const project = new ProjectManager().detect();
     const config = loadConfig();
-    const aiConfig = loadAiConfig();
 
     // Project status
     console.log(renderSectionTitle('PROJECT', uiOpts));
@@ -91,12 +89,6 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
 
     console.log(renderKeyValue('Memory', memoryStatus, 8, uiOpts));
     console.log(renderKeyValue('Index', indexStatus, 8, uiOpts));
-    console.log('');
-
-    // AI status
-    console.log(renderSectionTitle('AI', uiOpts));
-    console.log(renderKeyValue('Provider', aiConfig.llm.provider, 8, uiOpts));
-    console.log(renderKeyValue('Model', aiConfig.llm.model ?? 'not set', 8, uiOpts));
     console.log('');
 
     const integrations = detectAgentIntegrations();

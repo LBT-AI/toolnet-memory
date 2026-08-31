@@ -51,11 +51,6 @@ case "$COMMAND" in
     run bundle/memory-query.js src/work-continuity/memory-query-cli.ts "$@"
     ;;
 
-  ask-ai)
-    shift
-    run bundle/memory-agent.js src/work-continuity/memory-agent-cli.ts "$@"
-    ;;
-
   handoff:refresh)
     shift
     run bundle/handoff-refresh.js src/work-continuity/handoff-cli.ts "$@"
@@ -71,36 +66,9 @@ case "$COMMAND" in
     run bundle/config.js src/production/config-cli.ts "$@"
     ;;
 
-  setup)
-    if [ -f "$ROOT/bundle/setup.js" ]; then
-      exec node "$ROOT/bundle/setup.js" "$@"
-    elif [ -f "$ROOT/src/production/setup.ts" ]; then
-      exec npx --yes tsx "$ROOT/src/production/setup.ts" "$@"
-    else
-      echo "ToolNet setup module missing."
-      exit 1
-    fi
-    ;;
-
-
   doctor)
     shift
     run bundle/doctor.js src/production/doctor.ts "$@"
-    ;;
-
-  provider:list)
-    shift
-    run bundle/provider.js src/ai/provider-cli.ts list "$@"
-    ;;
-
-  provider:status)
-    shift
-    run bundle/provider.js src/ai/provider-cli.ts status "$@"
-    ;;
-
-  provider:test)
-    shift
-    run bundle/provider.js src/ai/provider-cli.ts test "$@"
     ;;
 
   run)
@@ -414,6 +382,21 @@ case "$COMMAND" in
     run bundle/grok.js src/session/grok/cli.ts "$@"
     ;;
 
+  integrate:toolnet-cli)
+    shift
+    run bundle/toolnet-cli.js src/session/toolnet-cli/cli.ts "$@"
+    ;;
+
+  integrate:kilo)
+    shift
+    run bundle/kilo.js src/session/kilo/cli.ts "$@"
+    ;;
+
+  integrate:all)
+    shift
+    run bundle/auto-integrate.js src/production/auto-integrate.ts "$@"
+    ;;
+
   integrate:status)
     shift
     run bundle/integration-status.js src/session/new-agents/scoped-status-cli.ts "$@"
@@ -703,16 +686,6 @@ case "$COMMAND" in
   graph:ui)
     shift
     run bundle/graph-cli.js src/production/graph-cli.ts "$@"
-    ;;
-
-  model)
-    shift
-    run bundle/model-cli.js src/production/model-cli.ts "$@"
-    ;;
-
-  provider)
-    shift
-    run bundle/provider.js src/ai/provider-cli.ts status "$@"
     ;;
 
   status)

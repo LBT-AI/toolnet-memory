@@ -16,7 +16,7 @@ describe('Phase 05 new-agent auto-integrate', () => {
     }
   });
 
-  it('returns 8 agents and installs Cursor/Copilot/Grok when detected', () => {
+  it('returns 10 agents and installs Cursor/Copilot/Grok when detected', () => {
     const root = mkdtempSync(join(tmpdir(), 'toolnet-p05-auto-'));
     roots.push(root);
 
@@ -57,7 +57,7 @@ describe('Phase 05 new-agent auto-integrate', () => {
       },
     });
 
-    expect(results).toHaveLength(8);
+    expect(results).toHaveLength(10);
 
     for (const agent of ['cursor', 'copilot', 'grok'] as const) {
       const result = results.find((item) => item.agent === agent);

@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -43,8 +43,6 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "storage:test": "tsx src/storage/test-connection.ts",
-    "embedding:test": "tsx src/embeddings/test-connection.ts",
-    "vector:persist:test": "tsx src/retrieval/vector/test-persistence.ts",
     "code:index:test": "tsx src/code-intelligence/test-index.ts",
     "code:incremental:test": "tsx src/code-intelligence/test-incremental.ts",
     "mcp": "tsx src/mcp/bootstrap.ts",

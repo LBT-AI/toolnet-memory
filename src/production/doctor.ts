@@ -13,12 +13,6 @@ import {
   PersistentCodeVectorStore,
 } from '../storage/index.js';
 
-import { createEmbeddingProvider } from '../embeddings/index.js';
-
-import { loadAiConfig } from '../ai/config.js';
-
-import { createAiProvider } from '../ai/factory.js';
-
 import { SnapshotManager } from '../snapshot/index.js';
 
 import { checkProductionConfig } from './config-check.js';
@@ -37,20 +31,6 @@ type DoctorResult = {
   storage?: {
     ok: boolean;
     provider?: string;
-  } | null;
-
-  llm?: {
-    ok: boolean;
-    provider?: string;
-    model?: string;
-    latencyMs?: number;
-    error?: string;
-  } | null;
-
-  embedding?: {
-    ok: boolean;
-    dimensions?: number;
-    mode?: string;
   } | null;
 
   memory?: number;
@@ -114,52 +94,6 @@ function printHuman(result: DoctorResult): void {
       console.log(`${branch} ${green('◆')} Storage${provider}`);
     } else {
       console.log(`${branch} ${red('✗')} Storage${provider}`);
-    }
-  }
-
-  if (result.llm) {
-    const details: string[] = [];
-
-    if (result.llm.provider) {
-      details.push(result.llm.provider);
-    }
-
-    if (result.llm.model) {
-      details.push(result.llm.model);
-    }
-
-    if (typeof result.llm.latencyMs === 'number') {
-      details.push(`${result.llm.latencyMs}ms`);
-    }
-
-    if (result.llm.ok) {
-      console.log(
-        `${branch} ${green('◆')} LLM${details.length ? ` — ${details.join(' · ')}` : ''}`
-      );
-    } else {
-      const error = result.llm.error ? ` — ${result.llm.error}` : '';
-
-      console.log(`${branch} ${red('✗')} LLM${error}`);
-    }
-  }
-
-  if (result.embedding) {
-    const details: string[] = [];
-
-    if (typeof result.embedding.mode === 'string') {
-      details.push(result.embedding.mode);
-    }
-
-    if (typeof result.embedding.dimensions === 'number') {
-      details.push(`${result.embedding.dimensions}d`);
-    }
-
-    if (result.embedding.ok) {
-      console.log(
-        `${branch} ${green('◆')} Embedding${details.length ? ` — ${details.join(' · ')}` : ''}`
-      );
-    } else {
-      console.log(`${branch} ${red('✗')} Embedding`);
     }
   }
 
@@ -330,44 +264,7 @@ async function main(): Promise<void> {
     project.remote ?? project.name
   );
 
-  const embeddings = createEmbeddingProvider();
-
-  const aiConfig = loadAiConfig();
-
-  let llmHealth: DoctorResult['llm'];
-
-  try {
-    const provider = createAiProvider({
-      id: aiConfig.llm.provider,
-
-      apiKey: aiConfig.llm.apiKey,
-
-      baseUrl: aiConfig.llm.baseUrl,
-
-      model: aiConfig.llm.model,
-
-      accountId: aiConfig.llm.accountId,
-    });
-
-    const result = await provider.healthCheck();
-
-    llmHealth = {
-      ok: result.ok,
-      provider: aiConfig.llm.provider,
-      model: result.model ?? aiConfig.llm.model,
-      latencyMs: result.latencyMs,
-      error: result.ok ? undefined : result.message,
-    };
-  } catch (error) {
-    llmHealth = {
-      ok: false,
-      provider: aiConfig.llm.provider,
-      model: aiConfig.llm.model,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-
-  const health = await new ProductionHealth(rawStorage, embeddings).run();
+  const health = await new ProductionHealth(rawStorage).run();
 
   const memories = await new MemoryStore(storage).load(project.id);
 
@@ -389,11 +286,9 @@ async function main(): Promise<void> {
       : [];
 
   const result: DoctorResult = {
-    ok: health.ok && Boolean(llmHealth?.ok) && capture.ok,
+    ok: health.ok && capture.ok,
     project: project.name,
     storage: health.storage,
-    llm: llmHealth,
-    embedding: health.embedding,
     memory: memories.length,
     graphSymbols: graph?.symbols.length ?? 0,
     graphEdges: graph?.edges.length ?? 0,

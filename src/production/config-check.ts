@@ -33,11 +33,7 @@ export function checkProductionConfig(): ConfigCheck {
   }
 
   if (!process.env.HF_TOKEN) {
-    warnings.push('HF_TOKEN missing: semantic embedding will use fallback');
-  }
-
-  if (!process.env.HF_EMBEDDING_MODEL) {
-    warnings.push('HF_EMBEDDING_MODEL not set; default model will be used');
+    warnings.push('HF_TOKEN missing: Hugging Face S3 storage credentials incomplete');
   }
 
   return {

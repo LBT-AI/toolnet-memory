@@ -698,49 +698,6 @@ Deep recovery is intentionally not run automatically on every startup.
 
 ---
 
-## AI Providers and Models
-
-Configure interactively:
-
-```bash
-toolnet-memory setup
-```
-
-Provider commands:
-
-```bash
-toolnet-memory provider
-toolnet-memory provider:list
-toolnet-memory provider:status
-toolnet-memory provider:test llm
-toolnet-memory provider:test embedding
-```
-
-Model commands:
-
-```bash
-toolnet-memory model
-toolnet-memory model status
-toolnet-memory model list
-toolnet-memory model set <model>
-```
-
-Canonical environment configuration:
-
-```text
-TOOLNET_LLM_PROVIDER
-TOOLNET_LLM_API_KEY
-TOOLNET_LLM_BASE_URL
-TOOLNET_LLM_MODEL
-
-TOOLNET_EMBEDDING_PROVIDER
-TOOLNET_EMBEDDING_API_KEY
-TOOLNET_EMBEDDING_BASE_URL
-TOOLNET_EMBEDDING_MODEL
-```
-
----
-
 ## Storage
 
 Supported modes include:

@@ -8,5 +8,3 @@ export * from './query-analyzer.js';
 export * from './hybrid-search.js';
 export * from './context-builder.js';
 export * from './retrieval-engine.js';
-export * from './vector/index.js';
-export * from './vector-hybrid-engine.js';

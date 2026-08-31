@@ -2,14 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import type { StorageProvider } from '../storage/types.js';
 
-import type { EmbeddingProvider } from '../embeddings/provider.js';
-
 export class ProductionHealth {
-  constructor(
-    private readonly storage: StorageProvider,
-
-    private readonly embeddings?: EmbeddingProvider
-  ) {}
+  constructor(private readonly storage: StorageProvider) {}
 
   async run() {
     const key = `_health/production-${randomUUID()}.txt`;
@@ -32,34 +26,8 @@ export class ProductionHealth {
       }
     }
 
-    let embedding: {
-      ok: boolean;
-      dimensions: number;
-      mode: string;
-    } | null = null;
-
-    if (this.embeddings) {
-      try {
-        const vector = await this.embeddings.embed('ToolNet Memory production health check');
-
-        embedding = {
-          ok: vector.length > 0,
-
-          dimensions: vector.length,
-
-          mode: vector.length === 384 ? 'huggingface' : 'fallback-or-custom',
-        };
-      } catch {
-        embedding = {
-          ok: false,
-          dimensions: 0,
-          mode: 'failed',
-        };
-      }
-    }
-
     return {
-      ok: storageOk && (embedding === null || embedding.ok),
+      ok: storageOk,
 
       storage: {
         ok: storageOk,
@@ -67,7 +35,7 @@ export class ProductionHealth {
         provider: this.storage.name,
       },
 
-      embedding,
+      embedding: null,
     };
   }
 }

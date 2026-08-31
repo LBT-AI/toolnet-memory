@@ -1,15 +1,20 @@
-import i from"node:fs";import d from"node:os";import u from"node:path";import{spawnSync as p}from"node:child_process";var l=u.join(d.homedir(),".config","toolnet-memory"),s=u.join(l,".env"),E=/(SECRET|TOKEN|PASSWORD|ACCESS_KEY|API_KEY|PRIVATE_KEY)/i;function f(){i.mkdirSync(l,{recursive:!0,mode:448}),i.existsSync(s)||i.writeFileSync(s,"",{encoding:"utf8",mode:384}),i.chmodSync(l,448),i.chmodSync(s,384)}function a(){return f(),i.readFileSync(s,"utf8").split(/\r?\n/)}function m(){let o=new Map;for(let t of a()){let e=t.trim();if(!e||e.startsWith("#"))continue;let n=e.indexOf("=");n<1||o.set(e.slice(0,n).trim(),e.slice(n+1).trim())}return o}function y(o){return/^[A-Za-z_][A-Za-z0-9_]*$/.test(o)}function g(o,t){return E.test(o)?t?t.length<=8?"********":t.slice(0,4)+"\u2026"+t.slice(-4):"":t}function h(o,t){if(!y(o))throw new Error(`Invalid config key: ${o}`);let e=a(),n=!1,r=e.map(c=>c.trim().startsWith(`${o}=`)?(n=!0,`${o}=${t}`):c);n||(r.length&&r[r.length-1]!==""&&r.push(""),r.push(`${o}=${t}`)),i.writeFileSync(s,r.join(`
-`),{encoding:"utf8",mode:384}),i.chmodSync(s,384)}function S(){console.log(`ToolNet Memory Config
+import{spawnSync as v}from"node:child_process";import s from"node:fs";import E from"node:os";import m from"node:path";var f=m.join(E.homedir(),".config","toolnet-memory"),i=m.join(f,".env"),y=/(SECRET|TOKEN|PASSWORD|ACCESS_KEY|API_KEY|PRIVATE_KEY)/i;function c(){s.mkdirSync(f,{recursive:!0,mode:448}),s.existsSync(i)||s.writeFileSync(i,"",{encoding:"utf8",mode:384}),s.chmodSync(f,448),s.chmodSync(i,384)}function u(){return c(),s.readFileSync(i,"utf8").split(/\r?\n/)}function l(){let o=new Map;for(let n of u()){let e=n.trim();if(!e||e.startsWith("#"))continue;let t=e.indexOf("=");t<1||o.set(e.slice(0,t).trim(),e.slice(t+1).trim())}return o}function d(o){return/^[A-Za-z_][A-Za-z0-9_]*$/.test(o)}function a(o,n){return y.test(o)?n?n.length<=8?"********":`${n.slice(0,4)}\u2026${n.slice(-4)}`:"":n}function p(o){c(),s.writeFileSync(i,`${o.join(`
+`).replace(/\n+$/,"")}
+`,{encoding:"utf8",mode:384}),s.chmodSync(i,384)}function h(o,n){if(!d(o))throw new Error(`Invalid config key: ${o}`);let e=u(),t=!1,r=e.map(g=>g.trim().startsWith(`${o}=`)?(t=!0,`${o}=${n}`):g);t||(r.length&&r.at(-1)!==""&&r.push(""),r.push(`${o}=${n}`)),p(r)}function S(o){if(!d(o))throw new Error(`Invalid config key: ${o}`);let n=u(),e=n.filter(t=>!t.trim().startsWith(`${o}=`));return e.length===n.length?!1:(p(e),!0)}function w(){let n=l().get("MEMORY_STORAGE_PROVIDER")||"not configured";console.log(""),console.log("\u25C7 ToolNet Memory Config"),console.log(""),console.log(`Storage    ${n}`),console.log(`File       ${i}`),console.log("Secrets    hidden"),console.log("")}function $(){let o=l(),n=[];if(o.get("MEMORY_STORAGE_PROVIDER")||n.push("Storage provider is missing"),n.length){console.log("Config needs attention:");for(let e of n)console.log(`  \u2717 ${e}`);return!1}return console.log("\u2713 Config structure looks valid"),!0}function R(){console.log("Guided AI/LLM setup was removed."),console.log("Configure storage and runtime via environment variables (see .env.example)"),console.log("or use `toolnet-memory config set KEY VALUE`.")}function C(){console.log(`ToolNet Memory Config
 
 Commands:
-  toolnet-memory config path
-  toolnet-memory config list
-  toolnet-memory config get KEY
-  toolnet-memory config get KEY --reveal
-  toolnet-memory config set KEY VALUE
-  toolnet-memory config open
+  toolnet-memory config                 Guided configuration
+  toolnet-memory config show            Friendly summary
+  toolnet-memory config file            Print config path
+  toolnet-memory config list            List active keys (secrets masked)
+  toolnet-memory config get KEY          Read one value (masked if secret)
+  toolnet-memory config get KEY --reveal Read one value including secret
+  toolnet-memory config set KEY VALUE    Set one value
+  toolnet-memory config unset KEY        Remove one value
+  toolnet-memory config validate         Validate required fields
+  toolnet-memory config open             Open config in editor
 
-Examples:
-  toolnet-memory config get HF_NAMESPACE
-  toolnet-memory config set HF_BUCKET toolnet-memory
-  toolnet-memory config open`)}function v(){let[o="help",...t]=process.argv.slice(2);if(o==="path"){f(),console.log(s);return}if(o==="list"){let e=m();for(let[n,r]of e)console.log(`${n}=${g(n,r)}`);return}if(o==="get"){let e=t[0];e||(console.error("Usage: toolnet-memory config get KEY"),process.exit(1));let n=m();n.has(e)||(console.error(`Config key not found: ${e}`),process.exit(1));let r=n.get(e)??"",c=t.includes("--reveal");console.log(c?r:g(e,r));return}if(o==="set"){let e=t[0],n=t[1];(!e||n===void 0)&&(console.error("Usage: toolnet-memory config set KEY VALUE"),process.exit(1)),h(e,n),console.log(`\u2713 ${e} updated`);return}if(o==="open"){if(f(),!process.stdin.isTTY){console.log(s);return}let e=process.env.VISUAL||process.env.EDITOR||"vi",n=p(e,[s],{stdio:"inherit",shell:!0});process.exitCode=n.status??0;return}S()}try{v()}catch(o){console.error(o instanceof Error?o.message:String(o)),process.exit(1)}
+Targeted setup:
+  toolnet-memory setup --section storage
+  toolnet-memory setup --section integrations
+  toolnet-memory setup --section health`)}function A(){let[o,...n]=process.argv.slice(2);if(!o||o==="configure"){R();return}if(o==="show"){w();return}if(o==="path"||o==="file"){c(),console.log(i);return}if(o==="list"){let e=l();for(let[t,r]of e)console.log(`${t}=${a(t,r)}`);return}if(o==="get"){let e=n[0];if(!e)throw new Error("Usage: toolnet-memory config get KEY");let t=l();if(!t.has(e))throw new Error(`Config key not found: ${e}`);let r=t.get(e)??"";console.log(n.includes("--reveal")?r:a(e,r));return}if(o==="set"){let e=n[0],t=n[1];if(!e||t===void 0)throw new Error("Usage: toolnet-memory config set KEY VALUE");h(e,t),console.log(`\u2713 ${e} updated`);return}if(o==="unset"){let e=n[0];if(!e)throw new Error("Usage: toolnet-memory config unset KEY");console.log(S(e)?`\u2713 ${e} removed`:`\xB7 ${e} was not set`);return}if(o==="validate"){$()||(process.exitCode=1);return}if(o==="open"){if(c(),!process.stdin.isTTY){console.log(i);return}let e=process.env.VISUAL||process.env.EDITOR||"vi",t=v(e,[i],{stdio:"inherit",shell:!0});process.exitCode=t.status??0;return}C()}try{A()}catch(o){console.error(o instanceof Error?o.message:String(o)),process.exit(1)}

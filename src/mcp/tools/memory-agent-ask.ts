@@ -4,8 +4,6 @@ import type { MCPContext } from '../context.js';
 
 import { answerRetrievedMemoryQuestion } from '../../work-continuity/memory-local-answer.js';
 
-import { askMemoryAgent } from '../../work-continuity/memory-agent.js';
-
 import {
   answerMemoryConversationFollowUp,
   prepareMemoryConversation,
@@ -29,11 +27,9 @@ export const memoryAgentAskSchema = {
     ),
 
   mode: z
-    .enum(['ai', 'local'])
+    .enum(['local'])
     .optional()
-    .describe(
-      'ai uses ToolNet Memory Agent with configured LLM fallback chain. local returns deterministic local memory only.'
-    ),
+    .describe('Returns deterministic local memory only. No external AI is used.'),
 
   detail: z
     .enum(['compact', 'normal', 'benchmark'])
@@ -46,7 +42,7 @@ export const memoryAgentAskSchema = {
 export interface MemoryAgentAskInput {
   question: string;
 
-  mode?: 'ai' | 'local';
+  mode?: 'local';
 
   detail?: StructuredHandoffDetail;
 }
@@ -93,45 +89,17 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
   const conversation = prepareMemoryConversation(ctx.project, input.question);
 
   /*
-   * Local mode:
-   * deterministic, canonical and zero external AI calls.
+   * All answering is deterministic and local.
+   * No LLM / AI provider is involved.
    */
-  if (input.mode === 'local') {
-    const followUp = answerMemoryConversationFollowUp(conversation);
+  const followUp = answerMemoryConversationFollowUp(conversation);
 
-    if (followUp) {
-      const structured = structuredLocalHandoff(
-        ctx,
-        conversation.originalQuestion,
-        String(followUp.intent),
-        followUp.answer,
-        input.detail
-      );
-
-      return {
-        ...structured,
-
-        mode: 'local' as const,
-
-        usedAi: false,
-
-        source: followUp.source,
-
-        intent: followUp.intent,
-      };
-    }
-
-    /*
-     * Direct deterministic questions must use only
-     * original user text for intent detection.
-     */
-    const result = answerRetrievedMemoryQuestion(ctx.project, conversation.originalQuestion);
-
+  if (followUp) {
     const structured = structuredLocalHandoff(
       ctx,
       conversation.originalQuestion,
-      String(result.intent),
-      result.answer,
+      String(followUp.intent),
+      followUp.answer,
       input.detail
     );
 
@@ -142,24 +110,15 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
 
       usedAi: false,
 
-      source: result.source,
+      source: followUp.source,
 
-      intent: result.intent,
+      intent: followUp.intent,
     };
   }
 
-  /*
-   * Structured continuity/takeover questions must prefer
-   * canonical deterministic handoff before invoking AI.
-   *
-   * Benefits:
-   * - no LLM paraphrase can drop evidence/files/next action
-   * - zero external AI cost for handoff retrieval
-   * - same result across Codex/Agy/Kiro/OpenCode/etc.
-   */
   const direct = answerRetrievedMemoryQuestion(ctx.project, conversation.originalQuestion);
 
-  const deterministicHandoff = structuredLocalHandoff(
+  const structured = structuredLocalHandoff(
     ctx,
     conversation.originalQuestion,
     String(direct.intent),
@@ -167,11 +126,11 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
     input.detail
   );
 
-  if ('handoff' in deterministicHandoff) {
+  if ('handoff' in structured) {
     return {
-      ...deterministicHandoff,
+      ...structured,
 
-      mode: 'ai' as const,
+      mode: 'local' as const,
 
       usedAi: false,
 
@@ -183,49 +142,15 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
     };
   }
 
-  /*
-   * Ordinary memory questions can still use Memory Agent AI.
-   *
-   * Memory Agent receives selected ToolNet context,
-   * never the raw full transcript.
-   */
-  const result = await askMemoryAgent(ctx.project, conversation.question);
-
-  if (!result.usedAi) {
-    const followUp = answerMemoryConversationFollowUp(conversation);
-
-    if (followUp) {
-      const structured = structuredLocalHandoff(
-        ctx,
-        conversation.originalQuestion,
-        String(followUp.intent),
-        followUp.answer,
-        input.detail
-      );
-
-      return {
-        ...structured,
-
-        mode: 'ai' as const,
-
-        usedAi: false,
-
-        provider: result.provider,
-
-        model: result.model,
-      };
-    }
-  }
-
   return {
-    answer: result.answer,
+    ...structured,
 
-    mode: 'ai' as const,
+    mode: 'local' as const,
 
-    usedAi: result.usedAi,
+    usedAi: false,
 
-    provider: result.provider,
+    source: direct.source,
 
-    model: result.model,
+    intent: direct.intent,
   };
 }

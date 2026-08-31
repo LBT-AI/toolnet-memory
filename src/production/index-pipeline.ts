@@ -2,8 +2,6 @@ import type { ProjectManifest } from '../core/types.js';
 
 import { loadConfig } from '../core/index.js';
 
-import { createEmbeddingProvider } from '../embeddings/index.js';
-
 import {
   ArchitectureEngine,
   CodeAnalysisEngine,
@@ -252,11 +250,7 @@ export async function runProductionIndex(
 
       rootPath: project.rootPath,
 
-      model: process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2',
-
       storage,
-
-      embeddings: createEmbeddingProvider(),
 
       graph,
     });

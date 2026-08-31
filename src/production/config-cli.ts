@@ -2,7 +2,6 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'toolnet-memory');
 const ENV_FILE = path.join(CONFIG_DIR, '.env');
@@ -84,17 +83,11 @@ function unsetValue(key: string): boolean {
 function showSummary(): void {
   const values = parseValues();
   const storage = values.get('MEMORY_STORAGE_PROVIDER') || 'not configured';
-  const llmProvider = values.get('TOOLNET_LLM_PROVIDER') || 'not configured';
-  const llmModel = values.get('TOOLNET_LLM_MODEL');
-  const embedding = values.get('TOOLNET_EMBEDDING_PROVIDER') || 'local';
-  const embeddingModel = values.get('TOOLNET_EMBEDDING_MODEL');
 
   console.log('');
   console.log('◇ ToolNet Memory Config');
   console.log('');
   console.log(`Storage    ${storage}`);
-  console.log(`LLM        ${llmProvider}${llmModel ? ` / ${llmModel}` : ''}`);
-  console.log(`Embedding  ${embedding}${embeddingModel ? ` / ${embeddingModel}` : ''}`);
   console.log(`File       ${ENV_FILE}`);
   console.log('Secrets    hidden');
   console.log('');
@@ -104,9 +97,6 @@ function validate(): boolean {
   const values = parseValues();
   const errors: string[] = [];
   if (!values.get('MEMORY_STORAGE_PROVIDER')) errors.push('Storage provider is missing');
-  if (!values.get('TOOLNET_LLM_PROVIDER')) errors.push('LLM provider is missing');
-  if (!values.get('TOOLNET_LLM_MODEL')) errors.push('LLM model is missing');
-  if (!values.get('TOOLNET_EMBEDDING_PROVIDER')) errors.push('Embedding provider is missing');
 
   if (errors.length) {
     console.log('Config needs attention:');
@@ -118,17 +108,9 @@ function validate(): boolean {
 }
 
 function launchSetup(): void {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const bundledSetup = path.join(here, 'setup.js');
-
-  if (fs.existsSync(bundledSetup)) {
-    const result = spawnSync(process.execPath, [bundledSetup, 'setup'], { stdio: 'inherit' });
-    process.exitCode = result.status ?? 0;
-    return;
-  }
-
-  const result = spawnSync('toolnet-memory', ['setup'], { stdio: 'inherit' });
-  process.exitCode = result.status ?? 0;
+  console.log('Guided AI/LLM setup was removed.');
+  console.log('Configure storage and runtime via environment variables (see .env.example)');
+  console.log('or use `toolnet-memory config set KEY VALUE`.');
 }
 
 function usage(): void {
@@ -147,8 +129,6 @@ Commands:
   toolnet-memory config open             Open config in editor
 
 Targeted setup:
-  toolnet-memory setup --section model
-  toolnet-memory setup --section embedding
   toolnet-memory setup --section storage
   toolnet-memory setup --section integrations
   toolnet-memory setup --section health`);

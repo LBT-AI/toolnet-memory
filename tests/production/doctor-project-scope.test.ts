@@ -15,9 +15,7 @@ describe('doctor project namespace', () => {
       /const storage = new ProjectScopedStorageProvider\(\s*rawStorage,\s*project\.id,\s*project\.name,\s*project\.remote \?\? project\.name\s*\)/
     );
 
-    expect(source).toContain(
-      'const health = await new ProductionHealth(rawStorage, embeddings).run();'
-    );
+    expect(source).toContain('const health = await new ProductionHealth(rawStorage).run();');
 
     expect(source).toContain(
       'const graph = await new PersistentCodeGraphStore(storage).load(project.id);'

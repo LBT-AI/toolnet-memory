@@ -1,6 +1,10 @@
 import type { StorageProvider } from './types.js';
 
-import type { VectorRecord } from '../retrieval/vector/vector-store.js';
+export interface CodeVectorRecord {
+  id: string;
+  embedding: number[];
+  metadata: Record<string, unknown>;
+}
 
 export interface CodeVectorSnapshot {
   version: 1;
@@ -12,7 +16,7 @@ export interface CodeVectorSnapshot {
 
   updatedAt: string;
 
-  records: VectorRecord[];
+  records: CodeVectorRecord[];
 }
 
 export class PersistentCodeVectorStore {

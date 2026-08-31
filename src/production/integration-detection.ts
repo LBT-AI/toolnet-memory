@@ -13,12 +13,23 @@ import { openCodeConfigDirectory } from '../session/opencode/config-paths.js';
 import { claudeConfigDirectory } from '../session/claude/config-paths.js';
 
 import { kiroDetectionPaths } from '../session/kiro/config-paths.js';
+import { toolnetCliDetectionPaths } from '../session/toolnet-cli/config-paths.js';
+import { kiloDetectionPaths } from '../session/kilo/config-paths.js';
 import { cursorDetectionPaths } from '../session/cursor/config-paths.js';
 import { copilotDetectionPaths } from '../session/copilot/config-paths.js';
 import { grokDetectionPaths } from '../session/grok/config-paths.js';
 
 export type AgentIntegrationId =
-  'agy' | 'opencode' | 'codex' | 'claude' | 'kiro' | 'cursor' | 'copilot' | 'grok';
+  | 'agy'
+  | 'opencode'
+  | 'codex'
+  | 'claude'
+  | 'kiro'
+  | 'toolnet-cli'
+  | 'kilo'
+  | 'cursor'
+  | 'copilot'
+  | 'grok';
 
 export interface AgentDetection {
   agent: AgentIntegrationId;
@@ -38,6 +49,8 @@ export interface DetectAgentIntegrationOptions {
   codexHome?: string;
 
   kiroHome?: string;
+
+  kiloHome?: string;
 
   cursorHome?: string;
 
@@ -242,6 +255,34 @@ export function detectAgentIntegrations(
         home,
 
         grokHome: options.grokHome,
+      }),
+    }),
+
+    detectOne({
+      agent: 'toolnet-cli',
+
+      command: 'toolnet-memory',
+
+      commandExists,
+
+      configPaths: toolnetCliDetectionPaths({
+        home,
+
+        xdgConfigHome: options.xdgConfigHome,
+      }),
+    }),
+
+    detectOneWithCommandAliases({
+      agent: 'kilo',
+
+      commands: ['kilo', 'kilo-code'],
+
+      commandExists,
+
+      configPaths: kiloDetectionPaths({
+        home,
+
+        kiloHome: options.kiloHome,
       }),
     }),
 

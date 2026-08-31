@@ -34,11 +34,8 @@ export function createToolNetMemoryRuntime(rootPath: string = process.cwd()) {
     project.remote ?? project.name
   );
 
-  const embeddingModel = process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2';
-
   return new ToolNetMemoryRuntime({
     project,
     storage,
-    embeddingModel,
   });
 }

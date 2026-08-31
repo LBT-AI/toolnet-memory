@@ -71,7 +71,7 @@ describe('integrate:auto applies scoped policy to Cursor/Copilot/Grok', () => {
       ...overrides,
     });
 
-    expect(results).toHaveLength(8);
+    expect(results).toHaveLength(10);
 
     for (const agent of ['cursor', 'copilot', 'grok'] as const) {
       const result = results.find((item) => item.agent === agent);

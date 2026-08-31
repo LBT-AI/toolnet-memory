@@ -47,7 +47,6 @@ function main() {
       const first = new ToolNetMemoryRuntime({
         project,
         storage,
-        embeddingModel: 'hash-test',
       });
 
       await first.start();
@@ -65,7 +64,6 @@ function main() {
       const second = new ToolNetMemoryRuntime({
         project,
         storage,
-        embeddingModel: 'hash-test',
       });
 
       const loaded = await second.start();

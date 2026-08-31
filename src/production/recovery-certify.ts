@@ -546,13 +546,7 @@ export async function certifyRecoveryResilience(): Promise<RecoveryCertification
             'Continue without provider'
           );
 
-          const answer = await askMemoryAgent(manifest, 'Task hiện tại là gì?', {
-            router: {
-              generate: async () => {
-                throw new Error('X2 forced provider outage');
-              },
-            },
-          });
+          const answer = await askMemoryAgent(manifest, 'Task hiện tại là gì?');
 
           return (
             answer.usedAi === false && answer.answer.includes('Deterministic AI outage fallback')

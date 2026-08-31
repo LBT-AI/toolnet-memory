@@ -216,20 +216,14 @@ export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationRe
       markDependencyLoading(runtime, 'semantic');
 
       try {
-        const [{ SemanticCodeEngine }, { createEmbeddingProvider }] = await Promise.all([
-          import('../code-intelligence/semantic/semantic-code-engine.js'),
-          import('../embeddings/index.js'),
-        ]);
+        const { SemanticCodeEngine } =
+          await import('../code-intelligence/semantic/semantic-code-engine.js');
 
         const semantic = new SemanticCodeEngine({
           projectId: ctx.project.id,
           rootPath: ctx.project.rootPath,
 
-          model: process.env.HF_EMBEDDING_MODEL ?? 'sentence-transformers/all-MiniLM-L6-v2',
-
           storage,
-
-          embeddings: createEmbeddingProvider(),
 
           graph: ctx.graph,
         });
