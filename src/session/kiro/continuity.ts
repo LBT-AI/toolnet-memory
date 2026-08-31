@@ -155,14 +155,13 @@ Required order:
 1. Use the injected ToolNet fast continuity handoff first.
 2. If that handoff is missing, stale, or ambiguous, invoke the MCP tool
    memory_agent_ask BEFORE repository/history exploration.
-3. Prefer mode="local" for current task, last file, blocker, completed work,
-   TODOs, and next action.
-4. Use mode="ai" only when continuity requires synthesis.
-5. Do NOT reconstruct prior work from .toolnet/sessions/**, state.json,
+3. Get current task, last file, blocker, completed work, TODOs, and next action.
+4. Do NOT reconstruct prior work from .toolnet/sessions/**, state.json,
    events.jsonl, raw transcripts, or another agent's internal history.
-6. After continuity is known, verify current git/source truth and continue
+5. After continuity is known, verify current git/source truth and continue
    the work. Do not ask the user to repeat context ToolNet already provides.
 
+Memory Agent is local-only. No AI/LLM mode.
 Current repository evidence overrides stale memory.
 `.trim();
 

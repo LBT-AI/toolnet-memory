@@ -1,6 +1,6 @@
-import { installKiroHooks } from './hook-installer.js';
+import { installKiroHooks, type InstallKiroHooksOptions } from './hook-installer.js';
 
-import { installKiroMcp } from './mcp-installer.js';
+import { installKiroMcp, type InstallKiroMcpOptions } from './mcp-installer.js';
 
 export interface InstallKiroIntegrationOptions {
   binary?: string;
@@ -8,6 +8,12 @@ export interface InstallKiroIntegrationOptions {
   configFile?: string;
 
   hooksFile?: string;
+
+  scope?: 'global' | 'project' | 'both';
+
+  cwd?: string;
+
+  force?: boolean;
 }
 
 export function installKiroIntegration(options: InstallKiroIntegrationOptions = {}) {
@@ -15,25 +21,25 @@ export function installKiroIntegration(options: InstallKiroIntegrationOptions = 
 
   const mcp = installKiroMcp({
     binary,
-
     configFile: options.configFile,
+    scope: options.scope,
+    cwd: options.cwd,
+    force: options.force,
   });
 
   const hooks = installKiroHooks({
     binary,
-
     hooksFile: options.hooksFile,
+    scope: options.scope,
+    cwd: options.cwd,
+    force: options.force,
   });
 
   return {
     installed: mcp.installed,
-
     changed: mcp.changed || hooks.changed,
-
     mcp,
-
     hooks,
-
     files: [mcp.configFile, hooks.hooksFile],
   };
 }

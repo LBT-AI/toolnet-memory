@@ -680,7 +680,45 @@ export async function syncOpenCodeSession(
   const db = openDatabase(dbPath);
 
   try {
-    const session = sessionRow(db, options.nativeSessionId);
+    let session: OpenCodeRow;
+
+    try {
+      session = sessionRow(db, options.nativeSessionId);
+    } catch {
+      // session.deleted: session may already be purged from DB.
+      // Record delete marker and return early.
+      const core = new SessionCore({
+        project: options.project,
+        storage: options.storage,
+        agent: 'opencode',
+        nativeSessionId: options.nativeSessionId,
+        metadata: { source: 'opencode.db', deleted: true },
+        eventContext: { source: 'opencode', cwd: options.project.rootPath },
+      });
+
+      if (core.status().lastSequence === 0) {
+        core.recordMany([{
+          type: 'custom' as const,
+          timestamp: new Date().toISOString(),
+          sourceEventId: `session:${options.nativeSessionId}:deleted`,
+          data: { event: 'session_deleted' },
+          provenance: { source: 'opencode' },
+        }]);
+      }
+
+      const flushed = await core.flush();
+
+      return {
+        nativeSessionId: options.nativeSessionId,
+        importedMessages: 0,
+        importedParts: 0,
+        recordedEvents: 0,
+        eventCount: flushed.eventCount,
+        chunkCount: flushed.chunkCount,
+        status: flushed.status,
+        durability: options.localOnly ? 'local' : 'remote',
+      };
+    }
 
     if (!sessionBelongsToProject(db, session, options.project)) {
       throw new Error(

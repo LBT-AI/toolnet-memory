@@ -10,10 +10,10 @@ import { detectAgentIntegrations } from '../../src/production/integration-detect
 
 import {
   agyAntigravityDirectory,
-  agyConfigDirectory,
+  agyLegacyConfigDirectory,
   agyDetectionPaths,
-  agyHooksFile,
-  agyMcpConfigFile,
+  agyLegacyHooksFile,
+  agyGlobalMcpConfigFile,
   agyPluginRoot,
 } from '../../src/session/agy/config-paths.js';
 
@@ -36,19 +36,19 @@ describe('Agy / Antigravity adapter hardening', () => {
     const home = '/tmp/toolnet-agy-home';
 
     expect(
-      agyConfigDirectory({
+      agyLegacyConfigDirectory({
         home,
       })
     ).toBe(join(home, '.gemini', 'config'));
 
     expect(
-      agyMcpConfigFile({
+      agyGlobalMcpConfigFile({
         home,
       })
     ).toBe(join(home, '.gemini', 'config', 'mcp_config.json'));
 
     expect(
-      agyHooksFile({
+      agyLegacyHooksFile({
         home,
       })
     ).toBe(join(home, '.gemini', 'config', 'hooks.json'));
@@ -65,11 +65,11 @@ describe('Agy / Antigravity adapter hardening', () => {
       })
     ).toBe(join(home, '.gemini', 'antigravity-cli', 'plugins', 'toolnet-memory'));
 
-    expect(
-      agyDetectionPaths({
-        home,
-      })
-    ).toEqual([join(home, '.gemini', 'antigravity-cli'), join(home, '.gemini', 'config')]);
+    const paths = agyDetectionPaths({ home });
+
+    expect(paths).toContain(join(home, '.gemini', 'antigravity-cli'));
+    expect(paths).toContain(join(home, '.gemini', 'config', 'mcp_config.json'));
+    expect(paths).toContain(join(home, '.gemini', 'config'));
   });
 
   test('keeps I3 legacy Agy config detection compatible', () => {
@@ -82,7 +82,6 @@ describe('Agy / Antigravity adapter hardening', () => {
 
       const detections = detectAgentIntegrations({
         home,
-
         commandExists: () => false,
       });
 
@@ -132,11 +131,9 @@ describe('Agy / Antigravity adapter hardening', () => {
           {
             custom: {
               enabled: true,
-
               Stop: [
                 {
                   type: 'command',
-
                   command: 'custom-stop',
                 },
               ],
@@ -159,11 +156,9 @@ describe('Agy / Antigravity adapter hardening', () => {
 
       expect(parsed.custom).toEqual({
         enabled: true,
-
         Stop: [
           {
             type: 'command',
-
             command: 'custom-stop',
           },
         ],
@@ -207,17 +202,13 @@ describe('Agy / Antigravity adapter hardening', () => {
         JSON.stringify(
           {
             customSetting: true,
-
             mcpServers: {
               github: {
                 command: 'github-mcp',
-
                 args: ['serve'],
               },
-
               'toolnet-memory': {
                 command: 'old-toolnet',
-
                 args: ['mcp'],
               },
             },
@@ -229,7 +220,6 @@ describe('Agy / Antigravity adapter hardening', () => {
 
       const first = installAgyMcp({
         configFile,
-
         binary: '/usr/local/bin/toolnet-memory',
       });
 
@@ -241,19 +231,16 @@ describe('Agy / Antigravity adapter hardening', () => {
 
       expect(parsed.mcpServers.github).toEqual({
         command: 'github-mcp',
-
         args: ['serve'],
       });
 
       expect(parsed.mcpServers['toolnet-memory']).toEqual({
         command: '/usr/local/bin/toolnet-memory',
-
         args: ['mcp'],
       });
 
       const second = installAgyMcp({
         configFile,
-
         binary: '/usr/local/bin/toolnet-memory',
       });
 

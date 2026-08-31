@@ -77,6 +77,22 @@ describe('CodeFtsIndex', () => {
 
     index.close();
   });
+
+  it('clears index and chunks on empty rebuild', () => {
+    const index = new CodeFtsIndex('p1');
+
+    index.build([chunk('a', 'alpha'), chunk('b', 'beta')]);
+    expect(index.size).toBe(2);
+
+    const cleared = index.build([]);
+    expect(cleared).toBe(0);
+    expect(index.size).toBe(0);
+
+    const results = index.search('alpha', 5);
+    expect(results).toEqual([]);
+
+    index.close();
+  });
 });
 
 describe('CodeFtsIndex hardening', () => {

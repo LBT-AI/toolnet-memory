@@ -1,10 +1,6 @@
 import type { StorageProvider } from './types.js';
 
-export interface VectorRecord {
-  id: string;
-  embedding: number[];
-  metadata: Record<string, unknown>;
-}
+import type { VectorRecord } from '../retrieval/vector/vector-store.js';
 
 export interface VectorSnapshot {
   version: 1;

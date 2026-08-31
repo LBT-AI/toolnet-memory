@@ -204,7 +204,7 @@ export function installAutoIntegrations(
       });
     } else {
       try {
-        const plugin = installOpenCodePlugin({
+        const pluginFiles = installOpenCodePlugin({
           binary,
         });
 
@@ -219,7 +219,7 @@ export function installAutoIntegrations(
 
           installed: true,
 
-          targets: [plugin, mcp.configFile, `mcp:${mcp.serverName}`],
+          targets: [...pluginFiles, mcp.configFile, `mcp:${mcp.serverName}`],
         });
       } catch (error) {
         results.push({

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 
 import { dirname } from 'node:path';
 
-import { agyMcpConfigFile } from './config-paths.js';
+import { agyGlobalMcpConfigFile, agyWorkspaceMcpConfigFile } from './config-paths.js';
 
 export interface InstallAgyMcpOptions {
   configFile?: string;
@@ -10,6 +10,12 @@ export interface InstallAgyMcpOptions {
   binary?: string;
 
   serverName?: string;
+
+  scope?: 'global' | 'workspace' | 'both';
+
+  cwd?: string;
+
+  force?: boolean;
 }
 
 export interface InstallAgyMcpResult {
@@ -35,7 +41,6 @@ function isObject(value: unknown): value is JsonObject {
 function atomicWriteJson(file: string, value: unknown): void {
   mkdirSync(dirname(file), {
     recursive: true,
-
     mode: 0o700,
   });
 
@@ -64,14 +69,16 @@ function readConfig(file: string): JsonObject {
 
   try {
     parsed = JSON.parse(raw);
-  } catch (error) {
+  } catch {
     throw new Error(
-      `Invalid existing Agy MCP config: ${error instanceof Error ? error.message : String(error)}`
+      `Invalid existing Agy MCP config at ${file}: parse error. Not overwriting.`
     );
   }
 
   if (!isObject(parsed)) {
-    throw new Error('Invalid existing Agy MCP config: root must be a JSON object.');
+    throw new Error(
+      `Invalid existing Agy MCP config at ${file}: root must be a JSON object. Not overwriting.`
+    );
   }
 
   return parsed;
@@ -90,19 +97,18 @@ function sameServer(value: unknown, binary: string): boolean {
   );
 }
 
-export function installAgyMcp(options: InstallAgyMcpOptions = {}): InstallAgyMcpResult {
-  const configFile = options.configFile ?? agyMcpConfigFile();
-
-  const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
-
-  const serverName = options.serverName ?? 'toolnet-memory';
-
+function installToSingleFile(
+  configFile: string,
+  binary: string,
+  serverName: string,
+  force: boolean
+): { installed: boolean; changed: boolean } {
   const root = readConfig(configFile);
 
   const currentServers = root.mcpServers;
 
   if (currentServers !== undefined && !isObject(currentServers)) {
-    throw new Error('Invalid existing Agy MCP config: mcpServers must be an object.');
+    throw new Error(`Invalid existing Agy MCP config: mcpServers must be an object in ${configFile}.`);
   }
 
   const mcpServers: JsonObject = isObject(currentServers)
@@ -113,37 +119,20 @@ export function installAgyMcp(options: InstallAgyMcpOptions = {}): InstallAgyMcp
 
   const existing = mcpServers[serverName];
 
-  if (sameServer(existing, binary)) {
+  if (sameServer(existing, binary) && !force) {
     return {
       installed: true,
-
       changed: false,
-
-      configFile,
-
-      serverName,
-
-      command: binary,
-
-      args: ['mcp'],
     };
   }
 
-  /*
-   * ToolNet owns only the "toolnet-memory" entry.
-   *
-   * Every other MCP server and every unrelated
-   * top-level Agy setting is preserved.
-   */
   mcpServers[serverName] = {
     command: binary,
-
     args: ['mcp'],
   };
 
   const next = {
     ...root,
-
     mcpServers,
   };
 
@@ -154,20 +143,73 @@ export function installAgyMcp(options: InstallAgyMcpOptions = {}): InstallAgyMcp
   const verifyServers = verify.mcpServers;
 
   if (!isObject(verifyServers) || !sameServer(verifyServers[serverName], binary)) {
-    throw new Error('Agy MCP configuration was written but verification failed.');
+    throw new Error(`Agy MCP configuration was written but verification failed for ${configFile}.`);
   }
 
   return {
     installed: true,
-
     changed: true,
+  };
+}
 
+/**
+ * Install ToolNet MCP for AGY / Antigravity CLI.
+ *
+ * Official paths:
+ * - Global: ~/.gemini/config/mcp_config.json
+ * - Workspace: <project>/.agents/mcp_config.json
+ *
+ * Preserves all other MCP servers.
+ * Stops on invalid JSON (never overwrites corrupt config).
+ */
+export function installAgyMcp(options: InstallAgyMcpOptions = {}): InstallAgyMcpResult {
+  const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
+
+  const serverName = options.serverName ?? 'toolnet-memory';
+
+  const scope = options.scope ?? 'global';
+
+  if (options.configFile) {
+    // Explicit file overrides scope
+    const result = installToSingleFile(options.configFile, binary, serverName, options.force ?? false);
+    return {
+      ...result,
+      configFile: options.configFile,
+      serverName,
+      command: binary,
+      args: ['mcp'],
+    };
+  }
+
+  if (scope === 'both') {
+    const globalFile = agyGlobalMcpConfigFile();
+    const workspaceFile = agyWorkspaceMcpConfigFile({ cwd: options.cwd });
+
+    const globalResult = installToSingleFile(globalFile, binary, serverName, options.force ?? false);
+    const workspaceResult = installToSingleFile(workspaceFile, binary, serverName, options.force ?? false);
+
+    return {
+      installed: true,
+      changed: globalResult.changed || workspaceResult.changed,
+      configFile: globalFile,
+      serverName,
+      command: binary,
+      args: ['mcp'],
+    };
+  }
+
+  const configFile =
+    scope === 'workspace'
+      ? agyWorkspaceMcpConfigFile({ cwd: options.cwd })
+      : agyGlobalMcpConfigFile();
+
+  const result = installToSingleFile(configFile, binary, serverName, options.force ?? false);
+
+  return {
+    ...result,
     configFile,
-
     serverName,
-
     command: binary,
-
     args: ['mcp'],
   };
 }

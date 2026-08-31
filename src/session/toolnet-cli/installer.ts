@@ -6,6 +6,8 @@ export interface InstallToolNetCliIntegrationOptions {
   configFile?: string;
 
   force?: boolean;
+
+  cwd?: string;
 }
 
 export function installToolNetCliIntegration(options: InstallToolNetCliIntegrationOptions = {}) {
@@ -13,10 +15,9 @@ export function installToolNetCliIntegration(options: InstallToolNetCliIntegrati
 
   const mcp = installToolNetCliMcp({
     binary,
-
     configFile: options.configFile,
-
     force: options.force,
+    cwd: options.cwd,
   });
 
   return {

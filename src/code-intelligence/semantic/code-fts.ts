@@ -30,12 +30,12 @@ export class CodeFtsIndex {
   }
 
   build(chunks: CodeChunk[]): number {
+    this.db.exec('DELETE FROM code_fts');
+    this.chunks.clear();
+
     if (chunks.length === 0) {
       return 0;
     }
-
-    this.db.exec('DELETE FROM code_fts');
-    this.chunks.clear();
 
     const insert = this.db.prepare(
       `INSERT INTO code_fts (id, projectId, filePath, symbol, content) VALUES (?, ?, ?, ?, ?)`

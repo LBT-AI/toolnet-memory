@@ -105,7 +105,7 @@ describe('OpenCode MCP installer', () => {
         installOpenCodeMcp({
           configFile,
         })
-      ).toThrow('Invalid existing OpenCode opencode.json');
+      ).toThrow('Invalid existing OpenCode config');
     } finally {
       rmSync(root, {
         recursive: true,

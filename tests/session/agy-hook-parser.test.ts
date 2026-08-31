@@ -67,25 +67,25 @@ describe('Agy Hook Input Parser', () => {
     expect(normalized.modelName).toBe('gemini-ultra');
   });
 
-  it('prefers nested schema over flat when both present', async () => {
+  it('prefers official top-level camelCase over nested legacy when both present', async () => {
     const input = {
       common: {
-        conversation_id: 'nested-wins',
+        conversation_id: 'nested-legacy',
         workspace_paths: ['/nested/path'],
         transcript_path: '/nested/transcript.jsonl',
       },
-      conversationId: 'flat-loses',
-      workspacePaths: ['/flat/path'],
-      transcriptPath: '/flat/transcript.jsonl',
+      conversationId: 'official-wins',
+      workspacePaths: ['/official/path'],
+      transcriptPath: '/official/transcript.jsonl',
     };
 
     const { normalizeAgyInput } = await import('../../src/session/agy/hook.js');
 
     const normalized = normalizeAgyInput(input);
 
-    expect(normalized.conversationId).toBe('nested-wins');
-    expect(normalized.workspacePaths).toEqual(['/nested/path']);
-    expect(normalized.transcriptPath).toBe('/nested/transcript.jsonl');
+    expect(normalized.conversationId).toBe('official-wins');
+    expect(normalized.workspacePaths).toEqual(['/official/path']);
+    expect(normalized.transcriptPath).toBe('/official/transcript.jsonl');
   });
 
   it('parses stop hook args with termination info', async () => {

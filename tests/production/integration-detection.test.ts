@@ -158,7 +158,7 @@ describe('automatic integration detection', () => {
 
     expect(kiroMcpConfigFile({ home })).toBe(join(home, '.kiro', 'settings', 'mcp.json'));
 
-    expect(kiroDetectionPaths({ home })).toEqual([join(home, '.kiro')]);
+    expect(kiroDetectionPaths({ home })).toEqual([join(home, '.kiro'), join(home, '.kiro', 'settings', 'mcp.json')]);
   });
 
   it('detects Codex from CODEX_HOME equivalent', () => {

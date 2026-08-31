@@ -53,7 +53,15 @@ interface NormalizedInput {
   error?: string;
 }
 
+/**
+ * Normalize AGY hook input.
+ *
+ * Priority: official camelCase fields first, then snake_case for backward compatibility.
+ * Official fields: conversationId, workspacePaths, transcriptPath, artifactDirectoryPath, modelName
+ */
 export function normalizeAgyInput(input: Record<string, unknown>): NormalizedInput {
+  // Official camelCase is top-level in the hook payload.
+  // Also support legacy nested schema for backward compatibility.
   const common =
     typeof input.common === 'object' && input.common !== null
       ? (input.common as Record<string, unknown>)
@@ -74,41 +82,44 @@ export function normalizeAgyInput(input: Record<string, unknown>): NormalizedInp
       ? (input.stop_hook_args as Record<string, unknown>)
       : {};
 
+  // Priority: official top-level camelCase > legacy nested > snake_case
+  // Top-level camelCase is the official AGY schema.
+  // Nested common.* is legacy backward compatibility.
   const conversationId =
-    (typeof common.conversation_id === 'string' ? common.conversation_id : '') ||
     (typeof input.conversationId === 'string' ? input.conversationId : '') ||
-    (typeof input.conversation_id === 'string' ? input.conversation_id : '');
+    (typeof input.conversation_id === 'string' ? input.conversation_id : '') ||
+    (typeof common.conversation_id === 'string' ? common.conversation_id : '');
 
   const transcriptPath =
-    (typeof common.transcript_path === 'string' ? common.transcript_path : '') ||
     (typeof input.transcriptPath === 'string' ? input.transcriptPath : '') ||
-    (typeof input.transcript_path === 'string' ? input.transcript_path : '');
+    (typeof input.transcript_path === 'string' ? input.transcript_path : '') ||
+    (typeof common.transcript_path === 'string' ? common.transcript_path : '');
 
   const workspacePaths =
-    strings(common.workspace_paths).length > 0
-      ? strings(common.workspace_paths)
-      : strings(input.workspacePaths).length > 0
-        ? strings(input.workspacePaths)
-        : strings(input.workspace_paths);
+    strings(input.workspacePaths).length > 0
+      ? strings(input.workspacePaths)
+      : strings(input.workspace_paths).length > 0
+        ? strings(input.workspace_paths)
+        : strings(common.workspace_paths);
 
   const invocationNum =
-    typeof preInvocationArgs.invocation_num === 'number'
-      ? preInvocationArgs.invocation_num
-      : typeof input.invocationNum === 'number'
-        ? input.invocationNum
+    typeof input.invocationNum === 'number'
+      ? input.invocationNum
+      : typeof preInvocationArgs.invocation_num === 'number'
+        ? preInvocationArgs.invocation_num
         : typeof input.invocation_num === 'number'
           ? input.invocation_num
           : undefined;
 
   const artifactDirectoryPath =
-    (typeof common.artifact_directory_path === 'string' ? common.artifact_directory_path : '') ||
     (typeof input.artifactDirectoryPath === 'string' ? input.artifactDirectoryPath : '') ||
+    (typeof common.artifact_directory_path === 'string' ? common.artifact_directory_path : '') ||
     (typeof input.artifact_directory_path === 'string' ? input.artifact_directory_path : '') ||
     undefined;
 
   const modelName =
-    (typeof common.model_name === 'string' ? common.model_name : '') ||
     (typeof input.modelName === 'string' ? input.modelName : '') ||
+    (typeof common.model_name === 'string' ? common.model_name : '') ||
     (typeof input.model_name === 'string' ? input.model_name : '') ||
     undefined;
 
@@ -139,6 +150,11 @@ export function normalizeAgyInput(input: Record<string, unknown>): NormalizedInp
   };
 }
 
+/**
+ * Build PreToolUse output.
+ *
+ * Official decision values: allow, deny, ask, force_ask, deny_unless_prior_grant
+ */
 export function buildAgyPreToolUseOutput(input: Record<string, unknown>): Record<string, unknown> {
   const toolCall =
     typeof input.toolCall === 'object' && input.toolCall !== null
@@ -161,7 +177,6 @@ export function buildAgyPreToolUseOutput(input: Record<string, unknown>): Record
   if (serialized.includes('.toolnet/sessions')) {
     return {
       decision: 'deny',
-
       reason:
         'ToolNet continuity guard: do not replay raw .toolnet/sessions history. ' +
         'Use the injected continuity handoff. If deeper history is required, ' +
@@ -181,7 +196,6 @@ async function main() {
 
   if (phase === 'pre-tool') {
     process.stdout.write(JSON.stringify(buildAgyPreToolUseOutput(input)));
-
     return;
   }
 
@@ -204,9 +218,7 @@ async function main() {
       const raw = withStorageRetry(
         createStorageProvider({
           provider: config.storage.provider,
-
           huggingface: config.storage.huggingface,
-
           localRoot: config.storage.localRoot,
         }),
         {
@@ -230,21 +242,14 @@ async function main() {
           await syncAgySession({
             project,
             storage,
-
             conversationId,
             transcriptPath,
             workspacePaths,
-
             artifactDirectoryPath: normalized.artifactDirectoryPath,
-
             modelName: normalized.modelName,
-
             phase,
-
             fullyIdle: normalized.fullyIdle,
-
             terminationReason: normalized.terminationReason,
-
             error: normalized.error,
           });
         } catch {
@@ -258,7 +263,6 @@ async function main() {
             project,
             storage,
             conversationId,
-
             invocationNum: normalized.invocationNum,
           });
         } catch {
@@ -285,6 +289,14 @@ async function main() {
   }
 
   if (phase === 'stop') {
+    /*
+     * Official Stop hook output:
+     * decision: "continue" re-enters the loop.
+     * Any other value allows the stop.
+     *
+     * Stop is NOT permanent SessionEnd.
+     * The same conversationId may be resumed with `agy -c`.
+     */
     process.stdout.write(
       JSON.stringify({
         decision: 'stop',

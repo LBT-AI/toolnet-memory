@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
 
-import { toolnetCliMcpConfigFile, toolnetCliConfigDirectory } from './config-paths.js';
+import { spawnSync } from 'node:child_process';
+
+import { toolnetCliHomeDirectory, toolnetCliConfigFile } from './config-paths.js';
 
 export interface ToolNetCliIntegrationStatus {
   installed: boolean;
@@ -16,38 +18,54 @@ export interface ToolNetCliIntegrationStatus {
   errors: string[];
 }
 
+function toolnetBinaryExists(): boolean {
+  const result = spawnSync('sh', ['-lc', 'command -v toolnet >/dev/null 2>&1'], {
+    stdio: 'ignore',
+  });
+  return result.status === 0;
+}
+
+/**
+ * Inspect ToolNet CLI integration status.
+ *
+ * Checks:
+ * - Binary exists (toolnet command)
+ * - Config directory exists (~/.toolnetcli/)
+ * - Config file exists and is valid JSON
+ */
 export function inspectToolNetCliIntegrationStatus(): ToolNetCliIntegrationStatus {
-  const configDir = toolnetCliConfigDirectory();
+  const homeDir = toolnetCliHomeDirectory();
+  const configFile = toolnetCliConfigFile();
 
-  const mcpConfigFile = toolnetCliMcpConfigFile();
-
-  const configExists = existsSync(configDir);
-
-  const mcpExists = existsSync(mcpConfigFile);
+  const homeExists = existsSync(homeDir);
+  const configExists = existsSync(configFile);
+  const binaryExists = toolnetBinaryExists();
 
   const errors: string[] = [];
 
-  if (!configExists) {
-    errors.push(`Config directory missing: ${configDir}`);
+  if (!homeExists) {
+    errors.push(`Config directory missing: ${homeDir}`);
   }
 
-  const installed = configExists;
+  if (!binaryExists) {
+    errors.push('ToolNet CLI binary not found (toolnet)');
+  }
 
-  const state: ToolNetCliIntegrationStatus['state'] = !configExists
+  const installed = homeExists && binaryExists;
+
+  const state: ToolNetCliIntegrationStatus['state'] = !homeExists
     ? 'missing-config'
-    : 'installed';
+    : !binaryExists
+      ? 'missing-binary'
+      : 'installed';
 
   return {
     installed,
-
     state,
-
     mcp: {
-      configured: mcpExists,
-
-      configFile: mcpConfigFile,
+      configured: configExists,
+      configFile,
     },
-
     errors,
   };
 }

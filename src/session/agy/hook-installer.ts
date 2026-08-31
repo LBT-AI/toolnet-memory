@@ -1,47 +1,82 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 
-import { agyHooksFile } from './config-paths.js';
+import { agyPluginRoot } from './config-paths.js';
 
 export interface InstallAgyHookOptions {
   hooksFile?: string;
 
   binary?: string;
+
+  pluginName?: string;
 }
 
 function quote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
-  const hooksFile = options.hooksFile ?? agyHooksFile();
+function readJsonFile(file: string): Record<string, unknown> {
+  if (!existsSync(file)) {
+    return {};
+  }
 
-  mkdirSync(dirname(hooksFile), {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    throw new Error(`Invalid existing Agy hooks.json at ${file}: parse error. Not overwriting.`);
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`Invalid existing Agy hooks.json at ${file}: root must be a JSON object.`);
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
+function atomicWriteJson(file: string, value: unknown): void {
+  mkdirSync(dirname(file), {
     recursive: true,
-
     mode: 0o700,
   });
 
-  let root: Record<string, unknown> = {};
+  const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
 
-  if (existsSync(hooksFile)) {
-    let parsed: unknown;
+  try {
+    writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
 
-    try {
-      parsed = JSON.parse(readFileSync(hooksFile, 'utf8'));
-    } catch (error) {
-      throw new Error(
-        `Invalid existing Agy hooks.json: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new Error('Invalid existing Agy hooks.json: root must be a JSON object.');
-    }
-
-    root = parsed as Record<string, unknown>;
+    renameSync(temp, file);
+  } finally {
+    rmSync(temp, {
+      force: true,
+    });
   }
+}
+
+/**
+ * Install ToolNet hooks into a hooks.json file.
+ *
+ * Official Antigravity hook schema:
+ * - PreToolUse: matcher + hooks[]
+ * - PreInvocation/PostInvocation/Stop: handlers directly, no matcher
+ * - Stop decision: "continue" re-enters loop, anything else allows stop
+ *
+ * Does NOT auto-migrate or remove legacy entries.
+ * Only writes the ToolNet hook entry.
+ */
+export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
+  const pluginName = options.pluginName ?? 'toolnet-memory';
+
+  // Write to plugin's hooks.json (official plugin location)
+  const pluginHooksFile =
+    options.hooksFile ?? join(agyPluginRoot(pluginName), 'hooks.json');
+
+  const root = readJsonFile(pluginHooksFile);
 
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
 
@@ -51,26 +86,20 @@ export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
    * Official Antigravity hook schema.
    * Stop = sync when one execution becomes idle.
    * It is intentionally NOT treated as permanent SessionEnd.
+   *
+   * PreToolUse uses matcher + hooks[] array.
+   * PreInvocation/PostInvocation/Stop use handlers directly (no matcher).
    */
   root['toolnet-memory'] = {
     enabled: true,
 
-    /*
-     * Prevent raw ToolNet session replay.
-     *
-     * Compact continuity belongs in PreInvocation.
-     * Deep history belongs behind memory_agent_ask.
-     */
     PreToolUse: [
       {
         matcher: 'view_file|list_dir|find_by_name|grep_search|run_command',
-
         hooks: [
           {
             type: 'command',
-
             command: `${command} pre-tool`,
-
             timeout: 5,
           },
         ],
@@ -80,9 +109,7 @@ export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
     PreInvocation: [
       {
         type: 'command',
-
         command: `${command} pre`,
-
         timeout: 15,
       },
     ],
@@ -90,9 +117,7 @@ export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
     PostInvocation: [
       {
         type: 'command',
-
         command: `${command} post`,
-
         timeout: 15,
       },
     ],
@@ -100,29 +125,13 @@ export function installAgyHooks(options: InstallAgyHookOptions = {}): string {
     Stop: [
       {
         type: 'command',
-
         command: `${command} stop`,
-
         timeout: 30,
       },
     ],
   };
 
-  const temporary = `${hooksFile}.tmp-${process.pid}-${Date.now()}`;
+  atomicWriteJson(pluginHooksFile, root);
 
-  try {
-    writeFileSync(temporary, JSON.stringify(root, null, 2) + '\n', {
-      encoding: 'utf8',
-
-      mode: 0o600,
-    });
-
-    renameSync(temporary, hooksFile);
-  } finally {
-    rmSync(temporary, {
-      force: true,
-    });
-  }
-
-  return hooksFile;
+  return pluginHooksFile;
 }

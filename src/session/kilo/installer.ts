@@ -13,19 +13,14 @@ export function installKiloIntegration(options: InstallKiloIntegrationOptions = 
 
   const mcp = installKiloMcp({
     binary,
-
     configFile: options.configFile,
-
     force: options.force,
   });
 
   return {
     installed: mcp.installed,
-
     changed: mcp.changed,
-
     mcp,
-
     files: [mcp.configFile],
   };
 }

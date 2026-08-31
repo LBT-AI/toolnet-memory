@@ -15,56 +15,9 @@ describe('Agy native plugin installer', () => {
     try {
       const pluginRoot = join(root, 'plugins', 'toolnet-memory');
 
-      const legacyMcpFile = join(root, 'legacy', 'mcp_config.json');
-
-      const legacyHooksFile = join(root, 'legacy', 'hooks.json');
-
-      mkdirSync(join(root, 'legacy'), {
-        recursive: true,
-      });
-
-      writeFileSync(
-        legacyMcpFile,
-        JSON.stringify({
-          customSetting: true,
-
-          mcpServers: {
-            github: {
-              command: 'github-mcp',
-
-              args: ['serve'],
-            },
-
-            'toolnet-memory': {
-              command: 'old-toolnet',
-
-              args: ['mcp'],
-            },
-          },
-        })
-      );
-
-      writeFileSync(
-        legacyHooksFile,
-        JSON.stringify({
-          existing: {
-            enabled: true,
-          },
-
-          'toolnet-memory': {
-            enabled: true,
-          },
-        })
-      );
-
       const result = installAgyPlugin({
         pluginRoot,
-
         binary: '/usr/local/bin/toolnet-memory',
-
-        legacyMcpFile,
-
-        legacyHooksFile,
       });
 
       expect(result.installed).toBe(true);
@@ -77,7 +30,6 @@ describe('Agy native plugin installer', () => {
 
       expect(mcp.mcpServers['toolnet-memory']).toEqual({
         command: '/usr/local/bin/toolnet-memory',
-
         args: ['mcp'],
       });
 
@@ -86,6 +38,10 @@ describe('Agy native plugin installer', () => {
       expect(hooks['toolnet-memory'].PreInvocation).toBeDefined();
 
       expect(hooks['toolnet-memory'].PreToolUse).toBeDefined();
+
+      expect(hooks['toolnet-memory'].Stop).toBeDefined();
+
+      expect(hooks['toolnet-memory'].PostInvocation).toBeDefined();
 
       const rule = readFileSync(join(pluginRoot, 'rules', 'toolnet-memory-continuity.md'), 'utf8');
 
@@ -96,24 +52,9 @@ describe('Agy native plugin installer', () => {
       expect(rule).toContain('~/.gemini/antigravity-cli/brain/**');
 
       expect(rule).toContain('transcript.jsonl');
-
-      const migratedMcp = JSON.parse(readFileSync(legacyMcpFile, 'utf8'));
-
-      expect(migratedMcp.customSetting).toBe(true);
-
-      expect(migratedMcp.mcpServers.github).toBeDefined();
-
-      expect(migratedMcp.mcpServers['toolnet-memory']).toBeUndefined();
-
-      const migratedHooks = JSON.parse(readFileSync(legacyHooksFile, 'utf8'));
-
-      expect(migratedHooks.existing).toBeDefined();
-
-      expect(migratedHooks['toolnet-memory']).toBeUndefined();
     } finally {
       rmSync(root, {
         recursive: true,
-
         force: true,
       });
     }
@@ -122,10 +63,93 @@ describe('Agy native plugin installer', () => {
   test('continuity rule is compact and explicit', () => {
     expect(AGY_CONTINUITY_RULE.length).toBeLessThan(12000);
 
-    expect(AGY_CONTINUITY_RULE).toContain('mode="local"');
-
-    expect(AGY_CONTINUITY_RULE).toContain('mode="ai"');
-
     expect(AGY_CONTINUITY_RULE).toContain('Current repository evidence overrides stale memory');
+
+    // Must NOT contain mode="ai"
+    expect(AGY_CONTINUITY_RULE).not.toContain('mode="ai"');
+  });
+
+  test('does not auto-remove legacy entries', () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolnet-agy-no-migrate-'));
+
+    try {
+      const pluginRoot = join(root, 'plugins', 'toolnet-memory');
+
+      // Create a legacy MCP file with toolnet-memory entry
+      const legacyMcpDir = join(root, '.gemini', 'config');
+
+      mkdirSync(legacyMcpDir, { recursive: true });
+
+      const legacyMcpFile = join(legacyMcpDir, 'mcp_config.json');
+
+      writeFileSync(
+        legacyMcpFile,
+        JSON.stringify({
+          mcpServers: {
+            'toolnet-memory': {
+              command: 'old-binary',
+              args: ['mcp'],
+            },
+            'other-server': {
+              command: 'other',
+              args: ['serve'],
+            },
+          },
+        })
+      );
+
+      installAgyPlugin({
+        pluginRoot,
+        binary: '/usr/local/bin/toolnet-memory',
+      });
+
+      // Legacy file should NOT be modified
+      const legacyContent = JSON.parse(readFileSync(legacyMcpFile, 'utf8'));
+
+      expect(legacyContent.mcpServers['toolnet-memory']).toEqual({
+        command: 'old-binary',
+        args: ['mcp'],
+      });
+
+      expect(legacyContent.mcpServers['other-server']).toBeDefined();
+    } finally {
+      rmSync(root, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  test('idempotent: reinstall produces same result', () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolnet-agy-idempotent-'));
+
+    try {
+      const pluginRoot = join(root, 'plugins', 'toolnet-memory');
+
+      const first = installAgyPlugin({
+        pluginRoot,
+        binary: '/usr/local/bin/toolnet-memory',
+      });
+
+      const second = installAgyPlugin({
+        pluginRoot,
+        binary: '/usr/local/bin/toolnet-memory',
+      });
+
+      const firstManifest = readFileSync(join(pluginRoot, 'plugin.json'), 'utf8');
+      const secondManifest = readFileSync(join(pluginRoot, 'plugin.json'), 'utf8');
+
+      expect(firstManifest).toBe(secondManifest);
+
+      const firstMcp = readFileSync(join(pluginRoot, 'mcp_config.json'), 'utf8');
+      const secondMcp = readFileSync(join(pluginRoot, 'mcp_config.json'), 'utf8');
+
+      expect(firstMcp).toBe(secondMcp);
+    } finally {
+      rmSync(root, {
+        recursive: true,
+        force: true,
+      });
+    }
   });
 });

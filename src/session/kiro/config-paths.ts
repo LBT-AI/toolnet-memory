@@ -6,6 +6,8 @@ export interface KiroConfigPathOptions {
   home?: string;
 
   kiroHome?: string;
+
+  cwd?: string;
 }
 
 /**
@@ -28,25 +30,50 @@ export function kiroCliSettingsFile(options: KiroConfigPathOptions = {}): string
   return join(kiroSettingsDirectory(options), 'cli.json');
 }
 
+/**
+ * Global MCP config: ~/.kiro/settings/mcp.json
+ */
 export function kiroMcpConfigFile(options: KiroConfigPathOptions = {}): string {
   return join(kiroSettingsDirectory(options), 'mcp.json');
+}
+
+/**
+ * Project MCP config: <project>/.kiro/settings/mcp.json
+ */
+export function kiroProjectMcpConfigFile(options: KiroConfigPathOptions = {}): string {
+  const cwd = options.cwd ?? process.cwd();
+  return join(cwd, '.kiro', 'settings', 'mcp.json');
 }
 
 export function kiroHooksDirectory(options: KiroConfigPathOptions = {}): string {
   return join(kiroHomeDirectory(options), 'hooks');
 }
 
+/**
+ * Global hooks: ~/.kiro/hooks/toolnet-memory.json
+ */
 export function kiroGlobalHooksFile(options: KiroConfigPathOptions = {}): string {
   return join(kiroHooksDirectory(options), 'toolnet-memory.json');
 }
 
 /**
- * Detection is intentionally based on Kiro's global home.
+ * Project hooks: <project>/.kiro/hooks/toolnet-memory.json
+ */
+export function kiroProjectHooksFile(options: KiroConfigPathOptions = {}): string {
+  const cwd = options.cwd ?? process.cwd();
+  return join(cwd, '.kiro', 'hooks', 'toolnet-memory.json');
+}
+
+/**
+ * Detection paths for Kiro CLI.
  *
- * Workspace-level .kiro/ detection belongs to project-scoped integration
- * logic in a later phase. Phase 01 only determines whether Kiro CLI is
- * installed/configured for the current user.
+ * Looks for:
+ * - ~/.kiro/ (home directory)
+ * - ~/.kiro/settings/mcp.json (global MCP)
  */
 export function kiroDetectionPaths(options: KiroConfigPathOptions = {}): string[] {
-  return [kiroHomeDirectory(options)];
+  return [
+    kiroHomeDirectory(options),
+    kiroMcpConfigFile(options),
+  ];
 }

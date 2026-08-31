@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 
 import { dirname, join } from 'node:path';
 
-import { openCodeJsonConfigFile } from './config-paths.js';
+import { openCodeGlobalConfigFile, openCodeProjectConfigFile } from './config-paths.js';
 
 export interface InstallOpenCodeMcpOptions {
   configFile?: string;
@@ -10,6 +10,12 @@ export interface InstallOpenCodeMcpOptions {
   binary?: string;
 
   serverName?: string;
+
+  scope?: 'global' | 'project' | 'both';
+
+  cwd?: string;
+
+  force?: boolean;
 }
 
 export interface InstallOpenCodeMcpResult {
@@ -62,16 +68,16 @@ function readConfig(file: string): JsonObject {
 
   try {
     parsed = JSON.parse(raw);
-  } catch (error) {
+  } catch {
     throw new Error(
-      `Invalid existing OpenCode opencode.json: ${
-        error instanceof Error ? error.message : String(error)
-      }`
+      `Invalid existing OpenCode config at ${file}: parse error. Not overwriting.`
     );
   }
 
   if (!isObject(parsed)) {
-    throw new Error('Invalid existing OpenCode opencode.json: root must be a JSON object.');
+    throw new Error(
+      `Invalid existing OpenCode config at ${file}: root must be a JSON object. Not overwriting.`
+    );
   }
 
   return parsed;
@@ -94,72 +100,21 @@ function sameServer(value: unknown, binary: string): boolean {
   );
 }
 
-function removeLegacyToolNetMcp(
-  root: JsonObject,
-  serverName: string
-): {
-  root: JsonObject;
-  changed: boolean;
-} {
-  const legacy = root.mcpServers;
-
-  if (!isObject(legacy) || !Object.prototype.hasOwnProperty.call(legacy, serverName)) {
-    return {
-      root,
-      changed: false,
-    };
-  }
-
-  /*
-   * ToolNet owns only its own entry.
-   * Preserve all other legacy MCP servers.
-   */
-  const nextLegacy: JsonObject = {
-    ...legacy,
-  };
-
-  delete nextLegacy[serverName];
-
-  return {
-    root: {
-      ...root,
-
-      mcpServers: nextLegacy,
-    },
-
-    changed: true,
-  };
-}
-
-export function installOpenCodeMcp(
-  options: InstallOpenCodeMcpOptions = {}
-): InstallOpenCodeMcpResult {
-  const configFile = options.configFile ?? openCodeJsonConfigFile();
-
-  const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
-
-  const serverName = options.serverName ?? 'toolnet-memory';
-
-  /*
-   * If the user uses opencode.jsonc, leave it untouched.
-   *
-   * ToolNet writes only its managed JSON config.
-   * OpenCode merges configuration sources.
-   */
+function installToSingleFile(
+  configFile: string,
+  binary: string,
+  serverName: string,
+  force: boolean
+): { installed: boolean; changed: boolean; preservedJsonc?: string } {
   const jsoncFile = join(dirname(configFile), 'opencode.jsonc');
-
   const preservedJsonc = existsSync(jsoncFile) ? jsoncFile : undefined;
 
-  const originalRoot = readConfig(configFile);
-
-  const legacyMigration = removeLegacyToolNetMcp(originalRoot, serverName);
-
-  const root = legacyMigration.root;
+  const root = readConfig(configFile);
 
   const currentMcp = root.mcp;
 
   if (currentMcp !== undefined && !isObject(currentMcp)) {
-    throw new Error('Invalid existing OpenCode config: mcp must be an object.');
+    throw new Error(`Invalid existing OpenCode config: mcp must be an object in ${configFile}.`);
   }
 
   const mcp: JsonObject = isObject(currentMcp)
@@ -170,40 +125,22 @@ export function installOpenCodeMcp(
 
   const existing = mcp[serverName];
 
-  if (sameServer(existing, binary) && !legacyMigration.changed) {
+  if (sameServer(existing, binary) && !force) {
     return {
       installed: true,
-
       changed: false,
-
-      configFile,
-
-      serverName,
-
-      command: [binary, 'mcp'],
-
       preservedJsonc,
     };
   }
 
-  /*
-   * ToolNet owns only this single MCP entry.
-   *
-   * Existing OpenCode providers, models,
-   * permissions, plugins and other MCP servers
-   * remain untouched.
-   */
   mcp[serverName] = {
     type: 'local',
-
     command: [binary, 'mcp'],
-
     enabled: true,
   };
 
   const next = {
     ...root,
-
     mcp,
   };
 
@@ -212,20 +149,81 @@ export function installOpenCodeMcp(
   const verify = readConfig(configFile);
 
   if (!isObject(verify.mcp) || !sameServer(verify.mcp[serverName], binary)) {
-    throw new Error('OpenCode MCP configuration was written but verification failed.');
+    throw new Error(`OpenCode MCP configuration was written but verification failed for ${configFile}.`);
   }
 
   return {
     installed: true,
-
     changed: true,
-
-    configFile,
-
-    serverName,
-
-    command: [binary, 'mcp'],
-
     preservedJsonc,
+  };
+}
+
+/**
+ * Install ToolNet MCP for OpenCode.
+ *
+ * Official MCP schema:
+ * {
+ *   "mcp": {
+ *     "toolnet-memory": {
+ *       "type": "local",
+ *       "command": ["toolnet-memory", "mcp"],
+ *       "enabled": true
+ *     }
+ *   }
+ * }
+ *
+ * Preserves all other MCP servers.
+ * Stops on invalid JSON (never overwrites corrupt config).
+ * Does NOT auto-migrate legacy mcpServers entries.
+ */
+export function installOpenCodeMcp(
+  options: InstallOpenCodeMcpOptions = {}
+): InstallOpenCodeMcpResult {
+  const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
+
+  const serverName = options.serverName ?? 'toolnet-memory';
+
+  const scope = options.scope ?? 'global';
+
+  if (options.configFile) {
+    const result = installToSingleFile(options.configFile, binary, serverName, options.force ?? false);
+    return {
+      ...result,
+      configFile: options.configFile,
+      serverName,
+      command: [binary, 'mcp'],
+    };
+  }
+
+  if (scope === 'both') {
+    const globalFile = openCodeGlobalConfigFile();
+    const projectFile = openCodeProjectConfigFile({ cwd: options.cwd });
+
+    const globalResult = installToSingleFile(globalFile, binary, serverName, options.force ?? false);
+    const projectResult = installToSingleFile(projectFile, binary, serverName, options.force ?? false);
+
+    return {
+      installed: true,
+      changed: globalResult.changed || projectResult.changed,
+      configFile: globalFile,
+      serverName,
+      command: [binary, 'mcp'],
+      preservedJsonc: globalResult.preservedJsonc ?? projectResult.preservedJsonc,
+    };
+  }
+
+  const configFile =
+    scope === 'project'
+      ? openCodeProjectConfigFile({ cwd: options.cwd })
+      : openCodeGlobalConfigFile();
+
+  const result = installToSingleFile(configFile, binary, serverName, options.force ?? false);
+
+  return {
+    ...result,
+    configFile,
+    serverName,
+    command: [binary, 'mcp'],
   };
 }

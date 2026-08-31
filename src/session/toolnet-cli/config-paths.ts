@@ -6,43 +6,46 @@ export interface ToolNetCliConfigPathOptions {
   home?: string;
 
   xdgConfigHome?: string;
+
+  cwd?: string;
 }
 
 /**
  * Resolve ToolNet CLI config directory.
  *
- * Priority:
- * 1. XDG_CONFIG_HOME if set
- * 2. ~/.config/toolnet-memory
+ * Based on audit of LBT-AI/Toolnet-CLI:
+ * - Config dir: ~/.toolnetcli/
+ * - Config file: ~/.toolnetcli/config.json
+ * - Project permissions: .toolnet/permissions.json
  */
-export function toolnetCliConfigDirectory(options: ToolNetCliConfigPathOptions = {}): string {
-  const home = options.home ?? homedir();
-
-  const xdgConfig = options.xdgConfigHome ?? process.env.XDG_CONFIG_HOME;
-
-  if (xdgConfig) {
-    return join(xdgConfig, 'toolnet-memory');
-  }
-
-  return join(home, '.config', 'toolnet-memory');
+export function toolnetCliHomeDirectory(options: ToolNetCliConfigPathOptions = {}): string {
+  return join(options.home ?? homedir(), '.toolnetcli');
 }
 
-export function toolnetCliEnvFile(options: ToolNetCliConfigPathOptions = {}): string {
-  return join(toolnetCliConfigDirectory(options), '.env');
+export function toolnetCliConfigFile(options: ToolNetCliConfigPathOptions = {}): string {
+  return join(toolnetCliHomeDirectory(options), 'config.json');
 }
 
-export function toolnetCliMcpConfigFile(options: ToolNetCliConfigPathOptions = {}): string {
-  return join(toolnetCliConfigDirectory(options), 'mcp.json');
+/**
+ * Resolve ToolNet CLI project-level MCP config.
+ *
+ * ToolNet CLI reads MCP config from .toolnet/mcp.json in the project root.
+ */
+export function toolnetCliProjectMcpConfigFile(options: ToolNetCliConfigPathOptions = {}): string {
+  const cwd = options.cwd ?? process.cwd();
+  return join(cwd, '.toolnet', 'mcp.json');
 }
 
 /**
  * Detection paths for ToolNet CLI.
+ *
  * Looks for:
- * - Config directory existence
- * - MCP config file
+ * - ~/.toolnetcli/ config directory
+ * - ~/.toolnetcli/config.json
  */
 export function toolnetCliDetectionPaths(options: ToolNetCliConfigPathOptions = {}): string[] {
-  const dir = toolnetCliConfigDirectory(options);
+  const home = toolnetCliHomeDirectory(options);
+  const configFile = toolnetCliConfigFile(options);
 
-  return [dir, toolnetCliMcpConfigFile(options)];
+  return [home, configFile];
 }

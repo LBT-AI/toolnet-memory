@@ -9,9 +9,9 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { detectAgentIntegrations } from '../../src/production/integration-detection.js';
 
 import {
-  openCodeAgentsFile,
+  openCodeGlobalAgentsFile,
   openCodeConfigDirectory,
-  openCodeJsonConfigFile,
+  openCodeGlobalConfigFile,
   openCodePluginDirectory,
 } from '../../src/session/opencode/config-paths.js';
 
@@ -41,7 +41,7 @@ describe('OpenCode adapter hardening', () => {
     ).toBe(join(root, 'opencode'));
 
     expect(
-      openCodeJsonConfigFile({
+      openCodeGlobalConfigFile({
         xdgConfigHome: root,
       })
     ).toBe(join(root, 'opencode', 'opencode.json'));
@@ -53,7 +53,7 @@ describe('OpenCode adapter hardening', () => {
     ).toBe(join(root, 'opencode', 'plugins'));
 
     expect(
-      openCodeAgentsFile({
+      openCodeGlobalAgentsFile({
         xdgConfigHome: root,
       })
     ).toBe(join(root, 'opencode', 'AGENTS.md'));
@@ -69,9 +69,7 @@ describe('OpenCode adapter hardening', () => {
 
       const result = detectAgentIntegrations({
         home: '/definitely-not-used',
-
         xdgConfigHome: root,
-
         commandExists: () => false,
       });
 
@@ -102,25 +100,18 @@ describe('OpenCode adapter hardening', () => {
         configFile,
         JSON.stringify({
           model: 'custom/model',
-
           permissions: {
             bash: 'ask',
           },
-
           mcp: {
             github: {
               type: 'local',
-
               command: ['github-mcp', 'serve'],
-
               enabled: true,
             },
-
             'toolnet-memory': {
               type: 'local',
-
               command: ['old-toolnet', 'mcp'],
-
               enabled: false,
             },
           },
@@ -129,7 +120,6 @@ describe('OpenCode adapter hardening', () => {
 
       const result = installOpenCodeMcp({
         configFile,
-
         binary: '/usr/local/bin/toolnet-memory',
       });
 
@@ -145,17 +135,13 @@ describe('OpenCode adapter hardening', () => {
 
       expect(stored.mcp.github).toEqual({
         type: 'local',
-
         command: ['github-mcp', 'serve'],
-
         enabled: true,
       });
 
       expect(stored.mcp['toolnet-memory']).toEqual({
         type: 'local',
-
         command: ['/usr/local/bin/toolnet-memory', 'mcp'],
-
         enabled: true,
       });
     } finally {
@@ -166,8 +152,8 @@ describe('OpenCode adapter hardening', () => {
     }
   });
 
-  test('migrates only legacy ToolNet mcpServers entry', () => {
-    const root = mkdtempSync(join(tmpdir(), 'toolnet-opencode-legacy-'));
+  test('does not auto-remove legacy mcpServers entries', () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolnet-opencode-no-migrate-'));
 
     try {
       const configFile = join(root, 'opencode.json');
@@ -180,23 +166,18 @@ describe('OpenCode adapter hardening', () => {
               api: 'https://example.test',
             },
           },
-
           mcpServers: {
             github: {
               command: 'github-mcp',
             },
-
             'toolnet-memory': {
               command: 'old-toolnet',
             },
           },
-
           mcp: {
             other: {
               type: 'local',
-
               command: ['other-mcp', 'serve'],
-
               enabled: true,
             },
           },
@@ -205,7 +186,6 @@ describe('OpenCode adapter hardening', () => {
 
       const first = installOpenCodeMcp({
         configFile,
-
         binary: 'toolnet-memory',
       });
 
@@ -219,31 +199,29 @@ describe('OpenCode adapter hardening', () => {
         },
       });
 
+      // Legacy mcpServers should NOT be auto-removed
       expect(stored.mcpServers.github).toEqual({
         command: 'github-mcp',
       });
 
-      expect(stored.mcpServers['toolnet-memory']).toBeUndefined();
+      expect(stored.mcpServers['toolnet-memory']).toEqual({
+        command: 'old-toolnet',
+      });
 
       expect(stored.mcp.other).toEqual({
         type: 'local',
-
         command: ['other-mcp', 'serve'],
-
         enabled: true,
       });
 
       expect(stored.mcp['toolnet-memory']).toEqual({
         type: 'local',
-
         command: ['toolnet-memory', 'mcp'],
-
         enabled: true,
       });
 
       const second = installOpenCodeMcp({
         configFile,
-
         binary: 'toolnet-memory',
       });
 
@@ -262,15 +240,19 @@ describe('OpenCode adapter hardening', () => {
     try {
       process.env.XDG_CONFIG_HOME = root;
 
-      const plugin = installOpenCodePlugin({
+      const pluginFiles = installOpenCodePlugin({
         binary: '/usr/local/bin/toolnet-memory',
       });
 
       const configRoot = join(root, 'opencode');
 
-      expect(plugin).toBe(join(configRoot, 'plugins', 'toolnet-memory.js'));
+      expect(pluginFiles.length).toBeGreaterThan(0);
 
-      expect(existsSync(plugin)).toBe(true);
+      const pluginFile = pluginFiles.find((f) => f.endsWith('toolnet-memory.js'));
+
+      expect(pluginFile).toBeDefined();
+
+      expect(existsSync(pluginFile!)).toBe(true);
 
       const agentsFile = join(configRoot, 'AGENTS.md');
 
@@ -284,7 +266,7 @@ describe('OpenCode adapter hardening', () => {
 
       expect(agents.match(/TOOLNET_MEMORY_BOOTSTRAP_START/gu)).toHaveLength(1);
 
-      const pluginText = readFileSync(plugin, 'utf8');
+      const pluginText = readFileSync(pluginFile!, 'utf8');
 
       expect(pluginText).toContain('const LOCAL_CAPTURE_MS = 15000');
 
@@ -311,6 +293,109 @@ describe('OpenCode adapter hardening', () => {
       expect(pluginText).toContain('projectStatusFile');
 
       expect(pluginText).toContain('opencode-status.json');
+    } finally {
+      rmSync(root, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  test('system transform merges in-place without extra message', () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolnet-opencode-transform-'));
+
+    try {
+      process.env.XDG_CONFIG_HOME = root;
+
+      const pluginFiles = installOpenCodePlugin({
+        binary: '/usr/local/bin/toolnet-memory',
+      });
+
+      const pluginFile = pluginFiles.find((f) => f.endsWith('toolnet-memory.js'));
+
+      expect(pluginFile).toBeDefined();
+
+      const pluginText = readFileSync(pluginFile!, 'utf8');
+
+      // Should use in-place merge, not push
+      expect(pluginText).toContain('output.system[output.system.length - 1]');
+    } finally {
+      rmSync(root, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  test('dispose does not pass --idle flag', () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolnet-opencode-dispose-'));
+
+    try {
+      process.env.XDG_CONFIG_HOME = root;
+
+      const pluginFiles = installOpenCodePlugin({
+        binary: '/usr/local/bin/toolnet-memory',
+      });
+
+      const pluginFile = pluginFiles.find((f) => f.endsWith('toolnet-memory.js'));
+
+      expect(pluginFile).toBeDefined();
+
+      const pluginText = readFileSync(pluginFile!, 'utf8');
+
+      // dispose should use dispose:local-flush, not --idle
+      expect(pluginText).toContain('"dispose:local-flush"');
+    } finally {
+      rmSync(root, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  test('session.deleted does not run DB sync', () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolnet-opencode-deleted-'));
+
+    try {
+      process.env.XDG_CONFIG_HOME = root;
+
+      const pluginFiles = installOpenCodePlugin({
+        binary: '/usr/local/bin/toolnet-memory',
+      });
+
+      const pluginFile = pluginFiles.find((f) => f.endsWith('toolnet-memory.js'));
+
+      expect(pluginFile).toBeDefined();
+
+      const pluginText = readFileSync(pluginFile!, 'utf8');
+
+      // session.deleted should return early
+      expect(pluginText).toContain('session.deleted');
+      expect(pluginText).toContain('return');
+    } finally {
+      rmSync(root, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  test('plugin continues working even if ToolNet binary fails', () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolnet-opencode-failopen-'));
+
+    try {
+      process.env.XDG_CONFIG_HOME = root;
+
+      const pluginFiles = installOpenCodePlugin({
+        binary: '/nonexistent/binary',
+      });
+
+      expect(pluginFiles.length).toBeGreaterThan(0);
+
+      // Plugin should still be written even with bad binary
+      for (const file of pluginFiles) {
+        expect(existsSync(file)).toBe(true);
+      }
     } finally {
       rmSync(root, {
         recursive: true,

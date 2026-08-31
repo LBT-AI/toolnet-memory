@@ -256,19 +256,16 @@ export function detectAgentIntegrations(
 
         grokHome: options.grokHome,
       }),
-    }),
-
-    detectOne({
+    }),    detectOne({
       agent: 'toolnet-cli',
 
-      command: 'toolnet-memory',
+      command: 'toolnet',
 
       commandExists,
 
       configPaths: toolnetCliDetectionPaths({
-        home,
 
-        xdgConfigHome: options.xdgConfigHome,
+        home,
       }),
     }),
 

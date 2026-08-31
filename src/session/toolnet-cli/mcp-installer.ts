@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 
 import { dirname } from 'node:path';
 
-import { toolnetCliMcpConfigFile } from './config-paths.js';
+import { toolnetCliProjectMcpConfigFile } from './config-paths.js';
 
 export interface InstallToolNetCliMcpOptions {
   binary?: string;
@@ -10,6 +10,8 @@ export interface InstallToolNetCliMcpOptions {
   configFile?: string;
 
   force?: boolean;
+
+  cwd?: string;
 }
 
 export interface InstallToolNetCliMcpResult {
@@ -41,16 +43,16 @@ function readConfig(file: string): JsonObject {
 
   try {
     parsed = JSON.parse(raw);
-  } catch (error) {
+  } catch {
     throw new Error(
-      `Invalid existing ToolNet CLI MCP config: ${
-        error instanceof Error ? error.message : String(error)
-      }`
+      `Invalid existing ToolNet CLI MCP config at ${file}: parse error. Not overwriting.`
     );
   }
 
   if (!isObject(parsed)) {
-    throw new Error('Invalid existing ToolNet CLI MCP config: root must be a JSON object.');
+    throw new Error(
+      `Invalid existing ToolNet CLI MCP config at ${file}: root must be a JSON object. Not overwriting.`
+    );
   }
 
   return parsed;
@@ -73,12 +75,21 @@ function writeConfig(file: string, config: JsonObject): void {
   }
 }
 
+/**
+ * Install ToolNet MCP for ToolNet CLI.
+ *
+ * Based on audit of LBT-AI/Toolnet-CLI:
+ * - Writes MCP config to project-level .toolnet/mcp.json
+ * - Preserves existing MCP servers
+ * - Stops on invalid JSON (never overwrites corrupt config)
+ * - Uses mcpServers format (ToolNet CLI standard)
+ */
 export function installToolNetCliMcp(
   options: InstallToolNetCliMcpOptions = {}
 ): InstallToolNetCliMcpResult {
   const binary = options.binary ?? 'toolnet-memory';
 
-  const configFile = options.configFile ?? toolnetCliMcpConfigFile();
+  const configFile = options.configFile ?? toolnetCliProjectMcpConfigFile({ cwd: options.cwd });
 
   const config = readConfig(configFile);
 
@@ -94,7 +105,7 @@ export function installToolNetCliMcp(
     };
   }
 
-  const mcpServers = isObject(config.mcpServers) ? config.mcpServers : {};
+  const mcpServers: JsonObject = isObject(config.mcpServers) ? { ...config.mcpServers } : {};
 
   mcpServers[serverName] = {
     command: binary,
