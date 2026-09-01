@@ -26,15 +26,15 @@ Use it automatically BEFORE guessing when:
   decisions, touched files, or next actions are unclear.
 - Fast startup context is not enough to safely continue.
 
-Preferred mode:
+Mode:
 
 - mode="local"
-  for direct factual questions such as:
-  current task, last file, blocker, completed TODOs.
+  for all continuity questions, including:
+  current task, last file, blocker, completed TODOs,
+  composite continuity questions, and agent takeover.
 
-- mode="ai"
-  for composite or ambiguous continuity questions
-  that benefit from ToolNet Memory Agent reasoning.
+- ToolNet Memory Agent is deterministic and local-only.
+  No external AI/LLM provider is used.
 
 Do NOT call it automatically when:
 
@@ -47,7 +47,7 @@ Rules:
 - Never invent previous work.
 - Current repository evidence overrides stale memory.
 - NEVER reconstruct previous work by reading ToolNet internal session files.
-- NEVER read/list/search .toolnet/runtime/sources/** and legacy .toolnet/sessions/**, session state.json,
+- NEVER read/list/search .toolnet/journal/**, .toolnet/runtime/sources/**, and legacy .toolnet/sessions/**, session state.json,
   events.jsonl, or raw transcripts to discover previous-agent state.
 - Do not search the filesystem for the implementation/schema of
   memory_agent_ask. Invoke the MCP tool directly when deeper
@@ -81,7 +81,7 @@ For resume/continue requests:
 2. If the handoff is missing or ambiguous, invoke
    ${MEMORY_AGENT_TOOL} directly BEFORE repository/history exploration.
 3. NEVER reconstruct prior work from:
-   - .toolnet/runtime/sources/** and legacy .toolnet/sessions/**
+   - .toolnet/journal/**, .toolnet/runtime/sources/**, and legacy .toolnet/sessions/**
    - state.json
    - events.jsonl
    - raw transcripts
@@ -90,8 +90,8 @@ For resume/continue requests:
 5. Inspect git/source only AFTER continuity context is known.
 
 Use:
-- mode="local" for current task, last file, blocker or next action.
-- mode="ai" for ambiguous or combined continuity questions.
+- mode="local" for all continuity questions.
+- No AI/LLM mode exists.
 
 Current repository evidence overrides stale memory.
 `.trim();

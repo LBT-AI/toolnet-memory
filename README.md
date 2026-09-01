@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.3.11**
+Current release: **v0.3.13**
 
 </div>
 
@@ -36,7 +36,7 @@ ToolNet Memory is **not a raw transcript dump**. Raw session history is kept sep
 
 ## Supported Coding Agents
 
-ToolNet Memory currently supports an 8-agent continuity ring:
+ToolNet Memory currently supports an 10-agent continuity ring:
 
 ```text
 Agy / Antigravity
@@ -877,10 +877,10 @@ Phase 07 integration certification:
 npm run release:certify:phase07
 ```
 
-8-agent continuity certification:
+10-agent continuity certification:
 
 ```bash
-npm run release:certify:8
+npm run release:certify:10
 ```
 
 Optional native CLI E2E certification:
@@ -913,7 +913,7 @@ lint
 format
 TypeScript
 unit/integration tests
-8-agent continuity
+10-agent continuity
 Phase 07 integration contracts
 production build
 npm package contents

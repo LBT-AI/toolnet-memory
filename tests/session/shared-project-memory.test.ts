@@ -10,7 +10,10 @@ import type { ProjectManifest } from '../../src/core/types.js';
 import { createSessionIdentity } from '../../src/session/identity.js';
 import { SessionWal } from '../../src/session/wal.js';
 
-import { sharedProjectJournalFile } from '../../src/session/shared-project-journal.js';
+import {
+  markSharedProjectJournalDirty,
+  sharedProjectJournalFile,
+} from '../../src/session/shared-project-journal.js';
 
 const roots: string[] = [];
 
@@ -122,5 +125,47 @@ describe('shared project memory journal', () => {
 
     expect(openCode.remotePrefix).not.toContain('/sessions/');
     expect(agy.remotePrefix).not.toContain('/sessions/');
+  });
+
+  it('reconciles a dirty shared journal from authoritative per-source WALs without duplicates', () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolnet-shared-reconcile-'));
+    roots.push(root);
+    const manifest = project(root);
+    const openCode = createSessionIdentity(manifest, 'opencode', 'reconcile-open');
+    const agy = createSessionIdentity(manifest, 'agy', 'reconcile-agy');
+    const openCodeWal = new SessionWal(openCode, {
+      source: 'opencode',
+      cwd: root,
+    });
+    const agyWal = new SessionWal(agy, {
+      source: 'agy',
+      cwd: root,
+    });
+    openCodeWal.append([
+      {
+        type: 'user_prompt',
+        role: 'user',
+        data: {
+          content: 'first event',
+        },
+      },
+    ]);
+    markSharedProjectJournalDirty(root);
+    agyWal.append([
+      {
+        type: 'assistant_message',
+        role: 'assistant',
+        data: {
+          content: 'second event',
+        },
+      },
+    ]);
+    const events = readFileSync(sharedProjectJournalFile(root), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { id: string; agent: string });
+    expect(events).toHaveLength(2);
+    expect(new Set(events.map((event) => event.id)).size).toBe(2);
+    expect(events.map((event) => event.agent).sort()).toEqual(['agy', 'opencode']);
   });
 });

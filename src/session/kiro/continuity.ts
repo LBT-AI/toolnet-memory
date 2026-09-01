@@ -24,6 +24,7 @@ const RESUME_PATTERNS: RegExp[] = [
 ];
 
 const FORBIDDEN_MARKERS = [
+  '.toolnet/journal/',
   '.toolnet/sessions/',
   '.toolnet\\sessions\\',
   '/.toolnet/sessions',
@@ -90,7 +91,9 @@ function containsForbiddenSessionReference(value: string): boolean {
   const normalized = normalizeSlashes(value);
 
   if (
+    normalized.includes('.toolnet/journal/') ||
     normalized.includes('.toolnet/runtime/sources/') ||
+    normalized.endsWith('.toolnet/journal') ||
     normalized.endsWith('.toolnet/runtime/sources') ||
     normalized.includes('.toolnet/sessions/') ||
     normalized.endsWith('.toolnet/sessions')

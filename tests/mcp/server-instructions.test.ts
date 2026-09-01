@@ -10,7 +10,7 @@ describe('ToolNet MCP Server Instructions', () => {
 
     expect(TOOLNET_MCP_SERVER_INSTRUCTIONS).toContain('mode="local"');
 
-    expect(TOOLNET_MCP_SERVER_INSTRUCTIONS).toContain('mode="ai"');
+    expect(TOOLNET_MCP_SERVER_INSTRUCTIONS).toContain('local-only');
 
     expect(TOOLNET_MCP_SERVER_INSTRUCTIONS).toContain('.toolnet/sessions/**');
 

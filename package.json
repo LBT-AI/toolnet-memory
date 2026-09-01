@@ -89,7 +89,6 @@
     "session:new-agents:test": "vitest run tests/session/new-agent-event-mappers.test.ts tests/session/new-agent-hook-installers.test.ts tests/session/new-agent-runtime.test.ts",
     "session:new-agents-continuity:test": "vitest run tests/session/new-agent-continuity.test.ts tests/session/new-agent-continuity-installers.test.ts",
     "session:new-agents-integration:test": "vitest run tests/session/new-agent-integrations.test.ts tests/production/new-agent-auto-integrate.test.ts tests/production/new-agent-production-wiring.test.ts",
-    "release:certify:8": "vitest run tests/integration/cross-agent-continuity.test.ts tests/production/eight-agent-release-contract.test.ts",
     "session:integration-scope:test": "vitest run tests/session/integration-scope.test.ts tests/session/hook-event-dedupe.test.ts",
     "session:cursor-dual-scope:test": "vitest run tests/session/cursor-dual-scope.test.ts tests/session/cursor-dual-scope-wiring.test.ts",
     "session:copilot-dual-scope:test": "vitest run tests/session/copilot-dual-scope.test.ts tests/session/copilot-dual-scope-wiring.test.ts",
@@ -98,8 +97,9 @@
     "production:auto-scope:test": "vitest run tests/production/auto-integration-scope.test.ts tests/production/auto-integrate-scoped-new-agents.test.ts tests/production/auto-integrate-scoped-wiring.test.ts",
     "production:native-e2e-wiring:test": "vitest run tests/production/native-e2e-certification-wiring.test.ts tests/production/integration-detection-new-agents.test.ts",
     "release:certify:native:optional": "bash scripts/native-e2e-certify.sh",
-    "release:certify:phase07": "npm run production:auto-scope:test && npm run session:scoped-status:test && npm run session:grok-dual-scope:test && npm run session:copilot-dual-scope:test && npm run session:cursor-dual-scope:test && npm run session:integration-scope:test && npm run release:certify:8 && npm run typecheck && npm run lint && npm run format:check",
-    "production:phase07-final:test": "vitest run tests/production/final-phase07-release.test.ts"
+    "release:certify:phase07": "npm run production:auto-scope:test && npm run session:scoped-status:test && npm run session:grok-dual-scope:test && npm run session:copilot-dual-scope:test && npm run session:cursor-dual-scope:test && npm run session:integration-scope:test && npm run release:certify:10 && npm run typecheck && npm run lint && npm run format:check",
+    "production:phase07-final:test": "vitest run tests/production/final-phase07-release.test.ts",
+    "release:certify:10": "vitest run tests/integration/cross-agent-continuity.test.ts tests/production/ten-agent-release-contract.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

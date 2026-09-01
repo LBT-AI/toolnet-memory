@@ -51,6 +51,7 @@ export const PRODUCTION_PACK_REQUIRED_FILES = [
   'bundle/copilot-hook.js',
   'bundle/grok.js',
   'bundle/grok-hook.js',
+  'bundle/toolnet-cli.js',
   'bundle/mcp.js',
   'bundle/continuity-certify.js',
   'bundle/recovery-certify.js',
@@ -68,6 +69,7 @@ const PRODUCTION_BUNDLE_REQUIRED_FILES = [
   'copilot-hook.js',
   'grok.js',
   'grok-hook.js',
+  'toolnet-cli.js',
   'mcp.js',
   'continuity-certify.js',
   'recovery-certify.js',
@@ -563,6 +565,20 @@ export async function certifyProductionReadiness(
         binText.includes('bundle/grok.js') &&
         binText.includes('bundle/grok-hook.js'),
       'Cursor/Copilot/Grok production bundle or CLI routing is missing.'
+    )
+  );
+
+  checks.push(
+    check(
+      'toolnet-cli-kilo-integrations',
+      'ToolNet CLI and Kilo production integrations available',
+      existsSync(join(bundleRoot, 'toolnet-cli.js')) &&
+        existsSync(join(bundleRoot, 'kilo.js')) &&
+        binText.includes('integrate:toolnet-cli)') &&
+        binText.includes('integrate:kilo)') &&
+        binText.includes('bundle/toolnet-cli.js') &&
+        binText.includes('bundle/kilo.js'),
+      'ToolNet CLI/Kilo production bundle or CLI routing is missing.'
     )
   );
 

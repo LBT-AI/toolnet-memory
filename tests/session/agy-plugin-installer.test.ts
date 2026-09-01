@@ -64,9 +64,8 @@ describe('Agy native plugin installer', () => {
     expect(AGY_CONTINUITY_RULE.length).toBeLessThan(12000);
 
     expect(AGY_CONTINUITY_RULE).toContain('Current repository evidence overrides stale memory');
-
-    // Must NOT contain mode="ai"
-    expect(AGY_CONTINUITY_RULE).not.toContain('mode="ai"');
+    // Continuity guidance must explicitly use local mode.
+    expect(AGY_CONTINUITY_RULE).toContain('mode="local"');
   });
 
   test('does not auto-remove legacy entries', () => {

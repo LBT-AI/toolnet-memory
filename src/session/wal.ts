@@ -1,11 +1,9 @@
 import {
-  appendFileSync,
   closeSync,
   existsSync,
   fsyncSync,
   mkdirSync,
   openSync,
-  readFileSync,
   readSync,
   rmSync,
   statSync,
@@ -26,7 +24,10 @@ import type {
 
 import { canonicalizeSessionEventInput } from './unified-event.js';
 
-import { appendSharedProjectJournal } from './shared-project-journal.js';
+import {
+  appendSharedProjectJournal,
+  markSharedProjectJournalDirty,
+} from './shared-project-journal.js';
 
 import { readJsonFile, sha256, stableStringify, writeJsonAtomic } from './utils.js';
 
@@ -294,8 +295,14 @@ export class SessionWal {
       } catch {
         /*
          * Per-source fsync'd WAL remains authoritative.
-         * Shared projection failure must not break the agent.
+         * Mark shared projection dirty so a later event can
+         * reconstruct missing records from runtime/sources/**.
          */
+        try {
+          markSharedProjectJournalDirty(this.identity.projectRoot);
+        } catch {
+          // Local per-source WAL is still authoritative.
+        }
       }
 
       const last = normalized[normalized.length - 1];

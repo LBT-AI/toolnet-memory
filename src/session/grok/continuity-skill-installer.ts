@@ -29,9 +29,9 @@ When the user asks to continue or resume previous work:
    ToolNet handoff is missing, stale, or ambiguous.
 3. Prefer \`mode="local"\` for current task, last file, blocker, completed
    work, TODOs, and next action.
-4. Use \`mode="ai"\` only when continuity requires synthesis.
+4. ToolNet Memory Agent is local-only; use \`mode="local"\` for all continuity questions.
 5. Do not reconstruct previous work from:
-   - \`.toolnet/runtime/sources/** and legacy .toolnet/sessions/**\`
+   - \`.toolnet/journal/**, .toolnet/runtime/sources/**, and legacy .toolnet/sessions/**\`
    - ToolNet \`events.jsonl\` or \`state.json\`
    - raw transcripts
    - another coding agent's private session/history files

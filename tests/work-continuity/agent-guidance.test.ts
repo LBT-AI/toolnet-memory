@@ -22,7 +22,7 @@ describe('Memory Agent guidance', () => {
 
     expect(guidance).toContain('mode="local"');
 
-    expect(guidance).toContain('mode="ai"');
+    expect(guidance).toContain('local-only');
   });
 
   test('fast project context exposes memory tool guidance', () => {

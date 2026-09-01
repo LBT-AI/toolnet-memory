@@ -30,9 +30,9 @@ Use ToolNet Memory as the continuity source for this project.
   is missing, stale, or ambiguous.
 - Prefer \`mode="local"\` for current task, current file, blockers, TODOs,
   completed work, and next action.
-- Use \`mode="ai"\` only when synthesis is actually required.
+- ToolNet Memory Agent is local-only; use \`mode="local"\` for all continuity questions.
 - Do not reconstruct continuity by reading:
-  - \`.toolnet/runtime/sources/** and legacy .toolnet/sessions/**\`
+  - \`.toolnet/journal/**, .toolnet/runtime/sources/**, and legacy .toolnet/sessions/**\`
   - ToolNet raw \`events.jsonl\`
   - ToolNet raw \`state.json\`
   - another coding agent's private transcript/history files.

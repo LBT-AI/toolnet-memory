@@ -306,10 +306,7 @@ export const COMMANDS: CommandMetadata[] = [
     description: 'Install Kilo CLI MCP integration',
     usage: 'toolnet-memory integrate:kilo [--status] [--json] [--force]',
     category: 'integration',
-    examples: [
-      'toolnet-memory integrate:kilo',
-      'toolnet-memory integrate:kilo --status',
-    ],
+    examples: ['toolnet-memory integrate:kilo', 'toolnet-memory integrate:kilo --status'],
   },
   {
     name: 'integrate:all',

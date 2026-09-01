@@ -35,7 +35,7 @@ export interface InstallAgyPluginResult {
 /**
  * ToolNet Memory continuity rule for AGY.
  *
- * No mode="ai" references. Local-only memory agent.
+ * Local-only memory agent. External AI/LLM mode is not supported.
  * Uses official camelCase hook payload fields.
  */
 export const AGY_CONTINUITY_RULE = `# ToolNet Memory Continuity
@@ -47,20 +47,21 @@ ToolNet Memory is the authoritative continuity layer for previous project work.
 Whenever the user asks to continue, resume, finish, pick up, return to, or complete previous work:
 
 1. FIRST call the ToolNet Memory MCP tool \`memory_agent_ask\`.
-2. Use ToolNet's compact continuity result to determine:
+2. Invoke \`memory_agent_ask\` with \`mode="local"\` for all continuity questions.
+3. Use ToolNet's compact continuity result to determine:
    - current task
    - completed work
    - current or last file
    - TODOs
    - blockers
    - next action
-3. Only AFTER continuity is known may you inspect current source or git to verify repository truth.
+4. Only AFTER continuity is known may you inspect current source or git to verify repository truth.
 
 ## Forbidden continuity recovery
 
 Do NOT reconstruct previous work by reading, listing, searching, or shelling into:
 
-- \`.toolnet/runtime/sources/** and legacy .toolnet/sessions/**\`
+- \`.toolnet/journal/**, .toolnet/runtime/sources/**, and legacy .toolnet/sessions/**\`
 - \`state.json\`
 - \`events.jsonl\`
 - raw transcripts

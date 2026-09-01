@@ -27,7 +27,7 @@ describe('Phase 07 final release contract', () => {
     expect(command).toContain('session:copilot-dual-scope:test');
     expect(command).toContain('session:cursor-dual-scope:test');
     expect(command).toContain('session:integration-scope:test');
-    expect(command).toContain('release:certify:8');
+    expect(command).toContain('release:certify:10');
     expect(command).toContain('typecheck');
     expect(command).toContain('lint');
     expect(command).toContain('format:check');

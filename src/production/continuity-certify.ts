@@ -9,7 +9,16 @@ import { memoryAgentAsk } from '../mcp/tools/memory-agent-ask.js';
 import { retrieveMemoryContext } from '../work-continuity/memory-retrieval.js';
 
 export type CertifiedAgent =
-  'agy' | 'codex' | 'opencode' | 'claude' | 'kiro' | 'cursor' | 'copilot' | 'grok';
+  | 'agy'
+  | 'codex'
+  | 'opencode'
+  | 'claude'
+  | 'kiro'
+  | 'cursor'
+  | 'copilot'
+  | 'grok'
+  | 'toolnet-cli'
+  | 'kilo';
 
 export interface ContinuityCertificationChecks {
   canonicalHandoffPreferred: boolean;
@@ -332,11 +341,9 @@ async function certifyPair(
     const nextAnswer = await askLocal(project, 'Tôi phải làm gì tiếp?');
 
     /*
-     * Code 7:
-     *
-     * Simulate a real new coding agent asking for a deep takeover.
-     * mode=ai is intentional: Code 6 must route this to the
-     * deterministic structured handoff without calling an LLM.
+     * Simulate a new coding agent asking for a deep takeover.
+     * The deterministic local structured handoff must answer
+     * without calling an external AI/LLM provider.
      */
     const takeoverAnswer = await memoryAgentAsk(
       {
@@ -446,7 +453,7 @@ async function certifyPair(
  * Canonical cross-agent ring:
  *
  * Agy -> Codex -> OpenCode -> Claude -> Kiro -> Cursor
- * -> Copilot -> Grok -> Agy
+ * -> Copilot -> Grok -> ToolNet CLI -> Kilo -> Agy
  *
  * X3 will later certify real installed adapters/hooks.
  * X1 certifies the shared continuity contract itself.
@@ -467,7 +474,11 @@ export async function certifyCrossAgentContinuity(): Promise<ContinuityCertifica
 
     ['copilot', 'grok'],
 
-    ['grok', 'agy'],
+    ['grok', 'toolnet-cli'],
+
+    ['toolnet-cli', 'kilo'],
+
+    ['kilo', 'agy'],
   ];
 
   const cases: ContinuityCertificationCase[] = [];

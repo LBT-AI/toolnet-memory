@@ -78,7 +78,9 @@ function isForbiddenRawHistoryReference(value: string): boolean {
   const normalized = normalizeSlashes(value);
 
   if (
+    normalized.includes('.toolnet/journal/') ||
     normalized.includes('.toolnet/runtime/sources/') ||
+    normalized.endsWith('.toolnet/journal') ||
     normalized.endsWith('.toolnet/runtime/sources') ||
     normalized.includes('.toolnet/sessions/') ||
     normalized.endsWith('.toolnet/sessions')
@@ -161,7 +163,7 @@ When the user asks to continue, resume, pick up, or finish previous work:
    memory_agent_ask before exploring prior history.
 3. Prefer mode="local" for current task, last file, blocker, completed work,
    TODOs, and next action.
-4. Use mode="ai" only when continuity requires synthesis.
+4. ToolNet Memory Agent is local-only; use mode="local" for all continuity questions.
 5. Never reconstruct prior work from .toolnet/sessions/**, events.jsonl,
    state.json, raw transcripts, or another agent's private history.
 6. After continuity is known, verify current git/source truth and continue.
