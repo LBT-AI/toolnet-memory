@@ -486,6 +486,26 @@ export async function loadWorkState(
 
   storage: StorageProvider
 ): Promise<WorkState | null> {
+  /*
+   * work/observations/*.json is authoritative.
+   *
+   * If at least one valid observation batch exists,
+   * never trust work/current.json as source of truth.
+   * Rebuild the projection deterministically.
+   */
+  const batches = await loadBatches(project, storage);
+
+  if (batches.length > 0) {
+    return reconcileWorkState(project, storage);
+  }
+
+  /*
+   * Backwards compatibility for projects created before
+   * the observation journal existed.
+   *
+   * Legacy current.json is accepted only when there are
+   * no valid authoritative observation batches.
+   */
   const text = await storage.getText(`projects/${project.id}/work/current.json`);
 
   if (!text) {

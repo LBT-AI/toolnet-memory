@@ -4,6 +4,18 @@ import type { SessionAgent } from '../types.js';
 
 export type LearnedMemoryKind = 'rule' | 'decision' | 'todo' | 'fix' | 'architecture' | 'context';
 
+export interface LearnedMemoryEvidence {
+  userExplicit: boolean;
+
+  sourceVerified: boolean;
+
+  testVerified: boolean;
+
+  crossSessionConfirmations: number;
+
+  assistantDerived: boolean;
+}
+
 export interface LearnedMemoryCandidate {
   version: 1;
 
@@ -26,6 +38,8 @@ export interface LearnedMemoryCandidate {
   confidence: number;
 
   importance: ImportanceLevel;
+
+  evidence?: LearnedMemoryEvidence;
 
   tags: string[];
 

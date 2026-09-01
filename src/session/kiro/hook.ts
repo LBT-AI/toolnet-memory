@@ -7,6 +7,8 @@ import {
   isKiroStartupEvent,
 } from './continuity.js';
 
+import { triggerProjectBackgroundRefresh } from '../../multi-host/refresh-trigger.js';
+
 import { handleKiroHookInput } from './runtime.js';
 
 async function readInput(): Promise<Record<string, unknown>> {
@@ -62,6 +64,8 @@ async function main(): Promise<void> {
    */
   if (isKiroStartupEvent(hookEvent)) {
     const cwd = typeof input.cwd === 'string' ? input.cwd : '';
+
+    triggerProjectBackgroundRefresh(cwd);
 
     const context = buildKiroStartupContext(cwd);
 

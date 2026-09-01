@@ -2,7 +2,7 @@ import { MemoryEngine } from '../../core/memory-engine.js';
 
 import type { ProjectManifest } from '../../core/types.js';
 
-import { MemoryStore } from '../../storage/memory-store.js';
+import { ConvergentMemoryStore } from '../../multi-host/memory-projection.js';
 
 import type { StorageProvider } from '../../storage/types.js';
 
@@ -98,6 +98,98 @@ function candidateFingerprint(memory: Record<string, any>): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function evidenceRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function confirmingSessions(memory: Record<string, any>): Set<string> {
+  const values = memory.metadata?.confirmingSessionKeys;
+
+  const sessions = new Set<string>();
+
+  if (Array.isArray(values)) {
+    for (const value of values) {
+      if (typeof value !== 'string') {
+        continue;
+      }
+
+      sessions.add(value);
+    }
+  }
+
+  const original = memory.metadata?.sessionKey;
+
+  if (typeof original === 'string') {
+    sessions.add(original);
+  }
+
+  return sessions;
+}
+
+function mergeConfirmationEvidence(
+  memory: Record<string, any>,
+  candidate: LearnedMemoryCandidate
+): boolean {
+  const sessions = confirmingSessions(memory);
+
+  const beforeCount = sessions.size;
+
+  sessions.add(candidate.sessionKey);
+
+  const oldEvidence = evidenceRecord(memory.metadata?.evidence);
+
+  const newEvidence = evidenceRecord(candidate.evidence);
+
+  const crossSessionConfirmations = sessions.size;
+
+  const userExplicit = oldEvidence.userExplicit === true || newEvidence.userExplicit === true;
+
+  const sourceVerified = oldEvidence.sourceVerified === true || newEvidence.sourceVerified === true;
+
+  const testVerified = oldEvidence.testVerified === true || newEvidence.testVerified === true;
+
+  const assistantDerived =
+    oldEvidence.assistantDerived === true && newEvidence.assistantDerived === true;
+
+  const previousConfirmations = Number(oldEvidence.crossSessionConfirmations ?? 0);
+
+  const changed =
+    beforeCount !== crossSessionConfirmations ||
+    previousConfirmations !== crossSessionConfirmations ||
+    oldEvidence.userExplicit !== userExplicit ||
+    oldEvidence.sourceVerified !== sourceVerified ||
+    oldEvidence.testVerified !== testVerified ||
+    oldEvidence.assistantDerived !== assistantDerived;
+
+  if (!changed) {
+    return false;
+  }
+
+  memory.metadata = {
+    ...(memory.metadata ?? {}),
+
+    evidence: {
+      userExplicit,
+
+      sourceVerified,
+
+      testVerified,
+
+      crossSessionConfirmations,
+
+      assistantDerived,
+    },
+
+    confirmingSessionKeys: [...sessions].sort(),
+  };
+
+  return true;
+}
+
 async function loadBatches(
   project: ProjectManifest,
 
@@ -141,7 +233,7 @@ export async function reconcileSessionMemoryJournal(
 ): Promise<MemoryReconcileResult> {
   const batches = await loadBatches(project, storage);
 
-  const store = new MemoryStore(storage);
+  const store = new ConvergentMemoryStore(storage);
 
   const existing = await store.load(project.id);
 
@@ -155,11 +247,25 @@ export async function reconcileSessionMemoryJournal(
       .filter((value): value is string => Boolean(value))
   );
 
+  const memoriesByFingerprint = new Map(
+    existing.flatMap((memory) => {
+      const fingerprint = candidateFingerprint(memory);
+
+      if (!fingerprint) {
+        return [];
+      }
+
+      return [[fingerprint, memory] as const];
+    })
+  );
+
   let candidates = 0;
 
   let added = 0;
 
   let duplicates = 0;
+
+  let evidenceUpdated = 0;
 
   for (const batch of batches) {
     for (const candidate of batch.candidates) {
@@ -168,10 +274,14 @@ export async function reconcileSessionMemoryJournal(
       if (fingerprints.has(candidate.fingerprint)) {
         duplicates += 1;
 
+        const memory = memoriesByFingerprint.get(candidate.fingerprint);
+
+        evidenceUpdated += memory && mergeConfirmationEvidence(memory, candidate) ? 1 : 0;
+
         continue;
       }
 
-      engine.remember({
+      const remembered = engine.remember({
         projectId: project.id,
 
         type: candidate.type,
@@ -205,11 +315,13 @@ export async function reconcileSessionMemoryJournal(
 
       fingerprints.add(candidate.fingerprint);
 
+      memoriesByFingerprint.set(candidate.fingerprint, remembered);
+
       added += 1;
     }
   }
 
-  if (added > 0) {
+  if (added > 0 || evidenceUpdated > 0) {
     await store.save(project.id, engine.exportProject(project.id));
   }
 

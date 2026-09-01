@@ -131,6 +131,8 @@ const LOCAL_CAPTURE_MS = 15000
 
 const REMOTE_SYNC_MS = 60000
 
+const PROJECT_REFRESH_MS = 60000
+
 const EVENT_CAPTURE_DEBOUNCE_MS = 1200
 
 const CAPTURE_TIMEOUT_MS = 20000
@@ -424,6 +426,9 @@ export const ToolNetMemoryPlugin =
     let remoteInFlight =
       null
 
+    let refreshInFlight =
+      null
+
     let debounceTimer =
       null
 
@@ -593,6 +598,14 @@ export const ToolNetMemoryPlugin =
               ? "capture-success"
               : "sync-success",
         })
+
+        if (
+          !localOnly
+        ) {
+          void refreshProjection(
+            "after-remote-sync"
+          )
+        }
       } catch (error) {
         writeStatus({
           active: true,
@@ -618,6 +631,70 @@ export const ToolNetMemoryPlugin =
 
         throw error
       }
+    }
+
+    function refreshProjection(
+      reason = "unknown"
+    ) {
+      if (
+        refreshInFlight
+      ) {
+        return refreshInFlight
+      }
+
+      refreshInFlight =
+        runWithTimeout(
+          [
+            TOOLNET_BINARY,
+            "background:refresh",
+            "--project",
+            projectRoot,
+            "--quiet",
+          ],
+          {
+            timeout:
+              REMOTE_TIMEOUT_MS,
+          }
+        )
+          .then(
+            () => {
+              writeStatus({
+                active: true,
+                projectRoot,
+                reason,
+                state:
+                  "projection-refresh-success",
+              })
+            }
+          )
+          .catch(
+            error => {
+              writeStatus({
+                active: true,
+                projectRoot,
+                reason,
+                state:
+                  "projection-refresh-failed",
+                error:
+                  error instanceof
+                  Error
+                    ? error.message
+                    : String(
+                        error
+                      ),
+              })
+
+              return undefined
+            }
+          )
+          .finally(
+            () => {
+              refreshInFlight =
+                null
+            }
+          )
+
+      return refreshInFlight
     }
 
     function queueCapture(
@@ -790,10 +867,38 @@ export const ToolNetMemoryPlugin =
         REMOTE_SYNC_MS
       )
 
+    /*
+     * Shared project projection refresh.
+     *
+     * Pulls memory/work operations created by other
+     * agents or VPS hosts and rebuilds local/shared
+     * current.json projection caches.
+     *
+     * Overlap is prevented by refreshInFlight.
+     */
+    const projectRefreshPeriodic =
+      setInterval(
+        () => {
+          void refreshProjection(
+            "periodic-project-refresh"
+          )
+        },
+        PROJECT_REFRESH_MS
+      )
+
+    /*
+     * First refresh is asynchronous.
+     * Plugin startup must not wait for remote storage.
+     */
+    void refreshProjection(
+      "plugin-startup"
+    )
+
     for (
       const timer of [
         localPeriodic,
         remotePeriodic,
+        projectRefreshPeriodic,
       ]
     ) {
       if (
@@ -1048,6 +1153,10 @@ export const ToolNetMemoryPlugin =
 
         clearInterval(
           remotePeriodic
+        )
+
+        clearInterval(
+          projectRefreshPeriodic
         )
 
         if (debounceTimer) {

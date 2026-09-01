@@ -10,6 +10,8 @@ import { handleCursorHookInput } from './runtime.js';
 
 import { claimHookEvent } from '../integration-scope/index.js';
 
+import { triggerProjectBackgroundRefresh } from '../../multi-host/refresh-trigger.js';
+
 async function readInput(): Promise<Record<string, unknown>> {
   let raw = '';
 
@@ -69,7 +71,14 @@ async function main(): Promise<void> {
     }
   }
 
-  await handleCursorHookInput(input);
+  const capture = await handleCursorHookInput(input);
+
+  const refreshBoundary =
+    event === 'sessionStart' || event === 'SessionStart' || event === 'stop' || event === 'Stop';
+
+  if (refreshBoundary && capture.projectRoot) {
+    triggerProjectBackgroundRefresh(capture.projectRoot);
+  }
 
   if (event === 'sessionStart' || event === 'SessionStart') {
     process.stdout.write(JSON.stringify(buildCursorSessionStartOutput(input)));

@@ -4,9 +4,11 @@ import {
   fsyncSync,
   mkdirSync,
   openSync,
+  readFileSync,
   readSync,
   rmSync,
   statSync,
+  truncateSync,
   writeSync,
 } from 'node:fs';
 
@@ -27,6 +29,7 @@ import { canonicalizeSessionEventInput } from './unified-event.js';
 import {
   appendSharedProjectJournal,
   markSharedProjectJournalDirty,
+  reconcileSharedProjectJournal,
 } from './shared-project-journal.js';
 
 import { readJsonFile, sha256, stableStringify, writeJsonAtomic } from './utils.js';
@@ -39,6 +42,176 @@ const RECENT_EVENT_LIMIT = 2_000;
 
 function sleepSync(milliseconds: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
+function writeAllSync(fd: number, value: string | Buffer): void {
+  const buffer = Buffer.isBuffer(value) ? value : Buffer.from(value, 'utf8');
+
+  let offset = 0;
+
+  while (offset < buffer.length) {
+    const written = writeSync(fd, buffer, offset, buffer.length - offset);
+
+    if (written <= 0) {
+      throw new Error('Unable to write session WAL');
+    }
+
+    offset += written;
+  }
+}
+
+function parseWalEvent(line: string): NormalizedSessionEvent | null {
+  const value = line.trim();
+
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const event = JSON.parse(value) as Partial<NormalizedSessionEvent>;
+
+    if (event.version !== 1) {
+      return null;
+    }
+
+    if (typeof event.id !== 'string' || !event.id) {
+      return null;
+    }
+
+    if (typeof event.sequence !== 'number' || !Number.isFinite(event.sequence)) {
+      return null;
+    }
+
+    if (typeof event.projectId !== 'string' || !event.projectId) {
+      return null;
+    }
+
+    if (typeof event.timestamp !== 'string') {
+      return null;
+    }
+
+    return event as NormalizedSessionEvent;
+  } catch {
+    return null;
+  }
+}
+
+function readWalEvents(file: string): NormalizedSessionEvent[] {
+  if (!existsSync(file)) {
+    return [];
+  }
+
+  let content = '';
+
+  try {
+    content = readFileSync(file, 'utf8');
+  } catch {
+    return [];
+  }
+
+  const events: NormalizedSessionEvent[] = [];
+
+  for (const line of content.split(/\r?\n/)) {
+    const event = parseWalEvent(line);
+
+    if (!event) {
+      continue;
+    }
+
+    events.push(event);
+  }
+
+  return events;
+}
+
+function statusFromEvent(event: NormalizedSessionEvent): SessionStatus {
+  if (event.type === 'session_end' || event.type === 'session_idle') {
+    return 'idle';
+  }
+
+  if (event.type === 'error') {
+    return 'error';
+  }
+
+  return 'active';
+}
+
+/**
+ * A process crash may leave the last JSONL record only
+ * partially written.
+ *
+ * Complete valid JSON without a final newline is preserved
+ * by appending the missing newline.
+ *
+ * Invalid trailing bytes are truncated only back to the
+ * previous newline. Earlier fsync'd events are untouched.
+ */
+function repairPartialWalTail(file: string): boolean {
+  if (!existsSync(file)) {
+    return false;
+  }
+
+  let buffer: Buffer;
+
+  try {
+    buffer = readFileSync(file);
+  } catch {
+    return false;
+  }
+
+  if (buffer.length === 0) {
+    return false;
+  }
+
+  if (buffer[buffer.length - 1] === 0x0a) {
+    return false;
+  }
+
+  const lastNewline = buffer.lastIndexOf(0x0a);
+
+  const tailStart = lastNewline >= 0 ? lastNewline + 1 : 0;
+
+  const tail = buffer.subarray(tailStart).toString('utf8').trim();
+
+  if (parseWalEvent(tail)) {
+    const fd = openSync(file, 'a');
+
+    try {
+      writeAllSync(fd, '\n');
+
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+
+    return true;
+  }
+
+  truncateSync(file, tailStart);
+
+  const fd = openSync(file, 'a');
+
+  try {
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+
+  return true;
+}
+
+function sameStrings(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export class SessionWal {
@@ -97,8 +270,94 @@ export class SessionWal {
     return readJsonFile<LocalSessionState>(this.stateFile) ?? this.initialState();
   }
 
+  private recoverStateUnsafe(): LocalSessionState {
+    repairPartialWalTail(this.eventsFile);
+
+    const state = this.loadStateUnsafe();
+
+    const events = readWalEvents(this.eventsFile);
+
+    if (events.length === 0) {
+      return state;
+    }
+
+    let latest = events[0];
+
+    for (const event of events) {
+      if (event.sequence <= latest.sequence) {
+        continue;
+      }
+
+      latest = event;
+    }
+
+    const recentEventIds = events.slice(-RECENT_EVENT_LIMIT).map((event) => event.id);
+
+    const fileSize = existsSync(this.eventsFile) ? statSync(this.eventsFile).size : 0;
+
+    const recoveredSequence = Math.max(state.lastSequence, latest.sequence);
+
+    const recoveredOffset = Math.min(state.remoteByteOffset, fileSize);
+
+    const stateLagged = latest.sequence > state.lastSequence;
+
+    const changed =
+      stateLagged ||
+      recoveredOffset !== state.remoteByteOffset ||
+      !sameStrings(state.recentEventIds, recentEventIds) ||
+      state.lastLocalEventAt !== latest.timestamp;
+
+    if (!changed) {
+      return state;
+    }
+
+    const recovered: LocalSessionState = {
+      ...state,
+
+      status: statusFromEvent(latest),
+
+      updatedAt: latest.timestamp,
+
+      lastLocalEventAt: latest.timestamp,
+
+      lastSequence: recoveredSequence,
+
+      remoteByteOffset: recoveredOffset,
+
+      recentEventIds,
+    };
+
+    this.saveStateUnsafe(recovered);
+
+    if (!stateLagged) {
+      return recovered;
+    }
+
+    /*
+     * WAL contains an fsync'd event that state.json did not
+     * acknowledge. The process may also have crashed before
+     * projecting that event into the shared journal.
+     */
+    try {
+      markSharedProjectJournalDirty(this.identity.projectRoot);
+    } catch {
+      return recovered;
+    }
+
+    try {
+      reconcileSharedProjectJournal(this.identity.projectRoot);
+    } catch {
+      /*
+       * Dirty marker remains. A later append/reconcile
+       * can rebuild from authoritative source WAL.
+       */
+    }
+
+    return recovered;
+  }
+
   loadState(): LocalSessionState {
-    return this.withLock(() => this.loadStateUnsafe());
+    return this.withLock(() => this.recoverStateUnsafe());
   }
 
   private saveStateUnsafe(state: LocalSessionState): void {
@@ -157,7 +416,7 @@ export class SessionWal {
     }
 
     return this.withLock(() => {
-      const state = this.loadStateUnsafe();
+      const state = this.recoverStateUnsafe();
 
       const recent = new Set(state.recentEventIds);
 
@@ -276,7 +535,7 @@ export class SessionWal {
       const fd = openSync(this.eventsFile, 'a', 0o600);
 
       try {
-        writeSync(fd, content, null, 'utf8');
+        writeAllSync(fd, content);
 
         fsyncSync(fd);
       } finally {
@@ -307,13 +566,7 @@ export class SessionWal {
 
       const last = normalized[normalized.length - 1];
 
-      let status: SessionStatus = 'active';
-
-      if (last.type === 'session_end' || last.type === 'session_idle') {
-        status = 'idle';
-      } else if (last.type === 'error') {
-        status = 'error';
-      }
+      const status = statusFromEvent(last);
 
       const recentEventIds = Array.from(recent).slice(-RECENT_EVENT_LIMIT);
 
@@ -337,12 +590,14 @@ export class SessionWal {
 
   readPending(): PendingSessionEvents {
     return this.withLock(() => {
-      const state = this.loadStateUnsafe();
+      const state = this.recoverStateUnsafe();
 
       if (!existsSync(this.eventsFile)) {
         return {
           events: [],
+
           startOffset: state.remoteByteOffset,
+
           endOffset: state.remoteByteOffset,
         };
       }
@@ -354,7 +609,9 @@ export class SessionWal {
       if (fileSize <= startOffset) {
         return {
           events: [],
+
           startOffset,
+
           endOffset: fileSize,
         };
       }
@@ -371,16 +628,23 @@ export class SessionWal {
         closeSync(fd);
       }
 
-      const text = buffer.toString('utf8');
+      const events: NormalizedSessionEvent[] = [];
 
-      const events = text
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as NormalizedSessionEvent);
+      for (const line of buffer.toString('utf8').split(/\r?\n/)) {
+        const event = parseWalEvent(line);
+
+        if (!event) {
+          continue;
+        }
+
+        events.push(event);
+      }
 
       return {
         events,
+
         startOffset,
+
         endOffset: fileSize,
       };
     });
@@ -388,7 +652,7 @@ export class SessionWal {
 
   markRemote(sequence: number, byteOffset: number): void {
     this.withLock(() => {
-      const state = this.loadStateUnsafe();
+      const state = this.recoverStateUnsafe();
 
       const now = new Date().toISOString();
 
@@ -408,7 +672,7 @@ export class SessionWal {
 
   setSourceCursor(source: string, value: string | number): void {
     this.withLock(() => {
-      const state = this.loadStateUnsafe();
+      const state = this.recoverStateUnsafe();
 
       this.saveStateUnsafe({
         ...state,

@@ -1,5 +1,7 @@
 import { buildFastProjectContext } from '../../work-continuity/fast-context.js';
 
+import { triggerProjectBackgroundRefresh } from '../../multi-host/refresh-trigger.js';
+
 import { findCodexToolNetProject } from './project-resolver.js';
 
 const MAX_CONTEXT_CHARS = 3200;
@@ -78,6 +80,8 @@ async function main(): Promise<void> {
 
     return;
   }
+
+  triggerProjectBackgroundRefresh(project.rootPath);
 
   try {
     /*

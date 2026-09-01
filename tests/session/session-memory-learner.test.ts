@@ -210,6 +210,14 @@ describe('Session Memory Learner', () => {
     const memories = await new MemoryStore(storage).load(p.id);
 
     expect(memories).toHaveLength(1);
+
+    const evidence = memories[0].metadata?.evidence as Record<string, unknown> | undefined;
+
+    expect(evidence?.crossSessionConfirmations).toBe(2);
+
+    const confirmingSessionKeys = memories[0].metadata?.confirmingSessionKeys;
+
+    expect(Array.isArray(confirmingSessionKeys) ? confirmingSessionKeys.length : 0).toBe(2);
   });
 
   it('learns decision, todo, architecture and fix', async () => {

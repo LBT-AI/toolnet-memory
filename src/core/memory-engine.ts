@@ -78,21 +78,54 @@ export class MemoryEngine {
       metadata: this.sanitizer.sanitizeValue(input.metadata) as Record<string, unknown> | undefined,
     };
 
-    const superseded = this.conflicts.findSuperseded(memory, this.list(input.projectId));
+    const resolution = this.conflicts.resolve(memory, this.list(input.projectId));
 
-    if (superseded.length) {
+    if (resolution.superseded.length > 0) {
       memory.metadata = {
         ...(memory.metadata ?? {}),
-        supersedes: superseded.map((item) => item.id),
+
+        supersedes: resolution.superseded.map((item) => item.id),
       };
 
-      for (const old of superseded) {
+      for (const old of resolution.superseded) {
         old.updatedAt = now;
 
         old.metadata = {
           ...(old.metadata ?? {}),
+
           supersededBy: memory.id,
+
           supersededAt: now,
+        };
+
+        this.memories.set(old.id, old);
+      }
+    }
+
+    if (resolution.conflicts.length > 0) {
+      const conflictsWith = resolution.conflicts.map((item) => item.id);
+
+      memory.metadata = {
+        ...(memory.metadata ?? {}),
+
+        conflictsWith,
+      };
+
+      for (const old of resolution.conflicts) {
+        const current = Array.isArray(old.metadata?.conflictsWith)
+          ? old.metadata?.conflictsWith
+          : [];
+
+        const ids = new Set(current.filter((value): value is string => typeof value === 'string'));
+
+        ids.add(memory.id);
+
+        old.updatedAt = now;
+
+        old.metadata = {
+          ...(old.metadata ?? {}),
+
+          conflictsWith: [...ids],
         };
 
         this.memories.set(old.id, old);

@@ -46,6 +46,7 @@ const entries = {
   grok: 'src/session/grok/cli.ts',
   'grok-hook': 'src/session/grok/hook.ts',
   'toolnet-cli': 'src/session/toolnet-cli/cli.ts',
+  'background-refresh': 'src/multi-host/background-refresh-cli.ts',
   kilo: 'src/session/kilo/cli.ts',
   'integration-status': 'src/session/new-agents/scoped-status-cli.ts',
   'continuity-certify': 'src/production/continuity-certify-cli.ts',

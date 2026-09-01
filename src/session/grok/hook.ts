@@ -4,6 +4,8 @@ import { handleGrokHookInput } from './runtime.js';
 
 import { claimHookEvent } from '../integration-scope/index.js';
 
+import { triggerProjectBackgroundRefresh } from '../../multi-host/refresh-trigger.js';
+
 async function readInput(): Promise<Record<string, unknown>> {
   let raw = '';
 
@@ -64,7 +66,18 @@ async function main(): Promise<void> {
     }
   }
 
-  await handleGrokHookInput(input);
+  const capture = await handleGrokHookInput(input);
+
+  const refreshBoundary =
+    event === 'SessionStart' ||
+    event === 'sessionStart' ||
+    event === 'session_start' ||
+    event === 'Stop' ||
+    event === 'stop';
+
+  if (refreshBoundary && capture.projectRoot) {
+    triggerProjectBackgroundRefresh(capture.projectRoot);
+  }
 }
 
 main().catch(() => {

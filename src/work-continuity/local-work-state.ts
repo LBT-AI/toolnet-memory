@@ -1,4 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { withProjectWorkLock } from './project-work-lock.js';
+
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 
 import { dirname, join } from 'node:path';
 
@@ -13,10 +24,17 @@ function atomicWriteJson(file: string, value: unknown): void {
 
   const temp = `${file}.tmp-${process.pid}-${Date.now()}`;
 
-  writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, {
-    encoding: 'utf8',
-    mode: 0o600,
-  });
+  const fd = openSync(temp, 'w', 0o600);
+
+  try {
+    writeFileSync(fd, `${JSON.stringify(value, null, 2)}\n`, {
+      encoding: 'utf8',
+    });
+
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
 
   renameSync(temp, file);
 }
@@ -210,7 +228,7 @@ function currentItem(items: WorkItem[]): WorkItem | undefined {
   );
 }
 
-export function applyObservationsToLocalWorkState(
+function applyObservationsUnlocked(
   project: ProjectManifest,
   observations: WorkObservation[]
 ): WorkState {
@@ -487,4 +505,11 @@ export function applyObservationsToLocalWorkState(
   atomicWriteJson(localWorkStateFile(project), state);
 
   return state;
+}
+
+export function applyObservationsToLocalWorkState(
+  project: ProjectManifest,
+  observations: WorkObservation[]
+): WorkState {
+  return withProjectWorkLock(project, () => applyObservationsUnlocked(project, observations));
 }

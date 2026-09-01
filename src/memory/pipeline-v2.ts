@@ -1,4 +1,6 @@
-import type { ImportanceLevel } from '../core/types.js';
+import { evaluateMemoryPromotion, type MemoryKnowledgeClass } from './promotion-policy.js';
+
+export type { MemoryKnowledgeClass } from './promotion-policy.js';
 
 import type { NormalizedSessionEvent, SessionIdentity } from '../session/types.js';
 
@@ -9,8 +11,6 @@ import type { LearnedMemoryCandidate } from '../session/learner/types.js';
 import { buildMemoryHierarchy, type MemoryHierarchy } from './hierarchy.js';
 
 import { extractSessionMemory } from '../session/session-extractor.js';
-
-export type MemoryKnowledgeClass = 'permanent' | 'task' | 'session' | 'transient';
 
 export interface MemoryPipelineCandidate extends LearnedMemoryCandidate {
   knowledgeClass: MemoryKnowledgeClass;
@@ -134,64 +134,6 @@ function normalizeEvents(events: NormalizedSessionEvent[]): NormalizedSessionEve
   );
 }
 
-function importanceBase(importance: ImportanceLevel): number {
-  switch (importance) {
-    case 'critical':
-      return 1;
-
-    case 'high':
-      return 0.85;
-
-    case 'normal':
-      return 0.6;
-
-    case 'temporary':
-      return 0.25;
-  }
-}
-
-function scoreCandidate(candidate: LearnedMemoryCandidate): number {
-  const base = importanceBase(candidate.importance);
-
-  /*
-   * Importance is primary.
-   * Extraction confidence is supporting evidence.
-   */
-  return Math.max(0, Math.min(1, base * 0.75 + candidate.confidence * 0.25));
-}
-
-function classifyKnowledge(candidate: LearnedMemoryCandidate): MemoryKnowledgeClass {
-  /*
-   * Explicitly low-value information never reaches
-   * durable memory/retrieval.
-   */
-  if (candidate.importance === 'temporary' || candidate.confidence < 0.78) {
-    return 'transient';
-  }
-
-  /*
-   * Stable project knowledge.
-   */
-  if (candidate.kind === 'rule' || candidate.kind === 'architecture') {
-    return 'permanent';
-  }
-
-  /*
-   * Work-specific knowledge needed to continue
-   * the current task across agents/sessions.
-   */
-  if (candidate.kind === 'decision' || candidate.kind === 'todo' || candidate.kind === 'fix') {
-    return 'task';
-  }
-
-  /*
-   * Paths, runtime context, temporary implementation
-   * context, etc. Useful during a session but should
-   * not be treated as a permanent project rule.
-   */
-  return 'session';
-}
-
 function retrievalTerms(text: string): string[] {
   const terms =
     text
@@ -217,25 +159,21 @@ function retrievalTerms(text: string): string[] {
 }
 
 function enrichCandidate(candidate: LearnedMemoryCandidate): MemoryPipelineCandidate {
-  const knowledgeClass = classifyKnowledge(candidate);
-
-  const importanceScore = scoreCandidate(candidate);
-
-  const terms = retrievalTerms(candidate.content);
+  const evaluation = evaluateMemoryPromotion(candidate);
 
   return {
     ...candidate,
 
-    knowledgeClass,
+    knowledgeClass: evaluation.knowledgeClass,
 
-    importanceScore,
+    importanceScore: evaluation.score,
 
-    retrievalTerms: terms,
+    retrievalTerms: retrievalTerms(candidate.content),
 
     tags: uniqueStrings([
       ...candidate.tags,
       'level:fact',
-      `class:${knowledgeClass}`,
+      `class:${evaluation.knowledgeClass}`,
       `kind:${candidate.kind}`,
     ]),
   };
@@ -348,7 +286,7 @@ export function runMemoryPipelineV2(
    * from durable persistence and retrieval.
    */
   const candidates = extracted
-    .filter((candidate) => candidate.knowledgeClass !== 'transient')
+    .filter((candidate) => evaluateMemoryPromotion(candidate).persist)
     .sort((left, right) => right.importanceScore - left.importanceScore);
 
   /*

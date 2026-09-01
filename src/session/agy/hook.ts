@@ -6,6 +6,8 @@ import {
   withStorageRetry,
 } from '../../storage/index.js';
 
+import { triggerProjectBackgroundRefresh } from '../../multi-host/refresh-trigger.js';
+
 import {
   buildAgyPreInvocationOutput,
   refreshStartupBriefCache,
@@ -213,6 +215,12 @@ async function main() {
   const workspacePaths = normalized.workspacePaths;
 
   const project = findToolNetProject(workspacePaths);
+
+  const shouldRefreshProjection = phase === 'pre' || phase === 'stop';
+
+  if (project && shouldRefreshProjection) {
+    triggerProjectBackgroundRefresh(project.rootPath);
+  }
 
   let hookOutput: Record<string, unknown> = {};
 

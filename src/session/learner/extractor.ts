@@ -199,10 +199,12 @@ function collectText(value: unknown, key: string | undefined, output: string[], 
     return;
   }
 
+  if (typeof value === 'string' && key && !TEXT_KEYS.has(key)) {
+    return;
+  }
+
   if (typeof value === 'string') {
-    if (!key || TEXT_KEYS.has(key)) {
-      output.push(value);
-    }
+    output.push(value);
 
     return;
   }
@@ -352,6 +354,35 @@ function classify(
   return null;
 }
 
+function evidenceFor(
+  kind: LearnedMemoryKind,
+  role: string,
+  event: NormalizedSessionEvent
+): LearnedMemoryCandidate['evidence'] {
+  const isUser = role === 'user' || event.type === 'user_prompt';
+
+  const isAssistant = role === 'assistant' || event.type === 'assistant_message';
+
+  const sourceVerified =
+    Boolean(event.provenance.sourcePath) &&
+    (kind === 'architecture' || kind === 'context' || kind === 'fix');
+
+  const testVerified =
+    kind === 'fix' && /(?:test|tests|pass|passed|passing)/iu.test(JSON.stringify(event.data));
+
+  return {
+    userExplicit: isUser,
+
+    sourceVerified,
+
+    testVerified,
+
+    crossSessionConfirmations: 1,
+
+    assistantDerived: isAssistant,
+  };
+}
+
 function memoryType(kind: LearnedMemoryKind): MemoryType {
   switch (kind) {
     case 'rule':
@@ -460,6 +491,8 @@ export function extractLearnedMemories(
         confidence: classified.confidence,
 
         importance: importance(classified.kind, type, text),
+
+        evidence: evidenceFor(classified.kind, role, event),
 
         /*
          * Keep decision/rule tags generic.

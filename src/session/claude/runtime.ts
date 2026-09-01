@@ -4,6 +4,8 @@ import { isAbsolute, join, relative } from 'node:path';
 
 import { ProjectManager } from '../../core/index.js';
 
+import { triggerProjectBackgroundRefresh } from '../../multi-host/refresh-trigger.js';
+
 import { buildFastProjectContext, findProjectRoot } from '../../work-continuity/fast-context.js';
 
 import { refreshFastHandoffFromCurrent } from '../../work-continuity/handoff-refresh.js';
@@ -192,6 +194,8 @@ export function handleClaudeHookInput(input: JsonObject): JsonObject {
     }
 
     if (event === 'SessionStart') {
+      triggerProjectBackgroundRefresh(project.rootPath);
+
       const context = buildFastProjectContext({
         projectPath: cwd,
       });
@@ -229,6 +233,8 @@ export function handleClaudeHookInput(input: JsonObject): JsonObject {
       } catch {
         // Fail open.
       }
+
+      triggerProjectBackgroundRefresh(project.rootPath);
 
       return {};
     }

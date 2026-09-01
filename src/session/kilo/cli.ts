@@ -10,6 +10,8 @@ function printStatus(): boolean {
   console.log('');
   console.log(`State : ${status.state}`);
   console.log(`MCP   : ${status.mcp.configured ? 'ready' : 'missing'} — ${status.mcp.configFile}`);
+  console.log(`Memory: ${status.capabilities.level}`);
+  console.log(`Capture: ${status.capabilities.nativeCapture ? 'native' : 'not available'}`);
 
   for (const error of status.errors) {
     console.log(`Error : ${error}`);

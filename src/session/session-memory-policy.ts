@@ -5,8 +5,14 @@
 
 import { loadConfig } from '../core/config.js';
 
+import {
+  shouldPromoteScore,
+  type CanonicalPromotionPolicy,
+  type PromotionMode,
+} from '../memory/promotion-policy.js';
+
 export type SessionMemoryMode = 'off' | 'summary' | 'archive' | 'full';
-export type PromotionMode = 'off' | 'conservative' | 'balanced' | 'aggressive';
+export type { PromotionMode } from '../memory/promotion-policy.js';
 
 export interface SessionMemoryPolicy {
   sessionSave: SessionMemoryMode;
@@ -85,28 +91,17 @@ export function shouldPromoteDurableFact(
   category: string,
   policy?: SessionMemoryPolicy
 ): boolean {
-  const p = policy || loadSessionMemoryPolicy();
+  const current = policy ?? loadSessionMemoryPolicy();
 
-  if (p.memoryPromotion === 'off') {
-    return false;
-  }
+  const canonicalPolicy: CanonicalPromotionPolicy = {
+    mode: current.memoryPromotion,
 
-  // Adjust threshold based on promotion mode
-  let threshold = p.promoteMinScore;
+    minScore: current.promoteMinScore,
 
-  if (p.memoryPromotion === 'aggressive') {
-    threshold = Math.max(0.5, threshold - 0.15);
-  } else if (p.memoryPromotion === 'balanced') {
-    threshold = Math.max(0.55, threshold - 0.1);
-  }
+    minConfidence: 0.78,
+  };
 
-  // Critical categories have lower threshold
-  const criticalCategories = ['rule', 'blocker', 'architecture', 'deploy'];
-  if (criticalCategories.includes(category)) {
-    threshold = Math.max(0.5, threshold - 0.1);
-  }
-
-  return score >= threshold;
+  return shouldPromoteScore(score, category, canonicalPolicy);
 }
 
 /**

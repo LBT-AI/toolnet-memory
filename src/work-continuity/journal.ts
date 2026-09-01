@@ -37,7 +37,11 @@ export class WorkObservationJournal {
 
       sessionKey: identity.sessionKey,
 
-      createdAt: new Date().toISOString(),
+      createdAt:
+        observations
+          .map((item) => item.occurredAt)
+          .sort()
+          .at(-1) ?? new Date().toISOString(),
 
       firstSequence,
 
@@ -50,14 +54,18 @@ export class WorkObservationJournal {
 
     const digest = sha256(
       observations
-        .map((item) => item.id)
+        .map((item) => JSON.stringify(item))
         .sort()
-        .join('|')
-    ).slice(0, 16);
+        .join('\n')
+    ).slice(0, 24);
 
     /*
-     * Shared project work journal.
-     * Source hash prevents filename collision only.
+     * Shared append-only project work journal.
+     *
+     * Source digest separates session writers.
+     * Content digest separates divergent payloads.
+     * Exact retry is idempotent because the key and content
+     * are deterministic.
      */
     const sourceDigest = sha256(identity.sessionKey).slice(0, 12);
 
@@ -68,9 +76,7 @@ export class WorkObservationJournal {
       `${pad(firstSequence)}-${pad(lastSequence)}-${sourceDigest}-${digest}.json`,
     ].join('/');
 
-    if (!(await this.storage.exists(key))) {
-      await this.storage.put(key, content, 'application/json');
-    }
+    await this.storage.put(key, content, 'application/json');
 
     return key;
   }
