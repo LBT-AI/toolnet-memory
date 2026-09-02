@@ -136,6 +136,16 @@ function evidenceOf(memory: MemoryRecord): MemoryEvidence {
   };
 }
 
+function hasEvidence(memory: MemoryRecord): boolean {
+  const evidence = evidenceOf(memory);
+  return (
+    evidence.userExplicit ||
+    evidence.sourceVerified ||
+    evidence.testVerified ||
+    evidence.crossSessionConfirmations > 0
+  );
+}
+
 function confidenceOf(memory: MemoryRecord): number {
   const value = Number(memory.metadata?.confidence);
 
@@ -326,6 +336,14 @@ export class ConflictDetector {
       }
 
       if (newerExplicitRuleWins(next, old)) {
+        superseded.push(old);
+
+        continue;
+      }
+
+      const oldHasEvidence = hasEvidence(old);
+
+      if (!oldHasEvidence && next.createdAt >= old.createdAt) {
         superseded.push(old);
 
         continue;

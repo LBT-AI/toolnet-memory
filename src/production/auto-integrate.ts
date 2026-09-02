@@ -639,7 +639,7 @@ export function installAutoIntegrations(
   return results;
 }
 
-function integrationDisplayName(agent: AgentIntegrationId): string {
+export function integrationDisplayName(agent: AgentIntegrationId): string {
   switch (agent) {
     case 'agy':
       return 'Agy / Antigravity';
@@ -661,6 +661,12 @@ function integrationDisplayName(agent: AgentIntegrationId): string {
 
     case 'grok':
       return 'Grok Build';
+
+    case 'toolnet-cli':
+      return 'ToolNet CLI';
+
+    case 'kilo':
+      return 'Kilo';
 
     case 'codex':
       return 'Codex';

@@ -4,9 +4,15 @@ import { resolve, join } from 'node:path';
 
 import { ProjectManager } from '../core/index.js';
 
+import { integrationCapabilityLabel } from '../session/integration-capabilities.js';
+
 import { withProgress } from './cli-progress.js';
 
-import { installAutoIntegrations, type AutoIntegrationResult } from './auto-integrate.js';
+import {
+  installAutoIntegrations,
+  integrationDisplayName,
+  type AutoIntegrationResult,
+} from './auto-integrate.js';
 
 export interface ToolNetInitResult {
   initialized: true;
@@ -110,7 +116,7 @@ async function main(): Promise<void> {
 
   if (autoIntegrate) {
     integrations = await withProgress(
-      'Detecting AI coding agents',
+      'Detecting coding agents',
       () =>
         installAutoIntegrations({
           projectRoot: result.project.rootPath,
@@ -157,14 +163,9 @@ async function main(): Promise<void> {
       console.log('  ○ No supported coding agent detected');
     } else {
       for (const item of installed) {
-        const name =
-          item.agent === 'agy'
-            ? 'Agy / Antigravity'
-            : item.agent === 'opencode'
-              ? 'OpenCode'
-              : 'Codex';
-
-        console.log(`  ✓ ${name}`);
+        const name = integrationDisplayName(item.agent);
+        const capability = integrationCapabilityLabel(item.agent);
+        console.log(`  ✓ ${name} — ${capability}`);
       }
     }
 

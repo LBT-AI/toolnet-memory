@@ -108,16 +108,20 @@ function validate(): boolean {
 }
 
 function launchSetup(): void {
-  console.log('Guided AI/LLM setup was removed.');
-  console.log('Configure storage and runtime via environment variables (see .env.example)');
+  console.log('ToolNet Memory configuration');
+  console.log('');
+  console.log('Memory runtime is local and does not require an LLM or embedding provider.');
+  console.log('Configure storage and runtime options through environment variables');
   console.log('or use `toolnet-memory config set KEY VALUE`.');
+  console.log('');
+  console.log(`Config file: ${ENV_FILE}`);
 }
 
 function usage(): void {
   console.log(`ToolNet Memory Config
 
 Commands:
-  toolnet-memory config                 Guided configuration
+  toolnet-memory config                 Show configuration guidance
   toolnet-memory config show            Friendly summary
   toolnet-memory config file            Print config path
   toolnet-memory config list            List active keys (secrets masked)
@@ -209,5 +213,5 @@ try {
   main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+  process.exitCode = 1;
 }

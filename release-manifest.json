@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "name": "toolnet-memory",
+  "version": "0.3.14",
+  "releaseSeries": "0.3.x",
+  "runtime": {
+    "node": ">=22",
+    "localMemoryRuntime": true,
+    "requiresLlm": false,
+    "requiresEmbeddings": false,
+    "retrieval": ["BM25", "SQLite FTS5"],
+    "sharedProjectMemory": true,
+    "multiHostConvergence": true,
+    "storageImplementationFrozen": true
+  },
+  "continuity": {
+    "sharedJournal": ".toolnet/journal/events.jsonl",
+    "runtimeProvenance": ".toolnet/runtime/sources",
+    "legacySessionsWrite": false,
+    "appendOnlyRemoteOperations": true,
+    "deterministicProjection": true,
+    "crashRecovery": true
+  },
+  "agents": {
+    "agy": {
+      "displayName": "Agy / Antigravity",
+      "refreshMode": "native-lifecycle"
+    },
+    "opencode": {
+      "displayName": "OpenCode",
+      "refreshMode": "persistent-plugin"
+    },
+    "codex": {
+      "displayName": "Codex",
+      "refreshMode": "native-lifecycle"
+    },
+    "claude": {
+      "displayName": "Claude Code",
+      "refreshMode": "native-lifecycle"
+    },
+    "kiro": {
+      "displayName": "Kiro CLI",
+      "refreshMode": "native-lifecycle"
+    },
+    "cursor": {
+      "displayName": "Cursor CLI",
+      "refreshMode": "native-lifecycle"
+    },
+    "copilot": {
+      "displayName": "GitHub Copilot CLI",
+      "refreshMode": "native-lifecycle"
+    },
+    "grok": {
+      "displayName": "Grok Build",
+      "refreshMode": "native-lifecycle"
+    },
+    "toolnet-cli": {
+      "displayName": "ToolNet CLI",
+      "refreshMode": "native-session"
+    },
+    "kilo": {
+      "displayName": "Kilo",
+      "refreshMode": "mcp-only"
+    }
+  },
+  "releasePolicy": {
+    "nativeCliE2ERequired": false,
+    "nativeCliE2EReason": "Native host binaries are optional and may be unavailable on the certification host.",
+    "fullRepositoryCertificationRequired": true,
+    "npmPublishAutomatic": false,
+    "gitTagAutomatic": false
+  }
+}

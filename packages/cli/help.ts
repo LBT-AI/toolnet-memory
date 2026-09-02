@@ -23,7 +23,6 @@ export interface CommandMetadata {
     | 'core'
     | 'memory'
     | 'code'
-    | 'ai'
     | 'system'
     | 'context'
     | 'work'

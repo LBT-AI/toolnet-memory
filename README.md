@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.3.13**
+Current release: **v0.3.14**
 
 </div>
 
@@ -32,11 +32,13 @@ ToolNet Memory combines four layers:
 
 ToolNet Memory is **not a raw transcript dump**. Raw session history is kept separate from durable project memory and is protected from normal agent reads.
 
+Memory promotion, retrieval, conflict handling, and continuity decisions are deterministic and local. ToolNet Memory does not require an LLM or embedding provider for its memory runtime.
+
 ---
 
 ## Supported Coding Agents
 
-ToolNet Memory currently supports an 10-agent continuity ring:
+ToolNet Memory currently supports a 10-agent continuity ring:
 
 ```text
 Agy / Antigravity
@@ -47,7 +49,20 @@ Kiro CLI
 Cursor CLI
 GitHub Copilot CLI
 Grok Build
+ToolNet CLI
+Kilo
 ```
+
+Integration capability depends on what the host application actually exposes:
+
+| Capability                 | Agents                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------- |
+| Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build |
+| Persistent plugin refresh  | OpenCode                                                                                    |
+| Native session capture     | ToolNet CLI                                                                                 |
+| MCP continuity             | Kilo                                                                                        |
+
+ToolNet does not report lifecycle support unless the host exposes a genuine lifecycle integration.
 
 A project can move between agents while keeping the same ToolNet work state and memory.
 
@@ -210,6 +225,8 @@ toolnet-memory integrate:kiro
 toolnet-memory integrate:cursor
 toolnet-memory integrate:copilot
 toolnet-memory integrate:grok
+toolnet-memory integrate:toolnet-cli
+toolnet-memory integrate:kilo
 ```
 
 ---
@@ -804,10 +821,6 @@ CODE
   impact
   graph
 
-AI
-  model
-  provider
-
 INTEGRATIONS
   integrate:detect
   integrate:auto
@@ -902,8 +915,8 @@ ToolNet Memory uses GitHub Actions for CI and npm releases.
 The current release line is:
 
 ```text
-npm package: toolnet-memory@0.3.11
-Git tag:     v0.3.11
+npm package: toolnet-memory@0.3.14
+Git tag:     v0.3.14
 ```
 
 Before release, the repository validates:

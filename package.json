@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -31,7 +31,12 @@
     "github-copilot",
     "copilot-cli",
     "grok",
-    "grok-build"
+    "grok-build",
+    "toolnet-cli",
+    "kilo",
+    "local-first",
+    "bm25",
+    "multi-agent-memory"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -99,7 +104,9 @@
     "release:certify:native:optional": "bash scripts/native-e2e-certify.sh",
     "release:certify:phase07": "npm run production:auto-scope:test && npm run session:scoped-status:test && npm run session:grok-dual-scope:test && npm run session:copilot-dual-scope:test && npm run session:cursor-dual-scope:test && npm run session:integration-scope:test && npm run release:certify:10 && npm run typecheck && npm run lint && npm run format:check",
     "production:phase07-final:test": "vitest run tests/production/final-phase07-release.test.ts",
-    "release:certify:10": "vitest run tests/integration/cross-agent-continuity.test.ts tests/production/ten-agent-release-contract.test.ts"
+    "release:certify:10": "vitest run tests/integration/cross-agent-continuity.test.ts tests/production/ten-agent-release-contract.test.ts",
+    "release:certify:final": "bash scripts/final-release-certify.sh",
+    "release:verify:static": "node scripts/verify-release-contract.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",
@@ -129,7 +136,9 @@
     "bin/toolnet-memory",
     "README.md",
     ".env.example",
-    "dist/sdk"
+    "dist/sdk",
+    "release-manifest.json",
+    ".release-target"
   ],
   "publishConfig": {
     "access": "public"

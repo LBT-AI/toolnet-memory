@@ -4,6 +4,24 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.3.14]
+
+- Reworked ToolNet Memory into a local-only deterministic memory and continuity runtime with no LLM or embedding dependency.
+- Unified project memory across supported coding-agent runtimes instead of maintaining agent-specific memory silos.
+- Added deterministic evidence-based memory promotion, conflict detection, and supersession rules.
+- Hardened shared project journal writes, WAL recovery, corrupt-tail repair, and crash recovery.
+- Added serialized local work-state updates for concurrent writers.
+- Added append-only multi-host operation logs with deterministic memory and work projection convergence.
+- Added background projection refresh for cross-host continuity.
+- Added lifecycle-triggered refresh for Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, and Grok Build.
+- Added persistent periodic project refresh for OpenCode.
+- Added ToolNet CLI native session capture with safe project binding, recovery, and watcher support without falsely claiming native lifecycle hooks.
+- Kept Kilo MCP-only until a genuine native lifecycle integration is available.
+- Hardened 10-agent integration capability reporting and shared continuity contracts.
+- Removed AI, embedding, and vector runtime dependencies while retaining local BM25 / FTS-based retrieval.
+- Preserved remote storage compatibility without changing the storage implementation.
+- Fixed initialization output so all supported coding agents display their correct integration names.
+
 ## [0.3.7]
 
 - Redesigned the CLI help system with a compact default view, full advanced help, and per-command help.
@@ -125,3 +143,4 @@ Earlier `0.2.x` releases introduced and expanded:
 [0.2.11]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.11
 [0.2.10]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.2.10
 [0.3.7]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.3.7
+[0.3.14]: https://github.com/LBT-AI/toolnet-memory/releases/tag/v0.3.14
