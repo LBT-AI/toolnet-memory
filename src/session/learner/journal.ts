@@ -293,18 +293,17 @@ export async function reconcileSessionMemoryJournal(
         tags: candidate.tags,
 
         source: 'session-memory-learner',
-
+        createdAt: candidate.createdAt,
         metadata: {
           learningFingerprint: candidate.fingerprint,
 
           learningKind: candidate.kind,
-
+          conflictKind: candidate.kind,
+          lifecycleState: 'active',
           confidence: candidate.confidence,
-
+          evidence: candidate.evidence,
           provenance: candidate.provenance,
-
           sourceCreatedAt: candidate.createdAt,
-
           sessionKey: candidate.sessionKey,
 
           agent: candidate.agent,

@@ -160,7 +160,10 @@ export function classifyMemoryKnowledge(
   }
 
   const taskScoped =
-    candidate.kind === 'decision' || candidate.kind === 'todo' || candidate.kind === 'fix';
+    candidate.kind === 'decision' ||
+    candidate.kind === 'todo' ||
+    candidate.kind === 'next_action' ||
+    candidate.kind === 'fix';
 
   if (taskScoped) {
     return 'task';

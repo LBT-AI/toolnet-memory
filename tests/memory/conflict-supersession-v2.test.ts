@@ -184,11 +184,9 @@ describe('Conflict / Supersession V2', () => {
       },
     });
 
-    expect(first.metadata?.supersededBy).toBeUndefined();
+    expect(first.metadata?.lifecycleState).toBe('superseded');
 
-    expect(second.metadata?.supersedes).toBeUndefined();
-
-    expect(second.metadata?.conflictsWith).toContain(first.id);
+    expect(second.metadata?.supersedes).toContain(first.id);
   });
 
   it('scores explicit user evidence above weak assistant inference', () => {

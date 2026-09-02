@@ -4,6 +4,25 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.3.16]
+
+- Added cross-machine Git project identity so independent clones can converge on the same ToolNet project ID.
+- Added normalized SSH/HTTPS Git remote fingerprints without leaking embedded URL credentials.
+- Added remote project identity registry and fail-closed legacy project adoption.
+- Preserved existing legacy project IDs while allowing explicit `--adopt-remote` migration.
+- Removed dead and zero-byte repository scaffolds outside the frozen storage boundary.
+- Documented unsupported Google Drive and GitHub storage backends explicitly instead of presenting placeholders as features.
+- Removed the obsolete `src/sync/**` scaffold and documented `src/multi-host/**` as the active append-only convergence architecture.
+- Renamed the user-facing code-search capability to Local Code Search — SQLite FTS5/BM25.
+- Preserved `SemanticCodeEngine`, `semantic_code_search`, `toolnet-memory semantic`, and `semantic-index` as compatibility aliases.
+- Added explicit runtime, parser, storage, security, project-identity, and multi-host capability documentation.
+- Added Conflict Engine V2 with deterministic topic/entity/lexical matching for rules, decisions, todos, next actions, fixes, context, and architecture memory.
+- Added lifecycle states for active, conflicting, superseded, resolved, completed, and stale memory.
+- Added verified fix → task completion and verified fix → context resolution behavior.
+- Preserved explicit-user authority and deterministic conflict resolution without LLM or embedding-based merge.
+- Preserved the local-first runtime with no required LLM, embeddings, vector database, or mandatory encryption key.
+- Preserved the frozen `src/storage/**` implementation boundary.
+
 ## [0.3.15]
 
 - Added safe retention and garbage collection with dry-run as the default and explicit --apply for deletion.

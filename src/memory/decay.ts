@@ -49,13 +49,23 @@ export function isExpired(memory: MemoryRecord, now = Date.now()): boolean {
 
   return new Date(memory.expiresAt).getTime() <= now;
 }
-
 export function isSuperseded(memory: MemoryRecord): boolean {
-  return Boolean(memory.metadata?.supersededBy);
+  return Boolean(memory.metadata?.supersededBy) || memory.metadata?.lifecycleState === 'superseded';
 }
-
 export function isMemoryActive(memory: MemoryRecord, now = Date.now()): boolean {
-  return !isExpired(memory, now) && !isSuperseded(memory);
+  if (isExpired(memory, now) || isSuperseded(memory)) {
+    return false;
+  }
+  const state = memory.metadata?.lifecycleState;
+  if (
+    state === 'completed' ||
+    state === 'resolved' ||
+    state === 'conflicting' ||
+    state === 'stale'
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function effectiveImportanceScore(memory: MemoryRecord, now = Date.now()): number {

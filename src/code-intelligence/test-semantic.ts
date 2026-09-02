@@ -58,6 +58,15 @@ async function main() {
 
   console.log({
     ok: true,
+    command: 'semantic',
+    legacyCommandName: true,
+    search: {
+      engine: 'sqlite-fts5-bm25',
+      mode: 'lexical',
+      semantic: false,
+      embedding: false,
+      vectorDatabase: false,
+    },
     query,
     ...stats,
 

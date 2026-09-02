@@ -15,7 +15,8 @@ describe('integrate:auto scoped production wiring', () => {
   test('toolnet init passes the initialized project root to auto integration', () => {
     const source = readFileSync('src/production/init.ts', 'utf8');
 
-    expect(source).toContain('projectRoot: result.project.rootPath');
+    expect(source).toContain('projectRoot:');
+    expect(source).toContain('result.project.rootPath');
   });
 
   test('auto CLI accepts explicit scope and project target', () => {

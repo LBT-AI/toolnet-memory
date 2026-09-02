@@ -221,7 +221,7 @@ function buildState(
   );
 
   const candidateTodos = candidates
-    .filter((candidate) => candidate.kind === 'todo')
+    .filter((candidate) => candidate.kind === 'todo' || candidate.kind === 'next_action')
     .map((candidate) => candidate.content);
 
   const candidateFiles = candidates.flatMap((candidate) => candidate.provenance.sourcePaths);

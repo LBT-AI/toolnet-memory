@@ -145,7 +145,7 @@ describe('CLI Help System', () => {
       expect(help).toContain('Parsing code');
       expect(help).toContain('Type Resolution');
       expect(help).toContain('Rich Graph');
-      expect(help).toContain('Semantic Code Index');
+      expect(help).toContain('Local Code Search');
     });
 
     it('should include usage when available', () => {

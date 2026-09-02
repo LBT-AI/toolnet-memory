@@ -244,27 +244,31 @@ export async function runProductionIndex(
   /*
    * 4. SEMANTIC INDEX
    */
-  const semantic = await stage('semantic-index', 'Semantic Code Index', async () => {
-    const engine = new SemanticCodeEngine({
-      projectId: project.id,
+  const semantic = await stage(
+    'semantic-index',
+    'Local Code Search — SQLite FTS5/BM25',
+    async () => {
+      const engine = new SemanticCodeEngine({
+        projectId: project.id,
 
-      rootPath: project.rootPath,
+        rootPath: project.rootPath,
 
-      storage,
+        storage,
 
-      graph,
-    });
-
-    return engine.initialize((progress) => {
-      options.onStageProgress?.({
-        stage: 'semantic-index',
-        current: progress.current,
-        total: progress.total,
-        phase: progress.phase,
-        detail: progress.detail,
+        graph,
       });
-    });
-  });
+
+      return engine.initialize((progress) => {
+        options.onStageProgress?.({
+          stage: 'semantic-index',
+          current: progress.current,
+          total: progress.total,
+          phase: progress.phase,
+          detail: progress.detail,
+        });
+      });
+    }
+  );
 
   /*
    * 5. ARCHITECTURE

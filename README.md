@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.3.15**
+Current release: **v0.3.16**
 
 </div>
 
@@ -28,7 +28,7 @@ ToolNet Memory combines four layers:
 - **Fast project context** — small local startup context for normal work.
 - **Work continuity** — current goal, phase, blockers, decisions, and next actions.
 - **Durable memory** — filtered project knowledge that survives agent/session changes.
-- **Code intelligence** — symbols, dependencies, call graphs, architecture, semantic search, impact analysis, and graph visualization.
+- **Code intelligence** — symbols, dependencies, call graphs, architecture, local SQLite FTS5/BM25 code search, impact analysis, and graph visualization.
 
 ToolNet Memory is **not a raw transcript dump**. Raw session history is kept separate from durable project memory and is protected from normal agent reads.
 
@@ -154,6 +154,25 @@ Project identity is stored in:
 .toolnet/project.json
 ```
 
+For Git projects, new project identity is derived from normalized Git
+repository identity instead of absolute checkout path.
+
+A fresh clone can recover a registered existing ToolNet project identity from
+the configured remote identity registry.
+
+Pre-registry legacy projects require explicit adoption when identity cannot be
+proven automatically:
+
+```text
+toolnet-memory init --adopt-remote <remote-name>
+```
+
+To intentionally initialize without remote identity lookup:
+
+```text
+toolnet-memory init --no-remote-identity
+```
+
 ### 4. Build project intelligence
 
 ```bash
@@ -171,7 +190,7 @@ Type Resolution
     ↓
 Rich Graph
     ↓
-Semantic Code Index
+Local Code Search — SQLite FTS5/BM25
     ↓
 Architecture Intelligence
     ↓
@@ -597,6 +616,117 @@ Secrets and credentials should remain in `.env` or another secret store, not in 
 
 ---
 
+## Runtime Capability Truth
+
+ToolNet Memory is local-first and deterministic.
+
+| Component            | Required | Notes |
+| -------------------- | -------- | ----- |
+| LLM                  | no       |       |
+| Embedding provider   | no       |       |
+| Vector database      | no       |       |
+| Mandatory crypto key | no       |       |
+
+Automatic memory promotion and conflict handling are deterministic and evidence-based.
+
+### Local Code Search
+
+The current code-search implementation is:
+
+```text
+Local Code Search — SQLite FTS5/BM25
+Index:   SQLite FTS5
+Ranking: BM25
+Mode:    lexical
+```
+
+It does not use embeddings or a vector database.
+
+The following historical names remain compatibility aliases and are not being
+removed in this release:
+
+- `SemanticCodeEngine`
+- `semantic_code_search`
+- `toolnet-memory semantic`
+- `semantic-index`
+
+### Parser support
+
+| Language family              | Status      |
+| ---------------------------- | ----------- |
+| TypeScript / TSX             | supported   |
+| JavaScript / JSX / MJS / CJS | supported   |
+| Python                       | unsupported |
+| Go                           | unsupported |
+| Rust                         | unsupported |
+| C / C++                      | unsupported |
+
+The supported TypeScript/JavaScript family uses the TypeScript Compiler API.
+
+Tree-sitter is not implemented in this release.
+
+### Cross-machine project identity
+
+Existing `.toolnet/project.json` identity remains canonical.
+
+New Git projects use normalized Git repository identity instead of absolute
+checkout path. A registered existing ToolNet project can therefore be adopted
+by another checkout of the same Git repository.
+
+For a pre-registry legacy project, adoption is explicit:
+
+```text
+toolnet-memory init --adopt-remote <remote-name>
+```
+
+ToolNet refuses unverified silent adoption when repository identity cannot be
+proven.
+
+### Multi-host behavior
+
+Cross-host convergence is implemented under `src/multi-host/**` using immutable
+append-only operations plus deterministic reduction.
+
+The removed legacy `src/sync/**` scaffold was not the active sync engine.
+
+ToolNet does not claim a WebSocket real-time sync protocol or vector-clock CRDT
+implementation.
+
+### Storage truth
+
+**Supported:**
+
+- Local
+- Hugging Face S3-compatible storage
+- S3-compatible storage
+- Cloudflare R2 through the S3-compatible provider
+
+**Unsupported:**
+
+- Google Drive storage
+- GitHub storage backend
+
+### Security truth
+
+ToolNet provides secret scanning and durable-data sanitization.
+
+ToolNet does not provide client-side encryption by default and does not require
+an encryption key.
+
+Remote payload protection at rest therefore depends on the configured storage
+provider unless optional ToolNet client-side encryption is implemented in a
+future release.
+
+Project instruction files are treated as untrusted project data, not as system
+or developer authority.
+
+For the detailed capability matrix, see:
+
+- `docs/runtime-truth.md`
+- `docs/repository-capabilities.md`
+
+---
+
 ## Code Intelligence
 
 ToolNet builds a persistent structural model of the codebase.
@@ -611,10 +741,32 @@ Capabilities include:
 - subsystem clustering,
 - hotspots,
 - dead-code candidates,
-- semantic code search,
+- local lexical code search (SQLite FTS5/BM25),
 - dependency paths,
 - change-impact analysis,
 - visualization datasets.
+
+### Local Code Search
+
+ToolNet code search is deterministic and local.
+
+```text
+Index backend: SQLite FTS5
+Ranking:       BM25
+Mode:          lexical
+Embeddings:    no
+Vector DB:     no
+LLM/model:     no
+Network:       not required
+```
+
+The historical public names remain available for compatibility:
+
+- CLI: `toolnet-memory semantic`
+- MCP: `semantic_code_search`
+- API: `SemanticCodeEngine`
+
+Those names are compatibility aliases and do not indicate embedding-based semantic retrieval.
 
 Useful commands:
 
@@ -625,7 +777,7 @@ toolnet-memory index
 # Incremental update
 toolnet-memory incremental
 
-# Semantic search
+# Local lexical code search (legacy command name)
 toolnet-memory semantic "authentication flow"
 
 # Change impact
@@ -939,7 +1091,7 @@ ToolNet Memory uses GitHub Actions for CI and npm releases.
 The current release line is:
 
 ```text
-npm package: toolnet-memory@0.3.14
+npm package: toolnet-memory@0.3.16
 Git tag:     v0.3.14
 ```
 

@@ -4,7 +4,7 @@ import { getImportanceScore, inferImportance } from './importance.js';
 
 import { sanitizeDurableText, sanitizeDurableValue } from '../security/durable-sanitizer.js';
 
-import { ConflictDetector } from '../memory/conflict-detector.js';
+import { ConflictDetector, memoryConflictKind } from '../memory/conflict-detector.js';
 
 import {
   planMemoryConsolidation,
@@ -37,16 +37,23 @@ interface RememberInput {
   source?: string;
   expiresAt?: string;
   metadata?: Record<string, unknown>;
+  /**
+   * Optional source timestamp used by deterministic session
+   * reconciliation. Ordinary explicit remember() calls omit it.
+   */
+  createdAt?: string;
 }
 
 export class MemoryEngine {
   private readonly memories = new Map<string, MemoryRecord>();
 
   private readonly conflicts = new ConflictDetector();
-
   remember(input: RememberInput): MemoryRecord {
-    const now = new Date().toISOString();
-
+    const requestedCreatedAt =
+      input.createdAt && Number.isFinite(Date.parse(input.createdAt))
+        ? new Date(input.createdAt).toISOString()
+        : undefined;
+    const now = requestedCreatedAt ?? new Date().toISOString();
     const content = sanitizeDurableText(input.content.trim());
 
     const importance = input.importance ?? inferImportance(input.type, content);
@@ -72,10 +79,16 @@ export class MemoryEngine {
       updatedAt: now,
 
       expiresAt: input.expiresAt ?? defaultExpiry(input.type, importance, new Date(now)),
-
       metadata: sanitizeDurableValue(input.metadata) as Record<string, unknown> | undefined,
     };
-
+    memory.metadata = {
+      ...(memory.metadata ?? {}),
+      lifecycleState: 'active',
+    };
+    memory.metadata = {
+      ...memory.metadata,
+      conflictKind: memoryConflictKind(memory),
+    };
     const resolution = this.conflicts.resolve(memory, this.list(input.projectId));
 
     if (resolution.superseded.length > 0) {
@@ -90,16 +103,47 @@ export class MemoryEngine {
 
         old.metadata = {
           ...(old.metadata ?? {}),
-
           supersededBy: memory.id,
-
           supersededAt: now,
+          lifecycleState: 'superseded',
         };
 
         this.memories.set(old.id, old);
       }
     }
 
+    if (resolution.completed.length > 0) {
+      memory.metadata = {
+        ...(memory.metadata ?? {}),
+        completes: resolution.completed.map((item) => item.id),
+      };
+      for (const old of resolution.completed) {
+        old.updatedAt = now;
+        old.metadata = {
+          ...(old.metadata ?? {}),
+          lifecycleState: 'completed',
+          completedBy: memory.id,
+          completedAt: now,
+        };
+        this.memories.set(old.id, old);
+      }
+    }
+    if (resolution.resolved.length > 0) {
+      memory.metadata = {
+        ...(memory.metadata ?? {}),
+        resolves: resolution.resolved.map((item) => item.id),
+      };
+      for (const old of resolution.resolved) {
+        old.updatedAt = now;
+        old.metadata = {
+          ...(old.metadata ?? {}),
+          lifecycleState: 'resolved',
+          resolvedBy: memory.id,
+          resolvedAt: now,
+        };
+        this.memories.set(old.id, old);
+      }
+    }
     if (resolution.conflicts.length > 0) {
       const conflictsWith = resolution.conflicts.map((item) => item.id);
 
@@ -107,6 +151,7 @@ export class MemoryEngine {
         ...(memory.metadata ?? {}),
 
         conflictsWith,
+        lifecycleState: 'conflicting',
       };
 
       for (const old of resolution.conflicts) {

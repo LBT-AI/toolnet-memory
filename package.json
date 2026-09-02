@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -112,7 +112,19 @@
     "release:certify:final": "bash scripts/final-release-certify.sh",
     "release:verify:static": "node scripts/verify-release-contract.mjs",
     "security:isolation:test": "vitest run tests/security/security-isolation.test.ts",
-    "release:verify:v0315": "node scripts/verify-v0315-contract.mjs"
+    "release:verify:v0315": "node scripts/verify-v0315-contract.mjs",
+    "project:cross-machine:test": "vitest run tests/core/project-cross-machine-identity.test.ts tests/core/project-identity.test.ts",
+    "repository:truth:cleanup": "node scripts/repository-truth-cleanup.mjs",
+    "repository:truth:audit": "node scripts/repository-truth-audit.mjs",
+    "repository:truth:test": "vitest run tests/repository-truth/repository-truth.test.ts",
+    "code:search:naming:audit": "node scripts/code-search-naming-audit.mjs",
+    "code:search:naming:test": "vitest run tests/code-intelligence/code-search-naming.test.ts",
+    "docs:truth:audit": "node scripts/documentation-truth-audit.mjs",
+    "docs:truth:test": "vitest run tests/documentation/documentation-truth.test.ts",
+    "memory:conflict-v2:audit": "node scripts/conflict-v2-audit.mjs",
+    "memory:conflict-v2:test": "vitest run tests/memory/conflict-v2.test.ts",
+    "release:verify:v0316": "node scripts/verify-v0316-contract.mjs",
+    "project:identity:audit": "node scripts/project-identity-audit.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

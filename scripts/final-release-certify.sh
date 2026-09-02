@@ -213,8 +213,23 @@ done
 # ------------------------------------------------------------
 
 run_gate \
-  "V0315_FEATURE_CONTRACT" \
-  node scripts/verify-v0315-contract.mjs
+  "V0316_FEATURE_CONTRACT" \
+  node scripts/verify-v0316-contract.mjs
+run_gate \
+  "PROJECT_IDENTITY_AUDIT" \
+  node scripts/project-identity-audit.mjs
+run_gate \
+  "REPOSITORY_TRUTH_AUDIT" \
+  node scripts/repository-truth-audit.mjs
+run_gate \
+  "CODE_SEARCH_NAMING_AUDIT" \
+  node scripts/code-search-naming-audit.mjs
+run_gate \
+  "DOCUMENTATION_TRUTH_AUDIT" \
+  node scripts/documentation-truth-audit.mjs
+run_gate \
+  "CONFLICT_V2_AUDIT" \
+  node scripts/conflict-v2-audit.mjs
 
 run_gate \
   "STATIC_RELEASE_CONTRACT" \

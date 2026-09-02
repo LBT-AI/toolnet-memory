@@ -35,7 +35,7 @@ const stages: IndexUiStage[] = [
   },
   {
     id: 'semantic-index',
-    title: 'Semantic index',
+    title: 'Local code search — FTS5/BM25',
   },
   {
     id: 'architecture',

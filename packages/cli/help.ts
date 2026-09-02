@@ -44,8 +44,14 @@ export const COMMANDS: CommandMetadata[] = [
   {
     name: 'init',
     description: 'Initialize current project',
-    usage: 'toolnet-memory init [path]',
+    usage:
+      'toolnet-memory init [path] [--adopt-remote NAME] [--no-remote-identity] [--rebind-git-identity]',
     category: 'core',
+    examples: [
+      'toolnet-memory init',
+      'toolnet-memory init /path/to/project',
+      'toolnet-memory init --adopt-remote my-project',
+    ],
   },
   {
     name: 'doctor',
@@ -83,7 +89,7 @@ export const COMMANDS: CommandMetadata[] = [
       'Parsing code',
       'Type Resolution',
       'Rich Graph',
-      'Semantic Code Index',
+      'Local Code Search — SQLite FTS5/BM25',
       'Architecture Intelligence',
       'Graph Analysis',
       '3D Visualization Dataset',
@@ -91,7 +97,7 @@ export const COMMANDS: CommandMetadata[] = [
   },
   {
     name: 'semantic',
-    description: 'Semantic code search',
+    description: 'Local code search — SQLite FTS5/BM25 (legacy command name)',
     usage: 'toolnet-memory semantic <query>',
     category: 'code',
   },

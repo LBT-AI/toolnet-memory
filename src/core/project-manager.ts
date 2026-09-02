@@ -5,6 +5,12 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { basename, dirname, join, parse, resolve } from 'node:path';
 
 import type { ProjectManifest } from './types.js';
+import {
+  GIT_IDENTITY_SCHEME,
+  inspectGitProjectIdentity,
+  stableProjectIdFromGitRemote,
+  type GitProjectIdentity,
+} from './project-identity.js';
 
 const TOOLNET_DIRECTORY = '.toolnet';
 
@@ -235,7 +241,124 @@ function toProjectManifest(
   };
 }
 
+export interface ProjectAdoptionInput {
+  id: string;
+  name: string;
+  remote: string;
+  createdAt?: string;
+  updatedAt?: string;
+  graphVersion?: number;
+  memoryVersion?: number;
+  metadata?: Record<string, unknown>;
+  gitIdentity?: GitProjectIdentity;
+}
+export interface RecordGitIdentityOptions {
+  allowRebind?: boolean;
+}
+function gitIdentityMetadata(identity: GitProjectIdentity): Record<string, unknown> {
+  return {
+    version: 1,
+    scheme: GIT_IDENTITY_SCHEME,
+    canonicalRemote: identity.canonicalRemote,
+    fingerprint: identity.fingerprint,
+    repositoryName: identity.repositoryName,
+  };
+}
+function manifestGitIdentityFingerprint(manifest: LocalProjectManifest): string | null {
+  const raw = manifest.metadata?.toolnetIdentity;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null;
+  }
+  const data = raw as Record<string, unknown>;
+  return typeof data.fingerprint === 'string' ? data.fingerprint : null;
+}
 export class ProjectManager {
+  adopt(rootPath: string, input: ProjectAdoptionInput): ProjectManifest {
+    const projectRoot = findRepositoryRoot(resolve(rootPath));
+    if (!input.id.trim()) {
+      throw new Error('PROJECT_ADOPTION_INVALID_ID');
+    }
+    if (!input.name.trim()) {
+      throw new Error('PROJECT_ADOPTION_INVALID_NAME');
+    }
+    if (!input.remote.trim()) {
+      throw new Error('PROJECT_ADOPTION_INVALID_REMOTE');
+    }
+    if (hasProjectManifest(projectRoot)) {
+      const current = parseManifest(manifestPath(projectRoot));
+      if (current.id !== input.id) {
+        throw new Error(
+          [
+            'PROJECT_IDENTITY_ALREADY_EXISTS',
+            `existing=${current.id}`,
+            `requested=${input.id}`,
+          ].join(' ')
+        );
+      }
+      return toProjectManifest(current, projectRoot);
+    }
+    const now = new Date().toISOString();
+    const metadata: Record<string, unknown> = {
+      ...input.metadata,
+    };
+    if (input.gitIdentity) {
+      metadata.toolnetIdentity = gitIdentityMetadata(input.gitIdentity);
+    }
+    const local: LocalProjectManifest = {
+      version: 1,
+      id: input.id.trim(),
+      name: input.name.trim(),
+      remote: input.remote.trim(),
+      rootPath: projectRoot,
+      createdAt: input.createdAt ?? now,
+      updatedAt: now,
+      graphVersion: input.graphVersion ?? 0,
+      memoryVersion: input.memoryVersion ?? 0,
+      metadata: Object.keys(metadata).length ? metadata : undefined,
+    };
+    writeManifest(projectRoot, local);
+    return toProjectManifest(local, projectRoot);
+  }
+  recordGitIdentity(
+    rootPath: string,
+    identity: GitProjectIdentity,
+    options: RecordGitIdentityOptions = {}
+  ): ProjectManifest {
+    const project = this.requireExisting(rootPath);
+    const file = manifestPath(project.rootPath);
+    const local = parseManifest(file);
+    const existingFingerprint = manifestGitIdentityFingerprint(local);
+    if (
+      existingFingerprint &&
+      existingFingerprint !== identity.fingerprint &&
+      !options.allowRebind
+    ) {
+      throw new Error(
+        [
+          'PROJECT_GIT_REMOTE_CHANGED',
+          `existing=${existingFingerprint}`,
+          `current=${identity.fingerprint}`,
+          'Use explicit rebind only when this repository identity change is intentional.',
+        ].join(' ')
+      );
+    }
+    const currentIdentity = local.metadata?.toolnetIdentity;
+    if (
+      currentIdentity &&
+      typeof currentIdentity === 'object' &&
+      !Array.isArray(currentIdentity) &&
+      (currentIdentity as Record<string, unknown>).fingerprint === identity.fingerprint
+    ) {
+      return toProjectManifest(local, project.rootPath);
+    }
+    local.metadata = {
+      ...local.metadata,
+      toolnetIdentity: gitIdentityMetadata(identity),
+    };
+    local.updatedAt = new Date().toISOString();
+    writeManifest(project.rootPath, local);
+    return toProjectManifest(local, project.rootPath);
+  }
   findExisting(rootPath: string = process.cwd()): ProjectManifest | null {
     const requestedPath = resolve(rootPath);
     const projectRoot = findRepositoryRoot(requestedPath);
@@ -339,20 +462,32 @@ export class ProjectManager {
 
     const name = basename(projectRoot);
 
+    const gitIdentity = inspectGitProjectIdentity(projectRoot);
+
     const local: LocalProjectManifest = {
       version: 1,
 
       /*
-       * Preserve the legacy ID on first initialization.
+       * New repositories use canonical Git identity so
+       * independent clones receive the same project ID.
        *
-       * From now on this value lives in the manifest
-       * and becomes path-independent.
+       * Non-Git projects retain the legacy path-based
+       * fallback for backwards compatibility.
        */
-      id: legacyProjectIdFromPath(projectRoot),
+      id: gitIdentity
+        ? stableProjectIdFromGitRemote(gitIdentity.canonicalRemote)
+        : legacyProjectIdFromPath(projectRoot),
 
       name,
 
-      remote: name,
+      /*
+       * New Git repositories also receive a stable remote
+       * storage namespace based on repository identity
+       * rather than the local checkout directory name.
+       *
+       * Existing projects never change their remote field.
+       */
+      remote: gitIdentity?.repositoryName ?? name,
 
       rootPath: projectRoot,
 
@@ -363,6 +498,12 @@ export class ProjectManager {
       graphVersion: 0,
 
       memoryVersion: 0,
+
+      metadata: gitIdentity
+        ? {
+            toolnetIdentity: gitIdentityMetadata(gitIdentity),
+          }
+        : undefined,
     };
 
     writeManifest(projectRoot, local);

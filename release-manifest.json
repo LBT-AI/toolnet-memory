@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "releaseSeries": "0.3.x",
   "runtime": {
     "node": ">=22",
@@ -119,6 +119,56 @@
       "projectDataTrusted": false,
       "clientSideEncryption": false,
       "requiresEncryptionKey": false
+    },
+    "projectIdentity": {
+      "crossMachine": true,
+      "existingManifestCanonical": true,
+      "normalizedGitRemote": true,
+      "sshHttpsEquivalent": true,
+      "remoteIdentityRegistry": true,
+      "legacyExplicitAdoption": true,
+      "silentUnverifiedAdoption": false,
+      "pathHashPrimaryForGit": false,
+      "credentialLeakIntoFingerprint": false
+    },
+    "repositoryTruth": {
+      "deadScaffoldsRemoved": true,
+      "unsupportedCapabilitiesExplicit": true,
+      "legacySyncScaffoldRemoved": true,
+      "multiHostReplacement": "src/multi-host",
+      "unclassifiedZeroByteSourceFiles": 0,
+      "storagePlaceholdersFrozen": true
+    },
+    "codeSearch": {
+      "displayName": "Local Code Search — SQLite FTS5/BM25",
+      "engine": "sqlite-fts5-bm25",
+      "mode": "lexical",
+      "embeddings": false,
+      "vectorDatabase": false,
+      "networkRequired": false,
+      "legacySemanticAliasesPreserved": true
+    },
+    "documentationTruth": {
+      "runtimeCapabilityMatrix": true,
+      "unsupportedLanguagesExplicit": true,
+      "unsupportedStorageExplicit": true,
+      "crossMachineIdentityDocumented": true,
+      "multiHostArchitectureDocumented": true,
+      "clientEncryptionClaimed": false
+    },
+    "conflictEngineV2": {
+      "deterministic": true,
+      "llmMerge": false,
+      "embeddingMatching": false,
+      "kinds": ["rule", "decision", "todo", "next_action", "fix", "context", "architecture"],
+      "topicMatching": true,
+      "entityMatching": true,
+      "lexicalSubjectMatching": true,
+      "verifiedFixCompletesTask": true,
+      "verifiedFixResolvesContext": true,
+      "conflictingMemoryActive": false,
+      "completedMemoryActive": false,
+      "resolvedMemoryActive": false
     }
   }
 }

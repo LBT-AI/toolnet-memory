@@ -203,7 +203,7 @@ export function createMCPServer(ctx: MCPContext) {
 
   server.tool(
     'semantic_code_search',
-    'Search source code by semantic meaning, not only exact symbol names.',
+    'Legacy-compatible local code search using SQLite FTS5/BM25 lexical ranking. No embeddings or vector database.',
     semanticCodeSearchSchema,
     async (input) => jsonText(await semanticCodeSearch(ctx, input))
   );
@@ -268,7 +268,7 @@ export function createMCPServer(ctx: MCPContext) {
       'CALL THIS TOOL before guessing when the user asks to continue/resume previous work,',
       'mentions a previous agent/session, asks what was unfinished, what file was last touched,',
       'which TODOs are complete, blockers, decisions, or what should happen next.',
-      'Use mode=local for direct state facts and mode=ai for composite or ambiguous continuity questions.',
+      'Use mode=local for continuity questions. Memory Agent is deterministic and local-only; no external AI provider is used.',
       'Do not use it for unrelated coding questions when current repository context is already sufficient.',
       'Returns concise selected memory instead of raw transcripts or full memory dumps.',
       'Short conversational follow-ups are supported using compact ToolNet Memory focus; raw transcripts are never replayed.',

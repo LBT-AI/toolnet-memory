@@ -63,6 +63,15 @@ const TODO = [
   /follow[- ]?up/iu,
 ];
 
+const NEXT_ACTION = [
+  /tiếp theo/iu,
+  /bước tiếp theo/iu,
+  /việc tiếp theo/iu,
+  /sau đó cần/iu,
+  /next step/iu,
+  /next action/iu,
+  /follow[- ]?up/iu,
+];
 const FIX = [
   /đã sửa/iu,
   /đã fix/iu,
@@ -319,10 +328,15 @@ function classify(
     };
   }
 
+  if (isUser && matches(text, NEXT_ACTION)) {
+    return {
+      kind: 'next_action',
+      confidence: 0.88,
+    };
+  }
   if (isUser && matches(text, TODO)) {
     return {
       kind: 'todo',
-
       confidence: 0.87,
     };
   }
@@ -393,6 +407,7 @@ function memoryType(kind: LearnedMemoryKind): MemoryType {
       return 'decision';
 
     case 'todo':
+    case 'next_action':
       return 'todo';
 
     case 'fix':

@@ -2,7 +2,8 @@ import type { ImportanceLevel, MemoryType } from '../../core/types.js';
 
 import type { SessionAgent } from '../types.js';
 
-export type LearnedMemoryKind = 'rule' | 'decision' | 'todo' | 'fix' | 'architecture' | 'context';
+export type LearnedMemoryKind =
+  'rule' | 'decision' | 'todo' | 'next_action' | 'fix' | 'architecture' | 'context';
 
 export interface LearnedMemoryEvidence {
   userExplicit: boolean;
