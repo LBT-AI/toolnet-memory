@@ -76,6 +76,11 @@ case "$COMMAND" in
     run bundle/doctor.js src/production/doctor.ts "$@"
     ;;
 
+  gc)
+    shift
+    run bundle/gc.js src/retention/cli.ts "$@"
+    ;;
+
   run)
     run bundle/runtime.js src/index.ts
     ;;

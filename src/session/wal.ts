@@ -25,6 +25,7 @@ import type {
 } from './types.js';
 
 import { canonicalizeSessionEventInput } from './unified-event.js';
+import { sanitizeDurableValue } from '../security/durable-sanitizer.js';
 
 import {
   appendSharedProjectJournal,
@@ -429,9 +430,9 @@ export class SessionWal {
 
         const timestamp = input.timestamp ?? new Date().toISOString();
 
-        const data = input.data ?? {};
-
-        const rawDigest = input.provenance?.rawDigest ?? sha256(stableStringify(data));
+        const rawData = input.data ?? {};
+        const rawDigest = input.provenance?.rawDigest ?? sha256(stableStringify(rawData));
+        const data = sanitizeDurableValue(rawData) as Record<string, unknown>;
 
         const idSeed = input.sourceEventId
           ? [

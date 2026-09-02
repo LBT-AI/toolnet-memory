@@ -1,4 +1,4 @@
-import { SecretScanner } from './secret-scanner.js';
+import { SecretScanner, type SecretScannerOptions } from './secret-scanner.js';
 
 export interface SanitizeResult {
   text: string;
@@ -7,25 +7,42 @@ export interface SanitizeResult {
 }
 
 export class Sanitizer {
-  private readonly scanner = new SecretScanner();
+  private readonly scanner: SecretScanner;
+
+  constructor(options: SecretScannerOptions = {}) {
+    this.scanner = new SecretScanner(options);
+  }
 
   sanitize(text: string): SanitizeResult {
+    const matches = this.scanner.scan(text);
+
+    if (matches.length === 0) {
+      return {
+        text,
+        redacted: 0,
+        secretTypes: [],
+      };
+    }
+
     let output = text;
 
-    const matches = this.scanner.scan(text);
+    /*
+     * Replace from end -> beginning so offsets remain valid.
+     */
+    const descending = [...matches].sort((left, right) => right.start - left.start);
 
     const secretTypes = new Set<string>();
 
-    for (const match of matches) {
+    for (const match of descending) {
       secretTypes.add(match.type);
 
-      output = output.split(match.value).join(`[REDACTED:${match.type}]`);
+      output = output.slice(0, match.start) + `[REDACTED:${match.type}]` + output.slice(match.end);
     }
 
     return {
       text: output,
       redacted: matches.length,
-      secretTypes: [...secretTypes],
+      secretTypes: [...secretTypes].sort(),
     };
   }
 
@@ -42,14 +59,6 @@ export class Sanitizer {
       const output: Record<string, unknown> = {};
 
       for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-        /*
-         * Normalize separators so all of these map consistently:
-         *
-         * api_key
-         * api-key
-         * apiKey
-         * API_KEY
-         */
         const normalized = key
           .normalize('NFKC')
           .toLowerCase()
@@ -71,9 +80,10 @@ export class Sanitizer {
 
         if (sensitiveKey) {
           output[key] = '[REDACTED]';
-        } else {
-          output[key] = this.sanitizeValue(item);
+          continue;
         }
+
+        output[key] = this.sanitizeValue(item);
       }
 
       return output;

@@ -30,6 +30,7 @@ const entries = {
   service: 'src/service/daemon.ts',
   'service-cli': 'src/service/cli.ts',
   snapshot: 'src/production/snapshot-cli.ts',
+  gc: 'src/retention/cli.ts',
 
   opencode: 'src/session/opencode/cli.ts',
   agy: 'src/session/agy/cli.ts',

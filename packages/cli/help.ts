@@ -120,6 +120,19 @@ export const COMMANDS: CommandMetadata[] = [
     category: 'system',
   },
   {
+    name: 'gc',
+    description: 'Plan or apply safe retention cleanup',
+    usage:
+      'toolnet-memory gc [--dry-run|--apply] [--remote] [--keep-snapshots N] [--snapshot-days N] [--runtime-days N] [--stale-lock-minutes N] [--project PATH] [--json]',
+    category: 'system',
+    examples: [
+      'toolnet-memory gc',
+      'toolnet-memory gc --remote --dry-run',
+      'toolnet-memory gc --apply',
+      'toolnet-memory gc --remote --apply --keep-snapshots 10',
+    ],
+  },
+  {
     name: 'update',
     description: 'Update ToolNet Memory',
     category: 'system',

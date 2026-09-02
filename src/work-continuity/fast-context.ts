@@ -14,6 +14,7 @@ import { buildCompactContextOffloadGraph } from '../memory/context-offload.js';
 import { formatFastHandoffContext } from './fast-handoff.js';
 
 import { memoryAgentGuidance, memoryAgentStartupGuidance } from './agent-guidance.js';
+import { renderUntrustedProjectData } from '../security/project-document-trust.js';
 
 interface FastContextOptions {
   projectPath?: string;
@@ -121,7 +122,10 @@ export function buildFastProjectContext(options: FastContextOptions = {}): strin
   // Build minimal context with token budget enforcement
   const header = `[TOOLNET PROJECT CONTEXT]\n\nProject: ${projectName}\nRoot: ${projectRoot}\n\n`;
 
-  const minimalContext = createMinimalContext(profileContent, currentContent);
+  const minimalContext = createMinimalContext(
+    renderUntrustedProjectData('.toolnet/profile.md', profileContent),
+    renderUntrustedProjectData('.toolnet/current.md', currentContent)
+  );
 
   /*
    * Fast handoff is also LOCAL ONLY.
@@ -196,13 +200,13 @@ ${memoryAgentGuidance()}
 
 ## Profile
 
-${profileContent}
+${renderUntrustedProjectData('.toolnet/profile.md', profileContent)}
 
 ---
 
 ## Current Work
 
-${currentContent}
+${renderUntrustedProjectData('.toolnet/current.md', currentContent)}
 `;
 
   const files = ['GEMINI.md', 'AGENTS.md', 'CLAUDE.md'];

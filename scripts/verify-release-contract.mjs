@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-const VERSION = '0.3.14';
+const VERSION =
+  fs.existsSync('.release-target')
+    ? fs.readFileSync('.release-target', 'utf8').trim()
+    : '';
 
 const EXPECTED_AGENTS = {
   agy: {
@@ -371,9 +374,9 @@ exact(
 );
 
 exact(
-  'npm publish not automatic',
+  'npm publish automatic after tag push',
   manifest?.releasePolicy?.npmPublishAutomatic,
-  false
+  true
 );
 
 exact(
@@ -475,8 +478,8 @@ exact(
   true
 );
 
-contains(
-  'MEMORY_AUTO_SUMMARIZE still in env template',
+absent(
+  'stale MEMORY_AUTO_SUMMARIZE removed',
   envExample,
   'MEMORY_AUTO_SUMMARIZE'
 );

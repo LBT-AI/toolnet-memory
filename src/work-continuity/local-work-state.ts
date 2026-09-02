@@ -14,6 +14,7 @@ import {
 import { dirname, join } from 'node:path';
 
 import type { ProjectManifest } from '../core/types.js';
+import { sanitizeDurableValue } from '../security/durable-sanitizer.js';
 
 import type { WorkCheck, WorkItem, WorkObservation, WorkState } from './types.js';
 
@@ -502,9 +503,10 @@ function applyObservationsUnlocked(
     updatedAt,
   };
 
-  atomicWriteJson(localWorkStateFile(project), state);
+  const durableState = sanitizeDurableValue(state) as WorkState;
+  atomicWriteJson(localWorkStateFile(project), durableState);
 
-  return state;
+  return durableState;
 }
 
 export function applyObservationsToLocalWorkState(

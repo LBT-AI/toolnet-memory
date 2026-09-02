@@ -236,6 +236,37 @@ function toProjectManifest(
 }
 
 export class ProjectManager {
+  findExisting(rootPath: string = process.cwd()): ProjectManifest | null {
+    const requestedPath = resolve(rootPath);
+    const projectRoot = findRepositoryRoot(requestedPath);
+    const repositoryMarkers = [
+      '.git',
+      'package.json',
+      'pyproject.toml',
+      'Cargo.toml',
+      'go.mod',
+      'composer.json',
+    ];
+    const hasRepositoryBoundary = repositoryMarkers.some((marker) =>
+      existsSync(join(projectRoot, marker))
+    );
+    const existingRoot = findExistingProjectRoot(
+      requestedPath,
+      hasRepositoryBoundary ? projectRoot : undefined
+    );
+    if (!existingRoot) {
+      return null;
+    }
+    const local = parseManifest(manifestPath(existingRoot));
+    return toProjectManifest(local, existingRoot);
+  }
+  requireExisting(rootPath: string = process.cwd()): ProjectManifest {
+    const project = this.findExisting(rootPath);
+    if (!project) {
+      throw new Error('PROJECT_NOT_INITIALIZED');
+    }
+    return project;
+  }
   detect(rootPath: string = process.cwd()): ProjectManifest {
     const requestedPath = resolve(rootPath);
 

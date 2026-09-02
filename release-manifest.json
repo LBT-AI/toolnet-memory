@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "releaseSeries": "0.3.x",
   "runtime": {
     "node": ">=22",
@@ -67,7 +67,58 @@
     "nativeCliE2ERequired": false,
     "nativeCliE2EReason": "Native host binaries are optional and may be unavailable on the certification host.",
     "fullRepositoryCertificationRequired": true,
-    "npmPublishAutomatic": false,
-    "gitTagAutomatic": false
+    "npmPublishAutomatic": true,
+    "gitTagAutomatic": false,
+    "npmPublishTrigger": "git-tag-workflow-trusted-publishing"
+  },
+  "hardening": {
+    "retention": {
+      "safeGc": true,
+      "defaultDryRun": true,
+      "realDeleteRequiresApply": true,
+      "protectSemanticMemory": true,
+      "protectWorkCurrent": true,
+      "protectSharedJournal": true,
+      "protectRemoteOperations": true,
+      "unflushedWalDeletion": false
+    },
+    "dedupe": {
+      "projectScoped": true,
+      "crossProcess": true,
+      "crossContainerSharedVolume": true,
+      "usesPidIdentity": false,
+      "atomicExclusiveClaim": true,
+      "ownershipToken": true,
+      "ttlRecovery": true,
+      "remoteDistributedLock": false
+    },
+    "largeRepository": {
+      "benchmarkProfiles": ["10k", "50k", "100k"],
+      "maxCodeFileBytes": 2097152,
+      "symlinkTraversal": false,
+      "boundedParseConcurrency": true,
+      "boundedHashConcurrency": true,
+      "cancellationBoundary": true,
+      "renameDetection": "unique-hash-1to1"
+    },
+    "codeIntelligence": {
+      "parserEngine": "typescript-compiler-api",
+      "treeSitterRuntime": false,
+      "supportedExtensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"],
+      "tsconfigPaths": true,
+      "baseUrlResolution": true,
+      "projectReferences": true,
+      "workspacePackages": true,
+      "graphRepair": true,
+      "danglingEdgeProtection": true
+    },
+    "security": {
+      "secretScannerVersion": 2,
+      "durableSanitization": true,
+      "projectIsolation": true,
+      "projectDataTrusted": false,
+      "clientSideEncryption": false,
+      "requiresEncryptionKey": false
+    }
   }
 }

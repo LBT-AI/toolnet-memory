@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { getImportanceScore, inferImportance } from './importance.js';
 
-import { Sanitizer } from '../security/sanitizer.js';
+import { sanitizeDurableText, sanitizeDurableValue } from '../security/durable-sanitizer.js';
 
 import { ConflictDetector } from '../memory/conflict-detector.js';
 
@@ -42,14 +42,12 @@ interface RememberInput {
 export class MemoryEngine {
   private readonly memories = new Map<string, MemoryRecord>();
 
-  private readonly sanitizer = new Sanitizer();
-
   private readonly conflicts = new ConflictDetector();
 
   remember(input: RememberInput): MemoryRecord {
     const now = new Date().toISOString();
 
-    const content = this.sanitizer.sanitize(input.content.trim()).text;
+    const content = sanitizeDurableText(input.content.trim());
 
     const importance = input.importance ?? inferImportance(input.type, content);
 
@@ -75,7 +73,7 @@ export class MemoryEngine {
 
       expiresAt: input.expiresAt ?? defaultExpiry(input.type, importance, new Date(now)),
 
-      metadata: this.sanitizer.sanitizeValue(input.metadata) as Record<string, unknown> | undefined,
+      metadata: sanitizeDurableValue(input.metadata) as Record<string, unknown> | undefined,
     };
 
     const resolution = this.conflicts.resolve(memory, this.list(input.projectId));
@@ -145,7 +143,8 @@ export class MemoryEngine {
         continue;
       }
 
-      this.memories.set(memory.id, memory);
+      const sanitized = sanitizeDurableValue(memory) as MemoryRecord;
+      this.memories.set(sanitized.id, sanitized);
 
       imported++;
     }

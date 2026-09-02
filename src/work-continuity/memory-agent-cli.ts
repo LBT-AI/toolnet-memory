@@ -1,5 +1,3 @@
-import { findProjectRoot } from './fast-context.js';
-
 import { askMemoryAgent } from './memory-agent.js';
 
 import { ProjectManager } from '../core/index.js';
@@ -9,30 +7,20 @@ async function main(): Promise<void> {
 
   if (!question) {
     console.error('Usage: toolnet-memory ask "<question>"');
-
     process.exitCode = 1;
-
     return;
   }
 
-  const root = findProjectRoot(process.cwd());
-
-  if (!root) {
-    console.error('Not in a ToolNet project.');
-
-    process.exitCode = 1;
-
-    return;
-  }
-
-  const project = new ProjectManager().detect(root);
-
-  if (!project) {
-    console.error('Unable to detect ToolNet project.');
-
-    process.exitCode = 1;
-
-    return;
+  let project;
+  try {
+    project = new ProjectManager().requireExisting(process.cwd());
+  } catch (error) {
+    if (error instanceof Error && error.message === 'PROJECT_NOT_INITIALIZED') {
+      console.error('PROJECT_NOT_INITIALIZED');
+      process.exitCode = 1;
+      return;
+    }
+    throw error;
   }
 
   const result = await askMemoryAgent(project, question);
@@ -41,7 +29,7 @@ async function main(): Promise<void> {
 
   if (process.env.TOOLNET_MEMORY_AGENT_DEBUG === '1') {
     process.stderr.write(
-      ['', `[ToolNet Memory Agent] AI: ${result.usedAi ? 'yes' : 'fallback'}`]
+      ['', `[ToolNet Memory Agent] local=${result.usedAi ? 'no' : 'yes'}`]
         .filter(Boolean)
         .join('\n') + '\n'
     );
@@ -50,6 +38,5 @@ async function main(): Promise<void> {
 
 main().catch((error) => {
   console.error(error instanceof Error ? error.message : String(error));
-
   process.exitCode = 1;
 });

@@ -2,11 +2,14 @@ export * from './types.js';
 
 export * from './indexer/repository-scanner.js';
 export * from './indexer/repository-indexer.js';
+export * from './indexer/bounded-concurrency.js';
 
 export * from './parsers/typescript-parser.js';
+export * from './parsers/capabilities.js';
 
 export * from './graph/graph-store.js';
 export * from './graph/graph-builder.js';
+export * from './graph/graph-repair.js';
 export * from './graph/architecture.js';
 export * from './graph/trace.js';
 

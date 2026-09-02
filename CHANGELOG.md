@@ -4,6 +4,25 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.3.15]
+
+- Added safe retention and garbage collection with dry-run as the default and explicit --apply for deletion.
+- Protected durable semantic memory, current work state, shared journal, unflushed WAL evidence, and append-only remote operations from generic GC.
+- Moved hook deduplication to project-scoped runtime state for cross-process and shared-volume container coordination.
+- Added atomic exclusive dedupe claims, ownership tokens, TTL recovery, bounded stale-marker cleanup, and project-aware event fingerprints.
+- Added 10k / 50k / 100k large-repository benchmark profiles.
+- Hardened code scanning with file-size limits, symlink protection, generated/dependency directory exclusion, cancellation, and bounded concurrency.
+- Added conservative unique-content rename detection and correctness-first graph reconstruction for structural changes.
+- Declared parser capabilities explicitly: TypeScript/JavaScript family uses the TypeScript Compiler API; Tree-sitter and Python/Go/Rust/C/C++ parsing remain unsupported.
+- Added TypeScript paths, baseUrl, project references, and workspace-package module resolution.
+- Added incremental graph repair with stable symbol remapping and dangling-edge protection.
+- Added Secret Scanner v2 with additional provider credential patterns, limited entropy detection, allowlists, and hash false-positive protection.
+- Unified durable-value sanitization for memory ingestion/import, session WAL persistence, and current work-state persistence.
+- Added strict existing-project resolution so read/query commands never initialize or inherit an unrelated project implicitly.
+- Marked repository/project instruction content as untrusted project data instead of system authority.
+- Kept the runtime local-first with no LLM, embedding, vector database, or client-side encryption-key requirement.
+- Preserved the existing storage implementation.
+
 ## [0.3.14]
 
 - Reworked ToolNet Memory into a local-only deterministic memory and continuity runtime with no LLM or embedding dependency.

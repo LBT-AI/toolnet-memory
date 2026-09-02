@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -54,6 +54,10 @@
     "snapshot:test": "tsx src/snapshot/test-snapshot.ts",
     "code:semantic:test": "tsx src/code-intelligence/test-semantic.ts",
     "doctor": "tsx src/production/doctor.ts",
+    "gc": "tsx src/retention/cli.ts",
+    "benchmark:large-repo": "tsx src/code-intelligence/benchmark/large-repo-benchmark.ts",
+    "code:large-repo-hardening:test": "vitest run tests/code-intelligence/large-repo-hardening.test.ts",
+    "code:correctness:test": "vitest run tests/code-intelligence/code-intelligence-correctness.test.ts",
     "cli": "./bin/toolnet-memory",
     "prod:check": "npm run build && npm test && npm run doctor",
     "project:migrate": "tsx src/storage/project/migrate.ts",
@@ -94,7 +98,7 @@
     "session:new-agents:test": "vitest run tests/session/new-agent-event-mappers.test.ts tests/session/new-agent-hook-installers.test.ts tests/session/new-agent-runtime.test.ts",
     "session:new-agents-continuity:test": "vitest run tests/session/new-agent-continuity.test.ts tests/session/new-agent-continuity-installers.test.ts",
     "session:new-agents-integration:test": "vitest run tests/session/new-agent-integrations.test.ts tests/production/new-agent-auto-integrate.test.ts tests/production/new-agent-production-wiring.test.ts",
-    "session:integration-scope:test": "vitest run tests/session/integration-scope.test.ts tests/session/hook-event-dedupe.test.ts",
+    "session:integration-scope:test": "vitest run tests/session/integration-scope.test.ts tests/session/hook-event-dedupe.test.ts tests/session/hook-event-dedupe-project.test.ts",
     "session:cursor-dual-scope:test": "vitest run tests/session/cursor-dual-scope.test.ts tests/session/cursor-dual-scope-wiring.test.ts",
     "session:copilot-dual-scope:test": "vitest run tests/session/copilot-dual-scope.test.ts tests/session/copilot-dual-scope-wiring.test.ts",
     "session:grok-dual-scope:test": "vitest run tests/session/grok-dual-scope.test.ts tests/session/grok-dual-scope-wiring.test.ts",
@@ -106,7 +110,9 @@
     "production:phase07-final:test": "vitest run tests/production/final-phase07-release.test.ts",
     "release:certify:10": "vitest run tests/integration/cross-agent-continuity.test.ts tests/production/ten-agent-release-contract.test.ts",
     "release:certify:final": "bash scripts/final-release-certify.sh",
-    "release:verify:static": "node scripts/verify-release-contract.mjs"
+    "release:verify:static": "node scripts/verify-release-contract.mjs",
+    "security:isolation:test": "vitest run tests/security/security-isolation.test.ts",
+    "release:verify:v0315": "node scripts/verify-v0315-contract.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

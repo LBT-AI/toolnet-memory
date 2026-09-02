@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.3.14**
+Current release: **v0.3.15**
 
 </div>
 
@@ -33,6 +33,30 @@ ToolNet Memory combines four layers:
 ToolNet Memory is **not a raw transcript dump**. Raw session history is kept separate from durable project memory and is protected from normal agent reads.
 
 Memory promotion, retrieval, conflict handling, and continuity decisions are deterministic and local. ToolNet Memory does not require an LLM or embedding provider for its memory runtime.
+
+### v0.3.15 hardening
+
+v0.3.15 strengthens the existing local-first architecture without adding an LLM, embedding provider, vector database, or encryption-key requirement.
+
+- Safe retention / garbage collection with dry-run by default.
+- Project-scoped cross-process and shared-volume container hook deduplication.
+- Large-repository scanner limits, bounded indexing concurrency, cancellation, and conservative rename detection.
+- Explicit TypeScript/JavaScript parser capability reporting and TypeScript monorepo/path-alias resolution.
+- Incremental graph repair with dangling-edge protection.
+- Secret Scanner v2 and one durable-data sanitization contract.
+- Strict existing-project resolution for read/query commands.
+- Repository instruction content is treated as untrusted project data rather than system authority.
+  Garbage collection is non-destructive by default:
+
+```bash
+toolnet-memory gc
+```
+
+Actual cleanup requires explicit application:
+
+```bash
+toolnet-memory gc --apply
+```
 
 ---
 

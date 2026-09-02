@@ -8,7 +8,11 @@ cd "$ROOT" || {
 }
 
 FAIL=0
-VERSION="0.3.14"
+VERSION="$(tr -d '[:space:]' < .release-target 2>/dev/null)"
+
+if [ -z "$VERSION" ]; then
+  VERSION="INVALID"
+fi
 
 pass() {
   printf "PASS  %s\n" "$1"
@@ -209,6 +213,10 @@ done
 # ------------------------------------------------------------
 
 run_gate \
+  "V0315_FEATURE_CONTRACT" \
+  node scripts/verify-v0315-contract.mjs
+
+run_gate \
   "STATIC_RELEASE_CONTRACT" \
   node scripts/verify-release-contract.mjs
 
@@ -223,6 +231,10 @@ run_gate \
 run_gate \
   "TYPECHECK" \
   npm run typecheck
+
+run_gate \
+  "LARGE_REPO_SCAN_10K" \
+  npm run benchmark:large-repo -- --profile 10k
 
 run_gate \
   "FULL_TEST_SUITE" \

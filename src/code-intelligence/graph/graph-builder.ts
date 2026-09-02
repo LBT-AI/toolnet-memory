@@ -4,9 +4,26 @@ import { dirname, extname, normalize, posix } from 'node:path';
 
 import type { CodeSymbol, GraphEdge } from '../../core/types.js';
 
-import type { ParsedFile, ParsedImport } from '../types.js';
+import type { ParsedFile } from '../types.js';
 
 import { CodeGraphStore } from './graph-store.js';
+
+export type GraphModuleResolver = (
+  fromFile: string,
+  source: string,
+  availableFiles: ReadonlySet<string>
+) => string | undefined;
+
+export interface GraphBuildOptions {
+  /**
+   * Existing symbols may be seeded during incremental
+   * reconstruction so modified files can resolve calls
+   * against unchanged files without reparsing them.
+   */
+  seedSymbols?: readonly CodeSymbol[];
+
+  resolveModule?: GraphModuleResolver;
+}
 
 function edgeId(projectId: string, from: string, type: string, to: string): string {
   return createHash('sha256')
@@ -19,10 +36,10 @@ function cleanPath(value: string): string {
   return normalize(value).replaceAll('\\', '/');
 }
 
-function resolveImportFile(
+function relativeImportFallback(
   fromFile: string,
   source: string,
-  availableFiles: Set<string>
+  availableFiles: ReadonlySet<string>
 ): string | undefined {
   if (!source.startsWith('.')) {
     return undefined;
@@ -36,15 +53,12 @@ function resolveImportFile(
 
   if (extension === '.js') {
     const stem = base.slice(0, -3);
-
     candidates = [`${stem}.ts`, `${stem}.tsx`, `${stem}.js`, `${stem}.jsx`];
   } else if (extension === '.mjs') {
     const stem = base.slice(0, -4);
-
     candidates = [`${stem}.mts`, `${stem}.ts`, `${stem}.mjs`];
   } else if (extension === '.cjs') {
     const stem = base.slice(0, -4);
-
     candidates = [`${stem}.cts`, `${stem}.ts`, `${stem}.cjs`];
   } else if (extension) {
     candidates = [base];
@@ -60,28 +74,64 @@ function resolveImportFile(
       `${base}.cjs`,
       `${base}/index.ts`,
       `${base}/index.tsx`,
+      `${base}/index.mts`,
+      `${base}/index.cts`,
       `${base}/index.js`,
       `${base}/index.jsx`,
+      `${base}/index.mjs`,
+      `${base}/index.cjs`,
     ];
   }
 
   return candidates.find((candidate) => availableFiles.has(cleanPath(candidate)));
 }
 
+function resolveImportFile(
+  fromFile: string,
+  source: string,
+  availableFiles: ReadonlySet<string>,
+  resolver: GraphModuleResolver | undefined
+): string | undefined {
+  const custom = resolver?.(fromFile, source, availableFiles);
+
+  if (custom) {
+    const clean = cleanPath(custom);
+
+    if (availableFiles.has(clean)) {
+      return clean;
+    }
+  }
+
+  return relativeImportFallback(fromFile, source, availableFiles);
+}
+
 export class GraphBuilder {
-  build(projectId: string, parsed: ParsedFile[]): CodeGraphStore {
+  build(projectId: string, parsed: ParsedFile[], options: GraphBuildOptions = {}): CodeGraphStore {
     const graph = new CodeGraphStore();
 
-    const files = new Map<string, CodeSymbol>();
+    /*
+     * Seed unchanged symbols first.
+     * Parsed/new symbols are added afterwards and therefore
+     * become authoritative if IDs happen to overlap.
+     */
+    for (const symbol of options.seedSymbols ?? []) {
+      graph.addSymbol(symbol);
+    }
 
     for (const file of parsed) {
       for (const symbol of file.symbols) {
         graph.addSymbol(symbol);
-
-        if (symbol.type === 'file') {
-          files.set(cleanPath(file.filePath), symbol);
-        }
       }
+    }
+
+    const files = new Map<string, CodeSymbol>();
+
+    for (const symbol of graph.allSymbols(projectId)) {
+      if (symbol.type !== 'file') {
+        continue;
+      }
+
+      files.set(cleanPath(symbol.filePath), symbol);
     }
 
     const availableFiles = new Set(files.keys());
@@ -106,7 +156,12 @@ export class GraphBuilder {
 
       // IMPORTS
       for (const item of file.imports) {
-        const targetPath = resolveImportFile(filePath, item.source, availableFiles);
+        const targetPath = resolveImportFile(
+          filePath,
+          item.source,
+          availableFiles,
+          options.resolveModule
+        );
 
         if (!targetPath) {
           continue;
@@ -121,6 +176,7 @@ export class GraphBuilder {
         graph.addEdge(
           this.edge(projectId, fileNode.id, 'IMPORTS', targetFile.id, {
             source: item.source,
+            resolvedFile: targetPath,
           })
         );
       }
@@ -147,9 +203,9 @@ export class GraphBuilder {
           file,
           call.calleeName,
           call.qualifier,
-          parsed,
           graph,
-          availableFiles
+          availableFiles,
+          options.resolveModule
         );
 
         for (const target of targets) {
@@ -160,7 +216,6 @@ export class GraphBuilder {
           graph.addEdge(
             this.edge(projectId, call.callerId, 'CALLS', target.id, {
               line: call.line,
-
               qualifier: call.qualifier,
             })
           );
@@ -176,9 +231,9 @@ export class GraphBuilder {
     file: ParsedFile,
     calleeName: string,
     qualifier: string | undefined,
-    parsed: ParsedFile[],
     graph: CodeGraphStore,
-    availableFiles: Set<string>
+    availableFiles: ReadonlySet<string>,
+    resolver: GraphModuleResolver | undefined
   ): CodeSymbol[] {
     const filePath = cleanPath(file.filePath);
 
@@ -202,7 +257,7 @@ export class GraphBuilder {
           continue;
         }
 
-        const targetPath = resolveImportFile(filePath, imported.source, availableFiles);
+        const targetPath = resolveImportFile(filePath, imported.source, availableFiles, resolver);
 
         if (!targetPath) {
           continue;
@@ -222,7 +277,7 @@ export class GraphBuilder {
         continue;
       }
 
-      const targetPath = resolveImportFile(filePath, imported.source, availableFiles);
+      const targetPath = resolveImportFile(filePath, imported.source, availableFiles, resolver);
 
       if (!targetPath) {
         continue;
@@ -239,7 +294,11 @@ export class GraphBuilder {
       }
     }
 
-    // Last fallback.
+    /*
+     * Last fallback remains conservative.
+     * Graph ambiguity is left visible rather than inventing
+     * type resolution.
+     */
     return graph
       .findByName(projectId, calleeName)
       .filter((symbol) => symbol.type === 'function' || symbol.type === 'method');
@@ -254,7 +313,6 @@ export class GraphBuilder {
   ): GraphEdge {
     return {
       id: edgeId(projectId, from, type, to),
-
       projectId,
       from,
       to,
