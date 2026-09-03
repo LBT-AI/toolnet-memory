@@ -10,7 +10,29 @@ The graph UI defaults to:
 127.0.0.1:9749
 ```
 
-Remote graph exposure requires an explicit non-loopback bind.
+The default remains loopback-only.
+
+Graph API hardening includes:
+
+- loopback Host-header validation to reduce DNS-rebinding exposure,
+- same-origin checks for browser API requests,
+- optional bearer authentication through `TOOLNET_GRAPH_TOKEN`,
+- constant-time bearer-token comparison,
+- minimal unauthenticated `/api/health`,
+- security response headers,
+- optional `TOOLNET_GRAPH_ALLOWED_HOSTS` for reverse-proxy / wildcard-host restriction.
+
+`/api/health` does not expose project IDs, project names, paths, project counts,
+storage information, or token state.
+
+The static Graph UI shell remains accessible so a browser can load it and
+request the bearer token interactively when protected APIs return HTTP 401.
+
+The bearer token is an access-control credential. It is not a memory encryption
+key and does not enable client-side encryption.
+
+Binding to a non-loopback host without `TOOLNET_GRAPH_TOKEN` remains possible
+for compatibility, but ToolNet emits an explicit security warning.
 
 ## Durable secret handling
 
@@ -25,18 +47,24 @@ dedicated secret-management system.
 
 ## Remote storage encryption
 
-ToolNet Memory does not currently provide mandatory client-side encryption.
+Remote client-side encryption is optional and disabled by default. When
+enabled with `TOOLNET_REMOTE_ENCRYPTION=on`, ToolNet encrypts remote object
+writes with AES-256-GCM before passing ciphertext to supported remote
+storage providers.
 
-There is no default ToolNet master-key requirement.
+Normal local/plaintext operation requires no encryption key. Existing
+plaintext remote objects remain readable after encryption is enabled. New
+and rewritten remote objects are encrypted. Encrypted objects require the
+matching key when read.
 
-When remote storage is enabled, ToolNet sends its serialized/sanitized durable
-payload to the configured storage provider.
+Supported key sources:
 
-TLS transport and provider-side encryption-at-rest depend on the provider and
-operator configuration.
+- `TOOLNET_REMOTE_ENCRYPTION_KEY`
+- `TOOLNET_REMOTE_ENCRYPTION_KEY_FILE`
 
-Therefore ToolNet documentation must not claim that remote durable memory is
-client-side encrypted by ToolNet.
+Provider TLS and provider-side encryption remain complementary protections.
+
+See `docs/remote-encryption.md`.
 
 ## Project instruction trust
 
@@ -61,7 +89,6 @@ raw runtime/session transcripts.
 Future optional features may include:
 
 - explicit remote graph authentication,
-- opt-in client-side encryption,
 - append-only audit logs.
 
 These features must remain documented as planned until implemented.

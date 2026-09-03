@@ -21,9 +21,11 @@ describe('Phase 21 documentation truth', () => {
     expect(readme).toContain('toolnet-memory init --adopt-remote <remote-name>');
     expect(readme).toContain('toolnet-memory init --no-remote-identity');
   });
-  it('does not claim mandatory client encryption', () => {
-    expect(runtimeTruth).toContain('client-side encryption');
-    expect(runtimeTruth).toContain('mandatory encryption key');
+  it('declares optional remote client-side encryption supported', () => {
+    expect(runtimeTruth).toContain(
+      'Optional remote client-side encryption is implemented with AES-256-GCM.'
+    );
+    expect(runtimeTruth).toMatch(/mandatory encryption key\s*\|\s*no/u);
   });
   it('keeps compatibility names explicit', () => {
     expect(runtimeTruth).toContain('SemanticCodeEngine');

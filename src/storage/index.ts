@@ -17,3 +17,4 @@ export * from './type-resolution-store.js';
 export * from './architecture-store.js';
 export * from './code-analysis-store.js';
 export * from './visualization-store.js';
+export * from './encrypted-provider.js';

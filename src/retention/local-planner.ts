@@ -280,6 +280,12 @@ export function planLocalGc(
     },
     {
       scope: 'local',
+      category: 'protected-audit',
+      target: join(toolnet, 'audit', 'events.jsonl'),
+      reason: 'tamper-evident audit history is durable security data',
+    },
+    {
+      scope: 'local',
       category: 'protected-legacy-session',
       target: join(toolnet, 'sessions'),
       reason: 'legacy sessions remain read/protected and are never automatically removed',

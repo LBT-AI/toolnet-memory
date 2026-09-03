@@ -7,6 +7,7 @@
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { graphTokenIsStrong, isLoopbackGraphHost } from '../visualization/security.js';
 import {
   renderHeader,
   renderSuccess,
@@ -45,7 +46,21 @@ async function startGraphUI(options: GraphCliOptions): Promise<void> {
 
   const PORT = process.env.TOOLNET_GRAPH_PORT ?? '9749';
   const HOST = process.env.TOOLNET_GRAPH_HOST ?? '127.0.0.1';
-
+  const graphToken = process.env.TOOLNET_GRAPH_TOKEN?.trim();
+  if (!isLoopbackGraphHost(HOST)) {
+    console.warn(`  WARNING: Graph UI is exposed beyond localhost at ${HOST}:${PORT}`);
+    if (graphToken) {
+      console.warn('  Graph API bearer authentication: enabled');
+    } else {
+      console.warn('  WARNING: Graph API bearer authentication: disabled');
+      console.warn('  Set TOOLNET_GRAPH_TOKEN before exposing this port to an untrusted network.');
+    }
+    console.log('');
+  }
+  if (graphToken && !graphTokenIsStrong(graphToken)) {
+    console.warn('  WARNING: TOOLNET_GRAPH_TOKEN should contain at least 24 random bytes.');
+    console.log('');
+  }
   console.log(dim('  Starting visualization server...', uiOpts));
   console.log('');
 

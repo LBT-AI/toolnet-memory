@@ -21,3 +21,4 @@ tmp/
 # Python generated cache
 __pycache__/
 *.py[cod]
+.standalone-build/

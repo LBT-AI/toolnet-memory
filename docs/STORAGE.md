@@ -83,16 +83,8 @@ Standard AWS S3 or any S3-compatible service (MinIO, DigitalOcean Spaces, Backbl
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject",
-        "s3:ListBucket"
-      ],
-      "Resource": [
-        "arn:aws:s3:::toolnet-memory",
-        "arn:aws:s3:::toolnet-memory/*"
-      ]
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::toolnet-memory", "arn:aws:s3:::toolnet-memory/*"]
     }
   ]
 }
@@ -125,6 +117,7 @@ toolnet-memory doctor
 ### S3-Compatible Services
 
 **MinIO:**
+
 ```bash
 STORAGE_PROVIDER=s3
 S3_ENDPOINT=http://localhost:9000
@@ -135,6 +128,7 @@ AWS_SECRET_ACCESS_KEY=minioadmin
 ```
 
 **DigitalOcean Spaces:**
+
 ```bash
 STORAGE_PROVIDER=s3
 S3_ENDPOINT=https://nyc3.digitaloceanspaces.com
@@ -145,6 +139,7 @@ AWS_SECRET_ACCESS_KEY=your-spaces-secret
 ```
 
 **Backblaze B2:**
+
 ```bash
 STORAGE_PROVIDER=s3
 S3_ENDPOINT=https://s3.us-west-004.backblazeb2.com
@@ -292,16 +287,19 @@ Each project gets an isolated namespace based on its stable identity.
 ### Encryption
 
 **R2/S3:**
+
 - Enable server-side encryption (SSE-S3 or SSE-KMS)
 - Use bucket policies to enforce encryption
 - Consider client-side encryption for sensitive data
 
 **Hugging Face:**
+
 - Use private repositories
 - Enable 2FA on your account
 - Limit token permissions
 
 **Local:**
+
 - Use encrypted filesystems (LUKS, FileVault, BitLocker)
 - Restrict directory permissions (chmod 700)
 - Regular backups to encrypted storage

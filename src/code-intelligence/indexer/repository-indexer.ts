@@ -2,7 +2,8 @@ import type { ParsedFile } from '../types.js';
 
 import { GraphBuilder } from '../graph/graph-builder.js';
 
-import { parseTypeScriptFile } from '../parsers/typescript-parser.js';
+import { parseCodeFile } from '../parsers/parse-code-file.js';
+import { searchableParserExtensions } from '../parsers/capabilities.js';
 
 import { DEFAULT_PARSE_CONCURRENCY, mapWithConcurrency } from './bounded-concurrency.js';
 
@@ -44,6 +45,7 @@ export class RepositoryIndexer {
   ): Promise<RepositoryIndexResult> {
     const scanOptions: RepositoryScanOptions = {
       ...options.scan,
+      extensions: options.scan?.extensions ?? searchableParserExtensions(),
     };
 
     if (options.signal) {
@@ -72,7 +74,7 @@ export class RepositoryIndexer {
       files,
       async (file): Promise<ParsedFile | null> => {
         try {
-          return await parseTypeScriptFile(projectId, rootPath, file);
+          return await parseCodeFile(projectId, rootPath, file);
         } catch (error) {
           parseFailures += 1;
 

@@ -1,10 +1,9 @@
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-const VERSION =
-  fs.existsSync('.release-target')
-    ? fs.readFileSync('.release-target', 'utf8').trim()
-    : '';
+const VERSION = fs.existsSync('.release-target')
+  ? fs.readFileSync('.release-target', 'utf8').trim()
+  : '';
 
 const EXPECTED_AGENTS = {
   agy: {
@@ -115,12 +114,7 @@ function readJson(file) {
   try {
     return JSON.parse(raw);
   } catch (error) {
-    fail(
-      `valid JSON: ${file}`,
-      error instanceof Error
-        ? error.message
-        : String(error)
-    );
+    fail(`valid JSON: ${file}`, error instanceof Error ? error.message : String(error));
 
     return undefined;
   }
@@ -132,10 +126,7 @@ function exact(label, actual, expected) {
     return;
   }
 
-  fail(
-    label,
-    `expected=${String(expected)} actual=${String(actual)}`
-  );
+  fail(label, `expected=${String(expected)} actual=${String(actual)}`);
 }
 
 function contains(label, text, needle) {
@@ -157,13 +148,9 @@ function absent(label, text, needle) {
 }
 
 function git(args) {
-  const result = spawnSync(
-    'git',
-    args,
-    {
-      encoding: 'utf8',
-    }
-  );
+  const result = spawnSync('git', args, {
+    encoding: 'utf8',
+  });
 
   return {
     status: result.status,
@@ -172,11 +159,7 @@ function git(args) {
   };
 }
 
-
-console.log(
-  '=== ToolNet Memory Static Release Contract ==='
-);
-
+console.log('=== ToolNet Memory Static Release Contract ===');
 
 const pkg = readJson('package.json');
 const lock = readJson('package-lock.json');
@@ -185,81 +168,39 @@ const manifest = readJson('release-manifest.json');
 const readme = read('README.md');
 const changelog = read('CHANGELOG.md');
 
-const capabilities = read(
-  'src/session/integration-capabilities.ts'
-);
+const capabilities = read('src/session/integration-capabilities.ts');
 
-const help = read(
-  'packages/cli/help.ts'
-);
+const help = read('packages/cli/help.ts');
 
-const bin = read(
-  'bin/toolnet-memory'
-);
+const bin = read('bin/toolnet-memory');
 
-const buildBundle = read(
-  'scripts/build-bundle.mjs'
-);
+const buildBundle = read('scripts/build-bundle.mjs');
 
-const productionCert = read(
-  'src/production/production-certify.ts'
-);
+const productionCert = read('src/production/production-certify.ts');
 
-const envExample = read(
-  '.env.example'
-);
+const envExample = read('.env.example');
 
-const finalCert = read(
-  'scripts/final-release-certify.sh'
-);
-
+const finalCert = read('scripts/final-release-certify.sh');
 
 console.log('');
 console.log('=== VERSION CONTRACT ===');
 
-exact(
-  'package.json version',
-  pkg?.version,
-  VERSION
-);
+exact('package.json version', pkg?.version, VERSION);
 
-exact(
-  'package-lock.json version',
-  lock?.version,
-  VERSION
-);
+exact('package-lock.json version', lock?.version, VERSION);
 
-exact(
-  'package-lock root version',
-  lock?.packages?.['']?.version,
-  VERSION
-);
+exact('package-lock root version', lock?.packages?.['']?.version, VERSION);
 
-exact(
-  'release manifest version',
-  manifest?.version,
-  VERSION
-);
+exact('release manifest version', manifest?.version, VERSION);
 
-contains(
-  'README version',
-  readme,
-  `Current release: **v${VERSION}**`
-);
+contains('README version', readme, `Current release: **v${VERSION}**`);
 
-contains(
-  'CHANGELOG version',
-  changelog,
-  `## [${VERSION}]`
-);
-
+contains('CHANGELOG version', changelog, `## [${VERSION}]`);
 
 console.log('');
 console.log('=== PACKAGE CONTRACT ===');
 
-const packageFiles = Array.isArray(pkg?.files)
-  ? pkg.files
-  : [];
+const packageFiles = Array.isArray(pkg?.files) ? pkg.files : [];
 
 if (packageFiles.includes('release-manifest.json')) {
   pass('release-manifest included in package files');
@@ -273,46 +214,23 @@ contains(
   'final-release-certify.sh'
 );
 
-contains(
-  'production pack requires release manifest',
-  productionCert,
-  "'release-manifest.json'"
-);
-
+contains('production pack requires release manifest', productionCert, "'release-manifest.json'");
 
 console.log('');
 console.log('=== AGENT CONTRACT ===');
 
 const manifestAgents =
-  manifest?.agents &&
-  typeof manifest.agents === 'object'
-    ? manifest.agents
-    : {};
+  manifest?.agents && typeof manifest.agents === 'object' ? manifest.agents : {};
 
-const expectedNames = Object.keys(
-  EXPECTED_AGENTS
-).sort();
+const expectedNames = Object.keys(EXPECTED_AGENTS).sort();
 
-const actualNames = Object.keys(
-  manifestAgents
-).sort();
+const actualNames = Object.keys(manifestAgents).sort();
 
-exact(
-  'manifest agent count',
-  actualNames.length,
-  expectedNames.length
-);
+exact('manifest agent count', actualNames.length, expectedNames.length);
 
-exact(
-  'manifest exact agent set',
-  actualNames.join(','),
-  expectedNames.join(',')
-);
+exact('manifest exact agent set', actualNames.join(','), expectedNames.join(','));
 
-
-for (const [agent, expected] of Object.entries(
-  EXPECTED_AGENTS
-)) {
+for (const [agent, expected] of Object.entries(EXPECTED_AGENTS)) {
   const actual = manifestAgents[agent];
 
   if (!actual) {
@@ -320,52 +238,23 @@ for (const [agent, expected] of Object.entries(
     continue;
   }
 
-  exact(
-    `${agent} display name`,
-    actual.displayName,
-    expected.displayName
-  );
+  exact(`${agent} display name`, actual.displayName, expected.displayName);
 
-  exact(
-    `${agent} refresh mode`,
-    actual.refreshMode,
-    expected.refreshMode
-  );
+  exact(`${agent} refresh mode`, actual.refreshMode, expected.refreshMode);
 
-  contains(
-    `${agent} capability registry`,
-    capabilities,
-    `'${agent}'`
-  );
+  contains(`${agent} capability registry`, capabilities, `'${agent}'`);
 
-  contains(
-    `${agent} CLI help`,
-    help,
-    `name: '${expected.command}'`
-  );
+  contains(`${agent} CLI help`, help, `name: '${expected.command}'`);
 
-  contains(
-    `${agent} CLI dispatcher`,
-    bin,
-    `${expected.command})`
-  );
+  contains(`${agent} CLI dispatcher`, bin, `${expected.command})`);
 
-  contains(
-    `${agent} production package`,
-    productionCert,
-    `'bundle/${expected.bundle}'`
-  );
+  contains(`${agent} production package`, productionCert, `'bundle/${expected.bundle}'`);
 }
-
 
 console.log('');
 console.log('=== RELEASE POLICY ===');
 
-exact(
-  'native CLI E2E non-blocking',
-  manifest?.releasePolicy?.nativeCliE2ERequired,
-  false
-);
+exact('native CLI E2E non-blocking', manifest?.releasePolicy?.nativeCliE2ERequired, false);
 
 exact(
   'full repository certification required',
@@ -373,18 +262,9 @@ exact(
   true
 );
 
-exact(
-  'npm publish automatic after tag push',
-  manifest?.releasePolicy?.npmPublishAutomatic,
-  true
-);
+exact('npm publish automatic after tag push', manifest?.releasePolicy?.npmPublishAutomatic, true);
 
-exact(
-  'git tag not automatic',
-  manifest?.releasePolicy?.gitTagAutomatic,
-  false
-);
-
+exact('git tag not automatic', manifest?.releasePolicy?.gitTagAutomatic, false);
 
 console.log('');
 console.log('=== CAPABILITY TRUTH ===');
@@ -395,30 +275,13 @@ contains(
   'NATIVE_SESSION_IMPORT_CAPABILITIES'
 );
 
-contains(
-  'Kilo MCP-only capability',
-  capabilities,
-  'MCP_ONLY_CAPABILITIES'
-);
+contains('Kilo MCP-only capability', capabilities, 'MCP_ONLY_CAPABILITIES');
 
-contains(
-  'native session refresh mode',
-  capabilities,
-  "'native-session'"
-);
+contains('native session refresh mode', capabilities, "'native-session'");
 
-contains(
-  'persistent plugin refresh mode',
-  capabilities,
-  "'persistent-plugin'"
-);
+contains('persistent plugin refresh mode', capabilities, "'persistent-plugin'");
 
-absent(
-  'unused AI CLI category removed',
-  help,
-  "| 'ai'"
-);
-
+absent('unused AI CLI category removed', help, "| 'ai'");
 
 console.log('');
 console.log('=== BUILD CONTRACT ===');
@@ -437,123 +300,58 @@ for (const expected of [
   "'background-refresh': 'src/multi-host/background-refresh-cli.ts'",
   "'integration-status': 'src/session/new-agents/scoped-status-cli.ts'",
 ]) {
-  contains(
-    `bundle entry ${expected.split(':')[0]}`,
-    buildBundle,
-    expected
-  );
+  contains(`bundle entry ${expected.split(':')[0]}`, buildBundle, expected);
 }
-
 
 console.log('');
 console.log('=== LOCAL-ONLY MEMORY CONTRACT ===');
 
-exact(
-  'manifest requiresLlm',
-  manifest?.runtime?.requiresLlm,
-  false
-);
+exact('manifest requiresLlm', manifest?.runtime?.requiresLlm, false);
 
-exact(
-  'manifest requiresEmbeddings',
-  manifest?.runtime?.requiresEmbeddings,
-  false
-);
+exact('manifest requiresEmbeddings', manifest?.runtime?.requiresEmbeddings, false);
 
-exact(
-  'manifest sharedProjectMemory',
-  manifest?.runtime?.sharedProjectMemory,
-  true
-);
+exact('manifest sharedProjectMemory', manifest?.runtime?.sharedProjectMemory, true);
 
-exact(
-  'manifest multiHostConvergence',
-  manifest?.runtime?.multiHostConvergence,
-  true
-);
+exact('manifest multiHostConvergence', manifest?.runtime?.multiHostConvergence, true);
 
-exact(
-  'storage implementation frozen',
-  manifest?.runtime?.storageImplementationFrozen,
-  true
-);
+exact('storage implementation frozen', manifest?.runtime?.storageImplementationFrozen, true);
 
-absent(
-  'stale MEMORY_AUTO_SUMMARIZE removed',
-  envExample,
-  'MEMORY_AUTO_SUMMARIZE'
-);
-
+absent('stale MEMORY_AUTO_SUMMARIZE removed', envExample, 'MEMORY_AUTO_SUMMARIZE');
 
 console.log('');
 console.log('=== README CONTRACT ===');
 
-contains(
-  'README 10-agent wording',
-  readme,
-  '10-agent continuity ring'
-);
+contains('README 10-agent wording', readme, '10-agent continuity ring');
 
-for (const { displayName } of Object.values(
-  EXPECTED_AGENTS
-)) {
-  contains(
-    `README agent ${displayName}`,
-    readme,
-    displayName
-  );
+for (const { displayName } of Object.values(EXPECTED_AGENTS)) {
+  contains(`README agent ${displayName}`, readme, displayName);
 }
 
-absent(
-  'README generated fence id',
-  readme,
-  '```text id='
-);
-
+absent('README generated fence id', readme, '```text id=');
 
 console.log('');
 console.log('=== PROTECTED SOURCE FREEZE ===');
 
-const storageStatus = git([
-  'status',
-  '--porcelain',
-  '--',
-  'src/storage',
-]);
+const storageStatus = git(['status', '--porcelain', '--', 'src/storage']);
 
-if (
-  storageStatus.status === 0 &&
-  !storageStatus.stdout.trim()
-) {
+if (storageStatus.status === 0 && !storageStatus.stdout.trim()) {
   pass('src/storage frozen');
 } else {
-  fail(
-    'src/storage frozen',
-    storageStatus.stdout.trim() ||
-      storageStatus.stderr.trim()
-  );
+  fail('src/storage frozen', storageStatus.stdout.trim() || storageStatus.stderr.trim());
 }
 
-const trackedEnv = git([
-  'ls-files',
-]);
+const trackedEnv = git(['ls-files']);
 
 const envFiles = trackedEnv.stdout
   .split(/\r?\n/u)
   .filter(Boolean)
-  .filter((file) =>
-    /(^|\/)\.env$/u.test(file)
-  );
+  .filter((file) => /(^|\/)\.env$/u.test(file));
 
 if (!envFiles.length) {
   pass('no tracked .env');
 } else {
-  fail(
-    'no tracked .env',
-    envFiles.join(', ')
-  );
+  fail('no tracked .env', envFiles.join(', '));
 }
-
 
 console.log('');
 console.log('=== FINAL CERTIFIER CONTRACT ===');
@@ -572,37 +370,22 @@ for (const gate of [
   'BUILD_RELEASE',
   'PRODUCTION_CERTIFY',
 ]) {
-  contains(
-    `final gate ${gate}`,
-    finalCert,
-    `"${gate}"`
-  );
+  contains(`final gate ${gate}`, finalCert, `"${gate}"`);
 }
 
-const npmTestOccurrences = (
-  finalCert.match(/^\s*npm test\s*$/gmu) ?? []
-).length;
+const npmTestOccurrences = (finalCert.match(/^\s*npm test\s*$/gmu) ?? []).length;
 
-exact(
-  'npm test appears exactly once in final certifier',
-  npmTestOccurrences,
-  1
-);
-
+exact('npm test appears exactly once in final certifier', npmTestOccurrences, 1);
 
 console.log('');
 console.log('======================================');
 
 if (failures === 0) {
-  console.log(
-    'STATIC_RELEASE_CONTRACT=PASS'
-  );
+  console.log('STATIC_RELEASE_CONTRACT=PASS');
 
   process.exitCode = 0;
 } else {
-  console.log(
-    `STATIC_RELEASE_CONTRACT=FAIL failures=${failures}`
-  );
+  console.log(`STATIC_RELEASE_CONTRACT=FAIL failures=${failures}`);
 
   process.exitCode = 1;
 }

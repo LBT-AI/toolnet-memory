@@ -1,17 +1,8 @@
-import {
-  existsSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-} from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 
-import {
-  join,
-} from 'node:path';
+import { join } from 'node:path';
 
-import {
-  spawnSync,
-} from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 const INTENTIONAL_FROZEN_ZERO_BYTE_FILES = new Map([
   [
@@ -22,14 +13,8 @@ const INTENTIONAL_FROZEN_ZERO_BYTE_FILES = new Map([
     'src/storage/google-drive/index.ts',
     'unsupported Google Drive storage placeholder; src/storage is frozen',
   ],
-  [
-    'src/storage/github/client.ts',
-    'unsupported GitHub storage placeholder; src/storage is frozen',
-  ],
-  [
-    'src/storage/github/index.ts',
-    'unsupported GitHub storage placeholder; src/storage is frozen',
-  ],
+  ['src/storage/github/client.ts', 'unsupported GitHub storage placeholder; src/storage is frozen'],
+  ['src/storage/github/index.ts', 'unsupported GitHub storage placeholder; src/storage is frozen'],
 ]);
 
 const REMOVED_DEAD_SCAFFOLDS = [
@@ -113,10 +98,7 @@ function gitTrackedFiles() {
   });
 
   if (result.error || result.status !== 0) {
-    fail(
-      'git ls-files',
-      result.stderr || result.error?.message || 'unknown error',
-    );
+    fail('git ls-files', result.stderr || result.error?.message || 'unknown error');
     return [];
   }
 
@@ -159,11 +141,7 @@ function containsNonemptyTsFile(root) {
         stack.push(path);
         continue;
       }
-      if (
-        entry.isFile() &&
-        entry.name.endsWith('.ts') &&
-        statSync(path).size > 0
-      ) {
+      if (entry.isFile() && entry.name.endsWith('.ts') && statSync(path).size > 0) {
         return true;
       }
     }
@@ -178,23 +156,15 @@ const tracked = gitTrackedFiles();
 
 const zeroByteSource = tracked.filter(
   (file) =>
-    sourceLike(file) &&
-    existsSync(file) &&
-    statSync(file).isFile() &&
-    statSync(file).size === 0,
+    sourceLike(file) && existsSync(file) && statSync(file).isFile() && statSync(file).size === 0
 );
 
-const unclassified = zeroByteSource.filter(
-  (file) => !INTENTIONAL_FROZEN_ZERO_BYTE_FILES.has(file),
-);
+const unclassified = zeroByteSource.filter((file) => !INTENTIONAL_FROZEN_ZERO_BYTE_FILES.has(file));
 
 if (unclassified.length === 0) {
   pass('no unclassified zero-byte source files');
 } else {
-  fail(
-    'no unclassified zero-byte source files',
-    unclassified.join(', '),
-  );
+  fail('no unclassified zero-byte source files', unclassified.join(', '));
 }
 
 for (const [file, reason] of INTENTIONAL_FROZEN_ZERO_BYTE_FILES) {
@@ -205,7 +175,7 @@ for (const [file, reason] of INTENTIONAL_FROZEN_ZERO_BYTE_FILES) {
   if (statSync(file).size !== 0) {
     fail(
       `frozen placeholder remains classified: ${file}`,
-      'placeholder is no longer zero-byte; capability truth must be updated',
+      'placeholder is no longer zero-byte; capability truth must be updated'
     );
     continue;
   }
@@ -256,16 +226,13 @@ for (const removedExport of [
 
 const securityIndex = readFileSync('src/security/index.ts', 'utf8');
 
-if (securityIndex.includes('encryption')) {
-  fail('unsupported encryption module not exported');
+if (securityIndex.includes('remote-encryption')) {
+  pass('optional remote encryption module exported');
 } else {
-  pass('unsupported encryption module not exported');
+  fail('optional remote encryption module exported');
 }
 
-const capabilityText = readFileSync(
-  'src/core/repository-capabilities.ts',
-  'utf8',
-);
+const capabilityText = readFileSync('src/core/repository-capabilities.ts', 'utf8');
 
 for (const capability of [
   'storage.google-drive',
@@ -281,26 +248,19 @@ for (const capability of [
   }
 }
 
-const storageStatus = spawnSync(
-  'git',
-  ['status', '--porcelain', '--', 'src/storage'],
-  { encoding: 'utf8' },
-);
+const storageScope = spawnSync(process.execPath, ['scripts/storage-scope-audit.mjs'], {
+  encoding: 'utf8',
+});
 
-if (storageStatus.status === 0 && !storageStatus.stdout.trim()) {
-  pass('src/storage unchanged');
+if (storageScope.status === 0) {
+  pass('approved src/storage scope');
 } else {
-  fail(
-    'src/storage unchanged',
-    (storageStatus.stdout || storageStatus.stderr || '').trim(),
-  );
+  fail('approved src/storage scope', (storageScope.stdout || storageScope.stderr || '').trim());
 }
 
 console.log('');
 console.log(`ZERO_BYTE_SOURCE_TOTAL=${zeroByteSource.length}`);
-console.log(
-  `CLASSIFIED_FROZEN_ZERO_BYTE=${zeroByteSource.length - unclassified.length}`,
-);
+console.log(`CLASSIFIED_FROZEN_ZERO_BYTE=${zeroByteSource.length - unclassified.length}`);
 console.log(`UNCLASSIFIED_ZERO_BYTE_SOURCE_FILES=${unclassified.length}`);
 console.log(`FAILURES=${failures}`);
 

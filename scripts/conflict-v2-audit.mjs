@@ -1,9 +1,5 @@
-import {
-  readFileSync,
-} from 'node:fs';
-import {
-  spawnSync,
-} from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 let failures = 0;
 function read(file) {
   return readFileSync(file, 'utf8');
@@ -30,7 +26,15 @@ const extractor = read('src/session/learner/extractor.ts');
 const promotion = read('src/memory/promotion-policy.ts');
 const journal = read('src/session/learner/journal.ts');
 console.log('=== Conflict Engine V2 Audit ===');
-for (const kind of ["'rule'", "'decision'", "'todo'", "'next_action'", "'fix'", "'context'", "'architecture'"]) {
+for (const kind of [
+  "'rule'",
+  "'decision'",
+  "'todo'",
+  "'next_action'",
+  "'fix'",
+  "'context'",
+  "'architecture'",
+]) {
   contains(`conflict kind ${kind}`, detector, kind);
 }
 contains('completion relation', detector, 'completed:');

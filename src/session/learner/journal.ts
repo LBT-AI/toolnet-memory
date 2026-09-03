@@ -9,6 +9,7 @@ import type { StorageProvider } from '../../storage/types.js';
 import type { SessionIdentity, NormalizedSessionEvent } from '../types.js';
 
 import { sha256 } from '../utils.js';
+import { safeAppendAuditEvent } from '../../audit/log.js';
 
 import type { LearnedMemoryBatch, LearnedMemoryCandidate, MemoryReconcileResult } from './types.js';
 
@@ -266,6 +267,12 @@ export async function reconcileSessionMemoryJournal(
   let duplicates = 0;
 
   let evidenceUpdated = 0;
+  const addedAuditRecords: Array<{
+    id: string;
+    type: string;
+    kind: string;
+    agent: string;
+  }> = [];
 
   for (const batch of batches) {
     for (const candidate of batch.candidates) {
@@ -315,13 +322,31 @@ export async function reconcileSessionMemoryJournal(
       fingerprints.add(candidate.fingerprint);
 
       memoriesByFingerprint.set(candidate.fingerprint, remembered);
-
+      addedAuditRecords.push({
+        id: remembered.id,
+        type: remembered.type,
+        kind: candidate.kind,
+        agent: candidate.agent,
+      });
       added += 1;
     }
   }
 
   if (added > 0 || evidenceUpdated > 0) {
     await store.save(project.id, engine.exportProject(project.id));
+    for (const item of addedAuditRecords) {
+      await safeAppendAuditEvent(project, {
+        action: 'memory.save',
+        outcome: 'success',
+        actor: { kind: 'agent', id: item.agent },
+        details: {
+          memoryId: item.id,
+          type: item.type,
+          learningKind: item.kind,
+          source: 'session-memory-learner',
+        },
+      });
+    }
   }
 
   return {

@@ -15,6 +15,7 @@ import { requireInitializedProject } from './project.js';
 import { GarbageCollector } from './service.js';
 
 import type { GcPlan, RetentionPolicy } from './types.js';
+import { safeAppendAuditEvent } from '../audit/log.js';
 
 interface CliOptions {
   apply: boolean;
@@ -227,6 +228,22 @@ async function main(): Promise<void> {
 
     const result = await collector.execute(plan, false);
 
+    await safeAppendAuditEvent(project, {
+      action: 'gc.manual',
+      outcome: result.failed > 0 ? 'failed' : 'success',
+      actor: {
+        kind: 'user',
+        id: process.env.TOOLNET_AGENT_ID?.trim() || 'cli',
+      },
+      details: {
+        includeRemote: options.includeRemote,
+        deleted: result.deleted,
+        skipped: result.skipped,
+        failed: result.failed,
+        bytesFreed: result.bytesFreed,
+      },
+    });
+
     console.log(
       JSON.stringify(
         {
@@ -257,6 +274,22 @@ async function main(): Promise<void> {
   }
 
   const result = await collector.execute(plan, false);
+
+  await safeAppendAuditEvent(project, {
+    action: 'gc.manual',
+    outcome: result.failed > 0 ? 'failed' : 'success',
+    actor: {
+      kind: 'user',
+      id: process.env.TOOLNET_AGENT_ID?.trim() || 'cli',
+    },
+    details: {
+      includeRemote: options.includeRemote,
+      deleted: result.deleted,
+      skipped: result.skipped,
+      failed: result.failed,
+      bytesFreed: result.bytesFreed,
+    },
+  });
 
   console.log('');
   console.log(`Deleted: ${result.deleted}`);

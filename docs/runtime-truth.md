@@ -59,6 +59,7 @@ Assistant-derived memory has lower authority than explicit user evidence.
 Conflict handling does not use an LLM merge.
 
 Conflict Engine V2 extends deterministic lifecycle handling across:
+
 - rules,
 - decisions,
 - todos,
@@ -66,9 +67,9 @@ Conflict Engine V2 extends deterministic lifecycle handling across:
 - fixes,
 - context/state,
 - architecture-derived memory.
-Verified fixes can complete related tasks or resolve related state. Lower-authority
-contradictions are retained as conflict evidence but are not surfaced as normal
-active memory.
+  Verified fixes can complete related tasks or resolve related state. Lower-authority
+  contradictions are retained as conflict evidence but are not surfaced as normal
+  active memory.
 
 ---
 
@@ -115,20 +116,20 @@ always zero.
 
 ## Code parser support
 
-| Language / extension | Status | Engine |
-| --- | --- | --- |
-| TypeScript `.ts` | supported | TypeScript Compiler API |
-| TSX `.tsx` | supported | TypeScript Compiler API |
-| JavaScript `.js` | supported | TypeScript Compiler API |
-| JSX `.jsx` | supported | TypeScript Compiler API |
-| MTS `.mts` | supported | TypeScript Compiler API |
-| CTS `.cts` | supported | TypeScript Compiler API |
-| MJS `.mjs` | supported | TypeScript Compiler API |
-| CJS `.cjs` | supported | TypeScript Compiler API |
-| Python `.py` | unsupported | none |
-| Go `.go` | unsupported | none |
-| Rust `.rs` | unsupported | none |
-| C / C++ | unsupported | none |
+| Language / extension | Status                                           | Engine                  |
+| -------------------- | ------------------------------------------------ | ----------------------- |
+| TypeScript `.ts`     | supported                                        | TypeScript Compiler API |
+| TSX `.tsx`           | supported                                        | TypeScript Compiler API |
+| JavaScript `.js`     | supported                                        | TypeScript Compiler API |
+| JSX `.jsx`           | supported                                        | TypeScript Compiler API |
+| MTS `.mts`           | supported                                        | TypeScript Compiler API |
+| CTS `.cts`           | supported                                        | TypeScript Compiler API |
+| MJS `.mjs`           | supported                                        | TypeScript Compiler API |
+| CJS `.cjs`           | supported                                        | TypeScript Compiler API |
+| Python `.py`         | lexical FTS5/BM25; structural parser unsupported | none                    |
+| Go `.go`             | lexical FTS5/BM25; structural parser unsupported | none                    |
+| Rust `.rs`           | lexical FTS5/BM25; structural parser unsupported | none                    |
+| C / C++              | unsupported                                      | none                    |
 
 Unsupported languages are not silently represented as fully parsed structural
 code intelligence.
@@ -273,18 +274,18 @@ Automatic scheduled GC is not implemented yet.
 
 Implemented:
 
-| Storage | Status |
-| --- | --- |
-| Local | supported |
-| Hugging Face S3-compatible storage | supported |
-| Generic S3-compatible storage | supported |
-| Cloudflare R2 | supported through S3-compatible provider |
+| Storage                            | Status                                   |
+| ---------------------------------- | ---------------------------------------- |
+| Local                              | supported                                |
+| Hugging Face S3-compatible storage | supported                                |
+| Generic S3-compatible storage      | supported                                |
+| Cloudflare R2                      | supported through S3-compatible provider |
 
 Not implemented:
 
-| Storage | Status |
-| --- | --- |
-| Google Drive | unsupported |
+| Storage                | Status      |
+| ---------------------- | ----------- |
+| Google Drive           | unsupported |
 | GitHub storage backend | unsupported |
 
 Frozen zero-byte placeholders under `src/storage/**` do not represent working
@@ -304,18 +305,23 @@ Implemented:
 - nested durable-data sanitization,
 - project-document trust boundaries.
 
-Not implemented by default:
+Optional remote client-side encryption is implemented with AES-256-GCM.
 
-- client-side encryption
-- mandatory encryption key
+Default behavior remains:
 
-ToolNet does not currently encrypt durable payloads itself before handing them
-to a configured remote storage provider.
+| Capability                    | Default   |
+| ----------------------------- | --------- |
+| remote client-side encryption | off       |
+| mandatory encryption key      | no        |
+| local storage encryption      | unchanged |
 
-Transport security and provider-side encryption are properties of the selected
-storage service and its configuration.
+When explicitly enabled, ToolNet encrypts new remote object writes before
+they reach supported S3 / R2 / Hugging Face storage providers. Existing
+plaintext remote objects remain readable for compatibility. No automatic
+bucket-wide migration occurs.
 
-This must not be described as ToolNet-provided client-side encryption.
+Plaintext remains the default and no encryption key is required unless the
+operator explicitly turns remote encryption on.
 
 ---
 
@@ -385,3 +391,12 @@ Repository truth rules:
 3. Frozen compatibility boundaries are explicitly documented.
 4. Planned functionality is called unsupported until implemented.
 5. Compatibility names are preserved when removing them would break clients.
+
+Non-TypeScript lexical search
+
+Python, Go, Rust, C, and C++ are eligible for Local Code Search through
+file-level sanitized chunks and SQLite FTS5/BM25.
+
+Their structural parser status remains unsupported.
+
+LSP capability detection is informational only in v0.3.17.

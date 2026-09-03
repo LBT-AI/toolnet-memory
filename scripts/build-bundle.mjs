@@ -29,8 +29,11 @@ const entries = {
   api: 'src/api/bootstrap.ts',
   service: 'src/service/daemon.ts',
   'service-cli': 'src/service/cli.ts',
+  'docker-healthcheck': 'src/service/docker-healthcheck.ts',
   snapshot: 'src/production/snapshot-cli.ts',
   gc: 'src/retention/cli.ts',
+  audit: 'src/audit/cli.ts',
+  'code-capabilities': 'src/code-intelligence/parsers/capability-cli.ts',
 
   opencode: 'src/session/opencode/cli.ts',
   agy: 'src/session/agy/cli.ts',

@@ -7,6 +7,7 @@
 import { ProjectManager } from '../core/index.js';
 import { loadGuardConfig } from './rules.js';
 import { checkPath, checkCommand, checkProject, type GuardResult } from './detector.js';
+import { safeAppendAuditEvent } from '../audit/log.js';
 
 interface CliOptions {
   file?: string;
@@ -221,6 +222,24 @@ async function main() {
     if (!result.ok && config.mode === 'strict') {
       process.exit(1);
     }
+
+    // Audit the check itself; raw command text is never recorded.
+    const checkType = options.command ? 'command' : options.file ? 'file' : 'project';
+    void safeAppendAuditEvent(project, {
+      action: 'guard.check',
+      outcome: !result.ok && config.mode === 'strict' ? 'blocked' : 'success',
+      actor: {
+        kind: 'agent',
+        id: process.env.TOOLNET_AGENT_ID?.trim() || 'cli',
+      },
+      details: {
+        checkType,
+        mode: result.mode,
+        ok: result.ok,
+        warnings: result.warnings.length,
+        warningTypes: result.warnings.map((warning) => warning.type).sort(),
+      },
+    });
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);

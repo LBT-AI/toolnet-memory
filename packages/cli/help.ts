@@ -109,8 +109,13 @@ export const COMMANDS: CommandMetadata[] = [
   },
   {
     name: 'graph',
-    description: 'Open code graph UI',
+    description: 'Open localhost-first code graph UI with optional bearer authentication',
+    usage: 'toolnet-memory graph',
     category: 'code',
+    examples: [
+      'toolnet-memory graph',
+      'TOOLNET_GRAPH_HOST=0.0.0.0 TOOLNET_GRAPH_TOKEN=<random-token> toolnet-memory graph',
+    ],
   },
   {
     name: 'graph:ui',

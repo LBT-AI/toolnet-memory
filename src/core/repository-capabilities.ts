@@ -46,9 +46,9 @@ export const REPOSITORY_CAPABILITIES: readonly RepositoryCapability[] = [
   },
   {
     id: 'security.client-side-encryption',
-    status: 'unsupported',
-    implementation: 'none',
-    note: 'ToolNet Memory does not provide client-side encryption in this release and does not require an encryption key.',
+    status: 'supported',
+    implementation: 'src/storage/encrypted-provider.ts',
+    note: 'Optional remote client-side encryption uses AES-256-GCM. It is disabled by default and does not require an encryption key for normal local/plaintext operation.',
   },
   {
     id: 'sync.legacy-engine',

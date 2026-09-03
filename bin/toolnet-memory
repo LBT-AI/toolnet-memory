@@ -80,6 +80,18 @@ case "$COMMAND" in
     shift
     run bundle/gc.js src/retention/cli.ts "$@"
     ;;
+  audit)
+    shift
+    run bundle/audit.js src/audit/cli.ts "$@"
+    ;;
+  audit:verify)
+    shift
+    run bundle/audit.js src/audit/cli.ts verify "$@"
+    ;;
+  code:capabilities)
+    shift
+    run bundle/code-capabilities.js src/code-intelligence/parsers/capability-cli.ts "$@"
+    ;;
 
   run)
     run bundle/runtime.js src/index.ts

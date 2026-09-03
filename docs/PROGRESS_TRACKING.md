@@ -11,29 +11,34 @@ ToolNet Memory's index UI displays real-time progress for each indexing stage. P
 Stages that report measurable progress with accurate percentages:
 
 #### 1. **Scanning files**
+
 - **Metric**: Files discovered
 - **Display**: Count only (e.g., "1,234 found")
 - **Implementation**: Reports total files found after scan completes
 
 #### 2. **Parsing code**
+
 - **Metric**: Files parsed / Total files
 - **Display**: Progress bar with % (e.g., "███████░░░ 44%")
 - **Implementation**: `RepositoryIndexer` reports after each file is parsed
 - **Guarantee**: 100% only when all files are parsed
 
 #### 3. **Type Resolution**
+
 - **Metric**: Files processed / Total files
 - **Display**: Progress bar with % (e.g., "███████░░░ 67%")
 - **Implementation**: `TypeScriptTypeResolver` reports after each source file is analyzed
 - **Guarantee**: 100% only when all TypeScript analysis is complete
 
 #### 4. **Rich Graph**
+
 - **Metric**: Files enriched / Total files
 - **Display**: Progress bar with % (e.g., "███████░░░ 82%")
 - **Implementation**: `RichGraphEnricher` reports after each file is processed
 - **Guarantee**: 100% only when all graph enrichment is complete
 
 #### 5. **Semantic Code Index**
+
 - **Metric**: Embedding batches completed / Total batches
 - **Display**: Progress bar with % (e.g., "███████░░░ 55%")
 - **Implementation**: `SemanticCodeEngine` reports after each batch of 8 chunks is embedded
@@ -43,6 +48,7 @@ Stages that report measurable progress with accurate percentages:
 - **Guarantee**: 100% only after all embeddings are generated AND saved
 
 #### 6. **3D Visualization Dataset**
+
 - **Metric**: Nodes/Links transformed / Total nodes/links
 - **Display**: Progress bar with % (e.g., "███████░░░ 91%")
 - **Implementation**: `VisualizationBuilder` reports every 100 nodes/links processed
@@ -56,12 +62,14 @@ Stages that report measurable progress with accurate percentages:
 Stages that cannot measure progress accurately and use animation only:
 
 #### 7. **Architecture Intelligence**
+
 - **Why shimmer-only**: Single-pass analysis with no divisible workload
 - **Display**: Animated spinner without progress bar
 - **Implementation**: `ArchitectureEngine.analyze()` runs as one atomic operation
 - **Stages**: Entry point detection, hotspot analysis, layer detection, cluster detection
 
 #### 8. **Graph Analysis**
+
 - **Why shimmer-only**: Single-pass analysis with no divisible workload
 - **Display**: Animated spinner without progress bar
 - **Implementation**: `CodeAnalysisEngine.analyze()` runs as one atomic operation
@@ -82,10 +90,10 @@ For a stage to show real progress (%), it MUST:
 
 ```typescript
 export interface StageProgressEvent {
-  current: number;  // Actual units completed
-  total: number;    // Total units to complete
-  phase?: string;   // Optional sub-phase (e.g., 'embedding', 'saving')
-  detail?: string;  // Optional detail (e.g., current file name)
+  current: number; // Actual units completed
+  total: number; // Total units to complete
+  phase?: string; // Optional sub-phase (e.g., 'embedding', 'saving')
+  detail?: string; // Optional detail (e.g., current file name)
 }
 
 export type StageProgressCallback = (event: StageProgressEvent) => void;
@@ -94,12 +102,14 @@ export type StageProgressCallback = (event: StageProgressEvent) => void;
 ### 3. Forbidden Practices
 
 ❌ **NEVER** fake progress based on:
+
 - Elapsed time
 - Arbitrary percentages (20%, 50%, 90%)
 - Estimated completion time
 - Timer intervals
 
 ❌ **NEVER** show 100% before:
+
 - All processing is complete
 - All data is persisted/saved
 - All sub-phases are finished
@@ -107,16 +117,19 @@ export type StageProgressCallback = (event: StageProgressEvent) => void;
 ### 4. UI Behavior
 
 **With Real Progress:**
+
 ```
 ✳ Semantic Code Index  ███████████░░░░░░░░░░░░░░  44%
 ```
 
 **Without Real Progress (Shimmer):**
+
 ```
 ✶ Architecture Intelligence  ░░███░░░░░░░░░░░░
 ```
 
 **Stage Complete:**
+
 ```
 ◆ Type Resolution — done
 ```
@@ -141,6 +154,7 @@ To add real progress tracking to a new indexing stage:
    - If NO to either: use shimmer-only
 
 2. **Add progress callback parameter**
+
    ```typescript
    async myStage(
      projectId: string,
@@ -151,10 +165,11 @@ To add real progress tracking to a new indexing stage:
    ```
 
 3. **Report progress after each work unit**
+
    ```typescript
    for (let i = 0; i < items.length; i++) {
      await processItem(items[i]);
-     
+
      onProgress?.({
        current: i + 1,
        total: items.length,
@@ -164,6 +179,7 @@ To add real progress tracking to a new indexing stage:
    ```
 
 4. **Include persistence in progress**
+
    ```typescript
    // Don't report 100% until save is complete
    onProgress?.({
@@ -171,7 +187,7 @@ To add real progress tracking to a new indexing stage:
      total: totalBatches,
      phase: 'saving',
    });
-   
+
    await storage.save(data);
    ```
 

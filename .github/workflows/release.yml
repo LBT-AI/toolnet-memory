@@ -3,34 +3,92 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 permissions:
   contents: write
   id-token: write
 
 jobs:
-  release:
-    name: Publish npm + GitHub Release
-    runs-on: ubuntu-latest
-
+  standalone:
+    name: Standalone ${{ matrix.id }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-x64
+            os: ubuntu-latest
+            target: node22-linux-x64
+            output: toolnet-memory-linux-x64
+          - id: linux-arm64
+            os: ubuntu-latest
+            target: node22-linux-arm64
+            output: toolnet-memory-linux-arm64
+          - id: macos-x64
+            os: macos-latest
+            target: node22-macos-x64
+            output: toolnet-memory-macos-x64
+          - id: macos-arm64
+            os: macos-latest
+            target: node22-macos-arm64
+            output: toolnet-memory-macos-arm64
+          - id: windows-x64
+            os: windows-latest
+            target: node22-win-x64
+            output: toolnet-memory-windows-x64.exe
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build standalone executable
+        shell: bash
+        run: |
+          npm run standalone:build -- \
+            --target "${{ matrix.target }}" \
+            --output "dist/standalone/${{ matrix.output }}"
+      - name: Ad-hoc sign macOS executable
+        if: startsWith(matrix.target, 'node22-macos-')
+        shell: bash
+        run: |
+          codesign --force --sign - "dist/standalone/${{ matrix.output }}"
+          codesign --verify --verbose "dist/standalone/${{ matrix.output }}"
+      - name: Runtime smoke when runner matches target
+        run: >-
+          node scripts/standalone-ci-smoke.mjs
+          --target "${{ matrix.target }}"
+          --binary "dist/standalone/${{ matrix.output }}"
+      - name: Upload standalone artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: standalone-${{ matrix.id }}
+          path: dist/standalone/${{ matrix.output }}
+          if-no-files-found: error
 
+  release:
+    name: Publish npm + GitHub Release
+    needs:
+      - standalone
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
-
       - name: Ensure npm supports trusted publishing
         run: npm install -g npm@latest
-
       - name: Install dependencies
         run: npm ci
-
       - name: Verify tag matches package version
         shell: bash
         run: |
@@ -41,23 +99,30 @@ jobs:
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-
       - name: Validate installer
         run: bash -n scripts/install.sh
-
       - name: Run tests
         run: npm test
-
       - name: Build production release
         run: npm run build:release
-
       - name: Pack release artifact
         shell: bash
         run: |
           TARBALL="$(npm pack --silent)"
           echo "TARBALL=$TARBALL" >> "$GITHUB_ENV"
           test -f "$TARBALL"
-
+      - name: Download standalone artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: standalone-*
+          path: standalone-artifacts
+          merge-multiple: true
+      - name: Create standalone checksums
+        shell: bash
+        run: |
+          cd standalone-artifacts
+          find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | sort | xargs sha256sum > SHA256SUMS
+          cat SHA256SUMS
       - name: Check npm release
         id: npm_release
         shell: bash
@@ -68,20 +133,25 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-
       - name: Publish to npm with trusted publishing
         if: steps.npm_release.outputs.exists != 'true'
         run: npm publish --access public
-
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "GitHub Release $GITHUB_REF_NAME already exists; skipping."
+            gh release upload \
+              "$GITHUB_REF_NAME" \
+              "$TARBALL" \
+              standalone-artifacts/* \
+              --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$TARBALL" \
+            gh release create \
+              "$GITHUB_REF_NAME" \
+              "$TARBALL" \
+              standalone-artifacts/* \
               --title "ToolNet Memory $GITHUB_REF_NAME" \
               --generate-notes
           fi

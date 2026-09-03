@@ -799,6 +799,55 @@
   <script src="/vendor/3d-force-graph.min.js"></script>
 
   <script>
+    const GRAPH_TOKEN_SESSION_KEY = "toolnet.graph.access-token";
+    function readGraphToken() {
+      try {
+        return sessionStorage.getItem(GRAPH_TOKEN_SESSION_KEY) || "";
+      } catch {
+        return "";
+      }
+    }
+    function writeGraphToken(value) {
+      try {
+        if (value) {
+          sessionStorage.setItem(GRAPH_TOKEN_SESSION_KEY, value);
+          return;
+        }
+        sessionStorage.removeItem(GRAPH_TOKEN_SESSION_KEY);
+      } catch {
+        // Session storage is optional.
+      }
+    }
+    function graphApiRequest(input, init, token) {
+      const headers = new Headers(init?.headers);
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+      return window.fetch(input, {
+        ...init,
+        headers,
+        cache: "no-store",
+      });
+    }
+    async function graphApiFetch(input, init = {}) {
+      let token = readGraphToken();
+      let response = await graphApiRequest(input, init, token);
+      if (response.status !== 401) {
+        return response;
+      }
+      // Existing token is invalid/stale.
+      writeGraphToken("");
+      token = window.prompt("ToolNet Graph access token")?.trim() || "";
+      if (!token) {
+        return response;
+      }
+      writeGraphToken(token);
+      response = await graphApiRequest(input, init, token);
+      if (response.status === 401) {
+        writeGraphToken("");
+      }
+      return response;
+    }
     const state = {
       raw:
         null,
@@ -2534,7 +2583,7 @@
       }
 
       const response =
-        await fetch(
+        await graphApiFetch(
           `/api/graph?${params.toString()}`
         );
 
@@ -2750,7 +2799,7 @@
 
     async function main() {
       const response =
-        await fetch(
+        await graphApiFetch(
           "/api/projects"
         );
 

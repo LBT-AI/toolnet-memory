@@ -50,9 +50,11 @@ describe('Phase 19 repository truth', () => {
     expect(repositoryCapability('storage.google-drive')?.status).toBe('unsupported');
   });
 
-  it('declares client-side encryption unsupported', () => {
-    expect(repositoryCapabilitySupported('security.client-side-encryption')).toBe(false);
-    expect(repositoryCapability('security.client-side-encryption')?.implementation).toBe('none');
+  it('declares optional client-side encryption supported', () => {
+    expect(repositoryCapabilitySupported('security.client-side-encryption')).toBe(true);
+    expect(repositoryCapability('security.client-side-encryption')?.implementation).toBe(
+      'src/storage/encrypted-provider.ts'
+    );
   });
 
   it('points legacy sync at multi-host replacement', () => {

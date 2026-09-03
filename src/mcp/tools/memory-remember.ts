@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { MCPContext } from '../context.js';
 
 import { invalidateServiceProject } from '../../service/client.js';
+import { safeAppendAuditEvent } from '../../audit/log.js';
 
 export const memoryRememberSchema = {
   type: z.enum(['activity', 'decision', 'rule', 'todo', 'summary']),
@@ -43,6 +44,21 @@ export async function memoryRemember(
   if (ctx.memoryStore) {
     await ctx.memoryStore.save(ctx.project.id, ctx.memory.exportProject(ctx.project.id));
   }
+
+  await safeAppendAuditEvent(ctx.project, {
+    action: 'memory.save',
+    outcome: 'success',
+    actor: {
+      kind: 'mcp',
+      id: process.env.TOOLNET_AGENT_ID?.trim() || 'mcp',
+    },
+    details: {
+      memoryId: record.id,
+      type: record.type,
+      importance: record.importance,
+      source: 'mcp',
+    },
+  });
 
   void invalidateServiceProject(ctx.project);
 

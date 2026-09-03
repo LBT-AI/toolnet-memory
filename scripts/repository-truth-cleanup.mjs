@@ -1,20 +1,8 @@
-import {
-  existsSync,
-  readFileSync,
-  rmSync,
-  statSync,
-} from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 
-import {
-  dirname,
-  extname,
-  normalize,
-  resolve,
-} from 'node:path';
+import { dirname, extname, normalize, resolve } from 'node:path';
 
-import {
-  spawnSync,
-} from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 const DEAD_ZERO_BYTE_SCAFFOLDS = [
   // Legacy sync scaffold.
@@ -88,9 +76,7 @@ function trackedFiles() {
   });
 
   if (result.error || result.status !== 0) {
-    throw new Error(
-      result.stderr || result.error?.message || 'git ls-files failed',
-    );
+    throw new Error(result.stderr || result.error?.message || 'git ls-files failed');
   }
 
   return result.stdout
@@ -120,35 +106,22 @@ function possibleTargets(sourceFile, specifier) {
   const extension = extname(relative);
 
   if (extension === '.js') {
-    return [
-      relative.slice(0, -3) + '.ts',
-      relative.slice(0, -3) + '.tsx',
-    ];
+    return [relative.slice(0, -3) + '.ts', relative.slice(0, -3) + '.tsx'];
   }
 
   if (extension === '.mjs') {
-    return [
-      relative.slice(0, -4) + '.mts',
-      relative.slice(0, -4) + '.ts',
-    ];
+    return [relative.slice(0, -4) + '.mts', relative.slice(0, -4) + '.ts'];
   }
 
   if (extension === '.cjs') {
-    return [
-      relative.slice(0, -4) + '.cts',
-      relative.slice(0, -4) + '.ts',
-    ];
+    return [relative.slice(0, -4) + '.cts', relative.slice(0, -4) + '.ts'];
   }
 
   if (extension) {
     return [relative];
   }
 
-  return [
-    `${relative}.ts`,
-    `${relative}.tsx`,
-    `${relative}/index.ts`,
-  ];
+  return [`${relative}.ts`, `${relative}.tsx`, `${relative}/index.ts`];
 }
 
 function importSpecifiers(text) {
@@ -207,8 +180,7 @@ function referencesTo(candidate, files) {
      */
     if (
       sourceFile.endsWith('package.json') &&
-      (text.includes(candidate) ||
-        text.includes(candidate.replace(/\.ts$/u, '.js')))
+      (text.includes(candidate) || text.includes(candidate.replace(/\.ts$/u, '.js')))
     ) {
       references.push(`${sourceFile} -> literal path`);
     }

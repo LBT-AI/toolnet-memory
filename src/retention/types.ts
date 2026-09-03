@@ -8,6 +8,7 @@ export type GcCategory =
   | 'protected-work'
   | 'protected-context'
   | 'protected-journal'
+  | 'protected-audit'
   | 'protected-wal'
   | 'protected-legacy-session'
   | 'protected-remote-operation';

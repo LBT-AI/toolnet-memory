@@ -31,3 +31,4 @@ export * from './architecture/index.js';
 export * from './query/index.js';
 export * from './analysis/index.js';
 export * from './visualization/index.js';
+export * from './parsers/index.js';

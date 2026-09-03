@@ -1,7 +1,4 @@
-import {
-  existsSync,
-  readFileSync,
-} from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 let failures = 0;
 

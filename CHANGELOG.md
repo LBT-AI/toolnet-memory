@@ -4,6 +4,19 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.3.17]
+
+- Hardened Graph UI exposure with localhost-first binding, DNS-rebinding Host validation, same-origin API checks, optional bearer authentication, security headers, and minimal unauthenticated health status.
+- Added official Docker support with Node.js 22 multi-stage builds, non-root runtime, tini PID 1, real ToolNet IPC health checks, persistent volumes, GHCR multi-architecture publishing, provenance, and SBOM output.
+- Added optional AES-256-GCM client-side encryption for supported remote object storage. Encryption remains disabled by default and no encryption key is required for normal operation.
+- Added standalone Linux, macOS, and Windows executables that do not require Node.js or npm on the target host.
+- Added SHA-256 hash-chained project audit logs for durable memory writes, snapshots, Guard checks, and garbage collection.
+- Added optional weekly automatic garbage collection with strict existing-project resolution, local exclusive coordination, and remote GC disabled by default.
+- Added Python, Go, Rust, C, and C++ to deterministic Local Code Search through sanitized file-level chunks indexed by SQLite FTS5/BM25.
+- Added optional LSP capability detection foundation for pyright-langserver, gopls, rust-analyzer, and clangd without automatic downloads or structural-graph claims.
+- Preserved TypeScript/JavaScript as the only structurally parsed language family in this release.
+- Preserved the local-first deterministic runtime with no LLM, embedding provider, or vector database requirement.
+
 ## [0.3.16]
 
 - Added cross-machine Git project identity so independent clones can converge on the same ToolNet project ID.

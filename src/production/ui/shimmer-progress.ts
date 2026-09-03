@@ -31,6 +31,13 @@ export interface ShimmerProgress {
 }
 
 export function createShimmerProgress(): ShimmerProgress {
+  // A standalone executable contains one runtime file. The shimmer Worker is
+  // cosmetic, so use deterministic plain progress rather than requiring a
+  // sibling worker file.
+  if (process.env.TOOLNET_STANDALONE === '1') {
+    return createPlainProgress();
+  }
+
   // Piped/redirected stdout: `\r`-rewriting animation frames are garbage in a
   // log file — emit one plain line per stage instead.
   if (process.stdout.isTTY !== true) {

@@ -25,6 +25,8 @@ import type {
 } from './protocol.js';
 
 import { toolNetServiceSocketPath } from './socket-path.js';
+import { createAutoGcScheduler } from '../retention/scheduler.js';
+import { ProjectManager } from '../core/project-manager.js';
 
 export type ToolNetServiceProjectLoader = (
   project: ToolNetServiceProject
@@ -139,7 +141,14 @@ export async function startToolNetService(
   );
 
   const loader = options.loader ?? loadProjectForService;
-
+  const autoGc = createAutoGcScheduler();
+  if (autoGc.enabled) {
+    const current = new ProjectManager().findExisting(process.cwd());
+    if (current) {
+      autoGc.observeRoot(current.rootPath);
+    }
+    console.log('[toolnet-memory] auto-GC scheduler enabled');
+  }
   const cache = new Map<string, CacheEntry>();
 
   const startedAt = new Date().toISOString();
@@ -176,6 +185,7 @@ export async function startToolNetService(
     }
 
     const key = projectKey(request.project);
+    autoGc.observeRoot(request.project.rootPath);
 
     if (request.type === 'invalidate') {
       return {
@@ -303,6 +313,7 @@ export async function startToolNetService(
     stats,
 
     close: async () => {
+      autoGc.close();
       await new Promise<void>((resolveClose) => {
         server.close(() => {
           resolveClose();

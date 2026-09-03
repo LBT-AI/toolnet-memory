@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.3.16**
+Current release: v0.3.17
 
 </div>
 
@@ -614,7 +614,47 @@ toolnet-memory project:manual-sync
 
 Secrets and credentials should remain in `.env` or another secret store, not in `PROJECT.md`.
 
+### Optional remote encryption
+
+Remote S3 / R2 / Hugging Face objects can be encrypted client-side with
+AES-256-GCM. Encryption remains disabled by default:
+
+```bash
+export TOOLNET_REMOTE_ENCRYPTION=on
+export TOOLNET_REMOTE_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+```
+
+Existing plaintext remote objects remain readable. New and rewritten
+remote objects are encrypted while the feature is enabled. For services or
+containers, `TOOLNET_REMOTE_ENCRYPTION_KEY_FILE` can load the key from a
+protected file instead of placing the key directly in an environment
+variable. See [`docs/remote-encryption.md`](docs/remote-encryption.md).
+
 ---
+
+### Graph UI security
+
+`toolnet-memory graph` remains localhost-first:
+
+```text
+127.0.0.1:9749
+```
+
+For remote exposure, Graph API endpoints support an optional bearer token:
+
+```bash
+export TOOLNET_GRAPH_TOKEN="$(openssl rand -hex 32)"
+export TOOLNET_GRAPH_HOST="0.0.0.0"
+toolnet-memory graph
+```
+
+The browser asks for the token when a protected Graph API returns HTTP 401 and
+keeps it in sessionStorage for that browser session.
+
+`/api/health` stays unauthenticated but returns only a minimal service status.
+
+`TOOLNET_GRAPH_TOKEN` controls Graph API access only. It is not an encryption
+key and is not required for normal localhost usage.
 
 ## Runtime Capability Truth
 
@@ -710,12 +750,15 @@ implementation.
 
 ToolNet provides secret scanning and durable-data sanitization.
 
-ToolNet does not provide client-side encryption by default and does not require
-an encryption key.
+ToolNet does not provide mandatory client-side encryption. Remote
+client-side encryption is optional and disabled by default. Normal ToolNet
+usage does not require an encryption key. When
+`TOOLNET_REMOTE_ENCRYPTION=on` is configured together with
+`TOOLNET_REMOTE_ENCRYPTION_KEY` (or the `_FILE` variant), ToolNet encrypts
+new remote object writes with AES-256-GCM before they reach S3 / R2 /
+Hugging Face storage. Existing plaintext remote objects remain readable.
 
-Remote payload protection at rest therefore depends on the configured storage
-provider unless optional ToolNet client-side encryption is implemented in a
-future release.
+See [`docs/remote-encryption.md`](docs/remote-encryption.md).
 
 Project instruction files are treated as untrusted project data, not as system
 or developer authority.
@@ -1091,7 +1134,7 @@ ToolNet Memory uses GitHub Actions for CI and npm releases.
 The current release line is:
 
 ```text
-npm package: toolnet-memory@0.3.16
+npm package: toolnet-memory@0.3.17
 Git tag:     v0.3.14
 ```
 
@@ -1117,3 +1160,110 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 ## License
 
 MIT © 2026 LBT-AI. See [LICENSE](LICENSE).
+
+Docker
+
+ToolNet Memory includes a hardened Node.js 22 container build.
+
+docker build -t toolnet-memory:local .
+docker run --rm toolnet-memory:local --version
+
+Run the daemon with persistent ToolNet runtime state:
+
+docker run --rm \
+-v toolnet-memory-home:/home/node/.toolnet \
+toolnet-memory:local
+
+Run against the current project:
+
+docker run --rm \
+-v "$PWD:/workspace" \
+-v toolnet-memory-home:/home/node/.toolnet \
+toolnet-memory:local \
+doctor
+
+The final image runs as a non-root user and the Docker health check uses the
+ToolNet daemon's real Unix-socket ping protocol.
+
+Release image target:
+
+ghcr.io/lbt-ai/toolnet-memory
+
+Optional Docker Hub publishing supports:
+
+lbtai/toolnet-memory
+
+when Docker Hub publishing is explicitly enabled in repository settings.
+
+See docs/docker.md for Compose, shared-volume dedupe, permissions, health
+checks, and multi-architecture release details.
+
+Standalone binaries
+
+ToolNet Memory can run without a separately installed Node.js/npm runtime.
+
+Release targets:
+
+Linux x64 / arm64
+macOS x64 / arm64
+Windows x64
+
+Example:
+
+```bash
+chmod +x toolnet-memory-linux-x64
+./toolnet-memory-linux-x64 --version
+```
+
+Standalone binaries embed the Node.js runtime and ToolNet production
+dependency graph. The npm package remains fully supported.
+
+See [`docs/standalone.md`](docs/standalone.md) for platform support,
+service limitations, checksums, and build instructions.
+
+Audit log and automatic GC
+
+ToolNet can maintain a tamper-evident project audit history:
+
+.toolnet/audit/events.jsonl
+
+Inspect and verify:
+
+```bash
+toolnet-memory audit
+toolnet-memory audit:verify
+```
+
+The log records durable memory writes, snapshot restore/recovery, Guard
+checks, and GC execution without intentionally storing raw memory
+content or raw shell commands.
+
+Automatic GC remains opt-in:
+
+```bash
+export TOOLNET_AUTO_GC=on
+toolnet-memory service
+```
+
+The default interval is weekly. Remote snapshot GC remains disabled
+unless `TOOLNET_AUTO_GC_REMOTE=on` is explicitly configured.
+
+See [`docs/audit-log.md`](docs/audit-log.md) and
+[`docs/auto-gc.md`](docs/auto-gc.md).
+
+Non-TypeScript local code search
+
+Structural graph parsing remains TypeScript/JavaScript-only.
+
+Python, Go, Rust, C, and C++ files are now included in deterministic local
+code search through sanitized file chunks indexed by SQLite FTS5/BM25.
+
+```bash
+toolnet-memory code:capabilities
+```
+
+Optional external LSP installations are detected for capability reporting
+only. ToolNet does not auto-download or automatically execute language
+servers during indexing.
+
+See [`docs/non-ts-intelligence.md`](docs/non-ts-intelligence.md).

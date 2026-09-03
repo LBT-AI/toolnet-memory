@@ -13,10 +13,19 @@ import { loadConfig, ProjectManager } from '../core/index.js';
 import { CodeGraphStore, VisualizationBuilder } from '../code-intelligence/index.js';
 
 import { createStorageProvider, withStorageRetry } from '../storage/index.js';
-
+import {
+  applyGraphSecurityHeaders,
+  graphBearerAuthorized,
+  graphHostHeaderAllowed,
+  graphTokenIsStrong,
+  isLoopbackGraphHost,
+  isSameOriginGraphRequest,
+  parseGraphAllowedHosts,
+} from './security.js';
 const PORT = Number(process.env.TOOLNET_GRAPH_PORT ?? 9749);
-
 const HOST = process.env.TOOLNET_GRAPH_HOST ?? '127.0.0.1';
+const GRAPH_TOKEN = process.env.TOOLNET_GRAPH_TOKEN?.trim() || undefined;
+const GRAPH_ALLOWED_HOSTS = parseGraphAllowedHosts(process.env.TOOLNET_GRAPH_ALLOWED_HOSTS);
 
 interface DashboardProject {
   id: string;
@@ -131,6 +140,24 @@ async function discoverProjects(storage: any): Promise<DashboardProject[]> {
 }
 
 async function main() {
+  if (!isLoopbackGraphHost(HOST)) {
+    console.warn(`[graph-ui] WARNING: Graph UI is exposed on non-loopback host ${HOST}:${PORT}.`);
+    if (GRAPH_TOKEN) {
+      console.warn('[graph-ui] Bearer authentication is enabled for Graph API endpoints.');
+    } else {
+      console.warn(
+        '[graph-ui] WARNING: Graph API has no bearer token. Set TOOLNET_GRAPH_TOKEN before exposing this port to an untrusted network.'
+      );
+    }
+    if (GRAPH_ALLOWED_HOSTS.length === 0) {
+      console.warn(
+        '[graph-ui] TIP: Set TOOLNET_GRAPH_ALLOWED_HOSTS to restrict accepted Host headers when using a public/reverse-proxy endpoint.'
+      );
+    }
+  }
+  if (GRAPH_TOKEN && !graphTokenIsStrong(GRAPH_TOKEN)) {
+    console.warn('[graph-ui] WARNING: TOOLNET_GRAPH_TOKEN is short. Use at least 24 random bytes.');
+  }
   const config = loadConfig();
 
   const currentProject = new ProjectManager().detect();
@@ -574,36 +601,63 @@ async function main() {
 
   const server = createServer(async (req, res) => {
     try {
+      applyGraphSecurityHeaders(res);
       const url = new URL(
         req.url ?? '/',
 
         `http://${req.headers.host ?? 'localhost'}`
       );
-
-      if (url.pathname === '/api/health') {
-        const catalog = await getCatalog();
-
+      /*
+       * Host-header validation protects default loopback mode
+       * from browser DNS-rebinding access.
+       */
+      if (!graphHostHeaderAllowed(HOST, req.headers.host, GRAPH_ALLOWED_HOSTS)) {
+        res.statusCode = 421;
         res.setHeader('content-type', 'application/json; charset=utf-8');
-
         res.setHeader('cache-control', 'no-store');
-
-        res.end(
-          JSON.stringify({
-            ok: true,
-
-            mode: 'multi-project',
-
-            projects: catalog.projects.length,
-
-            indexedProjects: catalog.projects.filter((item) => item.hasGraph).length,
-
-            defaultProject: catalog.defaultProject,
-          })
-        );
-
+        res.end(JSON.stringify({ error: 'misdirected_request' }));
         return;
       }
-
+      /*
+       * /api/health is intentionally unauthenticated.
+       * Keep this response minimal so monitoring does not expose
+       * project catalog, project IDs, paths, counts or token state.
+       */
+      if (url.pathname === '/api/health') {
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+        res.setHeader('cache-control', 'no-store');
+        res.end(JSON.stringify({ ok: true, service: 'toolnet-memory-graph' }));
+        return;
+      }
+      /*
+       * GRAPH_API_AUTH_GATE
+       * Every current/future /api/* endpoint except health passes through this gate.
+       */
+      if (url.pathname.startsWith('/api/')) {
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          res.statusCode = 405;
+          res.setHeader('allow', 'GET, HEAD');
+          res.setHeader('content-type', 'application/json; charset=utf-8');
+          res.setHeader('cache-control', 'no-store');
+          res.end(JSON.stringify({ error: 'method_not_allowed' }));
+          return;
+        }
+        if (!isSameOriginGraphRequest(req.headers.origin, req.headers.host)) {
+          res.statusCode = 403;
+          res.setHeader('content-type', 'application/json; charset=utf-8');
+          res.setHeader('cache-control', 'no-store');
+          res.end(JSON.stringify({ error: 'forbidden_origin' }));
+          return;
+        }
+        if (!graphBearerAuthorized(req.headers.authorization, GRAPH_TOKEN)) {
+          res.statusCode = 401;
+          res.setHeader('www-authenticate', 'Bearer realm="ToolNet Graph"');
+          res.setHeader('content-type', 'application/json; charset=utf-8');
+          res.setHeader('cache-control', 'no-store');
+          res.end(JSON.stringify({ error: 'unauthorized' }));
+          return;
+        }
+      }
       if (url.pathname === '/api/projects') {
         const catalog = await getCatalog();
 

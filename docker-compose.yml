@@ -1,0 +1,31 @@
+name: toolnet-memory
+services:
+  toolnet-memory:
+    image: ${TOOLNET_MEMORY_IMAGE:-ghcr.io/lbt-ai/toolnet-memory:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /workspace
+    command:
+      - service
+    environment:
+      HOME: /home/node
+      TOOLNET_SERVICE_SOCKET: /home/node/.toolnet/run/service.sock
+      TOOLNET_STORAGE_RETRIES: ${TOOLNET_STORAGE_RETRIES:-3}
+    volumes:
+      - toolnet-home:/home/node/.toolnet
+      - type: bind
+        source: ${TOOLNET_PROJECT_PATH:-.}
+        target: /workspace
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 15s
+volumes:
+  toolnet-home:
+    name: ${TOOLNET_HOME_VOLUME:-toolnet-memory-home}

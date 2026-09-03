@@ -5,6 +5,7 @@ This checklist covers tasks required before making the ToolNet Memory repository
 ## Pre-Publication Security
 
 - [ ] **Secret Scan**: Run comprehensive secret scan on entire git history
+
   ```bash
   git log --all --full-history --source -- '*/.env*'
   git log --all --full-history --source -- '*token*'
@@ -13,6 +14,7 @@ This checklist covers tasks required before making the ToolNet Memory repository
   ```
 
 - [ ] **Remove Sensitive History**: If secrets found, use `git filter-repo` or BFG Repo-Cleaner
+
   ```bash
   # Example with git-filter-repo
   git filter-repo --path-glob '**/.env' --invert-paths
@@ -31,6 +33,7 @@ This checklist covers tasks required before making the ToolNet Memory repository
 ### GitHub Settings
 
 - [ ] **Repository Description**:
+
   ```
   Persistent project memory, work continuity, and code intelligence for AI coding agents
   ```
@@ -49,6 +52,7 @@ This checklist covers tasks required before making the ToolNet Memory repository
   - `developer-tools`
 
 - [ ] **Website**: Link to npm package
+
   ```
   https://www.npmjs.com/package/toolnet-memory
   ```
@@ -143,11 +147,13 @@ This checklist covers tasks required before making the ToolNet Memory repository
 ### Publishing
 
 - [ ] **Test Pack**: Verify package contents
+
   ```bash
   npm pack --dry-run
   ```
 
 - [ ] **Test Install**: Install from tarball
+
   ```bash
   npm pack
   npm install -g toolnet-memory-*.tgz

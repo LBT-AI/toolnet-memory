@@ -31,10 +31,7 @@ function json(file) {
   try {
     return JSON.parse(raw);
   } catch (error) {
-    fail(
-      `valid JSON: ${file}`,
-      error instanceof Error ? error.message : String(error)
-    );
+    fail(`valid JSON: ${file}`, error instanceof Error ? error.message : String(error));
     return undefined;
   }
 }
@@ -70,10 +67,7 @@ function recursiveText(roots) {
     const stats = fs.lstatSync(target);
     if (stats.isSymbolicLink()) return;
     if (stats.isFile()) {
-      if (
-        /\.(?:ts|js|mjs|json|md|sh|example)$/u.test(target) ||
-        target.endsWith('.env.example')
-      ) {
+      if (/\.(?:ts|js|mjs|json|md|sh|example)$/u.test(target) || target.endsWith('.env.example')) {
         output.push(fs.readFileSync(target, 'utf8'));
       }
       return;
@@ -128,14 +122,22 @@ exact('GC default dry-run manifest', manifest?.hardening?.retention?.defaultDryR
 contains('GC apply flag', retentionCli, "args.includes('--apply')");
 contains('GC defaults to !apply', retentionCli, 'no --apply');
 contains('protected remote operations', runtimeRetention, 'REMOTE_GC_STORAGE_NOT_CONFIGURED');
-contains('re-plan before destructive remote GC', runtimeRetention, 'Re-plan immediately before destructive remote GC');
+contains(
+  're-plan before destructive remote GC',
+  runtimeRetention,
+  'Re-plan immediately before destructive remote GC'
+);
 contains('remote GC re-plans', runtimeRetention, 'plan = current');
 
 console.log('');
 console.log('=== CROSS-CONTAINER DEDUPE ===');
 exact('project scoped dedupe manifest', manifest?.hardening?.dedupe?.projectScoped, true);
 exact('PID identity disabled', manifest?.hardening?.dedupe?.usesPidIdentity, false);
-exact('remote distributed lock disabled', manifest?.hardening?.dedupe?.remoteDistributedLock, false);
+exact(
+  'remote distributed lock disabled',
+  manifest?.hardening?.dedupe?.remoteDistributedLock,
+  false
+);
 contains('project runtime dedupe path', dedupe, "'dedupe'");
 contains('dedupe hook directory', dedupe, "'hooks'");
 contains('exclusive atomic claim', dedupe, "'wx'");
@@ -155,8 +157,16 @@ contains('cancellation boundary', concurrency, 'signal?.aborted');
 
 console.log('');
 console.log('=== CODE INTELLIGENCE ===');
-exact('parser engine manifest', manifest?.hardening?.codeIntelligence?.parserEngine, 'typescript-compiler-api');
-exact('Tree-sitter disabled manifest', manifest?.hardening?.codeIntelligence?.treeSitterRuntime, false);
+exact(
+  'parser engine manifest',
+  manifest?.hardening?.codeIntelligence?.parserEngine,
+  'typescript-compiler-api'
+);
+exact(
+  'Tree-sitter disabled manifest',
+  manifest?.hardening?.codeIntelligence?.treeSitterRuntime,
+  false
+);
 contains('TypeScript parser truth', parserCapabilities, "'typescript-compiler-api'");
 contains('Python unsupported truth', parserCapabilities, "'python'");
 contains('Tree-sitter unavailable truth', treeSitter, 'TREE_SITTER_RUNTIME_AVAILABLE');
@@ -208,7 +218,9 @@ contains('10k scanner gate in final cert', finalCert, '"LARGE_REPO_SCAN_10K"');
 
 console.log('');
 console.log('=== STORAGE FREEZE ===');
-const storage = spawnSync('git', ['status', '--porcelain', '--', 'src/storage'], { encoding: 'utf8' });
+const storage = spawnSync('git', ['status', '--porcelain', '--', 'src/storage'], {
+  encoding: 'utf8',
+});
 if (storage.status === 0 && !(storage.stdout ?? '').trim()) {
   pass('src/storage unchanged');
 } else {

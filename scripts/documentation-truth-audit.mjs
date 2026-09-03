@@ -1,11 +1,6 @@
-import {
-  existsSync,
-  readFileSync,
-} from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
-import {
-  spawnSync,
-} from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 let failures = 0;
 
@@ -70,14 +65,18 @@ if (pkg.version === targetVersion) {
   fail(`package current release ${targetVersion}`, `actual=${pkg.version}`);
 }
 
-contains('README current release', readme, 'v0.3.16');
-absent('README no stale current npm package', readme, 'toolnet-memory@0.3.14');
+contains('README current release', readme, 'v0.3.17');
+absent('README no stale current npm package', readme, 'toolnet-memory@0.3.16');
 
 console.log('');
 console.log('=== CODE SEARCH TRUTH ===');
 
 contains('README names SQLite FTS5/BM25', readme, 'Local Code Search — SQLite FTS5/BM25');
-contains('runtime docs name SQLite FTS5/BM25', runtimeTruth, 'Local Code Search — SQLite FTS5/BM25');
+contains(
+  'runtime docs name SQLite FTS5/BM25',
+  runtimeTruth,
+  'Local Code Search — SQLite FTS5/BM25'
+);
 contains('runtime docs lexical', runtimeTruth, 'Mode:   lexical');
 contains('runtime docs embeddings disabled', runtimeTruth, 'embedding      no');
 contains('search contract engine', searchContract, "'sqlite-fts5-bm25'");
@@ -118,9 +117,17 @@ console.log('=== STORAGE / SECURITY TRUTH ===');
 
 contains('Google Drive unsupported', runtimeTruth, '| Google Drive | unsupported |');
 contains('GitHub storage unsupported', runtimeTruth, '| GitHub storage backend | unsupported |');
-contains('no mandatory encryption', security, 'does not currently provide mandatory client-side encryption');
-contains('provider encryption boundary', security, 'provider-side encryption-at-rest');
-absent('docs no mandatory master key', readme + runtimeTruth + security, 'TOOLNET_MEMORY_MASTER_KEY');
+contains(
+  'optional remote encryption documented',
+  security,
+  'Remote client-side encryption is optional and disabled by default.'
+);
+contains('AES-256-GCM documented', security, 'AES-256-GCM');
+absent(
+  'docs no mandatory master key',
+  readme + runtimeTruth + security,
+  'TOOLNET_MEMORY_MASTER_KEY'
+);
 
 console.log('');
 console.log('=== MEMORY AGENT TRUTH ===');
@@ -131,16 +138,16 @@ absent('MCP server no mode=ai guidance', mcpServer, 'mode=ai');
 contains('MCP server local-only guidance', mcpServer, 'local-only');
 
 console.log('');
-console.log('=== STORAGE FREEZE ===');
+console.log('=== STORAGE SCOPE (Phase 27 unlocked) ===');
 
-const storageStatus = spawnSync('git', ['status', '--porcelain', '--', 'src/storage'], {
+const storageStatus = spawnSync(process.execPath, ['scripts/storage-scope-audit.mjs'], {
   encoding: 'utf8',
 });
 
-if (storageStatus.status === 0 && !storageStatus.stdout.trim()) {
-  pass('src/storage unchanged');
+if (storageStatus.status === 0) {
+  pass('approved src/storage scope');
 } else {
-  fail('src/storage unchanged', (storageStatus.stdout || storageStatus.stderr || '').trim());
+  fail('approved src/storage scope', (storageStatus.stdout || storageStatus.stderr || '').trim());
 }
 
 console.log('');

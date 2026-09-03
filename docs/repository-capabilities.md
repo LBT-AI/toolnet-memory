@@ -4,18 +4,18 @@ This file distinguishes implemented runtime capabilities from legacy scaffolds a
 
 ## Implemented
 
-| Capability | Implementation |
-| --- | --- |
-| Local storage | `src/storage/local/**` |
-| Hugging Face storage | `src/storage/huggingface/**` |
-| S3 / compatible storage | `src/storage/s3/**` |
-| Cloudflare R2 | S3-compatible provider |
-| Deterministic BM25 retrieval | `src/retrieval/bm25.ts` |
+| Capability                         | Implementation                   |
+| ---------------------------------- | -------------------------------- |
+| Local storage                      | `src/storage/local/**`           |
+| Hugging Face storage               | `src/storage/huggingface/**`     |
+| S3 / compatible storage            | `src/storage/s3/**`              |
+| Cloudflare R2                      | S3-compatible provider           |
+| Deterministic BM25 retrieval       | `src/retrieval/bm25.ts`          |
 | Deterministic local hybrid ranking | `src/retrieval/hybrid-search.ts` |
-| Multi-host convergence | `src/multi-host/**` |
-| MCP memory search | `memory-search` |
-| MCP memory write | `memory-remember` |
-| MCP memory delete | `memory-forget` |
+| Multi-host convergence             | `src/multi-host/**`              |
+| MCP memory search                  | `memory-search`                  |
+| MCP memory write                   | `memory-remember`                |
+| MCP memory delete                  | `memory-forget`                  |
 
 ## Explicitly unsupported
 
@@ -23,7 +23,6 @@ The following names must not be interpreted as implemented features:
 
 - Google Drive storage
 - GitHub storage
-- client-side encryption
 - model/LLM reranking
 - embedding retrieval
 - vector database retrieval
@@ -31,6 +30,22 @@ The following names must not be interpreted as implemented features:
 - dedicated query classifier
 - dedicated MCP tools named `memory-rules`, `memory-todos`, `memory-decisions`, `memory-recent`
 - MCP `index-repository`
+
+## Optional remote encryption
+
+Supported:
+
+- AES-256-GCM remote client-side encryption
+
+Default:
+
+- disabled
+
+No encryption key is required unless the operator explicitly enables remote
+encryption. Existing plaintext remote objects remain readable; new or
+rewritten remote objects are encrypted while the feature is enabled.
+
+See `docs/remote-encryption.md`.
 
 Google Drive and GitHub placeholder files currently remain untouched because `src/storage/**` is a frozen compatibility boundary. They are not exported by the active storage provider surface.
 
@@ -66,12 +81,15 @@ Client-side encryption is not implemented in this release.
 No encryption key is required by default.
 
 ## Local Code Search naming
+
 The canonical capability name is:
+
 ```text
 Local Code Search — SQLite FTS5/BM25
 ```
 
 The following historical names remain compatibility aliases:
+
 - `SemanticCodeEngine`
 - `semantic_code_search`
 - `toolnet-memory semantic`

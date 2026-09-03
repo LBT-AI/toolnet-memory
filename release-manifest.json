@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.3.16",
+  "version": "0.3.17",
   "releaseSeries": "0.3.x",
   "runtime": {
     "node": ">=22",
@@ -169,6 +169,62 @@
       "conflictingMemoryActive": false,
       "completedMemoryActive": false,
       "resolvedMemoryActive": false
+    },
+    "graphExposure": {
+      "localhostDefault": true,
+      "optionalBearerAuthentication": true,
+      "hostHeaderProtection": true,
+      "sameOriginApiProtection": true,
+      "minimalUnauthenticatedHealth": true
+    },
+    "docker": {
+      "officialDockerfile": true,
+      "nodeRuntime": 22,
+      "multiStage": true,
+      "nonRoot": true,
+      "ipcHealthcheck": true,
+      "ghcr": true,
+      "multiArch": ["linux/amd64", "linux/arm64"]
+    },
+    "remoteEncryption": {
+      "supported": true,
+      "defaultEnabled": false,
+      "keyRequiredByDefault": false,
+      "algorithm": "AES-256-GCM",
+      "existingPlaintextReadable": true,
+      "automaticMigration": false
+    },
+    "standalone": {
+      "supported": true,
+      "nodeRequiredOnTarget": false,
+      "linuxX64": true,
+      "linuxArm64": true,
+      "macosX64": true,
+      "macosArm64": true,
+      "windowsX64": true
+    },
+    "auditLog": {
+      "projectScoped": true,
+      "appendOnly": true,
+      "sha256HashChain": true,
+      "durableSanitization": true,
+      "rawMemoryContent": false,
+      "rawGuardCommand": false
+    },
+    "autoGc": {
+      "supported": true,
+      "enabledByDefault": false,
+      "defaultIntervalHours": 168,
+      "remoteGcEnabledByDefault": false,
+      "implicitProjectInit": false,
+      "filesystemProjectScan": false
+    },
+    "nonTsIntelligence": {
+      "localCodeSearch": ["python", "go", "rust", "c", "cpp"],
+      "engine": "sqlite-fts5-bm25",
+      "structuralParserSupport": false,
+      "lspFoundation": "detection-only",
+      "automaticLspDownload": false
     }
   }
 }
