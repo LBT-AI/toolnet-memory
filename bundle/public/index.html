@@ -1,1549 +1,952 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
-
-  <title>
-    ToolNet Memory · Graph
-  </title>
-
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-
-      background:
-        #050608;
-
-      color:
-        #f6f7f9;
-
-      font-family:
-        Inter,
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-    }
-
-    #graph {
-      position: fixed;
-      inset: 0;
-    }
-
-    .panel {
-      position: fixed;
-      z-index: 20;
-
-      border:
-        1px solid
-        rgba(255,255,255,.12);
-
-      background:
-        rgba(10,12,17,.88);
-
-      backdrop-filter:
-        blur(20px);
-
-      -webkit-backdrop-filter:
-        blur(20px);
-
-      box-shadow:
-        0 22px 60px
-        rgba(0,0,0,.42);
-
-      border-radius:
-        18px;
-    }
-
-    #toolbar {
-      top:
-        max(
-          14px,
-          env(safe-area-inset-top)
-        );
-
-      left:
-        14px;
-
-      right:
-        14px;
-
-      padding:
-        14px;
-
-      display:
-        grid;
-
-      grid-template-columns:
-        auto minmax(170px, 1fr)
-        minmax(170px, 1fr)
-        minmax(150px, .7fr)
-        minmax(150px, .7fr)
-        auto;
-
-      gap:
-        10px;
-
-      align-items:
-        center;
-    }
+  <head>
+    <meta charset="UTF-8" />
 
-    .brand {
-      padding:
-        0 8px;
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
-      white-space:
-        nowrap;
+    <title>ToolNet Memory · Graph</title>
 
-      font-weight:
-        750;
+    <style>
+      * {
+        box-sizing: border-box;
+      }
 
-      font-size:
-        18px;
-    }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
 
-    .brand span {
-      opacity:
-        .45;
+        background: #050608;
 
-      font-weight:
-        500;
-    }
+        color: #f6f7f9;
 
-    input,
-    select,
-    button {
-      height:
-        42px;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
 
-      min-width:
-        0;
+      #graph {
+        position: fixed;
+        inset: 0;
+      }
 
-      border:
-        1px solid
-        rgba(255,255,255,.12);
+      .panel {
+        position: fixed;
+        z-index: 20;
 
-      border-radius:
-        11px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
 
-      background:
-        rgba(255,255,255,.06);
+        background: rgba(10, 12, 17, 0.88);
 
-      color:
-        white;
+        backdrop-filter: blur(20px);
 
-      padding:
-        0 12px;
+        -webkit-backdrop-filter: blur(20px);
 
-      outline:
-        none;
+        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
 
-      font:
-        inherit;
-    }
+        border-radius: 18px;
+      }
 
-    button {
-      cursor:
-        pointer;
-    }
-
-    #project {
-      font-weight:
-        650;
-    }
-
-    #stats {
-      left:
-        14px;
-
-      bottom:
-        max(
-          14px,
-          env(safe-area-inset-bottom)
-        );
-
-      min-width:
-        220px;
-
-      padding:
-        14px 16px;
-
-      font-size:
-        13px;
-
-      line-height:
-        1.7;
-    }
-
-    .status {
-      margin-top:
-        5px;
-
-      opacity:
-        .55;
-
-      font-size:
-        11px;
-    }
-
-    #details {
-      top:
-        96px;
-
-      right:
-        14px;
-
-      bottom:
-        14px;
-
-      width:
-        min(
-          410px,
-          calc(100vw - 28px)
-        );
-
-      padding:
-        68px 20px 20px;
-
-      overflow-y:
-        auto;
-
-      transform:
-        translateX(
-          calc(100% + 30px)
-        );
-
-      transition:
-        transform .2s ease;
-    }
-
-    #details.open {
-      transform:
-        translateX(0);
-    }
-
-    .details-close {
-      position:
-        absolute;
-
-      top:
-        14px;
-
-      right:
-        14px;
-
-      width:
-        44px;
-
-      height:
-        44px;
-
-      display:
-        grid;
-
-      place-items:
-        center;
-
-      padding:
-        0;
-
-      border-radius:
-        50%;
-
-      font-size:
-        28px;
-
-      line-height:
-        1;
-    }
-
-    .detail-title {
-      font-size:
-        21px;
-
-      font-weight:
-        750;
-
-      line-height:
-        1.25;
-
-      overflow-wrap:
-        anywhere;
-    }
-
-    .path {
-      margin-top:
-        8px;
-
-      opacity:
-        .55;
-
-      font-family:
-        ui-monospace,
-        SFMono-Regular,
-        Menlo,
-        monospace;
-
-      font-size:
-        12px;
-
-      overflow-wrap:
-        anywhere;
-    }
-
-    .tag {
-      display:
-        inline-flex;
-
-      margin:
-        10px 5px 0 0;
-
-      padding:
-        5px 9px;
-
-      border:
-        1px solid
-        rgba(255,255,255,.12);
-
-      border-radius:
-        999px;
-
-      background:
-        rgba(255,255,255,.06);
-
-      font-size:
-        11px;
-    }
-
-    .section {
-      margin-top:
-        24px;
-    }
-
-    .section-title {
-      margin-bottom:
-        8px;
-
-      opacity:
-        .5;
-
-      font-size:
-        11px;
-
-      letter-spacing:
-        .1em;
-
-      text-transform:
-        uppercase;
-    }
-
-    .row {
-      display:
-        flex;
-
-      justify-content:
-        space-between;
-
-      gap:
-        12px;
-
-      padding:
-        9px 0;
-
-      border-bottom:
-        1px solid
-        rgba(255,255,255,.06);
-
-      font-size:
-        13px;
-    }
-
-    #loading {
-      position:
-        fixed;
-
-      inset:
-        0;
-
-      z-index:
-        100;
-
-      display:
-        grid;
-
-      place-items:
-        center;
-
-      background:
-        #050608;
-
-      padding:
-        24px;
-
-      text-align:
-        center;
-    }
-
-    @media (
-      max-width: 1000px
-    ) {
       #toolbar {
+        top: max(14px, env(safe-area-inset-top));
+
+        left: 14px;
+
+        right: 14px;
+
+        padding: 14px;
+
+        display: grid;
+
         grid-template-columns:
-          1fr 1fr;
+          auto minmax(170px, 1fr)
+          minmax(170px, 1fr)
+          minmax(150px, 0.7fr)
+          minmax(150px, 0.7fr)
+          auto;
 
-        top:
-          max(
-            10px,
-            env(safe-area-inset-top)
-          );
+        gap: 10px;
 
-        left:
-          10px;
-
-        right:
-          10px;
+        align-items: center;
       }
 
       .brand {
-        grid-column:
-          1 / -1;
+        padding: 0 8px;
 
-        font-size:
-          17px;
+        white-space: nowrap;
+
+        font-weight: 750;
+
+        font-size: 18px;
       }
 
-      #search {
-        grid-column:
-          1 / -1;
+      .brand span {
+        opacity: 0.45;
+
+        font-weight: 500;
       }
 
-      #details {
-        top:
-          10px;
+      input,
+      select,
+      button {
+        height: 42px;
 
-        right:
-          10px;
+        min-width: 0;
 
-        bottom:
-          10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+
+        border-radius: 11px;
+
+        background: rgba(255, 255, 255, 0.06);
+
+        color: white;
+
+        padding: 0 12px;
+
+        outline: none;
+
+        font: inherit;
       }
 
-      #stats {
-        left:
-          10px;
-
-        bottom:
-          max(
-            10px,
-            env(safe-area-inset-bottom)
-          );
-      }
-    }
-
-    @media (
-      max-width: 1000px
-    ) {
-      #toolbar {
-        grid-template-columns:
-          repeat(12, minmax(0, 1fr));
-      }
-
-      .brand {
-        grid-column:
-          1 / -1;
+      button {
+        cursor: pointer;
       }
 
       #project {
-        grid-column:
-          1 / 10;
-
-        width:
-          100%;
+        font-weight: 650;
       }
 
-      #reset {
-        grid-column:
-          10 / 13;
+      #stats {
+        left: 14px;
 
-        width:
-          100%;
+        bottom: max(14px, env(safe-area-inset-bottom));
 
-        padding-left:
-          8px;
+        min-width: 220px;
 
-        padding-right:
-          8px;
+        padding: 14px 16px;
+
+        font-size: 13px;
+
+        line-height: 1.7;
       }
 
-      #search {
-        grid-column:
-          1 / -1;
+      .status {
+        margin-top: 5px;
 
-        width:
-          100%;
+        opacity: 0.55;
+
+        font-size: 11px;
       }
 
-      #cluster {
-        grid-column:
-          1 / 7;
+      #details {
+        top: 96px;
 
-        width:
-          100%;
+        right: 14px;
+
+        bottom: 14px;
+
+        width: min(410px, calc(100vw - 28px));
+
+        padding: 68px 20px 20px;
+
+        overflow-y: auto;
+
+        transform: translateX(calc(100% + 30px));
+
+        transition: transform 0.2s ease;
       }
 
-      #edge {
-        grid-column:
-          7 / 13;
-
-        width:
-          100%;
+      #details.open {
+        transform: translateX(0);
       }
-    }
 
+      .details-close {
+        position: absolute;
 
-    .intel-summary {
-      display:
-        grid;
+        top: 14px;
 
-      grid-template-columns:
-        1fr 1fr;
+        right: 14px;
 
-      gap:
-        8px;
+        width: 44px;
 
-      margin-top:
-        18px;
-    }
+        height: 44px;
 
-    .intel-card {
-      padding:
-        12px;
+        display: grid;
 
-      border:
-        1px solid
-        rgba(255,255,255,.08);
+        place-items: center;
 
-      border-radius:
-        12px;
+        padding: 0;
 
-      background:
-        rgba(255,255,255,.035);
-    }
+        border-radius: 50%;
 
-    .intel-card strong {
-      display:
-        block;
+        font-size: 28px;
 
-      font-size:
-        18px;
+        line-height: 1;
+      }
 
-      margin-top:
-        3px;
-    }
+      .detail-title {
+        font-size: 21px;
 
-    .intel-card span {
-      opacity:
-        .55;
+        font-weight: 750;
 
-      font-size:
-        11px;
-    }
+        line-height: 1.25;
 
-    .relation-list {
-      display:
-        flex;
+        overflow-wrap: anywhere;
+      }
 
-      flex-direction:
-        column;
+      .path {
+        margin-top: 8px;
 
-      gap:
-        6px;
-    }
+        opacity: 0.55;
 
-    .relation-item {
-      width:
-        100%;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-      height:
-        auto;
+        font-size: 12px;
 
-      min-height:
-        44px;
+        overflow-wrap: anywhere;
+      }
 
-      padding:
-        9px 11px;
+      .tag {
+        display: inline-flex;
 
-      display:
-        block;
+        margin: 10px 5px 0 0;
 
-      text-align:
-        left;
+        padding: 5px 9px;
 
-      border-radius:
-        10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
 
-      cursor:
-        pointer;
-    }
+        border-radius: 999px;
 
-    .relation-name {
-      display:
-        block;
+        background: rgba(255, 255, 255, 0.06);
 
-      font-size:
-        12px;
+        font-size: 11px;
+      }
 
-      font-weight:
-        650;
+      .section {
+        margin-top: 24px;
+      }
 
-      overflow-wrap:
-        anywhere;
-    }
+      .section-title {
+        margin-bottom: 8px;
 
-    .relation-meta {
-      display:
-        block;
+        opacity: 0.5;
 
-      margin-top:
-        4px;
+        font-size: 11px;
 
-      opacity:
-        .45;
+        letter-spacing: 0.1em;
 
-      font-size:
-        10px;
+        text-transform: uppercase;
+      }
 
-      font-family:
-        ui-monospace,
-        SFMono-Regular,
-        Menlo,
-        monospace;
+      .row {
+        display: flex;
 
-      overflow-wrap:
-        anywhere;
-    }
+        justify-content: space-between;
 
-    .relation-more {
-      margin-top:
-        7px;
+        gap: 12px;
 
-      opacity:
-        .45;
+        padding: 9px 0;
 
-      font-size:
-        11px;
-    }
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 
-    .risk {
-      display:
-        inline-flex;
+        font-size: 13px;
+      }
 
-      padding:
-        5px 9px;
+      #loading {
+        position: fixed;
 
-      margin-top:
-        8px;
+        inset: 0;
 
-      border:
-        1px solid
-        rgba(255,255,255,.12);
+        z-index: 100;
 
-      border-radius:
-        999px;
+        display: grid;
 
-      font-size:
-        11px;
+        place-items: center;
 
-      font-weight:
-        700;
-    }
+        background: #050608;
 
-    .path-actions {
-      display:
-        flex;
+        padding: 24px;
 
-      gap:
-        8px;
+        text-align: center;
+      }
 
-      margin-top:
-        10px;
-    }
+      @media (max-width: 1000px) {
+        #toolbar {
+          grid-template-columns: 1fr 1fr;
 
-    .path-actions button {
-      flex:
-        1;
+          top: max(10px, env(safe-area-inset-top));
 
-      height:
-        auto;
+          left: 10px;
 
-      min-height:
-        40px;
+          right: 10px;
+        }
 
-      white-space:
-        normal;
-    }
+        .brand {
+          grid-column: 1 / -1;
 
-    .path-chain {
-      display:
-        flex;
+          font-size: 17px;
+        }
 
-      flex-direction:
-        column;
+        #search {
+          grid-column: 1 / -1;
+        }
 
-      gap:
-        5px;
+        #details {
+          top: 10px;
 
-      margin-top:
-        9px;
-    }
+          right: 10px;
 
-    .path-node {
-      height:
-        auto;
+          bottom: 10px;
+        }
 
-      min-height:
-        36px;
+        #stats {
+          left: 10px;
 
-      padding:
-        7px 10px;
+          bottom: max(10px, env(safe-area-inset-bottom));
+        }
+      }
 
-      text-align:
-        left;
+      @media (max-width: 1000px) {
+        #toolbar {
+          grid-template-columns: repeat(12, minmax(0, 1fr));
+        }
 
-      font-size:
-        11px;
-    }
+        .brand {
+          grid-column: 1 / -1;
+        }
 
-  </style>
-</head>
+        #project {
+          grid-column: 1 / 10;
 
-<body>
-  <div id="loading">
-    Loading ToolNet projects…
-  </div>
+          width: 100%;
+        }
 
-  <div id="graph"></div>
+        #reset {
+          grid-column: 10 / 13;
 
-  <div
-    id="toolbar"
-    class="panel"
-  >
-    <div class="brand">
-      ToolNet Memory
-      <span>/ Graph</span>
+          width: 100%;
+
+          padding-left: 8px;
+
+          padding-right: 8px;
+        }
+
+        #search {
+          grid-column: 1 / -1;
+
+          width: 100%;
+        }
+
+        #cluster {
+          grid-column: 1 / 7;
+
+          width: 100%;
+        }
+
+        #edge {
+          grid-column: 7 / 13;
+
+          width: 100%;
+        }
+      }
+
+      .intel-summary {
+        display: grid;
+
+        grid-template-columns: 1fr 1fr;
+
+        gap: 8px;
+
+        margin-top: 18px;
+      }
+
+      .intel-card {
+        padding: 12px;
+
+        border: 1px solid rgba(255, 255, 255, 0.08);
+
+        border-radius: 12px;
+
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .intel-card strong {
+        display: block;
+
+        font-size: 18px;
+
+        margin-top: 3px;
+      }
+
+      .intel-card span {
+        opacity: 0.55;
+
+        font-size: 11px;
+      }
+
+      .relation-list {
+        display: flex;
+
+        flex-direction: column;
+
+        gap: 6px;
+      }
+
+      .relation-item {
+        width: 100%;
+
+        height: auto;
+
+        min-height: 44px;
+
+        padding: 9px 11px;
+
+        display: block;
+
+        text-align: left;
+
+        border-radius: 10px;
+
+        cursor: pointer;
+      }
+
+      .relation-name {
+        display: block;
+
+        font-size: 12px;
+
+        font-weight: 650;
+
+        overflow-wrap: anywhere;
+      }
+
+      .relation-meta {
+        display: block;
+
+        margin-top: 4px;
+
+        opacity: 0.45;
+
+        font-size: 10px;
+
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+        overflow-wrap: anywhere;
+      }
+
+      .relation-more {
+        margin-top: 7px;
+
+        opacity: 0.45;
+
+        font-size: 11px;
+      }
+
+      .risk {
+        display: inline-flex;
+
+        padding: 5px 9px;
+
+        margin-top: 8px;
+
+        border: 1px solid rgba(255, 255, 255, 0.12);
+
+        border-radius: 999px;
+
+        font-size: 11px;
+
+        font-weight: 700;
+      }
+
+      .path-actions {
+        display: flex;
+
+        gap: 8px;
+
+        margin-top: 10px;
+      }
+
+      .path-actions button {
+        flex: 1;
+
+        height: auto;
+
+        min-height: 40px;
+
+        white-space: normal;
+      }
+
+      .path-chain {
+        display: flex;
+
+        flex-direction: column;
+
+        gap: 5px;
+
+        margin-top: 9px;
+      }
+
+      .path-node {
+        height: auto;
+
+        min-height: 36px;
+
+        padding: 7px 10px;
+
+        text-align: left;
+
+        font-size: 11px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="loading">Loading ToolNet projects…</div>
+
+    <div id="graph"></div>
+
+    <div id="toolbar" class="panel">
+      <div class="brand">
+        ToolNet Memory
+        <span>/ Graph</span>
+      </div>
+
+      <select id="project" aria-label="Project">
+        <option>Loading…</option>
+      </select>
+
+      <button id="reset">Reset</button>
+
+      <input id="search" placeholder="Search symbol or file…" />
+
+      <select id="cluster" aria-label="Subsystem">
+        <option value="">All subsystems</option>
+      </select>
+
+      <select id="edge" aria-label="Relation">
+        <option value="">All relations</option>
+      </select>
     </div>
 
-    <select
-      id="project"
-      aria-label="Project"
-    >
-      <option>
-        Loading…
-      </option>
-    </select>
+    <div id="stats" class="panel"></div>
 
-    <button id="reset">
-      Reset
-    </button>
+    <div id="details" class="panel"></div>
 
-    <input
-      id="search"
-      placeholder="Search symbol or file…"
-    />
+    <script src="/vendor/3d-force-graph.min.js"></script>
 
-    <select
-      id="cluster"
-      aria-label="Subsystem"
-    >
-      <option value="">
-        All subsystems
-      </option>
-    </select>
-
-    <select
-      id="edge"
-      aria-label="Relation"
-    >
-      <option value="">
-        All relations
-      </option>
-    </select>
-
-  </div>
-
-  <div
-    id="stats"
-    class="panel"
-  ></div>
-
-  <div
-    id="details"
-    class="panel"
-  ></div>
-
-  <script src="/vendor/3d-force-graph.min.js"></script>
-
-  <script>
-    const GRAPH_TOKEN_SESSION_KEY = "toolnet.graph.access-token";
-    function readGraphToken() {
-      try {
-        return sessionStorage.getItem(GRAPH_TOKEN_SESSION_KEY) || "";
-      } catch {
-        return "";
-      }
-    }
-    function writeGraphToken(value) {
-      try {
-        if (value) {
-          sessionStorage.setItem(GRAPH_TOKEN_SESSION_KEY, value);
-          return;
+    <script>
+      const GRAPH_TOKEN_SESSION_KEY = 'toolnet.graph.access-token';
+      function readGraphToken() {
+        try {
+          return sessionStorage.getItem(GRAPH_TOKEN_SESSION_KEY) || '';
+        } catch {
+          return '';
         }
-        sessionStorage.removeItem(GRAPH_TOKEN_SESSION_KEY);
-      } catch {
-        // Session storage is optional.
       }
-    }
-    function graphApiRequest(input, init, token) {
-      const headers = new Headers(init?.headers);
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
+      function writeGraphToken(value) {
+        try {
+          if (value) {
+            sessionStorage.setItem(GRAPH_TOKEN_SESSION_KEY, value);
+            return;
+          }
+          sessionStorage.removeItem(GRAPH_TOKEN_SESSION_KEY);
+        } catch {
+          // Session storage is optional.
+        }
       }
-      return window.fetch(input, {
-        ...init,
-        headers,
-        cache: "no-store",
-      });
-    }
-    async function graphApiFetch(input, init = {}) {
-      let token = readGraphToken();
-      let response = await graphApiRequest(input, init, token);
-      if (response.status !== 401) {
+      function graphApiRequest(input, init, token) {
+        const headers = new Headers(init?.headers);
+        if (token) {
+          headers.set('Authorization', `Bearer ${token}`);
+        }
+        return window.fetch(input, {
+          ...init,
+          headers,
+          cache: 'no-store',
+        });
+      }
+      async function graphApiFetch(input, init = {}) {
+        let token = readGraphToken();
+        let response = await graphApiRequest(input, init, token);
+        if (response.status !== 401) {
+          return response;
+        }
+        // Existing token is invalid/stale.
+        writeGraphToken('');
+        token = window.prompt('ToolNet Graph access token')?.trim() || '';
+        if (!token) {
+          return response;
+        }
+        writeGraphToken(token);
+        response = await graphApiRequest(input, init, token);
+        if (response.status === 401) {
+          writeGraphToken('');
+        }
         return response;
       }
-      // Existing token is invalid/stale.
-      writeGraphToken("");
-      token = window.prompt("ToolNet Graph access token")?.trim() || "";
-      if (!token) {
-        return response;
-      }
-      writeGraphToken(token);
-      response = await graphApiRequest(input, init, token);
-      if (response.status === 401) {
-        writeGraphToken("");
-      }
-      return response;
-    }
-    const state = {
-      raw:
-        null,
+      const state = {
+        raw: null,
 
-      graph:
-        null,
+        graph: null,
 
-      project:
-        "",
+        project: '',
 
-      search:
-        "",
+        search: '',
 
-      cluster:
-        "",
+        cluster: '',
 
-      edge:
-        "",
+        edge: '',
 
-      selected:
-        null,
+        selected: null,
 
-      pathStart:
-        null,
+        pathStart: null,
 
-      highlightedPath:
-        [],
+        highlightedPath: [],
 
-      viewMode:
-        "overview",
+        viewMode: 'overview',
 
-      viewCluster:
-        "",
+        viewCluster: '',
 
-      viewFile:
-        "",
-    };
-
-    const graphEl =
-      document.getElementById(
-        "graph"
-      );
-
-    const projectEl =
-      document.getElementById(
-        "project"
-      );
-
-    const searchEl =
-      document.getElementById(
-        "search"
-      );
-
-    const clusterEl =
-      document.getElementById(
-        "cluster"
-      );
-
-    const edgeEl =
-      document.getElementById(
-        "edge"
-      );
-
-    const statsEl =
-      document.getElementById(
-        "stats"
-      );
-
-    const detailsEl =
-      document.getElementById(
-        "details"
-      );
-
-    const colors = [
-      "#62a8ff",
-      "#ff8f6b",
-      "#67d49b",
-      "#c493ff",
-      "#ffd166",
-      "#73d2de",
-      "#ff6b9a",
-      "#9fd356",
-      "#e5989b",
-      "#8ecae6",
-      "#c9cba3",
-      "#f4a261",
-    ];
-
-    function escapeHtml(
-      value
-    ) {
-      return String(
-        value ?? ""
-      )
-        .replaceAll(
-          "&",
-          "&amp;"
-        )
-        .replaceAll(
-          "<",
-          "&lt;"
-        )
-        .replaceAll(
-          ">",
-          "&gt;"
-        )
-        .replaceAll(
-          '"',
-          "&quot;"
-        )
-        .replaceAll(
-          "'",
-          "&#039;"
-        );
-    }
-
-    function hashCode(
-      value
-    ) {
-      let hash =
-        0;
-
-      for (
-        let i = 0;
-        i < value.length;
-        i++
-      ) {
-        hash =
-          (
-            (
-              hash << 5
-            ) -
-            hash
-          ) +
-          value.charCodeAt(
-            i
-          );
-
-        hash |=
-          0;
-      }
-
-      return Math.abs(
-        hash
-      );
-    }
-
-    function nodeColor(
-      node
-    ) {
-      const value =
-        node.clusterLabel ||
-        node.cluster ||
-        node.layer ||
-        node.type ||
-        "other";
-
-      return colors[
-        hashCode(
-          value
-        ) %
-        colors.length
-      ];
-    }
-
-    function linkColor(
-      link
-    ) {
-      const map = {
-        CALL_REFERENCE:
-          "rgba(255,190,90,.72)",
-
-        CALLS:
-          "rgba(255,255,255,.30)",
-
-        IMPORTS:
-          "rgba(100,170,255,.46)",
-
-        USES_TYPE:
-          "rgba(190,130,255,.44)",
-
-        WRITES:
-          "rgba(255,100,100,.60)",
-
-        TESTS:
-          "rgba(100,220,150,.42)",
-
-        IMPLEMENTS:
-          "rgba(100,220,220,.48)",
-
-        INHERITS:
-          "rgba(235,140,255,.50)",
+        viewFile: '',
       };
 
-      return (
-        map[link.type] ||
-        "rgba(255,255,255,.18)"
-      );
-    }
+      const graphEl = document.getElementById('graph');
 
-    function closeDetails() {
-      state.selected =
-        null;
+      const projectEl = document.getElementById('project');
 
-      detailsEl
-        .classList
-        .remove(
-          "open"
-        );
+      const searchEl = document.getElementById('search');
 
-      detailsEl.innerHTML =
-        "";
-    }
+      const clusterEl = document.getElementById('cluster');
 
-    const CALL_RELATIONS =
-      new Set([
-        "CALLS",
-        "CALL_REFERENCE",
-      ]);
+      const edgeEl = document.getElementById('edge');
 
-    const DEPENDENCY_RELATIONS =
-      new Set([
-        "CALLS",
-        "CALL_REFERENCE",
-        "IMPORTS",
-        "USES_TYPE",
-        "WRITES",
-        "INHERITS",
-        "IMPLEMENTS",
-        "ROUTE",
-      ]);
+      const statsEl = document.getElementById('stats');
 
-    const IMPACT_WEIGHTS = {
-      CALLS: 4,
-      CALL_REFERENCE: 6,
-      USES_TYPE: 4,
-      TESTS: 2,
-      ROUTE: 4,
-      WRITES: 3,
-      IMPORTS: 3,
-      INHERITS: 5,
-      IMPLEMENTS: 5,
-      DEFINES: 1,
-    };
+      const detailsEl = document.getElementById('details');
 
-    function endpointId(
-      link,
-      side
-    ) {
-      const value =
-        link[side];
+      const colors = [
+        '#62a8ff',
+        '#ff8f6b',
+        '#67d49b',
+        '#c493ff',
+        '#ffd166',
+        '#73d2de',
+        '#ff6b9a',
+        '#9fd356',
+        '#e5989b',
+        '#8ecae6',
+        '#c9cba3',
+        '#f4a261',
+      ];
 
-      return typeof value ===
-        "object"
-        ? value.id
-        : value;
-    }
-
-    function rawNode(
-      id
-    ) {
-      return state.raw
-        ?.nodes
-        ?.find(
-          node =>
-            node.id === id
-        );
-    }
-
-    function uniqueNodes(
-      values
-    ) {
-      const map =
-        new Map();
-
-      for (
-        const node
-        of values
-      ) {
-        if (
-          node &&
-          !map.has(
-            node.id
-          )
-        ) {
-          map.set(
-            node.id,
-            node
-          );
-        }
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
       }
 
-      return [
-        ...map.values()
-      ];
-    }
+      function hashCode(value) {
+        let hash = 0;
 
-    function relatedNodes(
-      nodeId,
-      direction,
-      allowed
-    ) {
-      const result =
-        [];
+        for (let i = 0; i < value.length; i++) {
+          hash = (hash << 5) - hash + value.charCodeAt(i);
 
-      for (
-        const link
-        of state.raw.links
-      ) {
-        if (
-          allowed &&
-          !allowed.has(
-            link.type
-          )
-        ) {
-          continue;
+          hash |= 0;
         }
 
-        const source =
-          endpointId(
-            link,
-            "source"
-          );
+        return Math.abs(hash);
+      }
 
-        const target =
-          endpointId(
-            link,
-            "target"
-          );
+      function nodeColor(node) {
+        const value = node.clusterLabel || node.cluster || node.layer || node.type || 'other';
 
-        if (
-          direction ===
-            "incoming" &&
-          target ===
-            nodeId
-        ) {
-          const node =
-            rawNode(
-              source
-            );
+        return colors[hashCode(value) % colors.length];
+      }
 
-          if (node) {
-            result.push(
-              node
-            );
+      function linkColor(link) {
+        const map = {
+          CALL_REFERENCE: 'rgba(255,190,90,.72)',
+
+          CALLS: 'rgba(255,255,255,.30)',
+
+          IMPORTS: 'rgba(100,170,255,.46)',
+
+          USES_TYPE: 'rgba(190,130,255,.44)',
+
+          WRITES: 'rgba(255,100,100,.60)',
+
+          TESTS: 'rgba(100,220,150,.42)',
+
+          IMPLEMENTS: 'rgba(100,220,220,.48)',
+
+          INHERITS: 'rgba(235,140,255,.50)',
+        };
+
+        return map[link.type] || 'rgba(255,255,255,.18)';
+      }
+
+      function closeDetails() {
+        state.selected = null;
+
+        detailsEl.classList.remove('open');
+
+        detailsEl.innerHTML = '';
+      }
+
+      const CALL_RELATIONS = new Set(['CALLS', 'CALL_REFERENCE']);
+
+      const DEPENDENCY_RELATIONS = new Set([
+        'CALLS',
+        'CALL_REFERENCE',
+        'IMPORTS',
+        'USES_TYPE',
+        'WRITES',
+        'INHERITS',
+        'IMPLEMENTS',
+        'ROUTE',
+      ]);
+
+      const IMPACT_WEIGHTS = {
+        CALLS: 4,
+        CALL_REFERENCE: 6,
+        USES_TYPE: 4,
+        TESTS: 2,
+        ROUTE: 4,
+        WRITES: 3,
+        IMPORTS: 3,
+        INHERITS: 5,
+        IMPLEMENTS: 5,
+        DEFINES: 1,
+      };
+
+      function endpointId(link, side) {
+        const value = link[side];
+
+        return typeof value === 'object' ? value.id : value;
+      }
+
+      function rawNode(id) {
+        return state.raw?.nodes?.find((node) => node.id === id);
+      }
+
+      function uniqueNodes(values) {
+        const map = new Map();
+
+        for (const node of values) {
+          if (node && !map.has(node.id)) {
+            map.set(node.id, node);
           }
         }
 
-        if (
-          direction ===
-            "outgoing" &&
-          source ===
-            nodeId
-        ) {
-          const node =
-            rawNode(
-              target
-            );
-
-          if (node) {
-            result.push(
-              node
-            );
-          }
-        }
+        return [...map.values()];
       }
 
-      return uniqueNodes(
-        result
-      );
-    }
+      function relatedNodes(nodeId, direction, allowed) {
+        const result = [];
 
-    function blastRadius(
-      startId,
-      maxDepth = 3
-    ) {
-      const visited =
-        new Map();
-
-      const queue = [
-        {
-          id:
-            startId,
-
-          depth:
-            0,
-
-          score:
-            0,
-        }
-      ];
-
-      visited.set(
-        startId,
-        {
-          depth:
-            0,
-
-          score:
-            0,
-        }
-      );
-
-      while (
-        queue.length
-      ) {
-        const current =
-          queue.shift();
-
-        if (
-          current.depth >=
-          maxDepth
-        ) {
-          continue;
-        }
-
-        for (
-          const link
-          of state.raw.links
-        ) {
-          const weight =
-            IMPACT_WEIGHTS[
-              link.type
-            ];
-
-          if (!weight) {
+        for (const link of state.raw.links) {
+          if (allowed && !allowed.has(link.type)) {
             continue;
           }
 
-          const source =
-            endpointId(
-              link,
-              "source"
-            );
+          const source = endpointId(link, 'source');
 
-          const target =
-            endpointId(
-              link,
-              "target"
-            );
+          const target = endpointId(link, 'target');
 
-          /*
-           * Reverse traversal:
-           * if source depends on target,
-           * changing target may affect source.
-           */
-          if (
-            target !==
-            current.id
-          ) {
+          if (direction === 'incoming' && target === nodeId) {
+            const node = rawNode(source);
+
+            if (node) {
+              result.push(node);
+            }
+          }
+
+          if (direction === 'outgoing' && source === nodeId) {
+            const node = rawNode(target);
+
+            if (node) {
+              result.push(node);
+            }
+          }
+        }
+
+        return uniqueNodes(result);
+      }
+
+      function blastRadius(startId, maxDepth = 3) {
+        const visited = new Map();
+
+        const queue = [
+          {
+            id: startId,
+
+            depth: 0,
+
+            score: 0,
+          },
+        ];
+
+        visited.set(startId, {
+          depth: 0,
+
+          score: 0,
+        });
+
+        while (queue.length) {
+          const current = queue.shift();
+
+          if (current.depth >= maxDepth) {
             continue;
           }
 
-          const nextDepth =
-            current.depth +
-            1;
+          for (const link of state.raw.links) {
+            const weight = IMPACT_WEIGHTS[link.type];
 
-          const nextScore =
-            current.score +
-            weight *
-            (
-              maxDepth -
-              current.depth
-            );
+            if (!weight) {
+              continue;
+            }
 
-          const previous =
-            visited.get(
-              source
-            );
+            const source = endpointId(link, 'source');
 
-          if (
-            !previous ||
-            nextDepth <
-              previous.depth ||
-            nextScore >
-              previous.score
-          ) {
-            visited.set(
-              source,
-              {
-                depth:
-                  nextDepth,
+            const target = endpointId(link, 'target');
 
-                score:
-                  nextScore,
-              }
-            );
+            /*
+             * Reverse traversal:
+             * if source depends on target,
+             * changing target may affect source.
+             */
+            if (target !== current.id) {
+              continue;
+            }
+
+            const nextDepth = current.depth + 1;
+
+            const nextScore = current.score + weight * (maxDepth - current.depth);
+
+            const previous = visited.get(source);
+
+            if (!previous || nextDepth < previous.depth || nextScore > previous.score) {
+              visited.set(source, {
+                depth: nextDepth,
+
+                score: nextScore,
+              });
+
+              queue.push({
+                id: source,
+
+                depth: nextDepth,
+
+                score: nextScore,
+              });
+            }
+          }
+        }
+
+        visited.delete(startId);
+
+        const impacted = [...visited.entries()]
+          .map(([id, info]) => ({
+            node: rawNode(id),
+
+            ...info,
+          }))
+          .filter((item) => item.node)
+          .sort((a, b) => b.score - a.score);
+
+        const score = impacted.reduce((total, item) => total + item.score, 0);
+
+        let risk = 'LOW';
+
+        if (score >= 250 || impacted.length >= 40) {
+          risk = 'CRITICAL';
+        } else if (score >= 120 || impacted.length >= 20) {
+          risk = 'HIGH';
+        } else if (score >= 40 || impacted.length >= 8) {
+          risk = 'MEDIUM';
+        }
+
+        return {
+          impacted,
+          score,
+          risk,
+        };
+      }
+
+      function shortestPath(fromId, toId, maxDepth = 10) {
+        if (fromId === toId) {
+          return [fromId];
+        }
+
+        const queue = [
+          {
+            id: fromId,
+
+            path: [fromId],
+          },
+        ];
+
+        const visited = new Set([fromId]);
+
+        while (queue.length) {
+          const current = queue.shift();
+
+          if (current.path.length > maxDepth) {
+            continue;
+          }
+
+          for (const link of state.raw.links) {
+            if (!DEPENDENCY_RELATIONS.has(link.type)) {
+              continue;
+            }
+
+            if (endpointId(link, 'source') !== current.id) {
+              continue;
+            }
+
+            const next = endpointId(link, 'target');
+
+            if (visited.has(next)) {
+              continue;
+            }
+
+            const path = [...current.path, next];
+
+            if (next === toId) {
+              return path;
+            }
+
+            visited.add(next);
 
             queue.push({
-              id:
-                source,
+              id: next,
 
-              depth:
-                nextDepth,
-
-              score:
-                nextScore,
+              path,
             });
           }
         }
+
+        return null;
       }
 
-      visited.delete(
-        startId
-      );
+      function relationHtml(title, nodes, limit = 8) {
+        const visible = nodes.slice(0, limit);
 
-      const impacted =
-        [
-          ...visited.entries()
-        ]
-          .map(
-            ([id, info]) => ({
-              node:
-                rawNode(
-                  id
-                ),
-
-              ...info,
-            })
-          )
-          .filter(
-            item =>
-              item.node
-          )
-          .sort(
-            (a, b) =>
-              b.score -
-              a.score
-          );
-
-      const score =
-        impacted.reduce(
-          (
-            total,
-            item
-          ) =>
-            total +
-            item.score,
-          0
-        );
-
-      let risk =
-        "LOW";
-
-      if (
-        score >= 250 ||
-        impacted.length >= 40
-      ) {
-        risk =
-          "CRITICAL";
-      } else if (
-        score >= 120 ||
-        impacted.length >= 20
-      ) {
-        risk =
-          "HIGH";
-      } else if (
-        score >= 40 ||
-        impacted.length >= 8
-      ) {
-        risk =
-          "MEDIUM";
-      }
-
-      return {
-        impacted,
-        score,
-        risk,
-      };
-    }
-
-    function shortestPath(
-      fromId,
-      toId,
-      maxDepth = 10
-    ) {
-      if (
-        fromId ===
-        toId
-      ) {
-        return [
-          fromId
-        ];
-      }
-
-      const queue = [
-        {
-          id:
-            fromId,
-
-          path: [
-            fromId
-          ],
-        }
-      ];
-
-      const visited =
-        new Set([
-          fromId
-        ]);
-
-      while (
-        queue.length
-      ) {
-        const current =
-          queue.shift();
-
-        if (
-          current.path.length >
-          maxDepth
-        ) {
-          continue;
-        }
-
-        for (
-          const link
-          of state.raw.links
-        ) {
-          if (
-            !DEPENDENCY_RELATIONS
-              .has(
-                link.type
-              )
-          ) {
-            continue;
-          }
-
-          if (
-            endpointId(
-              link,
-              "source"
-            ) !==
-            current.id
-          ) {
-            continue;
-          }
-
-          const next =
-            endpointId(
-              link,
-              "target"
-            );
-
-          if (
-            visited.has(
-              next
-            )
-          ) {
-            continue;
-          }
-
-          const path = [
-            ...current.path,
-            next,
-          ];
-
-          if (
-            next ===
-            toId
-          ) {
-            return path;
-          }
-
-          visited.add(
-            next
-          );
-
-          queue.push({
-            id:
-              next,
-
-            path,
-          });
-        }
-      }
-
-      return null;
-    }
-
-    function relationHtml(
-      title,
-      nodes,
-      limit = 8
-    ) {
-      const visible =
-        nodes.slice(
-          0,
-          limit
-        );
-
-      return `
+        return `
         <div class="section">
           <div class="section-title">
-            ${escapeHtml(
-              title
-            )}
+            ${escapeHtml(title)}
             · ${nodes.length}
           </div>
 
@@ -1551,33 +954,24 @@
             visible.length
               ? `
                 <div class="relation-list">
-                  ${
-                    visible
-                      .map(
-                        node => `
+                  ${visible
+                    .map(
+                      (node) => `
                           <button
                             class="relation-item"
-                            data-jump-node="${escapeHtml(
-                              node.id
-                            )}"
+                            data-jump-node="${escapeHtml(node.id)}"
                           >
                             <span class="relation-name">
-                              ${escapeHtml(
-                                node.qualifiedName ||
-                                node.name
-                              )}
+                              ${escapeHtml(node.qualifiedName || node.name)}
                             </span>
 
                             <span class="relation-meta">
-                              ${escapeHtml(
-                                node.filePath
-                              )}
+                              ${escapeHtml(node.filePath)}
                             </span>
                           </button>
                         `
-                      )
-                      .join("")
-                  }
+                    )
+                    .join('')}
                 </div>
               `
               : `
@@ -1588,331 +982,167 @@
           }
 
           ${
-            nodes.length >
-            limit
+            nodes.length > limit
               ? `
                 <div class="relation-more">
-                  +${
-                    nodes.length -
-                    limit
-                  } more
+                  +${nodes.length - limit} more
                 </div>
               `
-              : ""
+              : ''
           }
         </div>
       `;
-    }
-
-    function resetPathHighlight() {
-      state.highlightedPath =
-        [];
-
-      if (
-        !state.graph
-      ) {
-        return;
       }
 
-      state.graph
-        .linkWidth(
-          link =>
-            link.type ===
-              "CALL_REFERENCE"
-              ? 1.2
-              : .45
-        )
-        .linkColor(
-          link =>
-            linkColor(
-              link
-            )
-        );
-    }
+      function resetPathHighlight() {
+        state.highlightedPath = [];
 
-    function isPathLink(
-      link,
-      path
-    ) {
-      const source =
-        endpointId(
-          link,
-          "source"
-        );
-
-      const target =
-        endpointId(
-          link,
-          "target"
-        );
-
-      for (
-        let i = 0;
-        i <
-        path.length - 1;
-        i++
-      ) {
-        if (
-          path[i] ===
-            source &&
-          path[i + 1] ===
-            target
-        ) {
-          return true;
+        if (!state.graph) {
+          return;
         }
+
+        state.graph
+          .linkWidth((link) => (link.type === 'CALL_REFERENCE' ? 1.2 : 0.45))
+          .linkColor((link) => linkColor(link));
       }
 
-      return false;
-    }
+      function isPathLink(link, path) {
+        const source = endpointId(link, 'source');
 
-    function highlightPath(
-      path
-    ) {
-      state.highlightedPath =
-        path || [];
+        const target = endpointId(link, 'target');
 
-      if (
-        !state.graph
-      ) {
-        return;
+        for (let i = 0; i < path.length - 1; i++) {
+          if (path[i] === source && path[i + 1] === target) {
+            return true;
+          }
+        }
+
+        return false;
       }
 
-      state.graph
-        .linkWidth(
-          link =>
-            isPathLink(
-              link,
-              state.highlightedPath
-            )
+      function highlightPath(path) {
+        state.highlightedPath = path || [];
+
+        if (!state.graph) {
+          return;
+        }
+
+        state.graph
+          .linkWidth((link) =>
+            isPathLink(link, state.highlightedPath)
               ? 3.5
-              : (
-                  link.type ===
-                    "CALL_REFERENCE"
-                    ? 1.2
-                    : .35
-                )
-        )
-        .linkColor(
-          link =>
-            isPathLink(
-              link,
-              state.highlightedPath
-            )
-              ? "rgba(255,225,80,.98)"
-              : linkColor(
-                  link
-                )
-        );
-    }
+              : link.type === 'CALL_REFERENCE'
+                ? 1.2
+                : 0.35
+          )
+          .linkColor((link) =>
+            isPathLink(link, state.highlightedPath) ? 'rgba(255,225,80,.98)' : linkColor(link)
+          );
+      }
 
-    function flyToNode(
-      node
-    ) {
-      const distance =
-        70;
+      function flyToNode(node) {
+        const distance = 70;
 
-      const length =
-        Math.hypot(
-          node.x || 1,
-          node.y || 1,
-          node.z || 1
-        );
+        const length = Math.hypot(node.x || 1, node.y || 1, node.z || 1);
 
-      const ratio =
-        1 +
-        distance /
-        length;
+        const ratio = 1 + distance / length;
 
-      state.graph
-        .cameraPosition(
+        state.graph.cameraPosition(
           {
-            x:
-              node.x *
-              ratio,
+            x: node.x * ratio,
 
-            y:
-              node.y *
-              ratio,
+            y: node.y * ratio,
 
-            z:
-              node.z *
-              ratio,
+            z: node.z * ratio,
           },
 
           node,
 
           800
         );
-    }
+      }
 
-    function jumpToNode(
-      id
-    ) {
-      /*
-       * Clear filters if destination is hidden.
-       */
-      searchEl.value =
-        "";
+      function jumpToNode(id) {
+        /*
+         * Clear filters if destination is hidden.
+         */
+        searchEl.value = '';
 
-      clusterEl.value =
-        "";
+        clusterEl.value = '';
 
-      edgeEl.value =
-        "";
+        edgeEl.value = '';
 
-      state.search =
-        "";
+        state.search = '';
 
-      state.cluster =
-        "";
+        state.cluster = '';
 
-      state.edge =
-        "";
+        state.edge = '';
 
-      applyFilters();
+        applyFilters();
 
-      setTimeout(
-        () => {
-          const node =
-            state.graph
-              .graphData()
-              .nodes
-              .find(
-                item =>
-                  item.id ===
-                  id
-              );
+        setTimeout(() => {
+          const node = state.graph.graphData().nodes.find((item) => item.id === id);
 
           if (!node) {
             return;
           }
 
-          showDetails(
-            node
-          );
+          showDetails(node);
 
-          flyToNode(
-            node
-          );
-        },
-        100
-      );
-    }
-
-    function showDetails(
-      node
-    ) {
-      if (
-        node.viewKind ===
-        "cluster"
-      ) {
-        void loadProject(
-          state.project,
-          {
-            mode:
-              "files",
-
-            cluster:
-              node.clusterLabel ||
-              node.name,
-          }
-        );
-
-        return;
+          flyToNode(node);
+        }, 100);
       }
 
-      if (
-        node.viewKind ===
-        "file"
-      ) {
-        void loadProject(
-          state.project,
-          {
-            mode:
-              "symbols",
+      function showDetails(node) {
+        if (node.viewKind === 'cluster') {
+          void loadProject(state.project, {
+            mode: 'files',
 
-            file:
-              node.filePath,
-          }
-        );
+            cluster: node.clusterLabel || node.name,
+          });
 
-        return;
-      }
-
-      state.selected =
-        node;
-
-      detailsEl
-        .classList
-        .add(
-          "open"
-        );
-
-      const callers =
-        relatedNodes(
-          node.id,
-          "incoming",
-          CALL_RELATIONS
-        );
-
-      const callees =
-        relatedNodes(
-          node.id,
-          "outgoing",
-          CALL_RELATIONS
-        );
-
-      const dependencies =
-        relatedNodes(
-          node.id,
-          "outgoing",
-          DEPENDENCY_RELATIONS
-        );
-
-      const dependents =
-        relatedNodes(
-          node.id,
-          "incoming",
-          DEPENDENCY_RELATIONS
-        );
-
-      const blast =
-        blastRadius(
-          node.id,
-          3
-        );
-
-      let path =
-        null;
-
-      if (
-        state.pathStart &&
-        state.pathStart !==
-          node.id
-      ) {
-        path =
-          shortestPath(
-            state.pathStart,
-            node.id
-          );
-
-        if (path) {
-          highlightPath(
-            path
-          );
-        } else {
-          resetPathHighlight();
+          return;
         }
-      }
 
-      const pathStartNode =
-        state.pathStart
-          ? rawNode(
-              state.pathStart
-            )
-          : null;
+        if (node.viewKind === 'file') {
+          void loadProject(state.project, {
+            mode: 'symbols',
 
-      detailsEl.innerHTML = `
+            file: node.filePath,
+          });
+
+          return;
+        }
+
+        state.selected = node;
+
+        detailsEl.classList.add('open');
+
+        const callers = relatedNodes(node.id, 'incoming', CALL_RELATIONS);
+
+        const callees = relatedNodes(node.id, 'outgoing', CALL_RELATIONS);
+
+        const dependencies = relatedNodes(node.id, 'outgoing', DEPENDENCY_RELATIONS);
+
+        const dependents = relatedNodes(node.id, 'incoming', DEPENDENCY_RELATIONS);
+
+        const blast = blastRadius(node.id, 3);
+
+        let path = null;
+
+        if (state.pathStart && state.pathStart !== node.id) {
+          path = shortestPath(state.pathStart, node.id);
+
+          if (path) {
+            highlightPath(path);
+          } else {
+            resetPathHighlight();
+          }
+        }
+
+        const pathStartNode = state.pathStart ? rawNode(state.pathStart) : null;
+
+        detailsEl.innerHTML = `
         <button
           class="details-close"
           id="details-close"
@@ -1923,47 +1153,36 @@
         </button>
 
         <div class="detail-title">
-          ${escapeHtml(
-            node.qualifiedName ||
-            node.name
-          )}
+          ${escapeHtml(node.qualifiedName || node.name)}
         </div>
 
         <div class="path">
-          ${escapeHtml(
-            node.filePath
-          )}
+          ${escapeHtml(node.filePath)}
         </div>
 
         <div>
           <span class="tag">
-            ${escapeHtml(
-              node.type
-            )}
+            ${escapeHtml(node.type)}
           </span>
 
           ${
             node.clusterLabel
               ? `
                 <span class="tag">
-                  ${escapeHtml(
-                    node.clusterLabel
-                  )}
+                  ${escapeHtml(node.clusterLabel)}
                 </span>
               `
-              : ""
+              : ''
           }
 
           ${
             node.layer
               ? `
                 <span class="tag">
-                  ${escapeHtml(
-                    node.layer
-                  )}
+                  ${escapeHtml(node.layer)}
                 </span>
               `
-              : ""
+              : ''
           }
 
           ${
@@ -1971,13 +1190,10 @@
               ? `
                 <span class="tag">
                   dead-code:
-                  ${escapeHtml(
-                    node.deadCode
-                      .confidence
-                  )}
+                  ${escapeHtml(node.deadCode.confidence)}
                 </span>
               `
-              : ""
+              : ''
           }
         </div>
 
@@ -2045,39 +1261,19 @@
         ${
           blast.impacted.length
             ? relationHtml(
-                "Top Impacted",
-                blast.impacted
-                  .slice(
-                    0,
-                    8
-                  )
-                  .map(
-                    item =>
-                      item.node
-                  )
+                'Top Impacted',
+                blast.impacted.slice(0, 8).map((item) => item.node)
               )
-            : ""
+            : ''
         }
 
-        ${relationHtml(
-          "Callers",
-          callers
-        )}
+        ${relationHtml('Callers', callers)}
 
-        ${relationHtml(
-          "Callees",
-          callees
-        )}
+        ${relationHtml('Callees', callees)}
 
-        ${relationHtml(
-          "Dependencies",
-          dependencies
-        )}
+        ${relationHtml('Dependencies', dependencies)}
 
-        ${relationHtml(
-          "Dependents",
-          dependents
-        )}
+        ${relationHtml('Dependents', dependents)}
 
         <div class="section">
           <div class="section-title">
@@ -2096,11 +1292,7 @@
                 <div class="path">
                   From:
                   ${escapeHtml(
-                    pathStartNode
-                      ?.qualifiedName ||
-                    pathStartNode
-                      ?.name ||
-                    state.pathStart
+                    pathStartNode?.qualifiedName || pathStartNode?.name || state.pathStart
                   )}
                 </div>
               `
@@ -2111,12 +1303,7 @@
               id="path-start"
               type="button"
             >
-              ${
-                state.pathStart ===
-                  node.id
-                  ? "Start selected"
-                  : "Set path start"
-              }
+              ${state.pathStart === node.id ? 'Start selected' : 'Set path start'}
             </button>
 
             ${
@@ -2129,333 +1316,159 @@
                     Clear path
                   </button>
                 `
-                : ""
+                : ''
             }
           </div>
 
           ${
-            state.pathStart &&
-            state.pathStart !==
-              node.id
-              ? (
-                  path
-                    ? `
+            state.pathStart && state.pathStart !== node.id
+              ? path
+                ? `
                       <div class="path-chain">
-                        ${
-                          path.map(
-                            id => {
-                              const item =
-                                rawNode(
-                                  id
-                                );
+                        ${path
+                          .map((id) => {
+                            const item = rawNode(id);
 
-                              return `
+                            return `
                                 <button
                                   class="path-node"
-                                  data-jump-node="${escapeHtml(
-                                    id
-                                  )}"
+                                  data-jump-node="${escapeHtml(id)}"
                                 >
-                                  ${escapeHtml(
-                                    item?.qualifiedName ||
-                                    item?.name ||
-                                    id
-                                  )}
+                                  ${escapeHtml(item?.qualifiedName || item?.name || id)}
                                 </button>
                               `;
-                            }
-                          ).join("")
-                        }
+                          })
+                          .join('')}
                       </div>
                     `
-                    : `
+                : `
                       <div class="relation-more">
                         Không tìm thấy directed path
                         trong 10 bước.
                       </div>
                     `
-                )
-              : ""
+              : ''
           }
         </div>
       `;
 
-      document
-        .getElementById(
-          "details-close"
-        )
-        ?.addEventListener(
-          "click",
-          event => {
-            event.stopPropagation();
-            closeDetails();
-          }
-        );
+        document.getElementById('details-close')?.addEventListener('click', (event) => {
+          event.stopPropagation();
+          closeDetails();
+        });
 
-      detailsEl
-        .querySelectorAll(
-          "[data-jump-node]"
-        )
-        .forEach(
-          element => {
-            element
-              .addEventListener(
-                "click",
-                event => {
-                  event.stopPropagation();
-
-                  jumpToNode(
-                    element.dataset
-                      .jumpNode
-                  );
-                }
-              );
-          }
-        );
-
-      document
-        .getElementById(
-          "path-start"
-        )
-        ?.addEventListener(
-          "click",
-          event => {
+        detailsEl.querySelectorAll('[data-jump-node]').forEach((element) => {
+          element.addEventListener('click', (event) => {
             event.stopPropagation();
 
-            state.pathStart =
-              node.id;
+            jumpToNode(element.dataset.jumpNode);
+          });
+        });
 
-            resetPathHighlight();
+        document.getElementById('path-start')?.addEventListener('click', (event) => {
+          event.stopPropagation();
 
-            showDetails(
-              node
-            );
-          }
-        );
+          state.pathStart = node.id;
 
-      document
-        .getElementById(
-          "path-clear"
-        )
-        ?.addEventListener(
-          "click",
-          event => {
-            event.stopPropagation();
+          resetPathHighlight();
 
-            state.pathStart =
-              null;
+          showDetails(node);
+        });
 
-            resetPathHighlight();
+        document.getElementById('path-clear')?.addEventListener('click', (event) => {
+          event.stopPropagation();
 
-            showDetails(
-              node
-            );
-          }
-        );
-    }
+          state.pathStart = null;
 
-    function populateFilters() {
-      clusterEl.innerHTML =
-        '<option value="">All subsystems</option>';
+          resetPathHighlight();
 
-      edgeEl.innerHTML =
-        '<option value="">All relations</option>';
-
-      const clusters =
-        [
-          ...new Set(
-            state.raw.nodes
-              .map(
-                node =>
-                  node.clusterLabel
-              )
-              .filter(Boolean)
-          )
-        ]
-          .sort();
-
-      for (
-        const value
-        of clusters
-      ) {
-        const option =
-          document.createElement(
-            "option"
-          );
-
-        option.value =
-          value;
-
-        option.textContent =
-          value;
-
-        clusterEl.appendChild(
-          option
-        );
+          showDetails(node);
+        });
       }
 
-      const edges =
-        [
-          ...new Set(
-            state.raw.links
-              .map(
-                link =>
-                  link.type
-              )
-          )
-        ]
-          .sort();
+      function populateFilters() {
+        clusterEl.innerHTML = '<option value="">All subsystems</option>';
 
-      for (
-        const value
-        of edges
-      ) {
-        const option =
-          document.createElement(
-            "option"
-          );
+        edgeEl.innerHTML = '<option value="">All relations</option>';
 
-        option.value =
-          value;
+        const clusters = [
+          ...new Set(state.raw.nodes.map((node) => node.clusterLabel).filter(Boolean)),
+        ].sort();
 
-        option.textContent =
-          value;
+        for (const value of clusters) {
+          const option = document.createElement('option');
 
-        edgeEl.appendChild(
-          option
-        );
-      }
-    }
+          option.value = value;
 
-    function filteredData() {
-      const search =
-        state.search
-          .trim()
-          .toLowerCase();
+          option.textContent = value;
 
-      let nodes =
-        state.raw.nodes;
+          clusterEl.appendChild(option);
+        }
 
-      if (
-        state.cluster
-      ) {
-        nodes =
-          nodes.filter(
-            node =>
-              node.clusterLabel ===
-              state.cluster
-          );
+        const edges = [...new Set(state.raw.links.map((link) => link.type))].sort();
+
+        for (const value of edges) {
+          const option = document.createElement('option');
+
+          option.value = value;
+
+          option.textContent = value;
+
+          edgeEl.appendChild(option);
+        }
       }
 
-      if (
-        search
-      ) {
-        nodes =
-          nodes.filter(
-            node =>
-              node.name
-                ?.toLowerCase()
-                .includes(
-                  search
-                ) ||
+      function filteredData() {
+        const search = state.search.trim().toLowerCase();
 
-              node.qualifiedName
-                ?.toLowerCase()
-                .includes(
-                  search
-                ) ||
+        let nodes = state.raw.nodes;
 
-              node.filePath
-                ?.toLowerCase()
-                .includes(
-                  search
-                )
+        if (state.cluster) {
+          nodes = nodes.filter((node) => node.clusterLabel === state.cluster);
+        }
+
+        if (search) {
+          nodes = nodes.filter(
+            (node) =>
+              node.name?.toLowerCase().includes(search) ||
+              node.qualifiedName?.toLowerCase().includes(search) ||
+              node.filePath?.toLowerCase().includes(search)
           );
+        }
+
+        const ids = new Set(nodes.map((node) => node.id));
+
+        let links = state.raw.links.filter((link) => {
+          const source = typeof link.source === 'object' ? link.source.id : link.source;
+
+          const target = typeof link.target === 'object' ? link.target.id : link.target;
+
+          return ids.has(source) && ids.has(target);
+        });
+
+        if (state.edge) {
+          links = links.filter((link) => link.type === state.edge);
+        }
+
+        return {
+          nodes: nodes.map((node) => ({
+            ...node,
+          })),
+
+          links: links.map((link) => ({
+            ...link,
+
+            source: typeof link.source === 'object' ? link.source.id : link.source,
+
+            target: typeof link.target === 'object' ? link.target.id : link.target,
+          })),
+        };
       }
 
-      const ids =
-        new Set(
-          nodes.map(
-            node =>
-              node.id
-          )
-        );
+      function renderStats(data) {
+        const dashboard = state.raw.dashboard || {};
 
-      let links =
-        state.raw.links
-          .filter(
-            link => {
-              const source =
-                typeof link.source ===
-                  "object"
-                  ? link.source.id
-                  : link.source;
-
-              const target =
-                typeof link.target ===
-                  "object"
-                  ? link.target.id
-                  : link.target;
-
-              return (
-                ids.has(
-                  source
-                ) &&
-                ids.has(
-                  target
-                )
-              );
-            }
-          );
-
-      if (
-        state.edge
-      ) {
-        links =
-          links.filter(
-            link =>
-              link.type ===
-              state.edge
-          );
-      }
-
-      return {
-        nodes:
-          nodes.map(
-            node => ({
-              ...node
-            })
-          ),
-
-        links:
-          links.map(
-            link => ({
-              ...link,
-
-              source:
-                typeof link.source ===
-                  "object"
-                  ? link.source.id
-                  : link.source,
-
-              target:
-                typeof link.target ===
-                  "object"
-                  ? link.target.id
-                  : link.target,
-            })
-          ),
-      };
-    }
-
-    function renderStats(
-      data
-    ) {
-      const dashboard =
-        state.raw.dashboard ||
-        {};
-
-      statsEl.innerHTML = `
+        statsEl.innerHTML = `
         <div>
           <strong>
             ${data.nodes.length}
@@ -2485,552 +1498,273 @@
         </div>
 
         <div class="status">
-          ${escapeHtml(
-            dashboard.name ||
-            state.project
-          )}
+          ${escapeHtml(dashboard.name || state.project)}
 
-          ${
-            dashboard.hasArchitecture
-              ? " · architecture"
-              : ""
-          }
+          ${dashboard.hasArchitecture ? ' · architecture' : ''}
 
-          ${
-            dashboard.hasAnalysis
-              ? " · analysis"
-              : ""
-          }
+          ${dashboard.hasAnalysis ? ' · analysis' : ''}
         </div>
       `;
-    }
-
-    function applyFilters() {
-      const data =
-        filteredData();
-
-      state.graph.graphData(
-        data
-      );
-
-      renderStats(
-        data
-      );
-    }
-
-    async function loadProject(
-      project,
-      options = {}
-    ) {
-      closeDetails();
-
-      const mode =
-        options.mode ||
-        "overview";
-
-      let loading =
-        document.getElementById(
-          "loading"
-        );
-
-      if (!loading) {
-        loading =
-          document.createElement(
-            "div"
-          );
-
-        loading.id =
-          "loading";
-
-        document.body
-          .appendChild(
-            loading
-          );
       }
 
-      loading.textContent =
-        `Loading ${project} · ${mode}…`;
+      function applyFilters() {
+        const data = filteredData();
 
-      const params =
-        new URLSearchParams();
+        state.graph.graphData(data);
 
-      params.set(
-        "project",
-        project
-      );
-
-      params.set(
-        "mode",
-        mode
-      );
-
-      if (
-        options.cluster
-      ) {
-        params.set(
-          "cluster",
-          options.cluster
-        );
+        renderStats(data);
       }
 
-      if (
-        options.file
-      ) {
-        params.set(
-          "file",
-          options.file
-        );
-      }
+      async function loadProject(project, options = {}) {
+        closeDetails();
 
-      const response =
-        await graphApiFetch(
-          `/api/graph?${params.toString()}`
-        );
+        const mode = options.mode || 'overview';
 
-      if (
-        !response.ok
-      ) {
-        const error =
-          await response
-            .json()
-            .catch(
-              () => null
-            );
+        let loading = document.getElementById('loading');
 
-        throw new Error(
-          error?.error ||
-          "Unable to load graph"
-        );
-      }
+        if (!loading) {
+          loading = document.createElement('div');
 
-      state.project =
-        project;
+          loading.id = 'loading';
 
-      state.viewMode =
-        mode;
+          document.body.appendChild(loading);
+        }
 
-      state.viewCluster =
-        options.cluster ||
-        "";
+        loading.textContent = `Loading ${project} · ${mode}…`;
 
-      state.viewFile =
-        options.file ||
-        "";
+        const params = new URLSearchParams();
 
-      state.raw =
-        await response.json();
+        params.set('project', project);
 
-      state.search =
-        "";
+        params.set('mode', mode);
 
-      state.cluster =
-        "";
+        if (options.cluster) {
+          params.set('cluster', options.cluster);
+        }
 
-      state.edge =
-        "";
+        if (options.file) {
+          params.set('file', options.file);
+        }
 
-      state.pathStart =
-        null;
+        const response = await graphApiFetch(`/api/graph?${params.toString()}`);
 
-      searchEl.value =
-        "";
+        if (!response.ok) {
+          const error = await response.json().catch(() => null);
 
-      clusterEl.value =
-        "";
+          throw new Error(error?.error || 'Unable to load graph');
+        }
 
-      edgeEl.value =
-        "";
+        state.project = project;
 
-      populateFilters();
+        state.viewMode = mode;
 
-      const data =
-        filteredData();
+        state.viewCluster = options.cluster || '';
 
-      if (
-        !state.graph
-      ) {
-        state.graph =
-          ForceGraph3D()(
-            graphEl
-          )
-            .backgroundColor(
-              "#050608"
-            )
+        state.viewFile = options.file || '';
 
-            .nodeLabel(
-              node =>
-                `${
-                  node.qualifiedName ||
-                  node.name
-                }\n${
-                  node.filePath ||
-                  ""
-                }`
-            )
+        state.raw = await response.json();
 
-            .nodeColor(
-              node =>
-                nodeColor(
-                  node
-                )
-            )
+        state.search = '';
+
+        state.cluster = '';
+
+        state.edge = '';
+
+        state.pathStart = null;
+
+        searchEl.value = '';
+
+        clusterEl.value = '';
+
+        edgeEl.value = '';
+
+        populateFilters();
+
+        const data = filteredData();
+
+        if (!state.graph) {
+          state.graph = ForceGraph3D()(graphEl)
+            .backgroundColor('#050608')
+
+            .nodeLabel((node) => `${node.qualifiedName || node.name}\n${node.filePath || ''}`)
+
+            .nodeColor((node) => nodeColor(node))
 
             .nodeVal(
-              node =>
-                2 +
-                Math.min(
-                  10,
-                  Math.log2(
-                    1 +
-                    (
-                      node.incoming ||
-                      0
-                    ) +
-                    (
-                      node.outgoing ||
-                      0
-                    )
-                  )
-                )
+              (node) => 2 + Math.min(10, Math.log2(1 + (node.incoming || 0) + (node.outgoing || 0)))
             )
 
-            .linkColor(
-              link =>
-                linkColor(
-                  link
-                )
-            )
+            .linkColor((link) => linkColor(link))
 
-            .linkOpacity(
-              .38
-            )
+            .linkOpacity(0.38)
 
-            .linkWidth(
-              link =>
-                link.type ===
-                  "CALL_REFERENCE"
-                  ? 1
-                  : .4
-            )
+            .linkWidth((link) => (link.type === 'CALL_REFERENCE' ? 1 : 0.4))
 
             /*
              * Particles across 200k relationships are extremely
              * expensive on mobile GPUs. Keep them disabled.
              */
-            .linkDirectionalParticles(
-              0
-            )
+            .linkDirectionalParticles(0)
 
-            .onBackgroundClick(
-              () => {
-                closeDetails();
+            .onBackgroundClick(() => {
+              closeDetails();
+            })
+
+            .onNodeClick((node) => {
+              if (node.viewKind === 'cluster' || node.viewKind === 'file') {
+                showDetails(node);
+
+                return;
               }
-            )
 
-            .onNodeClick(
-              node => {
-                if (
-                  node.viewKind ===
-                    "cluster" ||
-                  node.viewKind ===
-                    "file"
-                ) {
-                  showDetails(
-                    node
-                  );
+              showDetails(node);
 
-                  return;
-                }
+              flyToNode(node);
+            });
+        }
 
-                showDetails(
-                  node
-                );
+        state.graph.cooldownTicks(mode === 'overview' ? 50 : 80);
 
-                flyToNode(
-                  node
-                );
-              }
-            );
+        state.graph.graphData(data);
+
+        renderStats(data);
+
+        document.title = `${state.raw.dashboard?.name || project} · ToolNet Graph`;
+
+        loading = document.getElementById('loading');
+
+        if (loading) {
+          loading.remove();
+        }
+
+        setTimeout(() => {
+          state.graph.zoomToFit(500, 45);
+        }, 150);
       }
 
-      state.graph
-        .cooldownTicks(
-          mode ===
-            "overview"
-            ? 50
-            : 80
+      async function main() {
+        const response = await graphApiFetch('/api/projects');
+
+        if (!response.ok) {
+          throw new Error('Unable to load ToolNet projects');
+        }
+
+        const catalog = await response.json();
+
+        projectEl.innerHTML = '';
+
+        for (const project of catalog.projects) {
+          const option = document.createElement('option');
+
+          option.value = project.remote;
+
+          option.textContent = project.hasGraph ? project.name : `${project.name} · not indexed`;
+
+          option.disabled = !project.hasGraph;
+
+          projectEl.appendChild(option);
+        }
+
+        const requested = new URLSearchParams(window.location.search).get('project');
+
+        const requestedValid = catalog.projects.some(
+          (project) => project.remote === requested && project.hasGraph
         );
 
-      state.graph.graphData(
-        data
-      );
+        const selected = requestedValid ? requested : catalog.defaultProject;
 
-      renderStats(
-        data
-      );
+        if (!selected) {
+          throw new Error('No indexed projects found');
+        }
 
-      document.title =
-        `${
-          state.raw.dashboard
-            ?.name ||
-          project
-        } · ToolNet Graph`;
+        projectEl.value = selected;
 
-      loading =
-        document.getElementById(
-          "loading"
-        );
-
-      if (loading) {
-        loading.remove();
+        await loadProject(selected);
       }
 
-      setTimeout(
-        () => {
-          state.graph
-            .zoomToFit(
-              500,
-              45
-            );
-        },
-        150
-      );
-    }
-
-    async function main() {
-      const response =
-        await graphApiFetch(
-          "/api/projects"
-        );
-
-      if (
-        !response.ok
-      ) {
-        throw new Error(
-          "Unable to load ToolNet projects"
-        );
-      }
-
-      const catalog =
-        await response.json();
-
-      projectEl.innerHTML =
-        "";
-
-      for (
-        const project
-        of catalog.projects
-      ) {
-        const option =
-          document.createElement(
-            "option"
-          );
-
-        option.value =
-          project.remote;
-
-        option.textContent =
-          project.hasGraph
-            ? project.name
-            : `${project.name} · not indexed`;
-
-        option.disabled =
-          !project.hasGraph;
-
-        projectEl.appendChild(
-          option
-        );
-      }
-
-      const requested =
-        new URLSearchParams(
-          window.location.search
-        ).get(
-          "project"
-        );
-
-      const requestedValid =
-        catalog.projects
-          .some(
-            project =>
-              project.remote ===
-                requested &&
-              project.hasGraph
-          );
-
-      const selected =
-        requestedValid
-          ? requested
-          : catalog.defaultProject;
-
-      if (!selected) {
-        throw new Error(
-          "No indexed projects found"
-        );
-      }
-
-      projectEl.value =
-        selected;
-
-      await loadProject(
-        selected
-      );
-    }
-
-    projectEl.addEventListener(
-      "change",
-      async () => {
-        const project =
-          projectEl.value;
+      projectEl.addEventListener('change', async () => {
+        const project = projectEl.value;
 
         if (!project) {
           return;
         }
 
-        const url =
-          new URL(
-            window.location.href
-          );
+        const url = new URL(window.location.href);
 
-        url.searchParams.set(
-          "project",
-          project
-        );
+        url.searchParams.set('project', project);
 
-        history.replaceState(
-          {},
-          "",
-          url
-        );
+        history.replaceState({}, '', url);
 
         try {
-          await loadProject(
-            project
-          );
-        } catch (
-          error
-        ) {
-          alert(
-            error.message
-          );
+          await loadProject(project);
+        } catch (error) {
+          alert(error.message);
         }
-      }
-    );
+      });
 
-    searchEl.addEventListener(
-      "input",
-      () => {
-        state.search =
-          searchEl.value;
+      searchEl.addEventListener('input', () => {
+        state.search = searchEl.value;
 
         applyFilters();
-      }
-    );
+      });
 
-    clusterEl.addEventListener(
-      "change",
-      () => {
-        state.cluster =
-          clusterEl.value;
+      clusterEl.addEventListener('change', () => {
+        state.cluster = clusterEl.value;
 
         applyFilters();
-      }
-    );
+      });
 
-    edgeEl.addEventListener(
-      "change",
-      () => {
-        state.edge =
-          edgeEl.value;
+      edgeEl.addEventListener('change', () => {
+        state.edge = edgeEl.value;
 
         applyFilters();
-      }
-    );
+      });
 
-    document
-      .getElementById(
-        "reset"
-      )
-      .addEventListener(
-        "click",
-        () => {
-          if (
-            state.viewMode !==
-            "overview"
-          ) {
-            void loadProject(
-              state.project
-            );
+      document.getElementById('reset').addEventListener('click', () => {
+        if (state.viewMode !== 'overview') {
+          void loadProject(state.project);
 
-            return;
-          }
-
-          searchEl.value =
-            "";
-
-          clusterEl.value =
-            "";
-
-          edgeEl.value =
-            "";
-
-          state.search =
-            "";
-
-          state.cluster =
-            "";
-
-          state.edge =
-            "";
-
-          state.pathStart =
-            null;
-
-          resetPathHighlight();
-
-          closeDetails();
-
-          applyFilters();
-
-          state.graph
-            .zoomToFit(
-              700,
-              60
-            );
+          return;
         }
-      );
 
-    document.addEventListener(
-      "keydown",
-      event => {
-        if (
-          event.key ===
-          "Escape"
-        ) {
+        searchEl.value = '';
+
+        clusterEl.value = '';
+
+        edgeEl.value = '';
+
+        state.search = '';
+
+        state.cluster = '';
+
+        state.edge = '';
+
+        state.pathStart = null;
+
+        resetPathHighlight();
+
+        closeDetails();
+
+        applyFilters();
+
+        state.graph.zoomToFit(700, 60);
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
           closeDetails();
         }
-      }
-    );
+      });
 
-    main().catch(
-      error => {
-        const loading =
-          document.getElementById(
-            "loading"
-          );
+      main().catch((error) => {
+        const loading = document.getElementById('loading');
 
-        if (
-          loading
-        ) {
-          loading.textContent =
-            error.message;
+        if (loading) {
+          loading.textContent = error.message;
         }
 
-        console.error(
-          error
-        );
-      }
-    );
-  </script>
-</body>
+        console.error(error);
+      });
+    </script>
+  </body>
 </html>
