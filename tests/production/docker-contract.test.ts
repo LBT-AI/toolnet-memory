@@ -35,7 +35,7 @@ describe('Phase 26 Docker contract', () => {
   it('bundles real daemon IPC healthcheck', () => {
     expect(bundleBuild).toContain("'docker-healthcheck': 'src/service/docker-healthcheck.ts'");
     expect(dockerfile).toContain('/opt/toolnet-memory/bundle/docker-healthcheck.js');
-    expect(health).toContain("type:\n                'ping'");
+    expect(health).toContain("type: 'ping'");
     expect(health).toContain('toolNetServiceSocketPath');
   });
   it('persists ToolNet home', () => {
