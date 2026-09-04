@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: v0.3.17
+Current release: **v0.4.0**
 
 </div>
 
@@ -59,6 +59,21 @@ toolnet-memory gc --apply
 ```
 
 ---
+
+### v0.4.0 Persistent Shared Tasks
+
+v0.4.0 adds a durable project-shared Task execution layer for coding agents.
+
+- Goal → Task → Subtask hierarchy.
+- Deterministic Task lifecycle and revision guards.
+- Progress, blockers, dependencies, evidence, tests, touched files, and next actions.
+- Multi-agent claim leases, heartbeat, release, handoff, and expired-lease takeover.
+- Deterministic `claimNext()` and resume-state continuity.
+- Task CLI and MCP tools.
+- Read-only authenticated Tasks Panel in the Graph UI.
+- Automatic file, test, verification, and Git commit evidence for claimed Tasks.
+- Automatic evidence never completes Tasks and never stores raw command output.
+- The Task runtime remains local-first and deterministic with no LLM, embeddings, or vector database requirement.
 
 ## Supported Coding Agents
 
@@ -969,6 +984,52 @@ toolnet-memory recover
 
 ---
 
+## Persistent Shared Tasks
+
+ToolNet Memory now includes the core durable model for project-shared Goals, Tasks and Subtasks.
+
+Authoritative task history is append-only:
+
+```text
+.toolnet/tasks/events.jsonl
+```
+
+A deterministic rebuildable projection is maintained at:
+
+```text
+.toolnet/tasks/state.json
+```
+
+Task ownership is project-wide rather than session-private. Agent identity is stored as attribution metadata and is not used to hide tasks from other agents.
+
+Phase 33 establishes persistence, revision guards, local multi-process locking, crash-tail recovery and GC protection. Lifecycle rules, evidence, MCP/CLI and the Tasks panel are layered on top in subsequent phases.
+
+See [docs/tasks-core.md](docs/tasks-core.md).
+
+---
+
+## Task State Engine
+
+Persistent Shared Tasks now include deterministic execution state:
+
+- lifecycle transitions,
+- blockers,
+- progress,
+- dependencies,
+- evidence,
+- touched files,
+- test history,
+- next actions,
+- deterministic resume state.
+
+Parent task progress can be derived from direct child state, allowing a Tasks panel to render progress such as 5/10 without relying on an LLM.
+
+Completion fails closed while blockers, open children, incomplete dependencies or incomplete explicit progress remain.
+
+See [docs/task-state-engine.md](docs/task-state-engine.md).
+
+---
+
 ## Architecture Guard
 
 Evaluate project rules and potentially dangerous changes:
@@ -1134,7 +1195,7 @@ ToolNet Memory uses GitHub Actions for CI and npm releases.
 The current release line is:
 
 ```text
-npm package: toolnet-memory@0.3.17
+npm package: toolnet-memory@0.3.19
 Git tag:     v0.3.14
 ```
 
@@ -1267,3 +1328,50 @@ only. ToolNet does not auto-download or automatically execute language
 servers during indexing.
 
 See [`docs/non-ts-intelligence.md`](docs/non-ts-intelligence.md).
+
+## Multi-Agent Task Handoff
+
+Persistent Shared Tasks support execution leases and deterministic handoff
+between agents.
+
+An agent may claim a task, heartbeat the lease, release it or explicitly
+transfer execution ownership to another agent without losing progress,
+evidence, blockers or next-action continuity.
+
+Expired leases can be taken over deterministically, and claimNext() skips
+work actively owned by other agents while selecting the next dependency-ready
+task.
+
+This is same-project task coordination, not a remote object-storage distributed
+lock.
+
+See [docs/task-handoff.md](docs/task-handoff.md).
+
+## Tasks Panel
+
+The Graph UI includes a read-only Persistent Tasks panel.
+
+It displays the current Task, progress such as 5/10, Goal/Task/Subtask
+hierarchy, lifecycle state, blockers, next actions and active agent leases.
+
+The browser reads a compact authenticated `/api/tasks` view and never accesses
+or writes the raw Task operation log.
+
+Task mutation remains available through the guarded CLI and MCP Task tools.
+
+See [docs/tasks-panel.md](docs/tasks-panel.md).
+
+## Automatic Task Evidence
+
+When an agent holds a Persistent Task lease, ToolNet hooks can automatically
+attach deterministic execution evidence to that Task.
+
+Supported evidence includes changed project files, test PASS/FAIL results,
+verification results and Git commit SHA references.
+
+Attribution fails closed when the agent has multiple ambiguous Task leases.
+Set `TOOLNET_TASK_ID` to select a Task explicitly.
+
+Automatic evidence never completes Tasks and never stores raw command output.
+
+See [docs/task-auto-evidence.md](docs/task-auto-evidence.md).

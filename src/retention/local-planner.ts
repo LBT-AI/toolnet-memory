@@ -286,6 +286,12 @@ export function planLocalGc(
     },
     {
       scope: 'local',
+      category: 'protected-tasks',
+      target: join(toolnet, 'tasks'),
+      reason: 'shared task operation history is durable project coordination state',
+    },
+    {
+      scope: 'local',
       category: 'protected-legacy-session',
       target: join(toolnet, 'sessions'),
       reason: 'legacy sessions remain read/protected and are never automatically removed',

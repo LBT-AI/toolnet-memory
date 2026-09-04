@@ -8,12 +8,19 @@ import {
 import { MemoryProcessor } from '../processor/memory-processor.js';
 import type { MemoryStore } from '../storage/memory-store.js';
 import { deduplicateMemories } from '../memory/deduplicate.js';
+import { ProjectManager } from '../core/project-manager.js';
+import { TaskAutoEvidenceEngine } from '../tasks/auto-evidence.js';
+import { TaskStore } from '../tasks/store.js';
 
 export interface HookRuntimeOptions {
   projectId: string;
   memory: MemoryEngine;
   memoryStore: MemoryStore;
   maxEventsBeforeFlush?: number;
+  projectRoot?: string;
+  taskAgentId?: string;
+  taskId?: string;
+  autoTaskEvidence?: boolean;
 }
 
 export class HookRuntime {
@@ -28,6 +35,8 @@ export class HookRuntime {
   private readonly dedup = new EventDeduplicator();
 
   private readonly maxEventsBeforeFlush: number;
+  private readonly taskAutoEvidence?: TaskAutoEvidenceEngine;
+  private taskAutoEvidenceFailures = 0;
 
   constructor(options: HookRuntimeOptions) {
     this.projectId = options.projectId;
@@ -37,6 +46,45 @@ export class HookRuntime {
     this.maxEventsBeforeFlush = options.maxEventsBeforeFlush ?? 100;
 
     this.processor = new MemoryProcessor(this.memory);
+
+    const autoEvidenceEnabled =
+      options.autoTaskEvidence !== false &&
+      process.env.TOOLNET_AUTO_TASK_EVIDENCE?.trim().toLowerCase() !== 'off';
+    const taskAgentId = options.taskAgentId?.trim() || process.env.TOOLNET_AGENT_ID?.trim();
+
+    if (autoEvidenceEnabled && taskAgentId) {
+      try {
+        const project = new ProjectManager().requireExisting(options.projectRoot ?? process.cwd());
+
+        if (project.id === this.projectId) {
+          this.taskAutoEvidence = new TaskAutoEvidenceEngine(new TaskStore(project), {
+            projectRoot: project.rootPath,
+            agentId: taskAgentId,
+            targetTaskId:
+              options.taskId?.trim() || process.env.TOOLNET_TASK_ID?.trim() || undefined,
+          });
+        }
+      } catch {
+        /*
+         * Hook runtime must remain backward compatible.
+         *
+         * Missing Task project/claim support must never break
+         * existing Memory capture.
+         */
+      }
+    }
+  }
+
+  private async captureTaskEvidence(action: () => Promise<unknown>): Promise<void> {
+    if (!this.taskAutoEvidence) {
+      return;
+    }
+
+    try {
+      await action();
+    } catch {
+      this.taskAutoEvidenceFailures += 1;
+    }
   }
 
   async sessionStart(): Promise<void> {
@@ -84,6 +132,8 @@ export class HookRuntime {
   async fileWrite(filePath: string): Promise<void> {
     this.capture.capture(this.projectId, 'file_write', { filePath });
 
+    await this.captureTaskEvidence(() => this.taskAutoEvidence!.recordFileWrite(filePath));
+
     await this.flushIfNeeded();
   }
 
@@ -92,6 +142,8 @@ export class HookRuntime {
       command,
       exitCode,
     });
+
+    await this.captureTaskEvidence(() => this.taskAutoEvidence!.recordCommand(command, exitCode));
 
     await this.flushIfNeeded();
   }
@@ -156,5 +208,13 @@ export class HookRuntime {
 
   pendingEvents(): number {
     return this.queue.size();
+  }
+
+  taskEvidenceFailureCount(): number {
+    return this.taskAutoEvidenceFailures;
+  }
+
+  taskAutoEvidenceEnabled(): boolean {
+    return Boolean(this.taskAutoEvidence);
   }
 }

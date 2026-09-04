@@ -34,6 +34,7 @@ const entries = {
   gc: 'src/retention/cli.ts',
   audit: 'src/audit/cli.ts',
   'code-capabilities': 'src/code-intelligence/parsers/capability-cli.ts',
+  'task-cli': 'src/tasks/cli.ts',
 
   opencode: 'src/session/opencode/cli.ts',
   agy: 'src/session/agy/cli.ts',

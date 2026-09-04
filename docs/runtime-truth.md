@@ -285,7 +285,7 @@ Not implemented:
 
 | Storage                | Status      |
 | ---------------------- | ----------- |
-| Google Drive           | unsupported |
+| Google Drive | unsupported |
 | GitHub storage backend | unsupported |
 
 Frozen zero-byte placeholders under `src/storage/**` do not represent working

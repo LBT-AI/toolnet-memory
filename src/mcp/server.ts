@@ -61,6 +61,43 @@ import {
 } from './tools/knowledge-governance-status.js';
 
 import { toolnetStatus, toolnetStatusSchema } from './tools/toolnet-status.js';
+import {
+  taskList,
+  taskListSchema,
+  taskGet,
+  taskGetSchema,
+  taskCreate,
+  taskCreateSchema,
+  taskUpdate,
+  taskUpdateSchema,
+  taskStart,
+  taskLifecycleSchema,
+  taskBlock,
+  taskBlockSchema,
+  taskResume,
+  taskComplete,
+  taskProgress,
+  taskProgressSchema,
+  taskNextAction,
+  taskNextActionSchema,
+  taskDependencyAdd,
+  taskDependencyRemove,
+  taskDependencySchema,
+  taskEvidenceAdd,
+  taskEvidenceSchema,
+  taskFileTouch,
+  taskFileSchema,
+  taskTestRecord,
+  taskTestSchema,
+  taskClaim,
+  taskClaimSchema,
+  taskRelease,
+  taskReleaseSchema,
+  taskHandoff,
+  taskHandoffSchema,
+  taskNext,
+  taskNextSchema,
+} from './tools/task-tools.js';
 
 function jsonText(value: unknown) {
   return {
@@ -116,6 +153,12 @@ export const TOOLNET_MCP_SERVER_INSTRUCTIONS = [
   '   If the compact graph references a needed asset, call context_offload_read.',
   '',
   '10. Never bulk-load offloaded assets. Read only the minimum asset required.',
+  '',
+  '11. Shared project Tasks are durable execution state.',
+  '    When continuing planned project work, use task_next or task_get after continuity memory is resolved.',
+  '',
+  '12. Never reconstruct Tasks by reading .toolnet/tasks/events.jsonl or state.json directly.',
+  '    Use Task MCP tools so revision, lifecycle, lease and dependency guards remain enforced.',
 ].join('\\n');
 
 export function createMCPServer(ctx: MCPContext) {
@@ -322,6 +365,114 @@ export function createMCPServer(ctx: MCPContext) {
     async (input) => jsonText(await wikiRead(ctx, input))
   );
 
+  server.tool(
+    'task_list',
+    'List durable project-shared Tasks with optional hierarchy/status filters.',
+    taskListSchema,
+    async (input) => jsonText(await taskList(ctx, input))
+  );
+  server.tool('task_get', 'Read one durable project Task by id.', taskGetSchema, async (input) =>
+    jsonText(await taskGet(ctx, input))
+  );
+  server.tool(
+    'task_create',
+    'Create a project-shared Goal, Task or Subtask.',
+    taskCreateSchema,
+    async (input) => jsonText(await taskCreate(ctx, input))
+  );
+  server.tool(
+    'task_update',
+    'Update Task metadata using optional revision protection.',
+    taskUpdateSchema,
+    async (input) => jsonText(await taskUpdate(ctx, input))
+  );
+  server.tool(
+    'task_start',
+    'Move a pending Task into active state.',
+    taskLifecycleSchema,
+    async (input) => jsonText(await taskStart(ctx, input))
+  );
+  server.tool(
+    'task_block',
+    'Block an active Task with a durable reason and optional next action.',
+    taskBlockSchema,
+    async (input) => jsonText(await taskBlock(ctx, input))
+  );
+  server.tool('task_resume', 'Resume a blocked Task.', taskLifecycleSchema, async (input) =>
+    jsonText(await taskResume(ctx, input))
+  );
+  server.tool(
+    'task_complete',
+    'Complete a Task only when deterministic completion guards pass.',
+    taskLifecycleSchema,
+    async (input) => jsonText(await taskComplete(ctx, input))
+  );
+  server.tool(
+    'task_progress',
+    'Set explicit deterministic Task progress such as 5/10.',
+    taskProgressSchema,
+    async (input) => jsonText(await taskProgress(ctx, input))
+  );
+  server.tool(
+    'task_next_action',
+    'Set or clear the durable next action for a Task.',
+    taskNextActionSchema,
+    async (input) => jsonText(await taskNextAction(ctx, input))
+  );
+  server.tool(
+    'task_dependency_add',
+    'Add a Task dependency with self/cycle protection.',
+    taskDependencySchema,
+    async (input) => jsonText(await taskDependencyAdd(ctx, input))
+  );
+  server.tool(
+    'task_dependency_remove',
+    'Remove a Task dependency.',
+    taskDependencySchema,
+    async (input) => jsonText(await taskDependencyRemove(ctx, input))
+  );
+  server.tool(
+    'task_evidence_add',
+    'Attach manual durable evidence to a Task.',
+    taskEvidenceSchema,
+    async (input) => jsonText(await taskEvidenceAdd(ctx, input))
+  );
+  server.tool(
+    'task_file_touch',
+    'Record a file touched by the current Task.',
+    taskFileSchema,
+    async (input) => jsonText(await taskFileTouch(ctx, input))
+  );
+  server.tool(
+    'task_test_record',
+    'Record pass/fail/skip test evidence for a Task.',
+    taskTestSchema,
+    async (input) => jsonText(await taskTestRecord(ctx, input))
+  );
+  server.tool(
+    'task_claim',
+    'Claim Task execution using the Phase 35 bounded agent lease.',
+    taskClaimSchema,
+    async (input) => jsonText(await taskClaim(ctx, input))
+  );
+  server.tool(
+    'task_release',
+    'Release a Task execution lease held by the requesting agent.',
+    taskReleaseSchema,
+    async (input) => jsonText(await taskRelease(ctx, input))
+  );
+  server.tool(
+    'task_handoff',
+    'Transfer active Task execution from one agent to another without losing state.',
+    taskHandoffSchema,
+    async (input) => jsonText(await taskHandoff(ctx, input))
+  );
+  server.tool(
+    'task_next',
+    'Resolve the deterministic next/resume Task for an agent; optionally claim it.',
+    taskNextSchema,
+    async (input) => jsonText(await taskNext(ctx, input))
+  );
   server.tool(
     'toolnet_status',
     [

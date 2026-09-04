@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.3.18",
+  "version": "0.4.0",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -147,7 +147,22 @@
     "phase30:audit": "node scripts/phase30-audit.mjs",
     "code:capabilities": "node bundle/code-capabilities.js",
     "release:verify:v0317": "node scripts/verify-v0317-contract.mjs",
-    "release:certify:v0317": "bash scripts/final-release-certify-v0317.sh"
+    "release:certify:v0317": "bash scripts/final-release-certify-v0317.sh",
+    "tasks:core:test": "vitest run tests/tasks/task-core.test.ts",
+    "phase33:audit": "node scripts/phase33-task-core-audit.mjs",
+    "tasks:state:test": "vitest run tests/tasks/task-state-engine.test.ts",
+    "phase34:audit": "node scripts/phase34-task-state-audit.mjs",
+    "tasks:handoff:test": "vitest run tests/tasks/task-handoff.test.ts",
+    "phase35:audit": "node scripts/phase35-task-handoff-audit.mjs",
+    "tasks:cli-mcp:test": "vitest run tests/tasks/task-cli-mcp.test.ts",
+    "phase36:audit": "node scripts/phase36-task-cli-mcp-audit.mjs",
+    "tasks:panel:test": "vitest run tests/visualization/tasks-panel.test.ts",
+    "phase37:audit": "node scripts/phase37-tasks-panel-audit.mjs",
+    "tasks:auto-evidence:test": "vitest run tests/tasks/task-auto-evidence.test.ts",
+    "phase38:audit": "node scripts/phase38-auto-task-evidence-audit.mjs",
+    "phase39:certify": "bash scripts/final-task-certify-phase39.sh",
+    "release:verify:v0400": "node scripts/verify-v0400-contract.mjs",
+    "release:certify:v0400": "bash scripts/final-release-certify-v0400.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

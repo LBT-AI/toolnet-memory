@@ -102,6 +102,66 @@ async function main(): Promise<void> {
     case 'code:capabilities':
       await runModule(args, () => import('../code-intelligence/parsers/capability-cli.js'));
       return;
+    case 'task:list':
+      await runModule(['list', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:show':
+      await runModule(['show', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:create':
+      await runModule(['create', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:update':
+      await runModule(['update', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:start':
+      await runModule(['start', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:block':
+      await runModule(['block', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:resume':
+      await runModule(['resume', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:complete':
+      await runModule(['complete', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:progress':
+      await runModule(['progress', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:next-action':
+      await runModule(['next-action', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:dependency-add':
+      await runModule(['dependency:add', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:dependency-remove':
+      await runModule(['dependency:remove', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:evidence':
+      await runModule(['evidence', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:file':
+      await runModule(['file', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:test':
+      await runModule(['test', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:claim':
+      await runModule(['claim', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:heartbeat':
+      await runModule(['heartbeat', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:release':
+      await runModule(['release', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:handoff':
+      await runModule(['handoff', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:next':
+      await runModule(['next', ...args], () => import('../tasks/cli.js'));
+      return;
     case 'run':
       await runModule([], () => import('../index.js'));
       return;

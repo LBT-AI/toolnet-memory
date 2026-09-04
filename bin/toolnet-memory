@@ -93,6 +93,86 @@ case "$COMMAND" in
     run bundle/code-capabilities.js src/code-intelligence/parsers/capability-cli.ts "$@"
     ;;
 
+  task:list)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts list "$@"
+    ;;
+  task:show)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts show "$@"
+    ;;
+  task:create)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts create "$@"
+    ;;
+  task:update)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts update "$@"
+    ;;
+  task:start)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts start "$@"
+    ;;
+  task:block)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts block "$@"
+    ;;
+  task:resume)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts resume "$@"
+    ;;
+  task:complete)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts complete "$@"
+    ;;
+  task:progress)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts progress "$@"
+    ;;
+  task:next-action)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts next-action "$@"
+    ;;
+  task:dependency-add)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts dependency:add "$@"
+    ;;
+  task:dependency-remove)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts dependency:remove "$@"
+    ;;
+  task:evidence)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts evidence "$@"
+    ;;
+  task:file)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts file "$@"
+    ;;
+  task:test)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts test "$@"
+    ;;
+  task:claim)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts claim "$@"
+    ;;
+  task:heartbeat)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts heartbeat "$@"
+    ;;
+  task:release)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts release "$@"
+    ;;
+  task:handoff)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts handoff "$@"
+    ;;
+  task:next)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts next "$@"
+    ;;
   run)
     run bundle/runtime.js src/index.ts
     ;;

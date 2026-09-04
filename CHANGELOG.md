@@ -4,6 +4,30 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.4.0]
+
+- Added Persistent Shared Tasks with project-scoped Goal, Task, and Subtask hierarchy backed by an append-only authoritative operation log and deterministic rebuildable projection.
+- Added deterministic Task lifecycle states for pending, active, blocked, completed, and cancelled work.
+- Added optimistic revision protection, explicit progress, child-derived progress, blockers, next actions, dependencies, dependency-cycle protection, evidence, touched-file tracking, and test history.
+- Added deterministic completion guards that reject completion while blockers, unresolved dependencies, open children, or incomplete explicit progress remain.
+- Added multi-agent Task execution leases with claim, heartbeat, release, explicit handoff, lease-expiry takeover, deterministic continuity, and claim-next behavior.
+- Added Task CLI commands across npm and standalone runtimes.
+- Added MCP Task tools for durable Task creation, reading, lifecycle, dependencies, progress, evidence, claims, handoff, and next-work resolution.
+- Added a read-only Tasks Panel to the authenticated Graph UI with current task, Goal/Task/Subtask tree, progress, blockers, next actions, and active agent lease visibility.
+- Added automatic Task evidence capture from existing ToolNet hooks for edited files, test PASS/FAIL results, verification checks, and successful Git commit SHA references.
+- Automatic Task evidence fails closed on ambiguous attribution, ignores ToolNet/Git internals and files outside the project, does not persist raw command output, and never automatically completes a Task.
+- Preserved local same-filesystem exclusive coordination without claiming an S3/R2/WebSocket distributed lock.
+- Preserved the local-first deterministic runtime with no required LLM, embedding provider, or vector database.
+- Phase 39 full certification completed with 43/43 gates passing before v0.4.0 release preparation.
+
+## [0.3.19]
+
+- Synchronized release metadata and repository truth for the v0.3.19 patch.
+- No runtime behavior change: this is a metadata-only release with no storage, runtime, or feature delta.
+- Updated package.json, package-lock.json, release-manifest.json, .release-target, and README Current release to 0.3.19.
+- Confirmed client-side remote encryption remains supported, AES-256-GCM, disabled by default, with no encryption key required by default and no automatic plaintext migration.
+- Preserved the local-first runtime with no LLM, embedding provider, or vector database.
+
 ## [0.3.17]
 
 - Hardened Graph UI exposure with localhost-first binding, DNS-rebinding Host validation, same-origin API checks, optional bearer authentication, security headers, and minimal unauthenticated health status.

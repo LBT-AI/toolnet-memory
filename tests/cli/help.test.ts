@@ -244,6 +244,7 @@ describe('CLI Help System', () => {
         'system',
         'context',
         'work',
+        'tasks',
         'integration',
         'session',
         'guard',

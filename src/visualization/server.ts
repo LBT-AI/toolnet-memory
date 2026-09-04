@@ -13,6 +13,8 @@ import { loadConfig, ProjectManager } from '../core/index.js';
 import { CodeGraphStore, VisualizationBuilder } from '../code-intelligence/index.js';
 
 import { createStorageProvider, withStorageRetry } from '../storage/index.js';
+import { TaskStore } from '../tasks/store.js';
+import { buildTaskPanelView } from './tasks-panel.js';
 import {
   applyGraphSecurityHeaders,
   graphBearerAuthorized,
@@ -161,6 +163,14 @@ async function main() {
   const config = loadConfig();
 
   const currentProject = new ProjectManager().detect();
+  /*
+   * Tasks Panel is intentionally scoped to the current local
+   * ToolNet project.
+   *
+   * Graph catalog may contain remote projects, but Phase 37
+   * does not invent remote Task state for them.
+   */
+  const taskStore = new TaskStore(currentProject);
 
   const rawStorage = withStorageRetry(
     createStorageProvider({
@@ -670,6 +680,28 @@ async function main() {
         return;
       }
 
+      if (url.pathname === '/api/tasks') {
+        const requestedRootTaskId = url.searchParams.get('rootTaskId')?.trim() || undefined;
+        const projection = taskStore.projection();
+        const view = buildTaskPanelView(
+          {
+            id: currentProject.id,
+            name: currentProject.name,
+            ...(currentProject.remote
+              ? {
+                  remote: currentProject.remote,
+                }
+              : {}),
+          },
+          projection,
+          requestedRootTaskId,
+          Date.now()
+        );
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+        res.setHeader('cache-control', 'no-store');
+        res.end(JSON.stringify(view));
+        return;
+      }
       if (url.pathname === '/api/graph') {
         const catalog = await getCatalog();
 

@@ -65,8 +65,8 @@ if (pkg.version === targetVersion) {
   fail(`package current release ${targetVersion}`, `actual=${pkg.version}`);
 }
 
-contains('README current release', readme, 'v0.3.17');
-absent('README no stale current npm package', readme, 'toolnet-memory@0.3.16');
+contains('README current release', readme, `v${targetVersion}`);
+absent('README no stale current npm package', readme, `toolnet-memory@0.3.16`);
 
 console.log('');
 console.log('=== CODE SEARCH TRUTH ===');

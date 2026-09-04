@@ -505,6 +505,236 @@
 
         font-size: 11px;
       }
+      /* TASKS_PANEL_PHASE_37 */
+      #tasks-toggle {
+        position: fixed;
+        z-index: 34;
+        right: 14px;
+        bottom: max(14px, env(safe-area-inset-bottom));
+        width: auto;
+        min-width: 96px;
+        padding: 0 18px;
+        font-weight: 720;
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.38);
+      }
+      body.tasks-panel-open #tasks-toggle {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #tasks-panel {
+        top: 96px;
+        right: 14px;
+        bottom: 14px;
+        width: min(410px, calc(100vw - 28px));
+        z-index: 32;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transform: translateX(calc(100% + 34px));
+        transition: transform 0.2s ease, opacity 0.2s ease;
+        opacity: 0;
+      }
+      #tasks-panel.open {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      .tasks-panel-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: start;
+        padding: 16px 16px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .tasks-panel-title {
+        font-size: 17px;
+        font-weight: 760;
+      }
+      .tasks-panel-project {
+        margin-top: 4px;
+        opacity: 0.45;
+        font-size: 11px;
+        overflow-wrap: anywhere;
+      }
+      #tasks-close {
+        width: 38px;
+        min-width: 38px;
+        height: 38px;
+        padding: 0;
+        border-radius: 50%;
+        font-size: 22px;
+      }
+      .tasks-panel-controls {
+        padding: 0 16px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      #tasks-root {
+        width: 100%;
+        height: 38px;
+        font-size: 12px;
+      }
+      #tasks-content {
+        flex: 1;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 14px 14px 24px;
+      }
+      .tasks-empty, .tasks-error {
+        padding: 26px 12px;
+        opacity: 0.58;
+        text-align: center;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .tasks-error { opacity: 0.9; }
+      .tasks-current-card {
+        margin-bottom: 13px;
+        padding: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.045);
+      }
+      .tasks-current-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+      .tasks-active-label {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 3px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .tasks-current-title {
+        margin-top: 10px;
+        font-size: 15px;
+        font-weight: 720;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+      .tasks-agent {
+        margin-top: 8px;
+        opacity: 0.64;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 10px;
+        overflow-wrap: anywhere;
+      }
+      .tasks-progress-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+        font-size: 11px;
+      }
+      .tasks-progress-track {
+        height: 7px;
+        margin-top: 7px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .tasks-progress-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: currentColor;
+        opacity: 0.75;
+        transition: width 0.2s ease;
+      }
+      .tasks-next-action, .tasks-blocker {
+        margin-top: 10px;
+        padding: 9px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.025);
+        font-size: 11px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+      .tasks-blocker { border-style: dashed; }
+      .tasks-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
+        margin-bottom: 14px;
+      }
+      .tasks-summary-card {
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.025);
+        text-align: center;
+      }
+      .tasks-summary-card strong { display: block; font-size: 14px; }
+      .tasks-summary-card span { display: block; margin-top: 2px; opacity: 0.45; font-size: 9px; text-transform: uppercase; }
+      .tasks-tree-title {
+        margin: 4px 2px 8px;
+        opacity: 0.48;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .task-tree-node { margin-top: 6px; }
+      .task-tree-line {
+        position: relative;
+        display: grid;
+        grid-template-columns: 22px minmax(0, 1fr) auto;
+        gap: 7px;
+        align-items: start;
+        min-height: 42px;
+        padding: 8px 9px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.018);
+      }
+      .task-tree-line.current {
+        border-color: rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.055);
+      }
+      .task-tree-glyph {
+        width: 22px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 20px;
+        text-align: center;
+      }
+      .task-tree-main { min-width: 0; }
+      .task-tree-name { font-size: 12px; font-weight: 650; line-height: 1.35; overflow-wrap: anywhere; }
+      .task-tree-meta { margin-top: 3px; opacity: 0.42; font-size: 9px; line-height: 1.45; overflow-wrap: anywhere; }
+      .task-tree-progress { padding-top: 2px; opacity: 0.65; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; white-space: nowrap; }
+      .task-tree-children { margin-left: 15px; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, 0.07); }
+      .task-status-completed .task-tree-glyph { opacity: 0.82; }
+      .task-status-pending .task-tree-glyph { opacity: 0.48; }
+      .task-status-blocked .task-tree-glyph { opacity: 0.92; }
+      .task-status-cancelled { opacity: 0.42; }
+      .tasks-truncated {
+        margin-top: 12px;
+        padding: 9px;
+        border: 1px dashed rgba(255, 255, 255, 0.1);
+        border-radius: 9px;
+        opacity: 0.5;
+        font-size: 10px;
+        text-align: center;
+      }
+      @media (max-width: 700px) {
+        #tasks-panel {
+          top: max(10px, env(safe-area-inset-top));
+          right: 10px;
+          bottom: max(10px, env(safe-area-inset-bottom));
+          width: calc(100vw - 20px);
+          z-index: 60;
+        }
+        #tasks-toggle { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); z-index: 55; }
+        .tasks-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      }
     </style>
   </head>
 
@@ -538,6 +768,50 @@
 
     <div id="stats" class="panel"></div>
 
+    <button
+      id="tasks-toggle"
+      class="panel"
+      type="button"
+      aria-expanded="false"
+      aria-controls="tasks-panel"
+    >
+      Tasks
+    </button>
+    <aside
+      id="tasks-panel"
+      class="panel"
+      aria-label="Persistent project tasks"
+      aria-hidden="true"
+    >
+      <div class="tasks-panel-head">
+        <div>
+          <div class="tasks-panel-title">Tasks</div>
+          <div id="tasks-project" class="tasks-panel-project">
+            Persistent project state
+          </div>
+        </div>
+        <button
+          id="tasks-close"
+          type="button"
+          aria-label="Close Tasks"
+        >
+          ×
+        </button>
+      </div>
+      <div class="tasks-panel-controls">
+        <select
+          id="tasks-root"
+          aria-label="Task goal"
+        >
+          <option value="">Loading…</option>
+        </select>
+      </div>
+      <div id="tasks-content">
+        <div class="tasks-empty">
+          Open Tasks to load project state.
+        </div>
+      </div>
+    </aside>
     <div id="details" class="panel"></div>
 
     <script src="/vendor/3d-force-graph.min.js"></script>
@@ -565,7 +839,7 @@
       function graphApiRequest(input, init, token) {
         const headers = new Headers(init?.headers);
         if (token) {
-          headers.set('Authorization', `Bearer ${token}`);
+          headers.set("Authorization", `Bearer ${token}`);
         }
         return window.fetch(input, {
           ...init,
@@ -631,7 +905,113 @@
       const statsEl = document.getElementById('stats');
 
       const detailsEl = document.getElementById('details');
+      const tasksToggleEl = document.getElementById('tasks-toggle');
+      const tasksPanelEl = document.getElementById('tasks-panel');
+      const tasksCloseEl = document.getElementById('tasks-close');
+      const tasksRootEl = document.getElementById('tasks-root');
+      const tasksContentEl = document.getElementById('tasks-content');
+      const tasksProjectEl = document.getElementById('tasks-project');
 
+      let tasksPanelOpen = false;
+      let selectedTaskRootId = '';
+      let taskRefreshInFlight = false;
+      function taskGlyph(status) {
+        if (status === 'completed') { return '✓'; }
+        if (status === 'active') { return '◉'; }
+        if (status === 'blocked') { return '!'; }
+        if (status === 'cancelled') { return '×'; }
+        return '○';
+      }
+      function taskProgressLabel(progress) {
+        if (!progress) { return ''; }
+        if (progress.total > 0) { return `${progress.done}/${progress.total}`; }
+        return progress.percent > 0 ? `${progress.percent}%` : '';
+      }
+      function taskProgressPercent(progress) {
+        const value = Number(progress?.percent ?? 0);
+        if (!Number.isFinite(value)) { return 0; }
+        return Math.max(0, Math.min(100, value));
+      }
+      function taskLeaseLabel(task) {
+        if (!task?.activeLease?.agentId) { return ''; }
+        return `agent: ${task.activeLease.agentId}`;
+      }
+      function renderTaskTreeNode(task, currentTaskId, depth = 0) {
+        if (!task) { return ''; }
+        const status = escapeHtml(task.status);
+        const progress = taskProgressLabel(task.progress);
+        const lease = taskLeaseLabel(task);
+        const dependencies = Array.isArray(task.unresolvedDependencyIds) ? task.unresolvedDependencyIds.length : 0;
+        const meta = [task.kind, lease, dependencies > 0 ? `${dependencies} dependency pending` : ''].filter(Boolean);
+        const children = Array.isArray(task.children) ? task.children : [];
+        return `<div class="task-tree-node task-status-${status}" data-task-id="${escapeHtml(task.id)}"><div class="task-tree-line ${task.id === currentTaskId ? 'current' : ''}"><div class="task-tree-glyph">${taskGlyph(task.status)}</div><div class="task-tree-main"><div class="task-tree-name">${escapeHtml(task.title)}</div>${meta.length ? `<div class="task-tree-meta">${meta.map(escapeHtml).join(' · ')}</div>` : ''}${task.blockerReason ? `<div class="task-tree-meta">Blocked: ${escapeHtml(task.blockerReason)}</div>` : ''}</div><div class="task-tree-progress">${escapeHtml(progress)}</div></div>${children.length ? `<div class="task-tree-children">${children.map((child) => renderTaskTreeNode(child, currentTaskId, depth + 1)).join('')}</div>` : ''}</div>`;
+      }
+      function renderCurrentTask(view) {
+        const task = view.currentTask;
+        if (!task) { return ''; }
+        const progressLabel = taskProgressLabel(task.progress);
+        const progressPercent = taskProgressPercent(task.progress);
+        const lease = taskLeaseLabel(task);
+        return `<div class="tasks-current-card"><div class="tasks-current-top"><span class="tasks-active-label">${escapeHtml(task.status)}</span><span class="tasks-active-label">${escapeHtml(progressLabel || task.kind)}</span></div><div class="tasks-current-title">${escapeHtml(task.title)}</div>${lease ? `<div class="tasks-agent">${escapeHtml(lease)}</div>` : ''}<div class="tasks-progress-row"><span>Progress</span><strong>${escapeHtml(progressLabel || `${progressPercent}%`)}</strong></div><div class="tasks-progress-track"><div class="tasks-progress-fill" style="width: ${progressPercent}%"></div></div>${task.blockerReason ? `<div class="tasks-blocker"><strong>Blocked</strong><br/>${escapeHtml(task.blockerReason)}</div>` : ''}${task.nextAction ? `<div class="tasks-next-action"><strong>Next</strong><br/>${escapeHtml(task.nextAction)}</div>` : ''}</div>`;
+      }
+      function renderTaskSummary(view) {
+        const counts = view.counts || {};
+        return `<div class="tasks-summary"><div class="tasks-summary-card"><strong>${Number(counts.total || 0)}</strong><span>Total</span></div><div class="tasks-summary-card"><strong>${Number(counts.active || 0)}</strong><span>Active</span></div><div class="tasks-summary-card"><strong>${Number(counts.blocked || 0)}</strong><span>Blocked</span></div><div class="tasks-summary-card"><strong>${Number(counts.completed || 0)}</strong><span>Done</span></div><div class="tasks-summary-card"><strong>${Number(counts.pending || 0)}</strong><span>Pending</span></div><div class="tasks-summary-card"><strong>${Number(view.activeLeaseCount || 0)}</strong><span>Agents</span></div></div>`;
+      }
+      function renderTaskRoots(view) {
+        const roots = Array.isArray(view.roots) ? view.roots : [];
+        const resolved = view.selectedRootTaskId || roots[0]?.id || '';
+        if (selectedTaskRootId && roots.some((root) => root.id === selectedTaskRootId)) {} else { selectedTaskRootId = resolved; }
+        tasksRootEl.innerHTML = roots.length ? roots.map((root) => { const progress = taskProgressLabel(root.progress); const suffix = progress ? ` · ${progress}` : ''; return `<option value="${escapeHtml(root.id)}" ${root.id === selectedTaskRootId ? 'selected' : ''}>${escapeHtml(root.title + suffix)}</option>`; }).join('') : '<option value="">No Tasks</option>';
+      }
+      function renderTasksPanel(view) {
+        tasksProjectEl.textContent = `${view.project?.name || 'Local project'} · local Tasks`;
+        renderTaskRoots(view);
+        if (view.empty || !view.selectedRoot) {
+          tasksContentEl.innerHTML = `<div class="tasks-empty">No persistent Tasks yet.<br/>Create one with <code>toolnet-memory task:create</code>.</div>`;
+          return;
+        }
+        const tree = renderTaskTreeNode(view.selectedRoot, view.currentTask?.id || '');
+        tasksContentEl.innerHTML = `${renderCurrentTask(view)}${renderTaskSummary(view)}<div class="tasks-tree-title">Task tree</div>${tree}${view.truncated ? `<div class="tasks-truncated">Panel limited to 500 items. ${Number(view.hiddenItemCount || 0)} hidden.</div>` : ''}`;
+      }
+      async function refreshTasksPanel(force = false) {
+        if (!force && !tasksPanelOpen) { return; }
+        if (taskRefreshInFlight) { return; }
+        taskRefreshInFlight = true;
+        try {
+          const query = selectedTaskRootId ? `?rootTaskId=${encodeURIComponent(selectedTaskRootId)}` : '';
+          const response = await graphApiFetch(`/api/tasks${query}`);
+          if (!response.ok) { throw new Error(`Task API returned ${response.status}`); }
+          const view = await response.json();
+          if (view.selectedRootTaskId && !selectedTaskRootId) { selectedTaskRootId = view.selectedRootTaskId; }
+          renderTasksPanel(view);
+        } catch (error) {
+          tasksContentEl.innerHTML = `<div class="tasks-error">Unable to load Tasks.<br/>${escapeHtml(error instanceof Error ? error.message : String(error))}</div>`;
+        } finally { taskRefreshInFlight = false; }
+      }
+      function openTasksPanel() {
+        tasksPanelOpen = true;
+        document.body.classList.add('tasks-panel-open');
+        tasksPanelEl.classList.add('open');
+        tasksPanelEl.setAttribute('aria-hidden', 'false');
+        tasksToggleEl.setAttribute('aria-expanded', 'true');
+        void refreshTasksPanel(true);
+      }
+      function closeTasksPanel() {
+        tasksPanelOpen = false;
+        document.body.classList.remove('tasks-panel-open');
+        tasksPanelEl.classList.remove('open');
+        tasksPanelEl.setAttribute('aria-hidden', 'true');
+        tasksToggleEl.setAttribute('aria-expanded', 'false');
+      }
+      function setupTasksPanel() {
+        tasksToggleEl.addEventListener('click', openTasksPanel);
+        tasksCloseEl.addEventListener('click', closeTasksPanel);
+        tasksRootEl.addEventListener('change', () => { selectedTaskRootId = tasksRootEl.value; void refreshTasksPanel(true); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && tasksPanelOpen) { closeTasksPanel(); } });
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && tasksPanelOpen) { void refreshTasksPanel(true); } });
+        window.setInterval(() => { if (tasksPanelOpen && document.visibilityState === 'visible') { void refreshTasksPanel(); } }, 3000);
+      }
       const colors = [
         '#62a8ff',
         '#ff8f6b',
@@ -1643,6 +2023,7 @@
       }
 
       async function main() {
+        setupTasksPanel();
         const response = await graphApiFetch('/api/projects');
 
         if (!response.ok) {

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.3.17",
-  "releaseSeries": "0.3.x",
+  "version": "0.4.0",
+  "releaseSeries": "0.4.x",
   "runtime": {
     "node": ">=22",
     "localMemoryRuntime": true,
@@ -225,6 +225,84 @@
       "structuralParserSupport": false,
       "lspFoundation": "detection-only",
       "automaticLspDownload": false
+    },
+    "taskSystem": {
+      "supported": true,
+      "projectScoped": true,
+      "sharedAcrossAgents": true,
+      "authoritativeOperationLog": ".toolnet/tasks/events.jsonl",
+      "rebuildableProjection": ".toolnet/tasks/state.json",
+      "operationLogAppendOnly": true,
+      "deterministicProjection": true,
+      "kinds": ["goal", "task", "subtask"],
+      "lifecycle": ["pending", "active", "blocked", "completed", "cancelled"],
+      "revisionGuard": true,
+      "dependencies": true,
+      "dependencyCycleProtection": true,
+      "completionGuards": {
+        "blockers": true,
+        "dependencies": true,
+        "openChildren": true,
+        "explicitProgress": true
+      },
+      "progress": {
+        "explicit": true,
+        "derivedFromChildren": true
+      },
+      "continuity": {
+        "nextAction": true,
+        "resumeState": true
+      },
+      "multiAgentHandoff": {
+        "supported": true,
+        "boundedLease": true,
+        "heartbeat": true,
+        "release": true,
+        "explicitHandoff": true,
+        "expiredLeaseTakeover": true,
+        "claimNext": true,
+        "remoteDistributedLock": false
+      },
+      "cli": {
+        "supported": true,
+        "standaloneParity": true
+      },
+      "mcp": {
+        "supported": true,
+        "rawTaskLogAccess": false
+      },
+      "panel": {
+        "supported": true,
+        "readOnly": true,
+        "authenticatedApi": true,
+        "rawOperationLogExposed": false,
+        "browserMutation": false,
+        "maxRenderedItems": 500
+      },
+      "autoEvidence": {
+        "supported": true,
+        "leaseAttributed": true,
+        "explicitTaskTarget": true,
+        "ambiguousAttributionFailsClosed": true,
+        "fileEvidence": true,
+        "testPassFail": true,
+        "verificationEvidence": true,
+        "commitShaEvidence": true,
+        "rawCommandStored": false,
+        "rawCommandOutputStored": false,
+        "environmentStored": false,
+        "automaticCompletion": false
+      }
+    },
+    "taskReleaseCertification": {
+      "phase33TaskCore": true,
+      "phase34TaskStateEngine": true,
+      "phase35MultiAgentHandoff": true,
+      "phase36CliMcp": true,
+      "phase37TasksPanel": true,
+      "phase38AutoEvidence": true,
+      "phase39FullCertification": true,
+      "phase39RequiredGateCount": 43
     }
   }
 }

@@ -26,6 +26,7 @@ export interface CommandMetadata {
     | 'system'
     | 'context'
     | 'work'
+    | 'tasks'
     | 'integration'
     | 'session'
     | 'guard'
@@ -187,6 +188,77 @@ export const COMMANDS: CommandMetadata[] = [
     category: 'context',
   },
 
+  // Persistent Shared Tasks
+  {
+    name: 'task:list',
+    description: 'List persistent project Tasks',
+    usage: 'toolnet-memory task:list [--status active] [--parent ID] [--root] [--json]',
+    category: 'tasks',
+  },
+  {
+    name: 'task:show',
+    description: 'Show one persistent Task',
+    usage: 'toolnet-memory task:show <taskId>',
+    category: 'tasks',
+  },
+  {
+    name: 'task:create',
+    description: 'Create Goal, Task or Subtask',
+    usage: 'toolnet-memory task:create --kind task --title "Title" [--parent ID]',
+    category: 'tasks',
+  },
+  {
+    name: 'task:update',
+    description: 'Update Task metadata',
+    usage: 'toolnet-memory task:update <taskId> [--title TEXT] [--priority high]',
+    category: 'tasks',
+  },
+  {
+    name: 'task:start',
+    description: 'Start a pending Task',
+    usage: 'toolnet-memory task:start <taskId>',
+    category: 'tasks',
+  },
+  {
+    name: 'task:block',
+    description: 'Block Task with reason',
+    usage: 'toolnet-memory task:block <taskId> --reason TEXT [--next-action TEXT]',
+    category: 'tasks',
+  },
+  {
+    name: 'task:resume',
+    description: 'Resume a blocked Task',
+    category: 'tasks',
+  },
+  {
+    name: 'task:complete',
+    description: 'Complete Task when guards pass',
+    category: 'tasks',
+  },
+  {
+    name: 'task:progress',
+    description: 'Set Task progress such as 5/10',
+    usage: 'toolnet-memory task:progress <taskId> --done 5 --total 10',
+    category: 'tasks',
+  },
+  {
+    name: 'task:claim',
+    description: 'Claim Task execution lease',
+    usage: 'toolnet-memory task:claim <taskId> --agent AGENT',
+    category: 'tasks',
+  },
+  {
+    name: 'task:handoff',
+    description: 'Transfer Task execution to another agent',
+    usage: 'toolnet-memory task:handoff <taskId> --from AGENT_A --to AGENT_B',
+    category: 'tasks',
+  },
+  {
+    name: 'task:next',
+    description: 'Resolve or claim next resumable Task',
+    usage: 'toolnet-memory task:next <rootTaskId> --agent AGENT [--claim]',
+    category: 'tasks',
+  },
   // Work Continuity (Advanced)
   {
     name: 'work:status',
@@ -593,6 +665,7 @@ export function generateDefaultHelp(options: HelpOptions): string {
   const categories = [
     { key: 'core', title: 'GET STARTED' },
     { key: 'memory', title: 'MEMORY' },
+    { key: 'tasks', title: 'TASKS' },
     { key: 'code', title: 'CODE' },
     { key: 'system', title: 'SYSTEM' },
   ] as const;
@@ -641,6 +714,7 @@ export function generateFullHelp(options: HelpOptions): string {
     { key: 'system', title: 'SYSTEM' },
     { key: 'context', title: 'CONTEXT & MEMORY' },
     { key: 'work', title: 'WORK CONTINUITY' },
+    { key: 'tasks', title: 'PERSISTENT TASKS' },
     { key: 'integration', title: 'AGENT INTEGRATIONS' },
     { key: 'session', title: 'SESSIONS' },
     { key: 'guard', title: 'GUARD' },
