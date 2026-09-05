@@ -24,6 +24,19 @@ import { SmartHandoffManager } from '../work-continuity/handoff.js';
 
 import { checkpointLocalSession } from './local-checkpoint.js';
 
+import { NativeTaskMirrorRuntime } from './native-plan/runtime.js';
+import { TaskReplicationRuntime } from '../tasks/replication/runtime.js';
+import {
+  resolveTaskSessionExecutionWithAutoRecovery,
+  renderTaskSessionBootstrap,
+} from '../tasks/session-resume.js';
+import {
+  TaskHeartbeatRuntime,
+  TaskOrchestrationEngine,
+  type SessionExecutionResolution,
+} from '../tasks/orchestration-engine.js';
+import { TaskStore } from '../tasks/store.js';
+
 export class SessionCore {
   readonly identity;
 
@@ -40,6 +53,16 @@ export class SessionCore {
   private readonly semantic: SemanticWorkLearner;
 
   private readonly handoff: SmartHandoffManager;
+
+  private readonly taskMirror: NativeTaskMirrorRuntime;
+
+  private readonly taskReplication: TaskReplicationRuntime;
+
+  private readonly taskAgentId: string;
+
+  private readonly taskHeartbeat?: import('../tasks/orchestration-engine.js').TaskHeartbeatRuntime;
+
+  private taskExecutionResolutionValue?: SessionExecutionResolution;
 
   private readonly project: SessionCoreOptions['project'];
 
@@ -101,6 +124,19 @@ export class SessionCore {
 
       identity: this.identity,
     });
+
+    this.taskMirror = new NativeTaskMirrorRuntime(options.project);
+
+    this.taskReplication = new TaskReplicationRuntime(options.project, options.storage);
+
+    this.taskAgentId = options.agent.trim();
+
+    if (this.taskAgentId) {
+      const taskStore = new TaskStore(options.project);
+      this.taskHeartbeat = new TaskHeartbeatRuntime(
+        new TaskOrchestrationEngine(taskStore, () => taskStore.replicationConflicts())
+      );
+    }
   }
 
   private sanitizeEvent(event: SessionEventInput): SessionEventInput {
@@ -138,20 +174,42 @@ export class SessionCore {
        * current.json rendering failed.
        */
     }
+
+    /*
+     * This method is called after SessionWal.append() succeeds. Task Mirror
+     * is another derived consumer and is intentionally non-blocking here.
+     */
+    this.taskMirror.enqueue(events);
   }
 
-  start(data: Record<string, unknown> = {}) {
+  async start(data: Record<string, unknown> = {}) {
     const state = this.wal.loadState();
 
-    return this.record({
+    const recorded = this.record({
       type: state.lastSequence === 0 ? 'session_start' : 'session_resume',
-
       data,
-
       provenance: {
         source: this.identity.agent,
       },
     });
+
+    try {
+      await this.taskMirror.drain();
+      this.taskExecutionResolutionValue = await this.resolveTaskSessionExecution();
+      const resolution = this.taskExecutionResolutionValue;
+      const task = resolution.task;
+      if (
+        task &&
+        (resolution.mode === 'owned' || resolution.mode === 'handoff') &&
+        task.activeLease
+      ) {
+        this.taskHeartbeat?.start(task.id, this.taskAgentId);
+      }
+    } catch {
+      // Task resume is derived context and must not block session capture.
+    }
+
+    return recorded;
   }
 
   record(event: SessionEventInput) {
@@ -190,6 +248,19 @@ export class SessionCore {
 
       this.wal.markRemote(last.sequence, pending.endOffset);
     }
+
+    /*
+     * Drain mirror work accepted by this SessionCore. The runtime absorbs
+     * mirror failures, so this cannot make flush fail because of Tasks.
+     */
+    await this.taskMirror.drain();
+
+    /*
+     * Publish only after native Task mutation has drained. Remote
+     * replication is downstream and never participates in local capture.
+     */
+    this.taskReplication.enqueue();
+    await this.taskReplication.drain();
 
     /*
      * Long-term learning is deliberately downstream
@@ -285,19 +356,61 @@ export class SessionCore {
   async end(data: Record<string, unknown> = {}): Promise<SessionFlushResult> {
     this.record({
       type: 'session_end',
-
       data,
-
       provenance: {
         source: this.identity.agent,
       },
     });
 
+    this.taskHeartbeat?.stop();
+    this.taskExecutionResolutionValue = undefined;
+
     return this.flush();
+  }
+  async resolveTaskSessionExecution(
+    options: { autoRecover?: boolean; now?: number } = {}
+  ): Promise<SessionExecutionResolution> {
+    return resolveTaskSessionExecutionWithAutoRecovery(this.project, {
+      agentId: this.taskAgentId,
+      nativeSessionId: this.identity.nativeSessionId,
+      ...(options.autoRecover !== undefined ? { autoRecover: options.autoRecover } : {}),
+      ...(options.now !== undefined ? { now: options.now } : {}),
+      maxChars: 4_000,
+    });
+  }
+
+  taskResumeBootstrap(options: { maxChars?: number } = {}): string | undefined {
+    return renderTaskSessionBootstrap(this.project, {
+      agentId: this.taskAgentId,
+      nativeSessionId: this.identity.nativeSessionId,
+      maxChars: options.maxChars,
+    });
+  }
+
+  taskExecutionResolution(): SessionExecutionResolution | undefined {
+    return this.taskExecutionResolutionValue;
+  }
+
+  taskHeartbeatStatus() {
+    return (
+      this.taskHeartbeat?.status() ?? {
+        running: false,
+        beats: 0,
+        failures: 0,
+      }
+    );
   }
 
   status(): LocalSessionState {
     return this.wal.loadState();
+  }
+
+  taskMirrorStatus() {
+    return this.taskMirror.status();
+  }
+
+  taskReplicationStatus() {
+    return this.taskReplication.status();
   }
 
   recoverRemote() {

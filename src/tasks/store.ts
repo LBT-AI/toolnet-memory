@@ -15,8 +15,16 @@ import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import type { ProjectManifest } from '../core/types.js';
 import { sanitizeDurableText, sanitizeDurableValue } from '../security/durable-sanitizer.js';
-import { createTaskOperation, readTaskOperations, taskOperationLogPath } from './operation-log.js';
+import {
+  createTaskOperation,
+  currentTaskHostId,
+  readTaskOperations,
+  taskOperationLogPath,
+} from './operation-log.js';
+import { convergeTaskOperations } from './replication/core.js';
+import { readAllReplicatedTaskOperations } from './replication/store.js';
 import { applyTaskOperation, projectTaskOperations, taskRecords } from './projection.js';
+import type { TaskReplicationConflict } from './replication/types.js';
 import type {
   TaskActor,
   TaskCreateInput,
@@ -225,14 +233,35 @@ function nextSiblingOrder(projection: TaskProjection, parentTaskId: string | und
 }
 export class TaskStore {
   constructor(private readonly project: Pick<ProjectManifest, 'id' | 'rootPath'>) {}
-  private readProjection(repairCorruptTail = false): TaskProjection {
-    const operations = readTaskOperations(taskOperationLogPath(this.project), {
+  projectManifest(): Pick<ProjectManifest, 'id' | 'rootPath'> {
+    return this.project;
+  }
+  private authoredOperations(repairCorruptTail = false): ReturnType<typeof readTaskOperations> {
+    return readTaskOperations(taskOperationLogPath(this.project), {
       repairCorruptTail,
     });
-    return projectTaskOperations(this.project.id, operations);
+  }
+  private readProjection(repairCorruptTail = false): TaskProjection {
+    const operations = this.authoredOperations(repairCorruptTail);
+    const replicated = readAllReplicatedTaskOperations(this.project);
+    if (replicated.length === 0) {
+      return projectTaskOperations(this.project.id, operations);
+    }
+    return convergeTaskOperations(
+      this.project.id,
+      [...operations, ...replicated],
+      operations[0]?.hostId ?? currentTaskHostId()
+    ).projection;
   }
   projection(): TaskProjection {
     return this.readProjection(false);
+  }
+  replicationConflicts(): TaskReplicationConflict[] {
+    const operations = [
+      ...this.authoredOperations(false),
+      ...readAllReplicatedTaskOperations(this.project),
+    ];
+    return convergeTaskOperations(this.project.id, operations, currentTaskHostId()).conflicts;
   }
   getTask(taskId: string): TaskRecord | undefined {
     return this.readProjection(false).tasks[taskId];
@@ -263,19 +292,25 @@ export class TaskStore {
     const token = await acquireTaskLock(this.project);
     try {
       const file = taskOperationLogPath(this.project);
-      const operations = readTaskOperations(file, {
-        repairCorruptTail: true,
-      });
-      const projection = projectTaskOperations(this.project.id, operations);
-      const operation = build(projection);
+      const operations = this.authoredOperations(true);
+      const effective = this.readProjection(true);
+      const localLastSequence = operations.reduce(
+        (highest, operation) => Math.max(highest, operation.sequence),
+        0
+      );
+      const mutationProjection: TaskProjection = {
+        ...effective,
+        operationCount: operations.length,
+        lastSequence: localLastSequence,
+      };
+      const operation = build(mutationProjection);
       /*
-       * Validate mutation before durable append.
-       *
-       * Stale revision / invalid parent / duplicate task
-       * must never enter the authoritative log.
+       * Validate against the converged task state while retaining the
+       * authored host-local sequence for the immutable local log.
        */
-      const next = applyTaskOperation(projection, operation);
+      applyTaskOperation(mutationProjection, operation);
       appendOperation(file, operation);
+      const next = this.readProjection(true);
       atomicWriteProjection(this.project, next);
       return next;
     } finally {

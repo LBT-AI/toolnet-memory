@@ -130,13 +130,13 @@ export function applyTaskAgentOperation(
       lastAgentId: agentId,
       ...updated(current, operation),
     };
-    if (previous && previous.agentId !== agentId) {
+    if (previous && !taskLeaseActiveAt(previous, operationTime)) {
       next.handoffHistory = handoffHistory(current, {
         id: operation.operationId,
         fromAgentId: previous.agentId,
         toAgentId: agentId,
         at: operation.occurredAt,
-        reason: 'lease-expired-takeover',
+        reason: previous.agentId === agentId ? 'lease-expired-recovery' : 'lease-expired-takeover',
       });
     }
     tasks[current.id] = next;

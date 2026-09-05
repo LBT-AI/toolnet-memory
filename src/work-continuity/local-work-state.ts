@@ -503,9 +503,12 @@ function applyObservationsUnlocked(
     updatedAt,
   };
 
+  return writeLocalWorkState(project, state);
+}
+
+export function writeLocalWorkState(project: ProjectManifest, state: WorkState): WorkState {
   const durableState = sanitizeDurableValue(state) as WorkState;
   atomicWriteJson(localWorkStateFile(project), durableState);
-
   return durableState;
 }
 

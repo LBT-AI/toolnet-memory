@@ -1,6 +1,7 @@
 import type {
   TaskActor,
   TaskComputedProgress,
+  TaskCompletionSnapshot,
   TaskEvidenceKind,
   TaskOperation,
   TaskPatch,
@@ -11,6 +12,7 @@ import type {
   TaskTestOutcome,
 } from './types.js';
 import { taskPayloadHash } from './operation-log.js';
+import { completionDigest } from './completion-snapshot.js';
 import { applyTaskAgentOperation, isTaskAgentOperationPayload } from './handoff-projection.js';
 const PRIORITIES = new Set<TaskPriority>(['critical', 'high', 'normal', 'low']);
 const STATUSES = new Set<TaskStatus>(['pending', 'active', 'blocked', 'completed', 'cancelled']);
@@ -23,6 +25,12 @@ const EVIDENCE_KINDS = new Set<TaskEvidenceKind>([
   'review',
 ]);
 const TEST_OUTCOMES = new Set<TaskTestOutcome>(['pass', 'fail', 'skip']);
+const COMPLETION_MAX_SUMMARY = 4_000;
+const COMPLETION_MAX_ENTRIES = 256;
+const COMPLETION_MAX_ENTRY_TEXT = 1_000;
+const COMPLETION_MAX_FILES = 256;
+const COMPLETION_MAX_FILE_TEXT = 500;
+const COMMIT_SHA = /^[0-9a-f]{7,64}$/iu;
 function copyActor(actor: TaskActor): TaskActor {
   return {
     kind: actor.kind,
@@ -124,6 +132,129 @@ function applyPatch(task: TaskRecord, patch: TaskPatch, operation: TaskOperation
     next.assignedAgentId = patch.assignedAgentId;
   }
   return next;
+}
+function completionText(value: unknown, max: number, code: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(code);
+  }
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error(code);
+  }
+  return normalized.slice(0, max);
+}
+function completionList(value: unknown, maxEntries: number, maxText: number): string[] {
+  if (!Array.isArray(value)) {
+    throw new Error('TASK_COMPLETION_LIST_INVALID');
+  }
+  return value
+    .slice(0, maxEntries)
+    .map((item) => completionText(item, maxText, 'TASK_COMPLETION_ENTRY_INVALID'));
+}
+function completionTests(value: unknown): TaskCompletionSnapshot['tests'] {
+  if (!Array.isArray(value)) {
+    throw new Error('TASK_COMPLETION_TESTS_INVALID');
+  }
+  return value.slice(0, COMPLETION_MAX_ENTRIES).map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error('TASK_COMPLETION_TEST_INVALID');
+    }
+    const test = item as Record<string, unknown>;
+    const outcome = test.outcome;
+    if (typeof outcome !== 'string' || !TEST_OUTCOMES.has(outcome as TaskTestOutcome)) {
+      throw new Error('TASK_COMPLETION_TEST_OUTCOME_INVALID');
+    }
+    return {
+      name: completionText(
+        test.name,
+        COMPLETION_MAX_ENTRY_TEXT,
+        'TASK_COMPLETION_TEST_NAME_INVALID'
+      ),
+      outcome: outcome as TaskTestOutcome,
+      ...(test.detail !== undefined
+        ? {
+            detail: completionText(
+              test.detail,
+              COMPLETION_MAX_ENTRY_TEXT,
+              'TASK_COMPLETION_TEST_DETAIL_INVALID'
+            ),
+          }
+        : {}),
+    };
+  });
+}
+function completionSource(value: unknown): TaskCompletionSnapshot['source'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('TASK_COMPLETION_SOURCE_INVALID');
+  }
+  const source = value as Record<string, unknown>;
+  return {
+    provider: completionText(source.provider, 100, 'TASK_COMPLETION_SOURCE_INVALID'),
+    nativeSessionId: completionText(source.nativeSessionId, 300, 'TASK_COMPLETION_SOURCE_INVALID'),
+    sourceEventId: completionText(source.sourceEventId, 300, 'TASK_COMPLETION_SOURCE_INVALID'),
+    ...(source.turnId !== undefined
+      ? {
+          turnId: completionText(source.turnId, 300, 'TASK_COMPLETION_SOURCE_INVALID'),
+        }
+      : {}),
+  };
+}
+function completionSnapshot(
+  payload: Extract<TaskOperation['payload'], { type: 'task.completion.recorded' }>,
+  operation: TaskOperation,
+  current: TaskRecord
+): TaskCompletionSnapshot {
+  const completion = payload.completion;
+  const id = completionText(completion.id, 100, 'TASK_COMPLETION_ID_INVALID');
+  const summary = completionText(
+    completion.summary,
+    COMPLETION_MAX_SUMMARY,
+    'TASK_COMPLETION_SUMMARY_REQUIRED'
+  );
+  const changes = completionList(completion.changes, 32, COMPLETION_MAX_ENTRY_TEXT);
+  const decisions = completionList(completion.decisions, 16, COMPLETION_MAX_ENTRY_TEXT);
+  const verification = completionList(completion.verification, 32, COMPLETION_MAX_ENTRY_TEXT);
+  const files = completionList(completion.files, COMPLETION_MAX_FILES, COMPLETION_MAX_FILE_TEXT);
+  const tests = completionTests(completion.tests);
+  const commitSha = completion.commitSha;
+  if (commitSha !== undefined && (typeof commitSha !== 'string' || !COMMIT_SHA.test(commitSha))) {
+    throw new Error('TASK_COMPLETION_COMMIT_INVALID');
+  }
+  const digest = completionText(completion.digest, 64, 'TASK_COMPLETION_DIGEST_INVALID');
+  const snapshot: TaskCompletionSnapshot = {
+    id,
+    summary,
+    changes,
+    decisions,
+    verification,
+    files,
+    tests,
+    ...(commitSha ? { commitSha: commitSha.toLowerCase() } : {}),
+    source: completionSource(completion.source),
+    capturedAt: operation.occurredAt,
+    digest,
+  };
+  const expectedDigest = completionDigest({
+    id: snapshot.id,
+    summary: snapshot.summary,
+    changes: snapshot.changes,
+    decisions: snapshot.decisions,
+    verification: snapshot.verification,
+    files: snapshot.files,
+    tests: snapshot.tests,
+    ...(snapshot.commitSha ? { commitSha: snapshot.commitSha } : {}),
+    source: snapshot.source,
+  });
+  if (expectedDigest !== digest) {
+    throw new Error('TASK_COMPLETION_DIGEST_MISMATCH');
+  }
+  if (current.completion) {
+    if (current.completion.digest === digest) {
+      return current.completion;
+    }
+    throw new Error('TASK_COMPLETION_ALREADY_RECORDED');
+  }
+  return snapshot;
 }
 function directChildren(tasks: Record<string, TaskRecord>, taskId: string): TaskRecord[] {
   return Object.values(tasks).filter((task) => task.parentTaskId === taskId);
@@ -325,6 +456,7 @@ export function applyTaskOperation(
       filesTouched: [],
       tests: [],
       handoffHistory: [],
+      resolvedConflicts: [],
       createdAt: operation.occurredAt,
       updatedAt: operation.occurredAt,
       createdBy: copyActor(operation.actor),
@@ -580,6 +712,60 @@ export function applyTaskOperation(
           actor: copyActor(operation.actor),
         },
       ],
+      ...updated(current, operation),
+    };
+  }
+  if (payload.type === 'task.replication.conflict.resolved') {
+    const current = tasks[payload.taskId];
+    if (!current) {
+      throw new Error(`TASK_NOT_FOUND id=${payload.taskId}`);
+    }
+    validRevision(payload.expectedRevision, current.revision);
+    const resolutions = (current.resolvedConflicts ?? []).filter(
+      (resolution) => resolution.conflictId !== payload.conflictId
+    );
+    tasks[current.id] = {
+      ...current,
+      resolvedConflicts: [
+        ...resolutions,
+        {
+          conflictId: requiredText(payload.conflictId, 'TASK_CONFLICT_ID_REQUIRED'),
+          resolvedBy: copyActor(operation.actor),
+          resolvedAt: operation.occurredAt,
+          ...(payload.leaseOwner
+            ? {
+                leaseOwner: requiredText(payload.leaseOwner, 'TASK_AGENT_ID_REQUIRED'),
+              }
+            : {}),
+        },
+      ],
+      ...updated(current, operation),
+    };
+  }
+  if (payload.type === 'task.completion.recorded') {
+    const current = tasks[payload.taskId];
+    if (!current) {
+      throw new Error(`TASK_NOT_FOUND id=${payload.taskId}`);
+    }
+    if (current.status !== 'completed') {
+      throw new Error('TASK_COMPLETION_REQUIRES_COMPLETED');
+    }
+    if (current.completion && current.completion.digest === payload.completion.digest) {
+      return {
+        version: 1,
+        projectId: state.projectId,
+        operationCount: state.operationCount + 1,
+        lastSequence: operation.sequence,
+        lastOperationId: operation.operationId,
+        generatedAt: operation.occurredAt,
+        tasks,
+      };
+    }
+    validRevision(payload.expectedRevision, current.revision);
+    const completion = completionSnapshot(payload, operation, current);
+    tasks[current.id] = {
+      ...current,
+      completion,
       ...updated(current, operation),
     };
   }

@@ -9,8 +9,15 @@ import { MemoryProcessor } from '../processor/memory-processor.js';
 import type { MemoryStore } from '../storage/memory-store.js';
 import { deduplicateMemories } from '../memory/deduplicate.js';
 import { ProjectManager } from '../core/project-manager.js';
+import type { ProjectManifest } from '../core/types.js';
 import { TaskAutoEvidenceEngine } from '../tasks/auto-evidence.js';
 import { TaskStore } from '../tasks/store.js';
+import {
+  TaskOrchestrationEngine,
+  TaskHeartbeatRuntime,
+  type SessionExecutionResolution,
+} from '../tasks/orchestration-engine.js';
+import { resolveTaskSessionExecutionWithAutoRecovery } from '../tasks/session-resume.js';
 
 export interface HookRuntimeOptions {
   projectId: string;
@@ -36,6 +43,11 @@ export class HookRuntime {
 
   private readonly maxEventsBeforeFlush: number;
   private readonly taskAutoEvidence?: TaskAutoEvidenceEngine;
+  private readonly taskHeartbeat?: TaskHeartbeatRuntime;
+  private readonly taskOrchestration?: TaskOrchestrationEngine;
+  private readonly taskProject?: Pick<ProjectManifest, 'id' | 'rootPath'>;
+  private readonly taskAgentId?: string;
+  private taskExecutionResolution?: SessionExecutionResolution;
   private taskAutoEvidenceFailures = 0;
 
   constructor(options: HookRuntimeOptions) {
@@ -51,18 +63,28 @@ export class HookRuntime {
       options.autoTaskEvidence !== false &&
       process.env.TOOLNET_AUTO_TASK_EVIDENCE?.trim().toLowerCase() !== 'off';
     const taskAgentId = options.taskAgentId?.trim() || process.env.TOOLNET_AGENT_ID?.trim();
+    this.taskAgentId = taskAgentId || undefined;
 
-    if (autoEvidenceEnabled && taskAgentId) {
+    if (taskAgentId) {
       try {
         const project = new ProjectManager().requireExisting(options.projectRoot ?? process.cwd());
 
         if (project.id === this.projectId) {
-          this.taskAutoEvidence = new TaskAutoEvidenceEngine(new TaskStore(project), {
-            projectRoot: project.rootPath,
-            agentId: taskAgentId,
-            targetTaskId:
-              options.taskId?.trim() || process.env.TOOLNET_TASK_ID?.trim() || undefined,
-          });
+          this.taskProject = project;
+          const taskStore = new TaskStore(project);
+          this.taskOrchestration = new TaskOrchestrationEngine(taskStore, () =>
+            taskStore.replicationConflicts()
+          );
+          this.taskHeartbeat = new TaskHeartbeatRuntime(this.taskOrchestration);
+
+          if (autoEvidenceEnabled) {
+            this.taskAutoEvidence = new TaskAutoEvidenceEngine(taskStore, {
+              projectRoot: project.rootPath,
+              agentId: taskAgentId,
+              targetTaskId:
+                options.taskId?.trim() || process.env.TOOLNET_TASK_ID?.trim() || undefined,
+            });
+          }
         }
       } catch {
         /*
@@ -89,11 +111,37 @@ export class HookRuntime {
 
   async sessionStart(): Promise<void> {
     this.session.start(this.projectId);
+
+    if (this.taskOrchestration && this.taskAgentId) {
+      try {
+        this.taskExecutionResolution = await resolveTaskSessionExecutionWithAutoRecovery(
+          this.taskProject!,
+          {
+            agentId: this.taskAgentId,
+          }
+        );
+      } catch {
+        this.taskExecutionResolution = undefined;
+      }
+    }
+
+    if (
+      this.taskHeartbeat &&
+      this.taskExecutionResolution?.task &&
+      (this.taskExecutionResolution.mode === 'owned' ||
+        this.taskExecutionResolution.mode === 'handoff') &&
+      this.taskExecutionResolution.task.activeLease
+    ) {
+      this.taskHeartbeat.start(this.taskExecutionResolution.task.id, this.taskAgentId!, 60_000);
+    }
+
     await this.flushIfNeeded();
   }
 
   async sessionEnd(): Promise<void> {
     this.session.end(this.projectId);
+    this.taskHeartbeat?.stop();
+    this.taskExecutionResolution = undefined;
     await this.flush();
   }
 

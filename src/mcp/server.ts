@@ -91,12 +91,16 @@ import {
   taskTestSchema,
   taskClaim,
   taskClaimSchema,
+  taskHeartbeat,
+  taskHeartbeatSchema,
   taskRelease,
   taskReleaseSchema,
   taskHandoff,
   taskHandoffSchema,
   taskNext,
   taskNextSchema,
+  taskResumeContext,
+  taskResumeContextSchema,
 } from './tools/task-tools.js';
 
 function jsonText(value: unknown) {
@@ -454,6 +458,18 @@ export function createMCPServer(ctx: MCPContext) {
     'Claim Task execution using the Phase 35 bounded agent lease.',
     taskClaimSchema,
     async (input) => jsonText(await taskClaim(ctx, input))
+  );
+  server.tool(
+    'task_heartbeat',
+    'Renew the current agent lease; fails closed for expired, foreign, or conflicted ownership.',
+    taskHeartbeatSchema,
+    async (input) => jsonText(await taskHeartbeat(ctx, input))
+  );
+  server.tool(
+    'task_resume_context',
+    'Build bounded durable execution context for resuming a Task.',
+    taskResumeContextSchema,
+    async (input) => jsonText(await taskResumeContext(ctx, input))
   );
   server.tool(
     'task_release',

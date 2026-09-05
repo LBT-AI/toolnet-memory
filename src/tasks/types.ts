@@ -33,6 +33,30 @@ export interface TaskTestRecord {
   recordedAt: string;
   actor: TaskActor;
 }
+export interface TaskCompletionSource {
+  provider: string;
+  nativeSessionId: string;
+  sourceEventId: string;
+  turnId?: string;
+}
+export interface TaskCompletionTest {
+  name: string;
+  outcome: TaskTestOutcome;
+  detail?: string;
+}
+export interface TaskCompletionSnapshot {
+  id: string;
+  summary: string;
+  changes: string[];
+  decisions: string[];
+  verification: string[];
+  files: string[];
+  tests: TaskCompletionTest[];
+  commitSha?: string;
+  source: TaskCompletionSource;
+  capturedAt: string;
+  digest: string;
+}
 export interface TaskAgentLease {
   leaseId: string;
   agentId: string;
@@ -46,6 +70,12 @@ export interface TaskHandoffRecord {
   toAgentId: string;
   at: string;
   reason?: string;
+}
+export interface TaskConflictResolution {
+  conflictId: string;
+  resolvedBy: TaskActor;
+  resolvedAt: string;
+  leaseOwner?: string;
 }
 export interface TaskRecord {
   id: string;
@@ -66,9 +96,11 @@ export interface TaskRecord {
   evidence: TaskEvidence[];
   filesTouched: string[];
   tests: TaskTestRecord[];
+  completion?: TaskCompletionSnapshot;
   activeLease?: TaskAgentLease;
   lastAgentId?: string;
   handoffHistory: TaskHandoffRecord[];
+  resolvedConflicts?: TaskConflictResolution[];
   createdAt: string;
   updatedAt: string;
   createdBy: TaskActor;
@@ -196,6 +228,27 @@ export interface TaskTestRecordedPayload {
     detail?: string;
   };
 }
+export interface TaskCompletionRecordedPayload {
+  type: 'task.completion.recorded';
+  taskId: string;
+  expectedRevision?: number;
+  completion: {
+    id: string;
+    summary: string;
+    changes: string[];
+    decisions: string[];
+    verification: string[];
+    files: string[];
+    tests: Array<{
+      name: string;
+      outcome: TaskTestOutcome;
+      detail?: string;
+    }>;
+    commitSha?: string;
+    source: TaskCompletionSource;
+    digest: string;
+  };
+}
 export interface TaskAgentClaimPayload {
   type: 'task.agent.claim';
   taskId: string;
@@ -231,6 +284,13 @@ export interface TaskAgentHandoffPayload {
   newLeaseExpiresAt: string;
   reason?: string;
 }
+export interface TaskReplicationConflictResolvedPayload {
+  type: 'task.replication.conflict.resolved';
+  taskId: string;
+  expectedRevision?: number;
+  conflictId: string;
+  leaseOwner?: string;
+}
 export type TaskAgentOperationPayload =
   | TaskAgentClaimPayload
   | TaskAgentHeartbeatPayload
@@ -248,6 +308,8 @@ export type TaskOperationPayload =
   | TaskEvidenceAddPayload
   | TaskFileTouchedPayload
   | TaskTestRecordedPayload
+  | TaskCompletionRecordedPayload
+  | TaskReplicationConflictResolvedPayload
   | TaskAgentOperationPayload;
 export interface TaskOperation {
   version: 1;

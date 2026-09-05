@@ -14,6 +14,7 @@ import {
 } from './fast-context.js';
 import { refreshStartupBriefCache } from './brief-cache.js';
 import { ProjectManager, loadConfig } from '../core/index.js';
+import { renderTaskSessionBootstrap } from '../tasks/session-resume.js';
 import {
   createStorageProvider,
   ProjectScopedStorageProvider,
@@ -25,6 +26,7 @@ interface CliOptions {
   limit?: number;
   mode?: 'minimal' | 'focused' | 'deep';
   query?: string;
+  agent?: string;
 }
 
 function parseArgs(): { command: string; options: CliOptions } {
@@ -32,19 +34,30 @@ function parseArgs(): { command: string; options: CliOptions } {
   const command = args[0] || 'print';
   const options: CliOptions = { mode: 'minimal' };
 
-  for (let i = 1; i < args.length; i++) {
+  for (let i = 1; i < args.length; i += 1) {
     if (args[i] === '--project' && args[i + 1]) {
       options.project = args[i + 1];
-      i++;
-    } else if (args[i] === '--limit' && args[i + 1]) {
+      i += 1;
+      continue;
+    }
+    if (args[i] === '--limit' && args[i + 1]) {
       options.limit = parseInt(args[i + 1], 10);
-      i++;
-    } else if (args[i] === '--focused' && args[i + 1]) {
+      i += 1;
+      continue;
+    }
+    if (args[i] === '--focused' && args[i + 1]) {
       options.mode = 'focused';
       options.query = args[i + 1];
-      i++;
-    } else if (args[i] === '--deep') {
+      i += 1;
+      continue;
+    }
+    if (args[i] === '--deep') {
       options.mode = 'deep';
+      continue;
+    }
+    if (args[i] === '--agent' && args[i + 1]) {
+      options.agent = args[i + 1];
+      i += 1;
     }
   }
 
@@ -86,7 +99,6 @@ async function handlePrint(options: CliOptions) {
   const mode = options.mode || 'minimal';
 
   if (mode === 'minimal') {
-    // Fast local context only (default)
     const context = buildFastProjectContext({ projectPath: options.project });
 
     if (!context) {
@@ -94,8 +106,19 @@ async function handlePrint(options: CliOptions) {
       process.exit(1);
     }
 
-    process.stdout.write(context);
-  } else if (mode === 'focused' || mode === 'deep') {
+    const projectRoot = findProjectRoot(options.project ?? process.cwd());
+    const project = projectRoot ? new ProjectManager().requireExisting(projectRoot) : undefined;
+    const bootstrap = project
+      ? renderTaskSessionBootstrap(project, {
+          agentId: options.agent ?? process.env.TOOLNET_AGENT_ID ?? 'opencode',
+          maxChars: 4_000,
+        })
+      : undefined;
+    process.stdout.write(bootstrap ? `${bootstrap}\n\n${context}` : context);
+    return;
+  }
+
+  if (mode === 'focused' || mode === 'deep') {
     console.error('Focused and deep modes require storage access.');
     console.error('Use: toolnet-memory brief --deep for deep context');
     process.exit(1);
@@ -143,9 +166,7 @@ async function handleRefresh(options: CliOptions) {
     project.remote ?? project.name
   );
 
-  // Use deep refresh logic
   await refreshStartupBriefCache(project, storage);
-
   console.log('Deep startup brief cache refreshed.');
 }
 

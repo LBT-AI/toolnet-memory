@@ -3,6 +3,7 @@ import type { MCPContext } from '../context.js';
 import { TaskStore } from '../../tasks/store.js';
 import { TaskStateEngine } from '../../tasks/state-engine.js';
 import { TaskHandoffEngine } from '../../tasks/handoff-engine.js';
+import { TaskOrchestrationEngine } from '../../tasks/orchestration-engine.js';
 import type { TaskActor, TaskPatch } from '../../tasks/types.js';
 const taskKind = z.enum(['goal', 'task', 'subtask']);
 const taskStatus = z.enum(['pending', 'active', 'blocked', 'completed', 'cancelled']);
@@ -18,6 +19,7 @@ function runtime(ctx: Pick<MCPContext, 'project'>) {
     store,
     state: new TaskStateEngine(store),
     handoff: new TaskHandoffEngine(store),
+    orchestration: new TaskOrchestrationEngine(store, () => store.replicationConflicts()),
   };
 }
 function mutation(input: { expectedRevision?: number; actorId?: string }) {
@@ -234,7 +236,13 @@ export async function taskComplete(
     actorId?: string;
   }
 ) {
-  return runtime(ctx).state.complete(input.taskId, mutation(input));
+  return runtime(ctx).orchestration.complete(input.taskId, input.actorId, {
+    ...(input.expectedRevision !== undefined
+      ? {
+          expectedRevision: input.expectedRevision,
+        }
+      : {}),
+  });
 }
 export const taskProgressSchema = {
   ...taskLifecycleSchema,
@@ -382,6 +390,21 @@ export const taskClaimSchema = {
   leaseMs,
   expectedRevision,
 };
+export async function taskHeartbeat(
+  ctx: Pick<MCPContext, 'project'>,
+  input: {
+    taskId: string;
+    agentId: string;
+    leaseMs?: number;
+    expectedRevision?: number;
+  }
+) {
+  return runtime(ctx).orchestration.heartbeat(input.taskId, input.agentId, {
+    ...(input.leaseMs !== undefined ? { leaseMs: input.leaseMs } : {}),
+    ...(input.expectedRevision !== undefined ? { expectedRevision: input.expectedRevision } : {}),
+  });
+}
+export const taskHeartbeatSchema = taskClaimSchema;
 export async function taskClaim(
   ctx: Pick<MCPContext, 'project'>,
   input: {
@@ -391,7 +414,7 @@ export async function taskClaim(
     expectedRevision?: number;
   }
 ) {
-  return runtime(ctx).handoff.claim(input.taskId, input.agentId, {
+  return runtime(ctx).orchestration.claim(input.taskId, input.agentId, {
     ...(input.leaseMs !== undefined
       ? {
           leaseMs: input.leaseMs,
@@ -417,7 +440,7 @@ export async function taskRelease(
     expectedRevision?: number;
   }
 ) {
-  return runtime(ctx).handoff.release(input.taskId, input.agentId, input.reason, {
+  return runtime(ctx).orchestration.release(input.taskId, input.agentId, input.reason, {
     ...(input.expectedRevision !== undefined
       ? {
           expectedRevision: input.expectedRevision,
@@ -444,7 +467,7 @@ export async function taskHandoff(
     expectedRevision?: number;
   }
 ) {
-  return runtime(ctx).handoff.handoff(
+  return runtime(ctx).orchestration.handoff(
     input.taskId,
     input.fromAgentId,
     input.toAgentId,
@@ -463,6 +486,41 @@ export async function taskHandoff(
     }
   );
 }
+export const taskResumeContextSchema = {
+  taskId: z.string().min(1).optional(),
+  agentId: agentId.optional(),
+  nativeSessionId: z.string().min(1).max(300).optional(),
+};
+export async function taskResumeContext(
+  ctx: Pick<MCPContext, 'project'>,
+  input: { taskId?: string; agentId?: string; nativeSessionId?: string }
+) {
+  const engines = runtime(ctx);
+  if (input.taskId) {
+    return {
+      mode: 'task' as const,
+      context: engines.orchestration.resumeContext(input.taskId),
+      bootstrap: engines.orchestration.renderSessionExecutionBootstrap({
+        agentId: input.agentId ?? process.env.TOOLNET_AGENT_ID ?? 'agent',
+        nativeSessionId: input.nativeSessionId,
+        maxChars: 4_000,
+      }),
+    };
+  }
+  const resolution = engines.orchestration.resolveSessionExecution({
+    agentId: input.agentId ?? process.env.TOOLNET_AGENT_ID ?? 'agent',
+    nativeSessionId: input.nativeSessionId,
+  });
+  return {
+    ...resolution,
+    mode: 'session' as const,
+    bootstrap: engines.orchestration.renderSessionExecutionBootstrap({
+      agentId: input.agentId ?? process.env.TOOLNET_AGENT_ID ?? 'agent',
+      nativeSessionId: input.nativeSessionId,
+      maxChars: 4_000,
+    }),
+  };
+}
 export const taskNextSchema = {
   rootTaskId: z.string().min(1),
   agentId,
@@ -480,7 +538,7 @@ export async function taskNext(
 ) {
   const engines = runtime(ctx);
   if (input.claim) {
-    return engines.handoff.claimNext(input.rootTaskId, input.agentId, {
+    return engines.orchestration.claimNext(input.rootTaskId, input.agentId, {
       ...(input.leaseMs !== undefined
         ? {
             leaseMs: input.leaseMs,
@@ -488,5 +546,5 @@ export async function taskNext(
         : {}),
     });
   }
-  return engines.handoff.continuity(input.rootTaskId, input.agentId);
+  return engines.orchestration.resolveNextTask(input.rootTaskId, input.agentId);
 }

@@ -147,6 +147,12 @@ async function main(): Promise<void> {
     case 'task:test':
       await runModule(['test', ...args], () => import('../tasks/cli.js'));
       return;
+    case 'task:resume-context':
+      await runModule(['resume-context', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:conflict-resolve':
+      await runModule(['conflict-resolve', ...args], () => import('../tasks/cli.js'));
+      return;
     case 'task:claim':
       await runModule(['claim', ...args], () => import('../tasks/cli.js'));
       return;
@@ -161,6 +167,12 @@ async function main(): Promise<void> {
       return;
     case 'task:next':
       await runModule(['next', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:sync':
+      await runModule(['sync', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:conflicts':
+      await runModule(['conflicts', ...args], () => import('../tasks/cli.js'));
       return;
     case 'run':
       await runModule([], () => import('../index.js'));

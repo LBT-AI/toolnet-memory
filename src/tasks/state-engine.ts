@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { sanitizeDurableText } from '../security/durable-sanitizer.js';
 import { computedTaskProgress, taskRecords, unresolvedTaskDependencies } from './projection.js';
+import type { TaskCompletionRecordInput } from './completion-snapshot.js';
 import { TaskStore } from './store.js';
 import type {
   TaskActor,
@@ -264,6 +265,36 @@ export class TaskStateEngine {
         type: 'task.file.touched',
         taskId: current.id,
         filePath: text(filePath, 'TASK_FILE_PATH_REQUIRED'),
+        ...(options.expectedRevision !== undefined
+          ? {
+              expectedRevision: options.expectedRevision,
+            }
+          : {}),
+      },
+      options.actor
+    );
+  }
+  async recordCompletion(
+    taskId: string,
+    input: TaskCompletionRecordInput,
+    options: TaskMutationOptions = {}
+  ): Promise<TaskRecord> {
+    const current = this.task(taskId);
+    if (current.status !== 'completed') {
+      throw new Error('TASK_COMPLETION_REQUIRES_COMPLETED');
+    }
+    if (current.completion) {
+      if (current.completion.digest === input.completion.digest) {
+        return current;
+      }
+      throw new Error('TASK_COMPLETION_ALREADY_RECORDED');
+    }
+    return this.transitionResult(
+      current.id,
+      {
+        type: 'task.completion.recorded',
+        taskId: current.id,
+        completion: input.completion,
         ...(options.expectedRevision !== undefined
           ? {
               expectedRevision: options.expectedRevision,

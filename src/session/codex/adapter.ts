@@ -4,8 +4,6 @@ import type { StorageProvider } from '../../storage/types.js';
 
 import { SessionCore } from '../core.js';
 
-import { createSessionIdentity } from '../identity.js';
-
 import { inspectCodexRollout, pathBelongsToProject } from './discovery.js';
 
 import { readCodexRollout } from './rollout.js';
@@ -13,11 +11,6 @@ import { readCodexRollout } from './rollout.js';
 import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 import { extractSessionMemory } from '../session-extractor.js';
 import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
-
-import { extractWorkObservations } from '../../work-continuity/extractor.js';
-import { applyObservationsToLocalWorkState } from '../../work-continuity/local-work-state.js';
-import { writeStableWorkStateToCurrent } from '../../work-continuity/work-state-current.js';
-import { writeSessionOrigin } from '../../work-continuity/session-origin.js';
 
 export interface CodexSyncOptions {
   project: ProjectManifest;
@@ -180,84 +173,6 @@ export async function syncCodexSession(options: CodexSyncOptions) {
     }));
 
   events.push(...filteredEvents);
-
-  /*
-   * C3.3
-   *
-   * Convert the already-filtered incremental Codex events
-   * into durable WorkObservations, merge them with the
-   * previous LOCAL WorkState, then render current.md.
-   *
-   * This keeps TODO/Phase status stable across turns.
-   *
-   * LOCAL ONLY:
-   * - no LLM
-   * - no remote storage
-   * - no embedding
-   */
-  if (filteredEvents.length > 0) {
-    try {
-      /*
-       * Use the canonical identity builder.
-       *
-       * Codex session/thread identity is provenance/runtime metadata only.
-       * It must never create a separate project-memory partition.
-       */
-      const identity = createSessionIdentity(options.project, 'codex', threadId);
-
-      const normalizedForWork = filteredEvents.map((event, index) => ({
-        version: 1 as const,
-
-        id: `codex-work-${threadId}-${event.sourceSequence ?? index}`,
-
-        sequence: index + 1,
-
-        projectId: options.project.id,
-
-        agent: 'codex',
-
-        nativeSessionId: threadId,
-
-        type: event.type,
-
-        timestamp: event.timestamp ?? new Date().toISOString(),
-
-        role: event.role,
-
-        sourceEventId: event.sourceEventId,
-
-        sourceSequence: event.sourceSequence,
-
-        data: event.data ?? {},
-
-        provenance: event.provenance ?? {},
-      }));
-
-      const observations = extractWorkObservations(identity, normalizedForWork);
-
-      const workState = applyObservationsToLocalWorkState(options.project, observations);
-
-      writeStableWorkStateToCurrent(options.project, workState);
-
-      /*
-       * C3.4
-       *
-       * Keep metadata about the exact session that
-       * produced the latest work state.
-       */
-      writeSessionOrigin(options.project, {
-        agent: 'codex',
-
-        nativeSessionId: threadId,
-
-        observations,
-
-        workState,
-      });
-    } catch {
-      // Stable work-state must never break Codex sync.
-    }
-  }
 
   /*
    * AfterAgent/agent-turn-complete means this TURN is done.

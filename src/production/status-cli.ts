@@ -13,6 +13,7 @@ import {
 import { inspectSessionCaptureHealth } from './session-capture-health.js';
 import { detectAgentIntegrations } from './integration-detection.js';
 import { inspectKiroIntegrationStatus } from '../session/kiro/status.js';
+import { TaskReplicationService } from '../tasks/replication/service.js';
 import {
   renderHeader,
   renderSectionTitle,
@@ -89,6 +90,13 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
 
     console.log(renderKeyValue('Memory', memoryStatus, 8, uiOpts));
     console.log(renderKeyValue('Index', indexStatus, 8, uiOpts));
+
+    const replication = new TaskReplicationService(project, storage);
+    const replicationStatus = replication.status();
+    console.log(
+      renderKeyValue('Task sync', replicationStatus.enabled ? 'enabled' : 'disabled', 8, uiOpts)
+    );
+    console.log(renderKeyValue('Task conflicts', String(replicationStatus.conflicts), 8, uiOpts));
     console.log('');
 
     const integrations = detectAgentIntegrations();

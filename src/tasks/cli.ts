@@ -1,6 +1,13 @@
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
+import { ProjectManager, loadConfig } from '../core/index.js';
+import {
+  createStorageProvider,
+  ProjectScopedStorageProvider,
+  withStorageRetry,
+} from '../storage/index.js';
 import { ProjectTaskService } from './service.js';
+import { TaskReplicationService } from './replication/service.js';
 import type {
   TaskActor,
   TaskEvidenceKind,
@@ -174,6 +181,27 @@ function labels(value: string | undefined): string[] | undefined {
 function projectService(parsed: ParsedArgs): ProjectTaskService {
   return new ProjectTaskService(flag(parsed, 'project') ?? process.cwd());
 }
+function replicationService(parsed: ParsedArgs): TaskReplicationService {
+  const project = new ProjectManager().requireExisting(flag(parsed, 'project') ?? process.cwd());
+  const config = loadConfig();
+  const rawStorage = withStorageRetry(
+    createStorageProvider({
+      provider: config.storage.provider,
+      r2: config.storage.r2,
+      s3: config.storage.s3,
+      huggingface: config.storage.huggingface,
+      localRoot: config.storage.localRoot,
+    }),
+    { attempts: 3 }
+  );
+  const storage = new ProjectScopedStorageProvider(
+    rawStorage,
+    project.id,
+    project.name,
+    project.remote ?? project.name
+  );
+  return new TaskReplicationService(project, storage);
+}
 export async function executeTaskCli(argv: string[]): Promise<unknown> {
   const command = argv[0] ?? 'list';
   const parsed = parseArgs(argv.slice(1));
@@ -313,7 +341,17 @@ export async function executeTaskCli(argv: string[]): Promise<unknown> {
     return service.state.resume(positional(parsed, 0, 'taskId'), mutationOptions(parsed));
   }
   if (command === 'complete') {
-    return service.state.complete(positional(parsed, 0, 'taskId'), mutationOptions(parsed));
+    return service.orchestration.complete(
+      positional(parsed, 0, 'taskId'),
+      flag(parsed, 'agent') ?? process.env.TOOLNET_AGENT_ID,
+      {
+        ...(optionalNumber(parsed, 'expected-revision') !== undefined
+          ? {
+              expectedRevision: optionalNumber(parsed, 'expected-revision'),
+            }
+          : {}),
+      }
+    );
   }
   if (command === 'progress') {
     return service.state.setProgress(
@@ -382,7 +420,7 @@ export async function executeTaskCli(argv: string[]): Promise<unknown> {
     );
   }
   if (command === 'claim') {
-    return service.handoff.claim(positional(parsed, 0, 'taskId'), agentId(parsed), {
+    return service.orchestration.claim(positional(parsed, 0, 'taskId'), agentId(parsed), {
       ...(optionalNumber(parsed, 'lease-ms') !== undefined
         ? {
             leaseMs: optionalNumber(parsed, 'lease-ms'),
@@ -396,7 +434,7 @@ export async function executeTaskCli(argv: string[]): Promise<unknown> {
     });
   }
   if (command === 'heartbeat') {
-    return service.handoff.heartbeat(positional(parsed, 0, 'taskId'), agentId(parsed), {
+    return service.orchestration.heartbeat(positional(parsed, 0, 'taskId'), agentId(parsed), {
       ...(optionalNumber(parsed, 'lease-ms') !== undefined
         ? {
             leaseMs: optionalNumber(parsed, 'lease-ms'),
@@ -410,7 +448,7 @@ export async function executeTaskCli(argv: string[]): Promise<unknown> {
     });
   }
   if (command === 'release') {
-    return service.handoff.release(
+    return service.orchestration.release(
       positional(parsed, 0, 'taskId'),
       agentId(parsed),
       flag(parsed, 'reason'),
@@ -424,7 +462,7 @@ export async function executeTaskCli(argv: string[]): Promise<unknown> {
     );
   }
   if (command === 'handoff') {
-    return service.handoff.handoff(
+    return service.orchestration.handoff(
       positional(parsed, 0, 'taskId'),
       agentId(parsed, 'from'),
       agentId(parsed, 'to'),
@@ -443,11 +481,24 @@ export async function executeTaskCli(argv: string[]): Promise<unknown> {
       }
     );
   }
+  if (command === 'sync') {
+    const replication = replicationService(parsed);
+    if (booleanFlag(parsed, 'push')) {
+      return replication.push();
+    }
+    if (booleanFlag(parsed, 'pull')) {
+      return replication.pull();
+    }
+    return replication.sync();
+  }
+  if (command === 'conflicts') {
+    return replicationService(parsed).converged().conflicts;
+  }
   if (command === 'next') {
     const rootTaskId = positional(parsed, 0, 'rootTaskId');
     const requester = agentId(parsed);
     if (booleanFlag(parsed, 'claim')) {
-      return service.handoff.claimNext(rootTaskId, requester, {
+      return service.orchestration.claimNext(rootTaskId, requester, {
         ...(optionalNumber(parsed, 'lease-ms') !== undefined
           ? {
               leaseMs: optionalNumber(parsed, 'lease-ms'),
@@ -455,7 +506,31 @@ export async function executeTaskCli(argv: string[]): Promise<unknown> {
           : {}),
       });
     }
-    return service.handoff.continuity(rootTaskId, requester);
+    return service.orchestration.resolveNextTask(rootTaskId, requester);
+  }
+  if (command === 'resume-context') {
+    const taskId = parsed.positionals[0]?.trim();
+    if (taskId) {
+      return service.orchestration.resumeContext(taskId);
+    }
+    return service.orchestration.renderSessionExecutionBootstrap({
+      agentId: agentId(parsed),
+      ...(optionalNumber(parsed, 'max-chars') !== undefined
+        ? { maxChars: optionalNumber(parsed, 'max-chars') }
+        : {}),
+    });
+  }
+  if (command === 'conflict-resolve') {
+    return service.orchestration.resolveConflict(
+      positional(parsed, 0, 'taskId'),
+      requiredFlag(parsed, 'conflict-id'),
+      {
+        kind: 'agent',
+        id: agentId(parsed),
+      },
+      flag(parsed, 'lease-owner'),
+      optionalNumber(parsed, 'expected-revision')
+    );
   }
   throw new Error(`TASK_CLI_COMMAND_UNKNOWN ${command}`);
 }

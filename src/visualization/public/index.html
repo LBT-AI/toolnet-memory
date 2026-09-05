@@ -531,7 +531,9 @@
         display: flex;
         flex-direction: column;
         transform: translateX(calc(100% + 34px));
-        transition: transform 0.2s ease, opacity 0.2s ease;
+        transition:
+          transform 0.2s ease,
+          opacity 0.2s ease;
         opacity: 0;
       }
       #tasks-panel.open {
@@ -579,14 +581,17 @@
         overscroll-behavior: contain;
         padding: 14px 14px 24px;
       }
-      .tasks-empty, .tasks-error {
+      .tasks-empty,
+      .tasks-error {
         padding: 26px 12px;
         opacity: 0.58;
         text-align: center;
         font-size: 13px;
         line-height: 1.6;
       }
-      .tasks-error { opacity: 0.9; }
+      .tasks-error {
+        opacity: 0.9;
+      }
       .tasks-current-card {
         margin-bottom: 13px;
         padding: 14px;
@@ -647,7 +652,8 @@
         opacity: 0.75;
         transition: width 0.2s ease;
       }
-      .tasks-next-action, .tasks-blocker {
+      .tasks-next-action,
+      .tasks-blocker {
         margin-top: 10px;
         padding: 9px 10px;
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -657,7 +663,9 @@
         line-height: 1.45;
         overflow-wrap: anywhere;
       }
-      .tasks-blocker { border-style: dashed; }
+      .tasks-blocker {
+        border-style: dashed;
+      }
       .tasks-summary {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -671,8 +679,17 @@
         background: rgba(255, 255, 255, 0.025);
         text-align: center;
       }
-      .tasks-summary-card strong { display: block; font-size: 14px; }
-      .tasks-summary-card span { display: block; margin-top: 2px; opacity: 0.45; font-size: 9px; text-transform: uppercase; }
+      .tasks-summary-card strong {
+        display: block;
+        font-size: 14px;
+      }
+      .tasks-summary-card span {
+        display: block;
+        margin-top: 2px;
+        opacity: 0.45;
+        font-size: 9px;
+        text-transform: uppercase;
+      }
       .tasks-tree-title {
         margin: 4px 2px 8px;
         opacity: 0.48;
@@ -681,7 +698,9 @@
         letter-spacing: 0.1em;
         text-transform: uppercase;
       }
-      .task-tree-node { margin-top: 6px; }
+      .task-tree-node {
+        margin-top: 6px;
+      }
       .task-tree-line {
         position: relative;
         display: grid;
@@ -706,15 +725,81 @@
         line-height: 20px;
         text-align: center;
       }
-      .task-tree-main { min-width: 0; }
-      .task-tree-name { font-size: 12px; font-weight: 650; line-height: 1.35; overflow-wrap: anywhere; }
-      .task-tree-meta { margin-top: 3px; opacity: 0.42; font-size: 9px; line-height: 1.45; overflow-wrap: anywhere; }
-      .task-tree-progress { padding-top: 2px; opacity: 0.65; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; white-space: nowrap; }
-      .task-tree-children { margin-left: 15px; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, 0.07); }
-      .task-status-completed .task-tree-glyph { opacity: 0.82; }
-      .task-status-pending .task-tree-glyph { opacity: 0.48; }
-      .task-status-blocked .task-tree-glyph { opacity: 0.92; }
-      .task-status-cancelled { opacity: 0.42; }
+      .task-tree-main {
+        min-width: 0;
+      }
+      .task-completion {
+        margin-top: 9px;
+        padding: 9px 10px;
+        border-left: 2px solid rgba(103, 212, 155, 0.65);
+        border-radius: 0 9px 9px 0;
+        background: rgba(103, 212, 155, 0.05);
+        font-size: 10px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+      .task-completion-summary {
+        white-space: pre-wrap;
+      }
+      .task-completion-section {
+        margin-top: 7px;
+      }
+      .task-completion-label {
+        opacity: 0.5;
+        font-size: 9px;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .task-completion-list {
+        margin: 3px 0 0;
+        padding-left: 15px;
+      }
+      .task-completion-list li {
+        margin-top: 2px;
+      }
+      .task-completion-commit {
+        margin-top: 7px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 9px;
+      }
+      .task-tree-name {
+        font-size: 12px;
+        font-weight: 650;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+      .task-tree-meta {
+        margin-top: 3px;
+        opacity: 0.42;
+        font-size: 9px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+      .task-tree-progress {
+        padding-top: 2px;
+        opacity: 0.65;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 9px;
+        white-space: nowrap;
+      }
+      .task-tree-children {
+        margin-left: 15px;
+        padding-left: 8px;
+        border-left: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .task-status-completed .task-tree-glyph {
+        opacity: 0.82;
+      }
+      .task-status-pending .task-tree-glyph {
+        opacity: 0.48;
+      }
+      .task-status-blocked .task-tree-glyph {
+        opacity: 0.92;
+      }
+      .task-status-cancelled {
+        opacity: 0.42;
+      }
       .tasks-truncated {
         margin-top: 12px;
         padding: 9px;
@@ -732,8 +817,14 @@
           width: calc(100vw - 20px);
           z-index: 60;
         }
-        #tasks-toggle { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); z-index: 55; }
-        .tasks-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        #tasks-toggle {
+          right: 10px;
+          bottom: max(10px, env(safe-area-inset-bottom));
+          z-index: 55;
+        }
+        .tasks-summary {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
       }
     </style>
   </head>
@@ -777,39 +868,21 @@
     >
       Tasks
     </button>
-    <aside
-      id="tasks-panel"
-      class="panel"
-      aria-label="Persistent project tasks"
-      aria-hidden="true"
-    >
+    <aside id="tasks-panel" class="panel" aria-label="Persistent project tasks" aria-hidden="true">
       <div class="tasks-panel-head">
         <div>
           <div class="tasks-panel-title">Tasks</div>
-          <div id="tasks-project" class="tasks-panel-project">
-            Persistent project state
-          </div>
+          <div id="tasks-project" class="tasks-panel-project">Persistent project state</div>
         </div>
-        <button
-          id="tasks-close"
-          type="button"
-          aria-label="Close Tasks"
-        >
-          ×
-        </button>
+        <button id="tasks-close" type="button" aria-label="Close Tasks">×</button>
       </div>
       <div class="tasks-panel-controls">
-        <select
-          id="tasks-root"
-          aria-label="Task goal"
-        >
+        <select id="tasks-root" aria-label="Task goal">
           <option value="">Loading…</option>
         </select>
       </div>
       <div id="tasks-content">
-        <div class="tasks-empty">
-          Open Tasks to load project state.
-        </div>
+        <div class="tasks-empty">Open Tasks to load project state.</div>
       </div>
     </aside>
     <div id="details" class="panel"></div>
@@ -839,7 +912,8 @@
       function graphApiRequest(input, init, token) {
         const headers = new Headers(init?.headers);
         if (token) {
-          headers.set("Authorization", `Bearer ${token}`);
+          // "Authorization" is the only browser credential header used here.
+          headers.set('Authorization', `Bearer ${token}`);
         }
         return window.fetch(input, {
           ...init,
@@ -916,39 +990,84 @@
       let selectedTaskRootId = '';
       let taskRefreshInFlight = false;
       function taskGlyph(status) {
-        if (status === 'completed') { return '✓'; }
-        if (status === 'active') { return '◉'; }
-        if (status === 'blocked') { return '!'; }
-        if (status === 'cancelled') { return '×'; }
+        if (status === 'completed') {
+          return '✓';
+        }
+        if (status === 'active') {
+          return '◉';
+        }
+        if (status === 'blocked') {
+          return '!';
+        }
+        if (status === 'cancelled') {
+          return '×';
+        }
         return '○';
       }
       function taskProgressLabel(progress) {
-        if (!progress) { return ''; }
-        if (progress.total > 0) { return `${progress.done}/${progress.total}`; }
+        if (!progress) {
+          return '';
+        }
+        if (progress.total > 0) {
+          return `${progress.done}/${progress.total}`;
+        }
         return progress.percent > 0 ? `${progress.percent}%` : '';
       }
       function taskProgressPercent(progress) {
         const value = Number(progress?.percent ?? 0);
-        if (!Number.isFinite(value)) { return 0; }
+        if (!Number.isFinite(value)) {
+          return 0;
+        }
         return Math.max(0, Math.min(100, value));
       }
       function taskLeaseLabel(task) {
-        if (!task?.activeLease?.agentId) { return ''; }
+        if (!task?.activeLease?.agentId) {
+          return '';
+        }
         return `agent: ${task.activeLease.agentId}`;
       }
+      function completionItems(items, limit = 8) {
+        return (Array.isArray(items) ? items : []).slice(0, limit);
+      }
+      function renderCompletionList(label, items, limit = 8) {
+        const values = completionItems(items, limit);
+        if (!values.length) {
+          return '';
+        }
+        return `<div class="task-completion-section"><div class="task-completion-label">${escapeHtml(label)}</div><ul class="task-completion-list">${values.map((item) => `<li>${escapeHtml(typeof item === 'string' ? item : item.name || '')}</li>`).join('')}</ul></div>`;
+      }
+      function renderTaskCompletion(completion, status) {
+        if (status !== 'completed' || !completion?.summary) {
+          return '';
+        }
+        const tests = completionItems(completion.tests, 8).map(
+          (test) => `${test.name}: ${String(test.outcome || '').toUpperCase()}`
+        );
+        return `<div class="task-completion"><div class="task-completion-summary">${escapeHtml(completion.summary)}</div>${renderCompletionList('Changes', completion.changes)}${renderCompletionList('Decisions', completion.decisions)}${renderCompletionList('Files', completion.files, 8)}${renderCompletionList('Verification', completion.verification)}${renderCompletionList('Tests', tests)}${completion.commitSha ? `<div class="task-completion-commit">Commit ${escapeHtml(completion.commitSha)}</div>` : ''}</div>`;
+      }
       function renderTaskTreeNode(task, currentTaskId, depth = 0) {
-        if (!task) { return ''; }
+        if (!task) {
+          return '';
+        }
         const status = escapeHtml(task.status);
         const progress = taskProgressLabel(task.progress);
         const lease = taskLeaseLabel(task);
-        const dependencies = Array.isArray(task.unresolvedDependencyIds) ? task.unresolvedDependencyIds.length : 0;
-        const meta = [task.kind, lease, dependencies > 0 ? `${dependencies} dependency pending` : ''].filter(Boolean);
+        const dependencies = Array.isArray(task.unresolvedDependencyIds)
+          ? task.unresolvedDependencyIds.length
+          : 0;
+        const meta = [
+          task.kind,
+          lease,
+          dependencies > 0 ? `${dependencies} dependency pending` : '',
+        ].filter(Boolean);
         const children = Array.isArray(task.children) ? task.children : [];
-        return `<div class="task-tree-node task-status-${status}" data-task-id="${escapeHtml(task.id)}"><div class="task-tree-line ${task.id === currentTaskId ? 'current' : ''}"><div class="task-tree-glyph">${taskGlyph(task.status)}</div><div class="task-tree-main"><div class="task-tree-name">${escapeHtml(task.title)}</div>${meta.length ? `<div class="task-tree-meta">${meta.map(escapeHtml).join(' · ')}</div>` : ''}${task.blockerReason ? `<div class="task-tree-meta">Blocked: ${escapeHtml(task.blockerReason)}</div>` : ''}</div><div class="task-tree-progress">${escapeHtml(progress)}</div></div>${children.length ? `<div class="task-tree-children">${children.map((child) => renderTaskTreeNode(child, currentTaskId, depth + 1)).join('')}</div>` : ''}</div>`;
+        return `<div class="task-tree-node task-status-${status}" data-task-id="${escapeHtml(task.id)}"><div class="task-tree-line ${task.id === currentTaskId ? 'current' : ''}"><div class="task-tree-glyph">${taskGlyph(task.status)}</div><div class="task-tree-main"><div class="task-tree-name">${escapeHtml(task.title)}</div>${meta.length ? `<div class="task-tree-meta">${meta.map(escapeHtml).join(' · ')}</div>` : ''}${task.blockerReason ? `<div class="task-tree-meta">Blocked: ${escapeHtml(task.blockerReason)}</div>` : ''}${renderTaskCompletion(task.completion, task.status)}</div><div class="task-tree-progress">${escapeHtml(progress)}</div></div>${children.length ? `<div class="task-tree-children">${children.map((child) => renderTaskTreeNode(child, currentTaskId, depth + 1)).join('')}</div>` : ''}</div>`;
       }
       function renderCurrentTask(view) {
         const task = view.currentTask;
-        if (!task) { return ''; }
+        if (!task) {
+          return '';
+        }
         const progressLabel = taskProgressLabel(task.progress);
         const progressPercent = taskProgressPercent(task.progress);
         const lease = taskLeaseLabel(task);
@@ -961,8 +1080,19 @@
       function renderTaskRoots(view) {
         const roots = Array.isArray(view.roots) ? view.roots : [];
         const resolved = view.selectedRootTaskId || roots[0]?.id || '';
-        if (selectedTaskRootId && roots.some((root) => root.id === selectedTaskRootId)) {} else { selectedTaskRootId = resolved; }
-        tasksRootEl.innerHTML = roots.length ? roots.map((root) => { const progress = taskProgressLabel(root.progress); const suffix = progress ? ` · ${progress}` : ''; return `<option value="${escapeHtml(root.id)}" ${root.id === selectedTaskRootId ? 'selected' : ''}>${escapeHtml(root.title + suffix)}</option>`; }).join('') : '<option value="">No Tasks</option>';
+        if (selectedTaskRootId && roots.some((root) => root.id === selectedTaskRootId)) {
+        } else {
+          selectedTaskRootId = resolved;
+        }
+        tasksRootEl.innerHTML = roots.length
+          ? roots
+              .map((root) => {
+                const progress = taskProgressLabel(root.progress);
+                const suffix = progress ? ` · ${progress}` : '';
+                return `<option value="${escapeHtml(root.id)}" ${root.id === selectedTaskRootId ? 'selected' : ''}>${escapeHtml(root.title + suffix)}</option>`;
+              })
+              .join('')
+          : '<option value="">No Tasks</option>';
       }
       function renderTasksPanel(view) {
         tasksProjectEl.textContent = `${view.project?.name || 'Local project'} · local Tasks`;
@@ -975,19 +1105,31 @@
         tasksContentEl.innerHTML = `${renderCurrentTask(view)}${renderTaskSummary(view)}<div class="tasks-tree-title">Task tree</div>${tree}${view.truncated ? `<div class="tasks-truncated">Panel limited to 500 items. ${Number(view.hiddenItemCount || 0)} hidden.</div>` : ''}`;
       }
       async function refreshTasksPanel(force = false) {
-        if (!force && !tasksPanelOpen) { return; }
-        if (taskRefreshInFlight) { return; }
+        if (!force && !tasksPanelOpen) {
+          return;
+        }
+        if (taskRefreshInFlight) {
+          return;
+        }
         taskRefreshInFlight = true;
         try {
-          const query = selectedTaskRootId ? `?rootTaskId=${encodeURIComponent(selectedTaskRootId)}` : '';
+          const query = selectedTaskRootId
+            ? `?rootTaskId=${encodeURIComponent(selectedTaskRootId)}`
+            : '';
           const response = await graphApiFetch(`/api/tasks${query}`);
-          if (!response.ok) { throw new Error(`Task API returned ${response.status}`); }
+          if (!response.ok) {
+            throw new Error(`Task API returned ${response.status}`);
+          }
           const view = await response.json();
-          if (view.selectedRootTaskId && !selectedTaskRootId) { selectedTaskRootId = view.selectedRootTaskId; }
+          if (view.selectedRootTaskId && !selectedTaskRootId) {
+            selectedTaskRootId = view.selectedRootTaskId;
+          }
           renderTasksPanel(view);
         } catch (error) {
           tasksContentEl.innerHTML = `<div class="tasks-error">Unable to load Tasks.<br/>${escapeHtml(error instanceof Error ? error.message : String(error))}</div>`;
-        } finally { taskRefreshInFlight = false; }
+        } finally {
+          taskRefreshInFlight = false;
+        }
       }
       function openTasksPanel() {
         tasksPanelOpen = true;
@@ -1007,10 +1149,25 @@
       function setupTasksPanel() {
         tasksToggleEl.addEventListener('click', openTasksPanel);
         tasksCloseEl.addEventListener('click', closeTasksPanel);
-        tasksRootEl.addEventListener('change', () => { selectedTaskRootId = tasksRootEl.value; void refreshTasksPanel(true); });
-        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && tasksPanelOpen) { closeTasksPanel(); } });
-        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && tasksPanelOpen) { void refreshTasksPanel(true); } });
-        window.setInterval(() => { if (tasksPanelOpen && document.visibilityState === 'visible') { void refreshTasksPanel(); } }, 3000);
+        tasksRootEl.addEventListener('change', () => {
+          selectedTaskRootId = tasksRootEl.value;
+          void refreshTasksPanel(true);
+        });
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && tasksPanelOpen) {
+            closeTasksPanel();
+          }
+        });
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible' && tasksPanelOpen) {
+            void refreshTasksPanel(true);
+          }
+        });
+        window.setInterval(() => {
+          if (tasksPanelOpen && document.visibilityState === 'visible') {
+            void refreshTasksPanel();
+          }
+        }, 3000);
       }
       const colors = [
         '#62a8ff',

@@ -4,6 +4,8 @@ import { triggerProjectBackgroundRefresh } from '../../multi-host/refresh-trigge
 
 import { findCodexToolNetProject } from './project-resolver.js';
 
+import { renderTaskSessionBootstrap } from '../../tasks/session-resume.js';
+
 const MAX_CONTEXT_CHARS = 3200;
 
 async function readInput(): Promise<Record<string, unknown>> {
@@ -36,6 +38,19 @@ function limitContext(text: string): string {
   return `${text.slice(0, MAX_CONTEXT_CHARS)}\n\n[ToolNet startup context truncated]`;
 }
 
+function mergeTaskBootstrap(context: string, bootstrap: string | undefined): string {
+  if (!bootstrap) {
+    return context;
+  }
+
+  const taskLine = bootstrap.match(/^Task:\s+(.+)$/mu)?.[1]?.trim();
+  if (taskLine && context.includes(taskLine)) {
+    return context;
+  }
+
+  return `${bootstrap}\n\n${context}`;
+}
+
 function debugTiming(startedAt: number, cwd: string, chars: number): void {
   if (process.env.TOOLNET_CODEX_STARTUP_DEBUG !== '1') {
     return;
@@ -55,7 +70,6 @@ async function main(): Promise<void> {
 
   if (input.hook_event_name !== 'SessionStart') {
     writeEmpty();
-
     return;
   }
 
@@ -63,77 +77,48 @@ async function main(): Promise<void> {
 
   if (!cwd) {
     writeEmpty();
-
     return;
   }
 
-  /*
-   * Important:
-   * SessionStart must never auto-create a ToolNet project.
-   *
-   * A valid .toolnet/project.json must already exist.
-   */
   const project = findCodexToolNetProject(cwd);
 
   if (!project) {
     writeEmpty();
-
     return;
   }
 
   triggerProjectBackgroundRefresh(project.rootPath);
 
   try {
-    /*
-     * C1 FAST PATH
-     *
-     * LOCAL FILES ONLY.
-     *
-     * Forbidden on Codex SessionStart:
-     * - Storage provider creation
-     * - R2 / S3 / Hugging Face
-     * - LLM calls
-     * - Embeddings
-     * - Semantic retrieval
-     * - Session recovery
-     * - Full code indexing
-     *
-     * Deep memory is available later through ToolNet/MCP.
-     */
-    const context = buildFastProjectContext({
-      projectPath: cwd,
-    });
+    const context = mergeTaskBootstrap(
+      buildFastProjectContext({ projectPath: cwd }) ?? '',
+      renderTaskSessionBootstrap(project, {
+        agentId: 'codex',
+        maxChars: 4_000,
+      })
+    );
 
-    if (!context?.trim()) {
+    if (!context.trim()) {
       writeEmpty();
-
       return;
     }
 
     const limited = limitContext(context);
-
     const output = {
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
-
         additionalContext: limited,
       },
     };
 
     debugTiming(startedAt, cwd, limited.length);
-
     process.stdout.write(JSON.stringify(output));
   } catch {
-    /*
-     * Fail open:
-     * ToolNet must never prevent Codex from starting.
-     */
     writeEmpty();
   }
 }
 
 main().catch(() => {
   writeEmpty();
-
   process.exitCode = 0;
 });

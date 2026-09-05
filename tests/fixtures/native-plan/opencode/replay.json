@@ -1,0 +1,60 @@
+[
+  {
+    "id": "oc-todo-1",
+    "sequence": 100,
+    "timestamp": "2026-09-05T01:00:00.000Z",
+    "data": {
+      "type": "tool",
+      "tool": "todowrite",
+      "state": {
+        "input": {
+          "todos": [
+            { "content": "Inspect project", "status": "completed", "priority": "high" },
+            { "content": "Implement mirror", "status": "in_progress", "priority": "high" },
+            { "content": "Run regression", "status": "pending", "priority": "medium" }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "oc-todo-2",
+    "sequence": 200,
+    "timestamp": "2026-09-05T01:01:00.000Z",
+    "data": {
+      "type": "tool",
+      "tool": "todowrite",
+      "state": {
+        "input": {
+          "todos": [
+            { "content": "Inspect project", "status": "completed", "priority": "high" },
+            { "content": "Implement mirror", "status": "completed", "priority": "high" },
+            { "content": "Run regression", "status": "in_progress", "priority": "medium" }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "oc-todo-3",
+    "sequence": 300,
+    "timestamp": "2026-09-05T01:02:00.000Z",
+    "data": {
+      "type": "tool",
+      "tool": "todowrite",
+      "state": {
+        "input": {
+          "todos": [
+            { "content": "Inspect project", "status": "completed", "priority": "high" },
+            { "content": "Implement mirror", "status": "completed", "priority": "high" },
+            {
+              "content": "Run final regression suite",
+              "status": "in_progress",
+              "priority": "medium"
+            }
+          ]
+        }
+      }
+    }
+  }
+]

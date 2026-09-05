@@ -187,16 +187,22 @@ export class TaskAutoEvidenceEngine {
   }
   private target(): TaskRecord | undefined {
     const now = this.now();
+    const unresolved = (task: TaskRecord): boolean => {
+      const resolved = new Set((task.resolvedConflicts ?? []).map((item) => item.conflictId));
+      return this.store
+        .replicationConflicts()
+        .some((conflict) => conflict.taskId === task.id && !resolved.has(conflict.id));
+    };
     if (this.targetTaskId) {
       const explicit = this.store.getTask(this.targetTaskId);
-      if (explicit && this.activeClaim(explicit, now)) {
+      if (explicit && !unresolved(explicit) && this.activeClaim(explicit, now)) {
         return explicit;
       }
       return undefined;
     }
     const claimed = this.store
       .listTasks()
-      .filter((task) => this.activeClaim(task, now))
+      .filter((task) => !unresolved(task) && this.activeClaim(task, now))
       .sort(
         (left, right) =>
           statusRank(left) - statusRank(right) ||

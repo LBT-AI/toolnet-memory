@@ -6,6 +6,14 @@ import type { ProjectManifest } from '../core/types.js';
 
 import type { StorageProvider } from '../storage/types.js';
 
+import { createSessionIdentity } from '../session/identity.js';
+
+import { TaskMirrorBindingStore } from '../tasks/mirror-binding-store.js';
+
+import { TaskStore } from '../tasks/store.js';
+
+import { projectWorkStateWithTasks } from './task-compatibility.js';
+
 import { sha256, writeJsonAtomic } from '../session/utils.js';
 
 import type {
@@ -393,7 +401,7 @@ export async function reconcileWorkState(
     20
   );
 
-  const state: WorkState = {
+  let state: WorkState = {
     version: 1,
 
     projectId: project.id,
@@ -463,6 +471,23 @@ export async function reconcileWorkState(
       ? observations[observations.length - 1].occurredAt
       : new Date().toISOString(),
   };
+
+  const latestObservation = observations.at(-1);
+
+  if (latestObservation) {
+    state = projectWorkStateWithTasks({
+      project,
+      identity: createSessionIdentity(
+        project,
+        latestObservation.agent,
+        latestObservation.nativeSessionId
+      ),
+      observations,
+      previousWorkState: state,
+      taskProjection: new TaskStore(project).projection(),
+      bindingProjection: new TaskMirrorBindingStore(project).projection(),
+    });
+  }
 
   const localDirectory = join(project.rootPath, '.toolnet', 'work');
 

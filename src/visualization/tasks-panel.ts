@@ -4,7 +4,13 @@ import {
   unresolvedTaskDependencies,
 } from '../tasks/projection.js';
 import { taskLeaseActiveAt } from '../tasks/handoff-projection.js';
-import type { TaskComputedProgress, TaskProjection, TaskRecord } from '../tasks/types.js';
+import type {
+  TaskCompletionSnapshot,
+  TaskComputedProgress,
+  TaskProjection,
+  TaskRecord,
+  TaskTestOutcome,
+} from '../tasks/types.js';
 export const TASK_PANEL_MAX_ITEMS = 500;
 export interface TaskPanelProject {
   id: string;
@@ -14,6 +20,22 @@ export interface TaskPanelProject {
 export interface TaskPanelLease {
   agentId: string;
   expiresAt: string;
+}
+export interface TaskPanelCompletionTest {
+  name: string;
+  outcome: TaskTestOutcome;
+  detail?: string;
+}
+export interface TaskPanelCompletion {
+  summary: string;
+  changes: string[];
+  decisions: string[];
+  verification: string[];
+  files: string[];
+  tests: TaskPanelCompletionTest[];
+  commitSha?: string;
+  capturedAt: string;
+  provider: string;
 }
 export interface TaskPanelItem {
   id: string;
@@ -28,6 +50,7 @@ export interface TaskPanelItem {
   activeLease?: TaskPanelLease;
   blockerReason?: string;
   nextAction?: string;
+  completion?: TaskPanelCompletion;
   children: TaskPanelItem[];
 }
 export interface TaskPanelRootSummary {
@@ -168,6 +191,28 @@ interface BuildTreeContext {
   emitted: number;
   truncated: boolean;
 }
+function panelCompletion(
+  completion: TaskCompletionSnapshot | undefined
+): TaskPanelCompletion | undefined {
+  if (!completion) {
+    return undefined;
+  }
+  return {
+    summary: completion.summary,
+    changes: completion.changes.slice(0, 32),
+    decisions: completion.decisions.slice(0, 16),
+    verification: completion.verification.slice(0, 32),
+    files: completion.files.slice(0, 256),
+    tests: completion.tests.slice(0, 256).map((test) => ({
+      name: test.name,
+      outcome: test.outcome,
+      ...(test.detail ? { detail: test.detail } : {}),
+    })),
+    ...(completion.commitSha ? { commitSha: completion.commitSha } : {}),
+    capturedAt: completion.capturedAt,
+    provider: completion.source.provider,
+  };
+}
 function panelItem(context: BuildTreeContext, task: TaskRecord): TaskPanelItem {
   context.emitted += 1;
   const children = childrenOf(context.projection, task.id);
@@ -194,6 +239,10 @@ function panelItem(context: BuildTreeContext, task: TaskRecord): TaskPanelItem {
   }
   if (task.nextAction) {
     output.nextAction = task.nextAction;
+  }
+  const completion = panelCompletion(task.completion);
+  if (completion) {
+    output.completion = completion;
   }
   for (const child of children) {
     if (context.emitted >= TASK_PANEL_MAX_ITEMS) {
