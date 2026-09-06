@@ -48,7 +48,8 @@ has('owned priority', engine, "mode: 'owned'");
 has('handoff priority', engine, "mode: 'handoff'");
 has('expired recovery', engine, "mode: 'recoverable'");
 has('recommended fallback', engine, "mode: 'recommended'");
-has('valid foreign lease blocks', engine, 'valid-foreign-lease-present');
+has('foreign lease safety is delegated to dependency scheduler', engine, 'buildTaskDependencySchedule');
+absent('independent work is not globally blocked by foreign lease', engine, ['valid-foreign-lease-present']);
 has('auto recovery opt in', sessionResume, 'TOOLNET_TASK_AUTO_RECOVER');
 has('recommended work requires claim', engine, 'requiresClaim: true');
 

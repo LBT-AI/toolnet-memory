@@ -589,6 +589,17 @@ export class SessionWal {
     });
   }
 
+  /**
+   * Return every durable event in this source WAL after repairing its tail.
+   * This is a replay API for derived consumers; it does not advance cursors.
+   */
+  readAllEvents(): NormalizedSessionEvent[] {
+    return this.withLock(() => {
+      this.recoverStateUnsafe();
+      return readWalEvents(this.eventsFile);
+    });
+  }
+
   readPending(): PendingSessionEvents {
     return this.withLock(() => {
       const state = this.recoverStateUnsafe();

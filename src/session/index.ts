@@ -17,3 +17,4 @@ export * from './native-plan/correlated-shadow.js';
 export * from './native-plan/mutate.js';
 export * from './native-plan/runtime.js';
 export * from '../tasks/session-resume.js';
+export * from './task-self-healing.js';

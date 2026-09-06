@@ -111,8 +111,8 @@ function launchSetup(): void {
   console.log('ToolNet Memory configuration');
   console.log('');
   console.log('Memory runtime is local and does not require an LLM or embedding provider.');
-  console.log('Configure storage and runtime options through environment variables');
-  console.log('or use `toolnet-memory config set KEY VALUE`.');
+  console.log('Run `toolnet-memory setup` for guided onboarding.');
+  console.log('Advanced values remain available through `toolnet-memory config set KEY VALUE`.');
   console.log('');
   console.log(`Config file: ${ENV_FILE}`);
 }

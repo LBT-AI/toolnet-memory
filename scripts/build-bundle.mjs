@@ -11,6 +11,7 @@ const entries = {
   init: 'src/production/init.ts',
   update: 'src/production/update.ts',
   config: 'src/production/config-cli.ts',
+  setup: 'src/production/setup.ts',
   'status-cli': 'src/production/status-cli.ts',
   'graph-cli': 'src/production/graph-cli.ts',
   'help-cli': 'src/production/help-cli.ts',
@@ -35,6 +36,7 @@ const entries = {
   audit: 'src/audit/cli.ts',
   'code-capabilities': 'src/code-intelligence/parsers/capability-cli.ts',
   'task-cli': 'src/tasks/cli.ts',
+  'task-migrate': 'src/production/task-migrate-cli.ts',
 
   opencode: 'src/session/opencode/cli.ts',
   agy: 'src/session/agy/cli.ts',

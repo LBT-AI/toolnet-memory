@@ -19,12 +19,18 @@ import type { TaskReplicationConflict } from './replication/types.js';
 import type { TaskMirrorBindingRecord } from './mirror-binding-types.js';
 import { TaskMirrorBindingStore } from './mirror-binding-store.js';
 import { taskMirrorTaskId } from './mirror-identity.js';
+import {
+  buildTaskDependencySchedule,
+  type TaskDependencySchedule,
+} from './dependency-scheduler.js';
 
 export interface TaskExecutionContext {
   taskId: string;
   title: string;
   status: TaskRecord['status'];
   progress: TaskRecord['progress'];
+  activityProgress?: TaskRecord['activityProgress'];
+  suggestedNextAction?: string;
   blocker?: TaskBlocker;
   nextAction?: string;
   dependencies: TaskRecord[];
@@ -56,6 +62,8 @@ export interface SessionExecutionOptions {
   nativeSessionId?: string;
   now?: number;
   autoRecover?: boolean;
+  /** Opt-in startup assignment for a deterministic recommendation. */
+  autoAssign?: boolean;
 }
 
 export interface SessionExecutionBootstrapOptions extends SessionExecutionOptions {
@@ -158,23 +166,6 @@ function leaseStatus(
   return lease.agentId === agentId ? 'owned-by-requester' : 'owned-by-other';
 }
 
-function ready(
-  task: TaskRecord,
-  projection: ReturnType<TaskStore['projection']>,
-  now: number
-): boolean {
-  if (task.status !== 'pending' && task.status !== 'active') {
-    return false;
-  }
-  if (task.blocker || unresolvedTaskDependencies(projection.tasks, task).length > 0) {
-    return false;
-  }
-  if (task.activeLease && taskLeaseActiveAt(task.activeLease, now)) {
-    return false;
-  }
-  return true;
-}
-
 function compareReady(left: TaskRecord, right: TaskRecord): number {
   return (
     PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority] ||
@@ -196,6 +187,18 @@ export class TaskOrchestrationEngine {
     this.state = new TaskStateEngine(store);
     this.handoffEngine = new TaskHandoffEngine(store);
     this.readConflicts = readConflicts;
+  }
+
+  scheduleTasks(
+    rootTaskId: string | undefined,
+    agentId: string,
+    at?: number
+  ): TaskDependencySchedule {
+    return buildTaskDependencySchedule(this.store.projection(), this.readConflicts(), {
+      agentId: requiredAgent(agentId),
+      ...(rootTaskId ? { rootTaskId } : {}),
+      now: nowValue(at),
+    });
   }
 
   private task(taskId: string): TaskRecord {
@@ -376,6 +379,17 @@ export class TaskOrchestrationEngine {
       title: task.title,
       status: task.status,
       progress: { ...task.progress },
+      ...(task.activityProgress
+        ? {
+            activityProgress: {
+              ...task.activityProgress,
+              signals: { ...task.activityProgress.signals },
+            },
+          }
+        : {}),
+      ...(task.activityProgress?.suggestedNextAction
+        ? { suggestedNextAction: task.activityProgress.suggestedNextAction }
+        : {}),
       ...(task.blocker ? { blocker: { ...task.blocker } } : {}),
       ...(task.nextAction ? { nextAction: task.nextAction } : {}),
       dependencies,
@@ -453,25 +467,11 @@ export class TaskOrchestrationEngine {
       };
     }
 
-    if (
-      tasks.some(
-        (task) =>
-          !terminal(task) &&
-          task.activeLease &&
-          task.activeLease.agentId !== agentId &&
-          taskLeaseActiveAt(task.activeLease, now)
-      )
-    ) {
-      return {
-        mode: 'none',
-        reason: 'valid-foreign-lease-present',
-        requiresClaim: false,
-      };
-    }
-
-    const recommended = tasks
-      .filter((task) => ready(task, projection, now) && this.taskConflicts(task).length === 0)
-      .sort(compareReady)[0];
+    const schedule = buildTaskDependencySchedule(projection, this.readConflicts(), {
+      agentId,
+      now,
+    });
+    const recommended = schedule.readyTasks[0]?.task;
     if (recommended) {
       return {
         mode: 'recommended',
@@ -502,15 +502,17 @@ export class TaskOrchestrationEngine {
       );
     }
     const context = resolution.context;
+    const nextAction = context.nextAction ?? context.suggestedNextAction;
     const lines = [
       '[TOOLNET TASK RESUME]',
       '',
       `Task: ${sanitizeDurableText(context.title)}`,
       `Status: ${context.status}`,
-      `Progress: ${context.progress.completed}/${context.progress.total}`,
+      `Progress: ${context.activityProgress?.percent ?? 0}%`,
+      ...(context.activityProgress ? [`Stage: ${context.activityProgress.stage}`] : []),
       ...(context.lastAgentId ? [`Agent: ${sanitizeDurableText(context.lastAgentId)}`] : []),
       `Reason: ${resolution.reason}`,
-      ...(context.nextAction ? ['', 'Next:', sanitizeDurableText(context.nextAction)] : []),
+      ...(nextAction ? ['', 'Next:', sanitizeDurableText(nextAction)] : []),
       ...(context.blocker ? ['', 'Blocker:', sanitizeDurableText(context.blocker.reason)] : []),
       ...(context.filesTouched.length > 0
         ? [
@@ -551,41 +553,28 @@ export class TaskOrchestrationEngine {
     if (!root) {
       throw new Error(`TASK_NOT_FOUND id=${rootTaskId}`);
     }
-    const children = taskRecords(projection).filter((task) => task.parentTaskId === root.id);
-    const scope = children.length > 0 ? children : [root];
-    const conflictsByTask = new Map(
-      scope.map((task) => [task.id, taskConflicts(task, this.readConflicts)])
-    );
-    const owned = scope.find(
-      (task) =>
-        !terminal(task) &&
-        !task.blocker &&
-        task.activeLease?.agentId === requester &&
-        taskLeaseActiveAt(task.activeLease, now) &&
-        (conflictsByTask.get(task.id)?.length ?? 0) === 0
-    );
-    const candidate =
-      owned ??
-      scope
-        .filter((task) => ready(task, projection, now))
-        .filter((task) => (conflictsByTask.get(task.id)?.length ?? 0) === 0)
-        .sort(compareReady)[0];
+    const schedule = buildTaskDependencySchedule(projection, this.readConflicts(), {
+      rootTaskId: root.id,
+      agentId: requester,
+      now,
+    });
+    const owned = schedule.ownedTasks[0]?.task;
+    const candidate = owned ?? schedule.readyTasks[0]?.task;
     if (!candidate) {
       return {
         why: 'no-ready-task',
         dependencies: [],
         leaseStatus: 'unleased',
-        conflicts: scope.flatMap((task) => conflictsByTask.get(task.id) ?? []),
+        conflicts: schedule.conflicts,
       };
     }
-    const dependencies = unresolvedTaskDependencies(projection.tasks, candidate);
     return {
       task: candidate,
       why: owned ? 'owned-lease-resume' : 'priority-ready',
-      dependencies,
+      dependencies: unresolvedTaskDependencies(projection.tasks, candidate),
       leaseStatus: leaseStatus(candidate, requester, now),
       resumeContext: this.resumeContext(candidate.id),
-      conflicts: conflictsByTask.get(candidate.id) ?? [],
+      conflicts: schedule.conflicts.filter((conflict) => conflict.taskId === candidate.id),
     };
   }
 

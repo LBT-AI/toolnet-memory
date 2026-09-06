@@ -25,6 +25,7 @@ import { SmartHandoffManager } from '../work-continuity/handoff.js';
 import { checkpointLocalSession } from './local-checkpoint.js';
 
 import { NativeTaskMirrorRuntime } from './native-plan/runtime.js';
+import { recoverSessionTaskState, type SessionTaskSelfHealingResult } from './task-self-healing.js';
 import { TaskReplicationRuntime } from '../tasks/replication/runtime.js';
 import {
   resolveTaskSessionExecutionWithAutoRecovery,
@@ -63,6 +64,8 @@ export class SessionCore {
   private readonly taskHeartbeat?: import('../tasks/orchestration-engine.js').TaskHeartbeatRuntime;
 
   private taskExecutionResolutionValue?: SessionExecutionResolution;
+
+  private taskSelfHealingResultValue?: SessionTaskSelfHealingResult;
 
   private readonly project: SessionCoreOptions['project'];
 
@@ -185,6 +188,13 @@ export class SessionCore {
   async start(data: Record<string, unknown> = {}) {
     const state = this.wal.loadState();
 
+    /*
+     * Preserve the historical synchronous WAL append boundary: callers may
+     * invoke start() without awaiting it. Recovery begins after this durable
+     * start/resume event, so later recordMany() calls cannot overtake it.
+     * A previous process may have fsynced a native plan event to the WAL and
+     * crashed before TaskMirror.enqueue() ran; the replay below repairs that.
+     */
     const recorded = this.record({
       type: state.lastSequence === 0 ? 'session_start' : 'session_resume',
       data,
@@ -194,6 +204,11 @@ export class SessionCore {
     });
 
     try {
+      this.taskSelfHealingResultValue = await recoverSessionTaskState(
+        this.project,
+        this.wal,
+        this.taskMirror
+      );
       await this.taskMirror.drain();
       this.taskExecutionResolutionValue = await this.resolveTaskSessionExecution();
       const resolution = this.taskExecutionResolutionValue;
@@ -206,6 +221,7 @@ export class SessionCore {
         this.taskHeartbeat?.start(task.id, this.taskAgentId);
       }
     } catch {
+      this.taskSelfHealingResultValue = undefined;
       // Task resume is derived context and must not block session capture.
     }
 
@@ -407,6 +423,10 @@ export class SessionCore {
 
   taskMirrorStatus() {
     return this.taskMirror.status();
+  }
+
+  taskSelfHealingStatus(): SessionTaskSelfHealingResult | undefined {
+    return this.taskSelfHealingResultValue;
   }
 
   taskReplicationStatus() {

@@ -3,7 +3,12 @@ import { sanitizeDurableText } from '../security/durable-sanitizer.js';
 import { computedTaskProgress, taskRecords, unresolvedTaskDependencies } from './projection.js';
 import { taskLeaseActiveAt } from './handoff-projection.js';
 import { TaskStore } from './store.js';
-import type { TaskAgentLease, TaskHandoffRecord, TaskRecord } from './types.js';
+import type {
+  TaskAgentLease,
+  TaskComputedProgress,
+  TaskHandoffRecord,
+  TaskRecord,
+} from './types.js';
 export const DEFAULT_TASK_LEASE_MS = 15 * 60_000;
 export const MIN_TASK_LEASE_MS = 30_000;
 export const MAX_TASK_LEASE_MS = 24 * 60 * 60_000;
@@ -21,12 +26,7 @@ export interface TaskClaimResult {
 export interface TaskAgentContinuity {
   rootTask: TaskRecord;
   recommendedTask?: TaskRecord;
-  progress: {
-    done: number;
-    total: number;
-    percent: number;
-    source: 'children' | 'explicit';
-  };
+  progress: TaskComputedProgress;
   currentlyOwnedTask?: TaskRecord;
   heldByOtherAgents: Array<{
     taskId: string;

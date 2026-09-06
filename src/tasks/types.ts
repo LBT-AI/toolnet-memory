@@ -10,6 +10,31 @@ export interface TaskProgress {
   completed: number;
   total: number;
 }
+export type TaskActivityStage =
+  | 'queued'
+  | 'implementing'
+  | 'verifying'
+  | 'needs_attention'
+  | 'ready_to_complete'
+  | 'blocked'
+  | 'completed'
+  | 'cancelled';
+export interface TaskActivitySignals {
+  filesTouched: number;
+  testsPassed: number;
+  testsFailed: number;
+  testsSkipped: number;
+  verificationsPassed: number;
+  verificationsFailed: number;
+  commits: number;
+}
+export interface TaskActivityProgress {
+  stage: TaskActivityStage;
+  percent: number;
+  suggestedNextAction?: string;
+  signals: TaskActivitySignals;
+  updatedAt: string;
+}
 export interface TaskBlocker {
   reason: string;
   blockedAt: string;
@@ -90,6 +115,11 @@ export interface TaskRecord {
   order: number;
   assignedAgentId?: string;
   progress: TaskProgress;
+  /**
+   * Derived execution progress. This is separate from `progress`, which
+   * participates in lifecycle completion guards.
+   */
+  activityProgress?: TaskActivityProgress;
   blocker?: TaskBlocker;
   nextAction?: string;
   dependencies: string[];
@@ -341,7 +371,7 @@ export interface TaskComputedProgress {
   done: number;
   total: number;
   percent: number;
-  source: 'children' | 'explicit';
+  source: 'children' | 'explicit' | 'activity';
 }
 export interface TaskResumeState {
   rootTask: TaskRecord;

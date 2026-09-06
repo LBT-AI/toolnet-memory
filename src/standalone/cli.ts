@@ -87,6 +87,9 @@ async function main(): Promise<void> {
     case 'config':
       await runModule(args, () => import('../production/config-cli.js'));
       return;
+    case 'setup':
+      await runModule(args, () => import('../production/setup.js'));
+      return;
     case 'doctor':
       await runModule(args, () => import('../production/doctor.js'));
       return;
@@ -167,6 +170,9 @@ async function main(): Promise<void> {
       return;
     case 'task:next':
       await runModule(['next', ...args], () => import('../tasks/cli.js'));
+      return;
+    case 'task:migrate':
+      await runModule(args, () => import('../production/task-migrate-cli.js'));
       return;
     case 'task:sync':
       await runModule(['sync', ...args], () => import('../tasks/cli.js'));

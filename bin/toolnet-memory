@@ -71,6 +71,11 @@ case "$COMMAND" in
     run bundle/config.js src/production/config-cli.ts "$@"
     ;;
 
+  setup)
+    shift
+    run bundle/setup.js src/production/setup.ts "$@"
+    ;;
+
   doctor)
     shift
     run bundle/doctor.js src/production/doctor.ts "$@"
@@ -172,6 +177,10 @@ case "$COMMAND" in
   task:next)
     shift
     run bundle/task-cli.js src/tasks/cli.ts next "$@"
+    ;;
+  task:migrate)
+    shift
+    run bundle/task-migrate.js src/production/task-migrate-cli.ts "$@"
     ;;
   run)
     run bundle/runtime.js src/index.ts

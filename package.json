@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -183,7 +183,17 @@
     "tasks:orchestration:test": "vitest run tests/tasks/task-orchestration.test.ts",
     "phase46:audit": "node scripts/phase46-task-orchestration-audit.mjs",
     "tasks:resume-bootstrap:test": "vitest run tests/tasks/task-resume-bootstrap.test.ts",
-    "phase47:audit": "node scripts/phase47-task-resume-bootstrap-audit.mjs"
+    "phase47:audit": "node scripts/phase47-task-resume-bootstrap-audit.mjs",
+    "tasks:activity-progress:test": "vitest run tests/tasks/task-activity-progress.test.ts",
+    "phase48:audit": "node scripts/phase48-task-activity-progress-audit.mjs",
+    "tasks:dependency-scheduler:test": "vitest run tests/tasks/task-dependency-scheduler.test.ts",
+    "phase49:audit": "node scripts/phase49-task-dependency-scheduler-audit.mjs",
+    "tasks:parallel-execution:test": "vitest run tests/tasks/task-parallel-execution.test.ts",
+    "phase50:audit": "node scripts/phase50-parallel-execution-audit.mjs",
+    "tasks:self-healing:test": "vitest run tests/tasks/task-self-healing.test.ts tests/tasks/task-self-healing-wiring.test.ts",
+    "phase51:audit": "node scripts/phase51-task-self-healing-audit.mjs",
+    "production:task-ga:test": "vitest run tests/production/phase52-task-ga.test.ts",
+    "phase52:audit": "node scripts/phase52-production-ga-audit.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

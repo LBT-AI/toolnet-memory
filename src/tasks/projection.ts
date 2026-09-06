@@ -13,6 +13,7 @@ import type {
 } from './types.js';
 import { taskPayloadHash } from './operation-log.js';
 import { completionDigest } from './completion-snapshot.js';
+import { deriveTaskActivityProgress } from './activity-progress.js';
 import { applyTaskAgentOperation, isTaskAgentOperationPayload } from './handoff-projection.js';
 const PRIORITIES = new Set<TaskPriority>(['critical', 'high', 'normal', 'low']);
 const STATUSES = new Set<TaskStatus>(['pending', 'active', 'blocked', 'completed', 'cancelled']);
@@ -360,11 +361,19 @@ export function computedTaskProgress(
   }
   const total = task.progress.total;
   const done = task.progress.completed;
+  if (total === 0) {
+    const activity = task.activityProgress ?? deriveTaskActivityProgress(task);
+    return {
+      done: 0,
+      total: 0,
+      percent: activity.percent,
+      source: 'activity',
+    };
+  }
   return {
     done,
     total,
-    percent:
-      total === 0 ? (task.status === 'completed' ? 100 : 0) : Math.floor((done / total) * 100),
+    percent: Math.floor((done / total) * 100),
     source: 'explicit',
   };
 }
@@ -771,6 +780,14 @@ export function applyTaskOperation(
   }
   if (isTaskAgentOperationPayload(payload)) {
     applyTaskAgentOperation(tasks, operation);
+  }
+  const affectedTaskId = payload.type === 'task.created' ? payload.task.id : payload.taskId;
+  const affectedTask = tasks[affectedTaskId];
+  if (affectedTask) {
+    tasks[affectedTaskId] = {
+      ...affectedTask,
+      activityProgress: deriveTaskActivityProgress(affectedTask),
+    };
   }
   return {
     version: 1,

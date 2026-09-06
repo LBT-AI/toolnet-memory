@@ -24,6 +24,8 @@ import {
   type SessionCaptureHealth,
 } from './session-capture-health.js';
 
+import { inspectProductionTaskHealth, type ProductionTaskHealth } from './task-health.js';
+
 type DoctorResult = {
   ok: boolean;
   project?: string;
@@ -42,6 +44,7 @@ type DoctorResult = {
   snapshots?: number;
 
   capture?: SessionCaptureHealth;
+  tasks?: ProductionTaskHealth;
 
   config?: {
     ok: boolean;
@@ -178,6 +181,23 @@ function printHuman(result: DoctorResult): void {
     console.log(`${branch} ${dim('Sync health')}   ${sync}`);
   }
 
+  if (result.tasks) {
+    console.log(pipe);
+    console.log(`${cyan('◇')} ${white('Persistent Tasks')}`);
+    const taskState = result.tasks.ok ? green('healthy') : red('attention');
+    console.log(`${branch} ${dim('Health')}          ${taskState}`);
+    console.log(`${branch} ${dim('Total')}           ${white(String(result.tasks.total))}`);
+    console.log(`${branch} ${dim('Pending')}         ${white(String(result.tasks.pending))}`);
+    console.log(`${branch} ${dim('Active')}          ${white(String(result.tasks.active))}`);
+    console.log(`${branch} ${dim('Blocked')}         ${white(String(result.tasks.blocked))}`);
+    console.log(`${branch} ${dim('Completed')}       ${white(String(result.tasks.completed))}`);
+    console.log(`${branch} ${dim('Conflicts')}       ${white(String(result.tasks.conflicts))}`);
+    console.log(
+      `${branch} ${dim('Operations')}      ${white(String(result.tasks.operationCount))}`
+    );
+    if (result.tasks.error) console.log(`${branch} ${red('!')} ${result.tasks.error}`);
+  }
+
   const errors = result.config?.errors ?? [];
 
   if (errors.length > 0) {
@@ -279,14 +299,23 @@ async function main(): Promise<void> {
   const snapshots = await new SnapshotManager(storage).list(project.id);
 
   const capture = inspectSessionCaptureHealth(project);
+  const taskHealth = inspectProductionTaskHealth(project);
 
   const captureWarnings =
     capture.syncHealth === 'degraded'
       ? [`Session capture degraded${capture.opencode?.error ? `: ${capture.opencode.error}` : ''}`]
       : [];
 
+  const taskWarnings = !taskHealth.ok
+    ? [
+        taskHealth.error
+          ? `Persistent Task health: ${taskHealth.error}`
+          : `Persistent Tasks have ${taskHealth.conflicts} unresolved replication conflict(s)`,
+      ]
+    : [];
+
   const result: DoctorResult = {
-    ok: health.ok && capture.ok,
+    ok: health.ok && capture.ok && taskHealth.ok,
     project: project.name,
     storage: health.storage,
     memory: memories.length,
@@ -297,7 +326,8 @@ async function main(): Promise<void> {
     codeVectors: codeVectors?.records.length ?? 0,
     snapshots: snapshots.length,
     capture,
-    warnings: [...configCheck.warnings, ...captureWarnings],
+    tasks: taskHealth,
+    warnings: [...configCheck.warnings, ...captureWarnings, ...taskWarnings],
   };
 
   output(result);
