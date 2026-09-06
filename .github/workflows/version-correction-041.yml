@@ -1,0 +1,91 @@
+name: Correct release version to v0.4.1
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/version-correction-041.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-correction-041
+  cancel-in-progress: false
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Correct repository version metadata
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          function updateJson(file, mutate) {
+            const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+            mutate(value);
+            fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
+          }
+
+          updateJson('package.json', value => {
+            value.version = '0.4.1';
+          });
+
+          updateJson('package-lock.json', value => {
+            value.version = '0.4.1';
+            if (value.packages && value.packages['']) {
+              value.packages[''].version = '0.4.1';
+            }
+          });
+
+          updateJson('release-manifest.json', value => {
+            value.version = '0.4.1';
+            value.releaseSeries = '0.4.x';
+          });
+          NODE
+
+      - name: Commit corrected metadata and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/version-correction-041.yml
+          git add package.json package-lock.json release-manifest.json
+          if git diff --cached --quiet; then
+            echo 'No metadata changes required.'
+          else
+            git commit -m 'chore: finalize v0.4.1 release metadata'
+            git push origin HEAD:main
+          fi
+
+      - name: Remove incorrect v0.5.0 GitHub Release and tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.5.0 >/dev/null 2>&1; then
+            gh release delete v0.5.0 --cleanup-tag --yes
+          elif git ls-remote --exit-code --tags origin refs/tags/v0.5.0 >/dev/null 2>&1; then
+            git push origin :refs/tags/v0.5.0
+          fi
+
+      - name: Create correct v0.4.1 tag
+        shell: bash
+        run: |
+          git fetch origin main --tags
+          git checkout -B main origin/main
+          if git ls-remote --exit-code --tags origin refs/tags/v0.4.1 >/dev/null 2>&1; then
+            echo 'v0.4.1 already exists; refusing to move it.'
+            exit 1
+          fi
+          git tag -a v0.4.1 -m 'ToolNet Memory v0.4.1 — Persistent Tasks GA'
+          git push origin v0.4.1
