@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   hotfix:
-    if: github.event.head_commit.message == 'chore: trigger v0.4.2 hotfix'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,7 +37,6 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
 
-          # Fix npm shell CLI parity for Task commands implemented by the canonical Task CLI.
           path = Path('bin/toolnet-memory')
           text = path.read_text()
           anchor = '''  task:migrate)
@@ -69,8 +67,6 @@ jobs:
               text = text.replace(anchor, anchor + routes, 1)
           path.write_text(text)
 
-          # Fix Worker resolution. `/bundle` does not contain the substring `/bundle/`.
-          # Resolve by the current module extension instead, which works for tsx, dist and bundle.
           path = Path('src/production/ui/shimmer-progress.ts')
           text = path.read_text()
           old = '''  // Resolve worker path: production uses .js, test/dev uses .ts
@@ -91,7 +87,6 @@ jobs:
               text = text.replace(old, new, 1)
           path.write_text(text)
 
-          # Allow the canonical release workflow to be dispatched on an explicitly created tag.
           path = Path('.github/workflows/release.yml')
           text = path.read_text()
           if 'workflow_dispatch:' not in text:
@@ -102,7 +97,6 @@ jobs:
               text = text.replace(old, new, 1)
           path.write_text(text)
 
-          # README release marker.
           path = Path('README.md')
           text = path.read_text().replace('Current release: **v0.4.0**', 'Current release: **v0.4.2**')
           path.write_text(text)
@@ -177,7 +171,6 @@ jobs:
           git add -A
           git commit -m 'fix: production CLI and index worker resolution v0.4.2'
           git push origin HEAD:main
-          echo "HOTFIX_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Create v0.4.2 tag
         shell: bash
@@ -197,4 +190,4 @@ jobs:
         run: |
           set -euo pipefail
           gh workflow run release.yml --ref v0.4.2
-          echo "HOTFIX_RELEASE_DISPATCHED=YES"
+          echo 'HOTFIX_RELEASE_DISPATCHED=YES'
