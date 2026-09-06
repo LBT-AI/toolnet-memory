@@ -78,15 +78,6 @@ jobs:
                   raise SystemExit('SHIMMER_WORKER_ANCHOR_MISSING')
           p.write_text(s)
 
-          p = Path('.github/workflows/release.yml')
-          s = p.read_text()
-          if 'workflow_dispatch:' not in s:
-              needle = "on:\n  push:\n    tags:\n      - 'v*'\n"
-              if needle not in s:
-                  raise SystemExit('RELEASE_TRIGGER_ANCHOR_MISSING')
-              s = s.replace(needle, needle + '  workflow_dispatch:\n', 1)
-          p.write_text(s)
-
           p = Path('README.md')
           s = p.read_text()
           s = re.sub(r'Current release: \*\*v[0-9.]+\*\*', 'Current release: **v0.4.2**', s, count=1)
