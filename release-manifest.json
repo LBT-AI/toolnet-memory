@@ -1,17 +1,14 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "releaseSeries": "0.4.x",
   "runtime": {
     "node": ">=22",
     "localMemoryRuntime": true,
     "requiresLlm": false,
     "requiresEmbeddings": false,
-    "retrieval": [
-      "BM25",
-      "SQLite FTS5"
-    ],
+    "retrieval": ["BM25", "SQLite FTS5"],
     "sharedProjectMemory": true,
     "multiHostConvergence": true,
     "storageImplementationFrozen": true
@@ -96,11 +93,7 @@
       "remoteDistributedLock": false
     },
     "largeRepository": {
-      "benchmarkProfiles": [
-        "10k",
-        "50k",
-        "100k"
-      ],
+      "benchmarkProfiles": ["10k", "50k", "100k"],
       "maxCodeFileBytes": 2097152,
       "symlinkTraversal": false,
       "boundedParseConcurrency": true,
@@ -111,16 +104,7 @@
     "codeIntelligence": {
       "parserEngine": "typescript-compiler-api",
       "treeSitterRuntime": false,
-      "supportedExtensions": [
-        ".ts",
-        ".tsx",
-        ".js",
-        ".jsx",
-        ".mts",
-        ".cts",
-        ".mjs",
-        ".cjs"
-      ],
+      "supportedExtensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"],
       "tsconfigPaths": true,
       "baseUrlResolution": true,
       "projectReferences": true,
@@ -176,15 +160,7 @@
       "deterministic": true,
       "llmMerge": false,
       "embeddingMatching": false,
-      "kinds": [
-        "rule",
-        "decision",
-        "todo",
-        "next_action",
-        "fix",
-        "context",
-        "architecture"
-      ],
+      "kinds": ["rule", "decision", "todo", "next_action", "fix", "context", "architecture"],
       "topicMatching": true,
       "entityMatching": true,
       "lexicalSubjectMatching": true,
@@ -208,10 +184,7 @@
       "nonRoot": true,
       "ipcHealthcheck": true,
       "ghcr": true,
-      "multiArch": [
-        "linux/amd64",
-        "linux/arm64"
-      ]
+      "multiArch": ["linux/amd64", "linux/arm64"]
     },
     "remoteEncryption": {
       "supported": true,
@@ -247,13 +220,7 @@
       "filesystemProjectScan": false
     },
     "nonTsIntelligence": {
-      "localCodeSearch": [
-        "python",
-        "go",
-        "rust",
-        "c",
-        "cpp"
-      ],
+      "localCodeSearch": ["python", "go", "rust", "c", "cpp"],
       "engine": "sqlite-fts5-bm25",
       "structuralParserSupport": false,
       "lspFoundation": "detection-only",
@@ -267,18 +234,8 @@
       "rebuildableProjection": ".toolnet/tasks/state.json",
       "operationLogAppendOnly": true,
       "deterministicProjection": true,
-      "kinds": [
-        "goal",
-        "task",
-        "subtask"
-      ],
-      "lifecycle": [
-        "pending",
-        "active",
-        "blocked",
-        "completed",
-        "cancelled"
-      ],
+      "kinds": ["goal", "task", "subtask"],
+      "lifecycle": ["pending", "active", "blocked", "completed", "cancelled"],
       "revisionGuard": true,
       "dependencies": true,
       "dependencyCycleProtection": true,

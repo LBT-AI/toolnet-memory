@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.4.0**
+Current release: **v0.4.2**
 
 </div>
 

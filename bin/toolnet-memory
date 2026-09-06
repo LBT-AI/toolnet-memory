@@ -182,6 +182,23 @@ case "$COMMAND" in
     shift
     run bundle/task-migrate.js src/production/task-migrate-cli.ts "$@"
     ;;
+  task:resume-context)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts resume-context "$@"
+    ;;
+  task:conflict-resolve)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts conflict-resolve "$@"
+    ;;
+  task:sync)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts sync "$@"
+    ;;
+  task:conflicts)
+    shift
+    run bundle/task-cli.js src/tasks/cli.ts conflicts "$@"
+    ;;
+
   run)
     run bundle/runtime.js src/index.ts
     ;;

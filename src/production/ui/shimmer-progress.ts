@@ -77,10 +77,12 @@ export function createShimmerProgress(): ShimmerProgress {
     lastCount = 0;
   };
 
-  // Resolve worker path: production uses .js, test/dev uses .ts
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const isBundle = currentDir.includes('/bundle/') || currentDir.includes('\\bundle\\');
-  const workerPath = path.join(currentDir, isBundle ? 'shimmer-worker.js' : 'shimmer-worker.ts');
+  // Resolve from the executing module extension instead of directory-name heuristics.
+  // tsx executes this source as .ts; compiled dist/bundle execute it as .js.
+  const modulePath = fileURLToPath(import.meta.url);
+  const currentDir = path.dirname(modulePath);
+  const workerExtension = path.extname(modulePath) === '.ts' ? '.ts' : '.js';
+  const workerPath = path.join(currentDir, `shimmer-worker${workerExtension}`);
 
   const worker = new Worker(workerPath, {
     // colors:false keeps the animation (still an interactive TTY) but drops
