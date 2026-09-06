@@ -1,4 +1,4 @@
-name: Hotfix v0.4.2
+name: Retry v0.4.2 Release
 
 on:
   push:
@@ -6,161 +6,21 @@ on:
     paths: ['.github/workflows/hotfix-042.yml']
 
 permissions:
-  contents: write
   actions: write
+  contents: read
 
 jobs:
-  hotfix:
+  dispatch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-
-      - name: Apply hotfix
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path('bin/toolnet-memory')
-          s = p.read_text()
-          if '  task:sync)\n' not in s:
-              anchor = '\n  run)\n'
-              if anchor not in s:
-                  raise SystemExit('BIN_RUN_ANCHOR_MISSING')
-              routes = '''
-            task:resume-context)
-              shift
-              run bundle/task-cli.js src/tasks/cli.ts resume-context "$@"
-              ;;
-            task:conflict-resolve)
-              shift
-              run bundle/task-cli.js src/tasks/cli.ts conflict-resolve "$@"
-              ;;
-            task:sync)
-              shift
-              run bundle/task-cli.js src/tasks/cli.ts sync "$@"
-              ;;
-            task:conflicts)
-              shift
-              run bundle/task-cli.js src/tasks/cli.ts conflicts "$@"
-              ;;
-          '''
-              s = s.replace(anchor, routes + anchor, 1)
-          p.write_text(s)
-
-          p = Path('src/production/ui/shimmer-progress.ts')
-          s = p.read_text()
-          if 'workerExtension = path.extname(modulePath)' not in s:
-              pattern = re.compile(
-                  r"  // Resolve worker path: production uses \.js, test/dev uses \.ts\n"
-                  r"  const currentDir = path\.dirname\(fileURLToPath\(import\.meta\.url\)\);\n"
-                  r"  const isBundle = .*?;\n"
-                  r"  const workerPath = .*?;\n"
-              )
-              replacement = '''  // Resolve from the executing module extension instead of directory-name heuristics.
-            // tsx executes this source as .ts; compiled dist/bundle execute it as .js.
-            const modulePath = fileURLToPath(import.meta.url);
-            const currentDir = path.dirname(modulePath);
-            const workerExtension = path.extname(modulePath) === '.ts' ? '.ts' : '.js';
-            const workerPath = path.join(currentDir, `shimmer-worker${workerExtension}`);
-          '''
-              s, count = pattern.subn(replacement, s, count=1)
-              if count != 1:
-                  raise SystemExit('SHIMMER_WORKER_ANCHOR_MISSING')
-          p.write_text(s)
-
-          p = Path('README.md')
-          s = p.read_text()
-          s = re.sub(r'Current release: \*\*v[0-9.]+\*\*', 'Current release: **v0.4.2**', s, count=1)
-          p.write_text(s)
-          PY
-
-          npm version 0.4.2 --no-git-tag-version
-
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const file = 'release-manifest.json';
-          const value = JSON.parse(fs.readFileSync(file, 'utf8'));
-          value.version = '0.4.2';
-          fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
-          NODE
-
-          cat > tests/production/hotfix-042.test.ts <<'EOF'
-          import { readFileSync } from 'node:fs';
-          import { describe, expect, it } from 'vitest';
-
-          describe('v0.4.2 production hotfix', () => {
-            it('restores npm shell Task route parity', () => {
-              const source = readFileSync('bin/toolnet-memory', 'utf8');
-              for (const route of [
-                'task:sync)',
-                'task:conflicts)',
-                'task:resume-context)',
-                'task:conflict-resolve)',
-              ]) expect(source).toContain(route);
-            });
-
-            it('resolves shimmer worker by executing module extension', () => {
-              const source = readFileSync('src/production/ui/shimmer-progress.ts', 'utf8');
-              expect(source).toContain("path.extname(modulePath) === '.ts' ? '.ts' : '.js'");
-              expect(source).not.toContain("currentDir.includes('/bundle/')");
-            });
-
-            it('packages the worker as a separate bundle entry', () => {
-              const source = readFileSync('scripts/build-bundle.mjs', 'utf8');
-              expect(source).toContain("'shimmer-worker': 'src/production/ui/shimmer-worker.ts'");
-            });
-          });
-          EOF
-
-          npx prettier --write src/production/ui/shimmer-progress.ts tests/production/hotfix-042.test.ts README.md package.json release-manifest.json
-          bash -n bin/toolnet-memory
-
-      - name: Certify and build
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx vitest run tests/production/hotfix-042.test.ts
-          npm run typecheck
-          npm run lint
-          npm run format:check
-          npm test
-          npm run build:release
-          test -f bundle/shimmer-worker.js
-          grep -q 'task:sync)' bin/toolnet-memory
-          ./bin/toolnet-memory --version | grep -qx 'v0.4.2'
-          git diff --check
-
-      - name: Commit
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'fix: production CLI and index worker resolution v0.4.2'
-          git push origin HEAD:main
-
-      - name: Tag and dispatch release
+      - name: Dispatch corrected canonical release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if git ls-remote --exit-code --tags origin refs/tags/v0.4.2 >/dev/null 2>&1; then
-            echo 'TAG_v0.4.2_ALREADY_EXISTS'
-            exit 1
-          fi
-          git tag -a v0.4.2 -m 'ToolNet Memory v0.4.2 — production hotfix'
-          git push origin v0.4.2
-          gh workflow run release.yml --ref v0.4.2
-          echo 'HOTFIX_RELEASE_DISPATCHED=YES'
+          gh workflow run release.yml \
+            --repo LBT-AI/toolnet-memory \
+            --ref main \
+            -f release_tag=v0.4.2
+          echo 'RELEASE_v0.4.2_RETRY_DISPATCHED=YES'
