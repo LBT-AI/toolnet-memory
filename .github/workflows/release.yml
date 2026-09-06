@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to publish, for example v0.4.2
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -41,6 +46,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -77,9 +84,13 @@ jobs:
     needs:
       - standalone
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
@@ -94,7 +105,7 @@ jobs:
         shell: bash
         run: |
           VERSION="$(node -p "require('./package.json').version")"
-          TAG="${GITHUB_REF_NAME}"
+          TAG="$RELEASE_TAG"
           if [ "$TAG" != "v$VERSION" ]; then
             echo "Tag $TAG does not match package.json version v$VERSION"
             exit 1
@@ -136,23 +147,23 @@ jobs:
           fi
       - name: Publish to npm with trusted publishing
         if: steps.npm_release.outputs.exists != 'true'
-        run: npm publish --access public
+        run: npm publish --access public --tag latest
       - name: Create or update GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload \
-              "$GITHUB_REF_NAME" \
+              "$RELEASE_TAG" \
               "$TARBALL" \
               standalone-artifacts/* \
               --clobber
           else
             gh release create \
-              "$GITHUB_REF_NAME" \
+              "$RELEASE_TAG" \
               "$TARBALL" \
               standalone-artifacts/* \
-              --title "ToolNet Memory $GITHUB_REF_NAME" \
+              --title "ToolNet Memory $RELEASE_TAG" \
               --generate-notes
           fi
