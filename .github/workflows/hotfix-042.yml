@@ -1,0 +1,200 @@
+name: Hotfix v0.4.2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/hotfix-042.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  hotfix:
+    if: github.event.head_commit.message == 'chore: trigger v0.4.2 hotfix'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply production hotfixes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          # Fix npm shell CLI parity for Task commands implemented by the canonical Task CLI.
+          path = Path('bin/toolnet-memory')
+          text = path.read_text()
+          anchor = '''  task:migrate)
+            shift
+            run bundle/task-migrate.js src/production/task-migrate-cli.ts "$@"
+            ;;
+          '''
+          routes = '''  task:resume-context)
+            shift
+            run bundle/task-cli.js src/tasks/cli.ts resume-context "$@"
+            ;;
+          task:conflict-resolve)
+            shift
+            run bundle/task-cli.js src/tasks/cli.ts conflict-resolve "$@"
+            ;;
+          task:sync)
+            shift
+            run bundle/task-cli.js src/tasks/cli.ts sync "$@"
+            ;;
+          task:conflicts)
+            shift
+            run bundle/task-cli.js src/tasks/cli.ts conflicts "$@"
+            ;;
+          '''
+          if '  task:sync)\n' not in text:
+              if anchor not in text:
+                  raise SystemExit('BIN_TASK_MIGRATE_ANCHOR_MISSING')
+              text = text.replace(anchor, anchor + routes, 1)
+          path.write_text(text)
+
+          # Fix Worker resolution. `/bundle` does not contain the substring `/bundle/`.
+          # Resolve by the current module extension instead, which works for tsx, dist and bundle.
+          path = Path('src/production/ui/shimmer-progress.ts')
+          text = path.read_text()
+          old = '''  // Resolve worker path: production uses .js, test/dev uses .ts
+            const currentDir = path.dirname(fileURLToPath(import.meta.url));
+            const isBundle = currentDir.includes('/bundle/') || currentDir.includes('\\\\bundle\\\\');
+            const workerPath = path.join(currentDir, isBundle ? 'shimmer-worker.js' : 'shimmer-worker.ts');
+          '''
+          new = '''  // Resolve from the executing module extension instead of directory-name heuristics.
+            // tsx executes this source as .ts; compiled dist/bundle execute it as .js.
+            const modulePath = fileURLToPath(import.meta.url);
+            const currentDir = path.dirname(modulePath);
+            const workerExtension = path.extname(modulePath) === '.ts' ? '.ts' : '.js';
+            const workerPath = path.join(currentDir, `shimmer-worker${workerExtension}`);
+          '''
+          if 'workerExtension = path.extname(modulePath)' not in text:
+              if old not in text:
+                  raise SystemExit('SHIMMER_WORKER_ANCHOR_MISSING')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+
+          # Allow the canonical release workflow to be dispatched on an explicitly created tag.
+          path = Path('.github/workflows/release.yml')
+          text = path.read_text()
+          if 'workflow_dispatch:' not in text:
+              old = "on:\n  push:\n    tags:\n      - 'v*'\n"
+              new = "on:\n  push:\n    tags:\n      - 'v*'\n  workflow_dispatch:\n"
+              if old not in text:
+                  raise SystemExit('RELEASE_TRIGGER_ANCHOR_MISSING')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+
+          # README release marker.
+          path = Path('README.md')
+          text = path.read_text().replace('Current release: **v0.4.0**', 'Current release: **v0.4.2**')
+          path.write_text(text)
+          PY
+
+          npm version 0.4.2 --no-git-tag-version
+
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path = 'release-manifest.json';
+          const manifest = JSON.parse(fs.readFileSync(path, 'utf8'));
+          manifest.version = '0.4.2';
+          fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n');
+          NODE
+
+          cat > tests/production/hotfix-042.test.ts <<'EOF'
+          import { readFileSync } from 'node:fs';
+          import { describe, expect, it } from 'vitest';
+
+          describe('v0.4.2 production hotfix', () => {
+            it('exposes Task sync and conflict routes in the npm shell CLI', () => {
+              const source = readFileSync('bin/toolnet-memory', 'utf8');
+              expect(source).toContain('task:sync)');
+              expect(source).toContain('task:conflicts)');
+              expect(source).toContain('task:resume-context)');
+              expect(source).toContain('task:conflict-resolve)');
+            });
+
+            it('resolves the shimmer worker by runtime module extension', () => {
+              const source = readFileSync('src/production/ui/shimmer-progress.ts', 'utf8');
+              expect(source).toContain("path.extname(modulePath) === '.ts' ? '.ts' : '.js'");
+              expect(source).not.toContain("currentDir.includes('/bundle/')");
+            });
+
+            it('keeps shimmer-worker as a production bundle entry', () => {
+              const source = readFileSync('scripts/build-bundle.mjs', 'utf8');
+              expect(source).toContain("'shimmer-worker': 'src/production/ui/shimmer-worker.ts'");
+            });
+          });
+          EOF
+
+          npx prettier --write \
+            src/production/ui/shimmer-progress.ts \
+            tests/production/hotfix-042.test.ts \
+            README.md \
+            package.json \
+            release-manifest.json
+
+          bash -n bin/toolnet-memory
+
+      - name: Verify hotfix
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx vitest run tests/production/hotfix-042.test.ts
+          npm run typecheck
+          npm run lint
+          npm run format:check
+          npm test
+          npm run build:release
+          test -f bundle/shimmer-worker.js
+          grep -q 'task:sync)' bin/toolnet-memory
+          ./bin/toolnet-memory --version | grep -qx 'v0.4.2'
+          git diff --check
+
+      - name: Commit hotfix and generated release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: production CLI and index worker resolution v0.4.2'
+          git push origin HEAD:main
+          echo "HOTFIX_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Create v0.4.2 tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin refs/tags/v0.4.2 >/dev/null 2>&1; then
+            echo 'v0.4.2 already exists; refusing to move an existing release tag.'
+            exit 1
+          fi
+          git tag -a v0.4.2 -m 'ToolNet Memory v0.4.2 — production hotfix'
+          git push origin v0.4.2
+
+      - name: Dispatch canonical release workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml --ref v0.4.2
+          echo "HOTFIX_RELEASE_DISPATCHED=YES"
