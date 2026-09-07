@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.4.2**
+Current release: **v0.5.1**
 
 </div>
 
@@ -74,6 +74,38 @@ v0.4.0 adds a durable project-shared Task execution layer for coding agents.
 - Automatic file, test, verification, and Git commit evidence for claimed Tasks.
 - Automatic evidence never completes Tasks and never stores raw command output.
 - The Task runtime remains local-first and deterministic with no LLM, embeddings, or vector database requirement.
+
+### v0.5.1 Persistent Tasks GA + Memory Quality
+
+v0.5.1 completes the production Persistent Tasks architecture and the Memory Quality roadmap.
+Persistent Tasks:
+
+- Provider-native plan/TODO mirroring into one canonical Task system.
+- Stable mirror identity and binding across supported coding agents.
+- Append-only Task operation log with rebuildable projections.
+- Deterministic Task lifecycle, dependencies, progress, blockers, evidence, files, tests, and next actions.
+- Immutable completion snapshots.
+- Multi-agent claim leases, heartbeat, release, handoff, and recovery.
+- Dependency-aware scheduling and bounded parallel execution coordination.
+- Cross-host immutable operation replication without distributed locks.
+- Deterministic multi-host convergence.
+- Replication conflict explainability with `task:conflicts --explain`.
+- Crash recovery and Task projection self-healing.
+- Three-host divergence/convergence and restart E2E certification.
+  Memory Quality:
+- Explicit long-term rule vs observation/history scope.
+- Timestamps, confidence, verification state, and derived freshness.
+- Task-first Current Work Projection v2.
+- Structured artifact evidence for backups, reports, builds, deployments, SEO audits, crawler output, releases, and verification.
+- Separate `planned`, `executed`, `verified`, and `failed` artifact states.
+- Startup context noise filtering and bounded ranking.
+- Read-only `memory:review` quality inspection.
+- Memory Quality and active Artifact Path health in `doctor`.
+- Stale historical work remains searchable but is not automatically injected as current work.
+  Architecture:
+- `docs/architecture.md` documents Session WAL → Task Mirror → Persistent Task Core → Replication → Current Work → CLI/MCP.
+- Persistent Tasks remain execution authority.
+- Current Work and Task `state.json` remain rebuildable projections rather than independent sources of truth.
 
 ## Supported Coding Agents
 

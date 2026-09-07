@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.4.2",
-  "releaseSeries": "0.4.x",
+  "version": "0.5.1",
+  "releaseSeries": "0.5.x",
   "runtime": {
     "node": ">=22",
     "localMemoryRuntime": true,
@@ -292,7 +292,20 @@
         "rawCommandOutputStored": false,
         "environmentStored": false,
         "automaticCompletion": false
-      }
+      },
+      "nativeTaskMirror": true,
+      "mirrorBinding": true,
+      "completionSnapshots": true,
+      "crossHostReplication": true,
+      "replicationExplainability": true,
+      "threeHostE2ECertified": true,
+      "dependencyScheduler": true,
+      "parallelExecutionCoordinator": true,
+      "crashSelfHealing": true,
+      "currentWorkProjectionV2": true,
+      "structuredArtifactEvidence": true,
+      "memoryQualityAwareContext": true,
+      "architectureOverview": "docs/architecture.md"
     },
     "taskReleaseCertification": {
       "phase33TaskCore": true,
@@ -302,7 +315,28 @@
       "phase37TasksPanel": true,
       "phase38AutoEvidence": true,
       "phase39FullCertification": true,
-      "phase39RequiredGateCount": 43
+      "phase39RequiredGateCount": 43,
+      "phase42TaskMirror": true,
+      "phase43CompletionSnapshot": true,
+      "phase44WorkStateConsolidation": true,
+      "phase45CrossHostReplication": true,
+      "phase46Orchestration": true,
+      "phase47ResumeBootstrap": true,
+      "phase48ActivityProgress": true,
+      "phase49DependencyScheduler": true,
+      "phase50ParallelExecution": true,
+      "phase51CrashSelfHealing": true,
+      "phase52ProductionGA": true,
+      "phase53MemoryScopeFreshness": true,
+      "phase54CurrentWorkProjectionV2": true,
+      "phase55StructuredArtifactEvidence": true,
+      "phase56ContextNoiseFiltering": true,
+      "phase57MemoryQualityReview": true,
+      "phase58MemoryQualityGA": true,
+      "phase58bArchitectureReplicationE2E": true,
+      "threeHostConvergence": true,
+      "restartAfterDivergence": true,
+      "replicationOrderExplainability": true
     }
   }
 }
