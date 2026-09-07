@@ -37,6 +37,7 @@ import {
   type SessionExecutionResolution,
 } from '../tasks/orchestration-engine.js';
 import { TaskStore } from '../tasks/store.js';
+import { refreshCurrentWorkProjection } from '../work-continuity/current-work-projection.js';
 
 export class SessionCore {
   readonly identity;
@@ -210,7 +211,25 @@ export class SessionCore {
         this.taskMirror
       );
       await this.taskMirror.drain();
+      try {
+        refreshCurrentWorkProjection(this.project, {
+          agentId: this.taskAgentId,
+        });
+      } catch {
+        // Current work is a derived projection and must not break session startup.
+      }
       this.taskExecutionResolutionValue = await this.resolveTaskSessionExecution();
+      try {
+        /*
+         * resolveTaskSessionExecution() may opt-in recover/claim a Task.
+         * Refresh once more so lease ownership is immediately visible.
+         */
+        refreshCurrentWorkProjection(this.project, {
+          agentId: this.taskAgentId,
+        });
+      } catch {
+        // Derived projection only.
+      }
       const resolution = this.taskExecutionResolutionValue;
       const task = resolution.task;
       if (
@@ -270,6 +289,16 @@ export class SessionCore {
      * mirror failures, so this cannot make flush fail because of Tasks.
      */
     await this.taskMirror.drain();
+    try {
+      refreshCurrentWorkProjection(this.project, {
+        agentId: this.taskAgentId,
+      });
+    } catch {
+      /*
+       * Current work is derived state.
+       * WAL + canonical Tasks remain authoritative.
+       */
+    }
 
     /*
      * Publish only after native Task mutation has drained. Remote

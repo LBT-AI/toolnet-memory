@@ -6,7 +6,10 @@ import { extractWorkObservations } from '../work-continuity/extractor.js';
 
 import { applyObservationsToLocalWorkState } from '../work-continuity/local-work-state.js';
 
-import { writeStableWorkStateToCurrent } from '../work-continuity/work-state-current.js';
+import {
+  buildCurrentWorkProjection,
+  writeCurrentWorkProjectionToCurrent,
+} from '../work-continuity/current-work-projection.js';
 
 import { writeSessionOrigin } from '../work-continuity/session-origin.js';
 
@@ -56,7 +59,13 @@ export function checkpointLocalSession(
 
   const workState = applyObservationsToLocalWorkState(project, observations);
 
-  writeStableWorkStateToCurrent(project, workState);
+  writeCurrentWorkProjectionToCurrent(
+    project,
+    buildCurrentWorkProjection(project, {
+      fallback: workState,
+      agentId: identity.agent,
+    })
+  );
 
   writeSessionOrigin(project, {
     agent: identity.agent,

@@ -265,9 +265,14 @@ describe('Work State Intelligence', () => {
 
     const currentMd = readFileSync(join(project.rootPath, '.toolnet', 'current.md'), 'utf8');
 
-    expect(currentMd).toContain('Current request:');
+    /*
+     * Phase 54: current.md is now the task-first Current Work Projection v2.
+     * Session-derived fallback renders the active task title, files touched
+     * and verification checks instead of the legacy stable-work sections.
+     */
+    expect(currentMd).toContain('Sửa OAuth callback');
 
-    expect(currentMd).toContain('Active files:');
+    expect(currentMd).toContain('Files touched:');
 
     expect(currentMd).toContain('[passed] test: npm test');
 
