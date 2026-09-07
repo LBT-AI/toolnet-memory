@@ -1,0 +1,82 @@
+name: Phase 53 Memory Scope Retry
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/phase53-memory-scope-retry.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  phase53-retry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Reapply Phase 53 and fix scope fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/phase53-memory-scope.yml').read_text()
+          marker = '      - name: Apply Phase 53\n'
+          start = workflow.index(marker)
+          run_marker = '        run: |\n'
+          body_start = workflow.index(run_marker, start) + len(run_marker)
+          body_end = workflow.index('      - name: Certify Phase 53\n', body_start)
+          script = textwrap.dedent(workflow[body_start:body_end])
+          Path('/tmp/apply-phase53.sh').write_text('#!/usr/bin/env bash\nset -euo pipefail\n' + script)
+          PY
+
+          bash /tmp/apply-phase53.sh
+
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/memory/scope-freshness.ts')
+          s = p.read_text()
+          old = "    case 'code':\n      return 'fact';\n  }\n}\n\nexport function inferMemoryLifetimeClass"
+          new = "    case 'code':\n      return 'fact';\n  }\n\n  return 'history';\n}\n\nexport function inferMemoryLifetimeClass"
+          if s.count(old) != 1:
+              raise SystemExit('PHASE53_SCOPE_FALLBACK_ANCHOR_MISSING')
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+          npx prettier --write src/memory/scope-freshness.ts
+
+      - name: Certify Phase 53
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx vitest run \
+            tests/memory/phase53-scope-freshness.test.ts \
+            tests/memory/pipeline-v2.test.ts \
+            tests/session/session-memory-learner.test.ts
+          npm run typecheck
+          npm run lint
+          npm run format:check
+          npm test
+          git diff --check
+
+      - name: Commit Phase 53
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/phase53-memory-scope.yml
+          git rm .github/workflows/phase53-memory-scope-retry.yml
+          git add -A
+          git commit -m 'feat: phase 53 memory scope and freshness model'
+          git push origin HEAD:main
+          echo 'PHASE53_MEMORY_SCOPE=PASS'
