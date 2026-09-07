@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import { fileURLToPath } from 'node:url';
+import { certifyMemoryQualityGA } from './memory-quality-ga-certify.js';
 
 export interface ProductionReadinessCheck {
   id: string;
@@ -64,6 +65,7 @@ export const PRODUCTION_PACK_REQUIRED_FILES = [
   'bundle/kilo.js',
   'bundle/integration-status.js',
   'bundle/background-refresh.js',
+  'bundle/memory-review.js',
   'bundle/mcp.js',
   'bundle/continuity-certify.js',
   'bundle/recovery-certify.js',
@@ -92,6 +94,7 @@ const PRODUCTION_BUNDLE_REQUIRED_FILES = [
   'kilo.js',
   'integration-status.js',
   'background-refresh.js',
+  'memory-review.js',
   'mcp.js',
   'continuity-certify.js',
   'recovery-certify.js',
@@ -623,6 +626,22 @@ export async function certifyProductionReadiness(
   const x2 = runBundleCertification(packageRoot, 'recovery-certify.js');
 
   checks.push(check('x2', 'X2 recovery certification passes', x2.status === 0, compactError(x2)));
+
+  const memoryQualityGA = await certifyMemoryQualityGA();
+
+  checks.push(
+    check(
+      'phase58-memory-quality-ga',
+      'Phase 53-58 Memory Quality GA certification passes',
+      memoryQualityGA.passed,
+      memoryQualityGA.passed
+        ? undefined
+        : memoryQualityGA.checks
+            .filter((item) => !item.passed)
+            .map((item) => `${item.id}: ${item.detail ?? 'failed'}`)
+            .join('\n')
+    )
+  );
 
   const passedCount = checks.filter((item) => item.passed).length;
 
