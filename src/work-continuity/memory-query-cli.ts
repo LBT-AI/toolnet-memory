@@ -6,10 +6,10 @@ import {
 } from '../storage/index.js';
 import type { StorageProvider } from '../storage/types.js';
 import {
-  retrieveIntentAwareAnswer,
-  routeNeedsStorage,
-  routeRetrievalIntent,
-} from './intent-aware-retrieval.js';
+  compositePlanNeedsStorage,
+  planCompositeRetrieval,
+  retrieveCompositeAnswer,
+} from './composite-retrieval.js';
 import { findProjectRoot } from './fast-context.js';
 
 interface CliInput {
@@ -77,16 +77,18 @@ async function main(): Promise<void> {
     return;
   }
   const project = new ProjectManager().requireExisting(root);
-  const route = routeRetrievalIntent(input.question);
   /*
-   * Critical Phase 59 property:
+   * Phase 60:
    *
-   * Do not even construct remote storage for a pure
-   * current-work / artifact / continuity query.
+   * Plan before storage construction.
+   *
+   * A local Task + Artifact composite query still performs
+   * ZERO remote Memory / Code storage initialization.
    */
-  const storage = routeNeedsStorage(route) ? projectStorage(project) : undefined;
-  const result = await retrieveIntentAwareAnswer(project, input.question, {
-    route,
+  const plan = planCompositeRetrieval(input.question);
+  const storage = compositePlanNeedsStorage(plan) ? projectStorage(project) : undefined;
+  const result = await retrieveCompositeAnswer(project, input.question, {
+    plan,
     ...(storage ? { storage } : {}),
     agentId: process.env.TOOLNET_AGENT_ID ?? 'opencode',
   });
@@ -99,13 +101,16 @@ async function main(): Promise<void> {
     process.stderr.write(
       [
         '',
-        '[ToolNet Retrieval Router]',
-        `intent=${result.route.intent}`,
-        `confidence=${result.route.confidence.toFixed(2)}`,
-        `primary=${result.route.primarySource}`,
+        '[ToolNet Retrieval Planner]',
+        `mode=${result.mode}`,
+        `intents=${result.plan.steps.map((step) => step.intent).join(',')}`,
+        `planned_sources=${result.plan.sources.join(',')}`,
         `attempted=${result.attemptedSources.join(' -> ')}`,
         `selected=${result.source}`,
-        `reasons=${result.route.reasons.join(',')}`,
+        `primary=${result.route.primarySource}`,
+        `confidence=${result.route.confidence.toFixed(2)}`,
+        `omitted=${result.plan.omittedIntents.join(',') || 'none'}`,
+        `conflicts=${result.conflicts.map((conflict) => conflict.code).join(',') || 'none'}`,
         '',
       ].join('\n')
     );

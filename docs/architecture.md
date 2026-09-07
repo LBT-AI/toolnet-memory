@@ -643,3 +643,113 @@ The central invariant remains:
 - durable knowledge -> canonical Memory
 - code structure -> Code Intelligence
 - production evidence -> Task Artifact Evidence
+
+---
+
+## 18. Composite Retrieval Planner
+
+Phase 59 routes one intent to one primary source.
+
+Phase 60 adds a bounded planning layer for questions containing multiple
+independent intents.
+
+```text
+Question
+   │
+   ▼
+Clause / Intent Detection
+   │
+   ▼
+Composite Retrieval Plan
+   │
+   ├── Current Work ───────► Persistent Tasks
+   │
+   ├── Artifact State ─────► Task Artifact Evidence
+   │
+   ├── Code Location ──────► Code Intelligence
+   │
+   └── Decision / Rule ────► Canonical Memory
+   │
+   ▼
+Maximum 3 distinct sources
+   │
+   ▼
+Phase 59 source executors
+   │
+   ▼
+Authority-aware merge
+   │
+   ▼
+Compact answer + provenance
+```
+
+Single-intent questions are delegated directly to the Phase 59 engine, so
+Phase 60 does not replace the existing deterministic router.
+
+Composite mode deliberately disables per-step fallback expansion. This keeps
+the three-source budget real and prevents accidental full fan-out.
+
+Source authority for merged execution context is:
+
+```text
+Persistent Tasks
+      >
+Task Artifact Evidence
+      >
+Code Intelligence
+      >
+Canonical Memory
+      >
+Legacy Continuity
+```
+
+Code Intelligence is structurally orthogonal to Task state, but it is rendered
+before Memory because repository evidence should be inspected before historical
+knowledge when both are requested.
+
+For production execution state, Task Artifact Evidence is authoritative over
+Memory.
+
+Example conflict:
+
+```text
+Artifact Evidence:
+  [executed] deploy
+Memory:
+  "Production deploy is verified"
+Result:
+  MEMORY_TASK_STATE_CONFLICT
+Authority:
+  task-artifacts
+```
+
+Memory is not deleted or rewritten. The conflict is surfaced in the answer and
+the canonical Task Artifact state remains authoritative.
+
+Example:
+
+```bash
+toolnet-memory ask --debug-route \
+  "Task hiện tại là gì, deploy production đã verified chưa và TaskStore nằm ở đâu?"
+```
+
+The planner may produce:
+
+```text
+current_work -> persistent-tasks
+artifact     -> task-artifacts
+code         -> code-intelligence
+```
+
+No canonical Memory query is performed in that case.
+
+The central Phase 60 invariant is:
+
+```text
+single intent
+    -> Phase 59 exactly
+multi intent
+    -> only explicitly required sources
+    -> maximum 3 distinct sources
+    -> no full fan-out
+```

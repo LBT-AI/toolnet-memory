@@ -189,6 +189,22 @@ function sourcePlan(
   }
 }
 
+export function routeForRetrievalIntent(
+  intent: IntentAwareRetrievalIntent,
+  options: {
+    confidence?: number;
+    reasons?: string[];
+  } = {}
+): IntentAwareRetrievalRoute {
+  const plan = sourcePlan(intent);
+  return {
+    intent,
+    ...plan,
+    confidence: Math.max(0, Math.min(1, options.confidence ?? 0.9)),
+    reasons: options.reasons?.length ? [...options.reasons] : ['explicit-intent'],
+  };
+}
+
 /**
  * Pure deterministic intent classification.
  *
@@ -369,13 +385,10 @@ export function routeRetrievalIntent(question: string): IntentAwareRetrievalRout
       right.score - left.score || tieOrder.indexOf(left.intent) - tieOrder.indexOf(right.intent)
   );
   const winner = candidates[0]!;
-  const plan = sourcePlan(winner.intent);
-  return {
-    intent: winner.intent,
-    ...plan,
+  return routeForRetrievalIntent(winner.intent, {
     confidence: Math.max(0.55, Math.min(0.99, 0.55 + winner.score / 25)),
     reasons: winner.reasons.length ? winner.reasons : ['default-summary'],
-  };
+  });
 }
 
 function queryTerms(question: string): string[] {

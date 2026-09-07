@@ -2,10 +2,8 @@ import { z } from 'zod';
 
 import type { MCPContext } from '../context.js';
 
-import {
-  retrieveIntentAwareAnswer,
-  type IntentAwareCodeHit,
-} from '../../work-continuity/intent-aware-retrieval.js';
+import { retrieveCompositeAnswer } from '../../work-continuity/composite-retrieval.js';
+import type { IntentAwareCodeHit } from '../../work-continuity/intent-aware-retrieval.js';
 
 import {
   answerMemoryConversationFollowUp,
@@ -134,7 +132,7 @@ export async function memoryAgentAsk(
         }))
     : undefined;
 
-  const direct = await retrieveIntentAwareAnswer(ctx.project, conversation.originalQuestion, {
+  const direct = await retrieveCompositeAnswer(ctx.project, conversation.originalQuestion, {
     ...(ctx.storage ? { storage: ctx.storage } : {}),
     ...(searchCode ? { searchCode } : {}),
   });
@@ -163,6 +161,12 @@ export async function memoryAgentAsk(
 
       retrievalRoute: direct.route,
 
+      retrievalPlan: direct.plan,
+
+      retrievalFragments: direct.fragments,
+
+      retrievalConflicts: direct.conflicts,
+
       attemptedSources: direct.attemptedSources,
     };
   }
@@ -178,9 +182,16 @@ export async function memoryAgentAsk(
 
     intent: direct.route.intent,
 
-    routing: 'intent-aware' as const,
+    routing:
+      direct.mode === 'composite' ? ('composite-intent-aware' as const) : ('intent-aware' as const),
 
     retrievalRoute: direct.route,
+
+    retrievalPlan: direct.plan,
+
+    retrievalFragments: direct.fragments,
+
+    retrievalConflicts: direct.conflicts,
 
     attemptedSources: direct.attemptedSources,
   };
