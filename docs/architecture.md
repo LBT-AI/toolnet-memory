@@ -753,3 +753,108 @@ multi intent
     -> maximum 3 distinct sources
     -> no full fan-out
 ```
+
+---
+
+## 19. Retrieval Quality Evaluation
+
+Phase 61 adds a deterministic quality gate around the Phase 59 router and
+Phase 60 Composite Retrieval Planner.
+Routing quality is evaluated against a fixed bilingual benchmark rather than
+being inferred from unit tests alone.
+
+```text
+Fixed benchmark
+      │
+      ▼
+Phase 59 / Phase 60 planner
+      │
+      ▼
+Expected vs predicted
+      │
+      ├── mode
+      ├── intents
+      ├── sources
+      ├── omitted intents
+      └── source budget
+      │
+      ▼
+Precision / Recall / F1
+      │
+      ▼
+Regression quality gate
+
+The benchmark covers:
+
+Vietnamese + English
+single intent + composite intent
+current work
+artifact state
+rules
+decisions
+recent state
+history
+continuity
+code intelligence
+three-source planning
+source-budget omission
+
+Important metrics:
+
+exact case accuracy
+mode accuracy
+intent precision / recall / F1
+source precision / recall / F1
+unnecessary source reads
+missing source reads
+source-budget violations
+average planned sources
+maximum planned sources
+
+Actual retrieval results can also be measured for:
+
+attempted sources
+successful fragments
+answer characters
+estimated tokens
+provenance coverage
+conflict count
+
+The evaluator is deterministic and does not call an LLM.
+
+Run:
+
+npm run retrieval:eval
+
+Strict certification:
+
+npm run retrieval:eval -- --strict
+
+Machine-readable report:
+
+npm run retrieval:eval -- --json
+
+Routing explainability remains on the existing ask command:
+
+toolnet-memory ask --debug-route \
+  "task hiện tại là gì và deploy production verified chưa?"
+
+The debug output includes:
+
+mode
+source budget
+every planned intent
+source selected by each step
+authority
+route confidence
+route reasons
+attempted sources
+answer character cost
+estimated token cost
+provenance coverage
+conflicts
+
+The benchmark is external ground truth. It must not be generated dynamically
+from router implementation rules, otherwise routing regressions could make both
+the implementation and its expected answers wrong at the same time.
+```

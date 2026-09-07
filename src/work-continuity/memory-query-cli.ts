@@ -11,6 +11,7 @@ import {
   retrieveCompositeAnswer,
 } from './composite-retrieval.js';
 import { findProjectRoot } from './fast-context.js';
+import { explainRetrievalPlan, measureRetrievalExecution } from './retrieval-quality.js';
 
 interface CliInput {
   question: string;
@@ -98,19 +99,19 @@ async function main(): Promise<void> {
   }
   process.stdout.write(`${result.answer}\n`);
   if (input.debugRoute) {
+    const execution = measureRetrievalExecution(result);
+    const conflicts = result.conflicts.map((conflict) => conflict.code).join(',') || 'none';
     process.stderr.write(
       [
         '',
         '[ToolNet Retrieval Planner]',
-        `mode=${result.mode}`,
-        `intents=${result.plan.steps.map((step) => step.intent).join(',')}`,
-        `planned_sources=${result.plan.sources.join(',')}`,
+        ...explainRetrievalPlan(result.plan),
         `attempted=${result.attemptedSources.join(' -> ')}`,
         `selected=${result.source}`,
-        `primary=${result.route.primarySource}`,
-        `confidence=${result.route.confidence.toFixed(2)}`,
-        `omitted=${result.plan.omittedIntents.join(',') || 'none'}`,
-        `conflicts=${result.conflicts.map((conflict) => conflict.code).join(',') || 'none'}`,
+        `answer_chars=${execution.answerChars}`,
+        `estimated_tokens=${execution.estimatedTokens}`,
+        `provenance_coverage=${execution.provenanceCoverage.toFixed(2)}`,
+        `conflicts=${conflicts}`,
         '',
       ].join('\n')
     );
