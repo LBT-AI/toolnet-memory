@@ -1,4 +1,11 @@
 import { evaluateMemoryPromotion, type MemoryKnowledgeClass } from './promotion-policy.js';
+import {
+  candidateVerifiedAt,
+  defaultMemoryStaleAfter,
+  inferMemoryScope,
+} from './scope-freshness.js';
+
+import type { MemoryScope } from '../core/types.js';
 
 export type { MemoryKnowledgeClass } from './promotion-policy.js';
 
@@ -14,6 +21,10 @@ import { extractSessionMemory } from '../session/session-extractor.js';
 
 export interface MemoryPipelineCandidate extends LearnedMemoryCandidate {
   knowledgeClass: MemoryKnowledgeClass;
+
+  scope: MemoryScope;
+
+  observedAt: string;
 
   importanceScore: number;
 
@@ -44,6 +55,8 @@ export interface MemoryRetrievalIndexEntry {
   kind: LearnedMemoryCandidate['kind'];
 
   knowledgeClass: MemoryKnowledgeClass;
+
+  scope: MemoryScope;
 
   importanceScore: number;
 
@@ -161,10 +174,39 @@ function retrievalTerms(text: string): string[] {
 function enrichCandidate(candidate: LearnedMemoryCandidate): MemoryPipelineCandidate {
   const evaluation = evaluateMemoryPromotion(candidate);
 
+  const scope = inferMemoryScope(candidate.kind, candidate.type);
+
+  const observedAt = candidate.observedAt ?? candidate.createdAt;
+
+  const verifiedAt =
+    candidate.verifiedAt ??
+    candidateVerifiedAt({
+      observedAt,
+      evidence: candidate.evidence,
+    });
+
+  const staleAfter =
+    candidate.staleAfter ?? defaultMemoryStaleAfter(evaluation.knowledgeClass, observedAt);
+
+  const sourceRef =
+    candidate.sourceRef ??
+    candidate.provenance.sourcePaths[0] ??
+    candidate.provenance.sourceEventIds[0];
+
   return {
     ...candidate,
 
     knowledgeClass: evaluation.knowledgeClass,
+
+    scope,
+
+    observedAt,
+
+    verifiedAt,
+
+    staleAfter,
+
+    sourceRef,
 
     importanceScore: evaluation.score,
 
@@ -174,6 +216,7 @@ function enrichCandidate(candidate: LearnedMemoryCandidate): MemoryPipelineCandi
       ...candidate.tags,
       'level:fact',
       `class:${evaluation.knowledgeClass}`,
+      `scope:${scope}`,
       `kind:${candidate.kind}`,
     ]),
   };
@@ -315,6 +358,8 @@ export function runMemoryPipelineV2(
     kind: candidate.kind,
 
     knowledgeClass: candidate.knowledgeClass,
+
+    scope: candidate.scope,
 
     importanceScore: candidate.importanceScore,
 

@@ -10,6 +10,7 @@ import type { SessionIdentity, NormalizedSessionEvent } from '../types.js';
 
 import { sha256 } from '../utils.js';
 import { safeAppendAuditEvent } from '../../audit/log.js';
+import { normalizeMemoryScopeMetadata } from '../../memory/scope-freshness.js';
 
 import type { LearnedMemoryBatch, LearnedMemoryCandidate, MemoryReconcileResult } from './types.js';
 
@@ -238,6 +239,12 @@ export async function reconcileSessionMemoryJournal(
 
   const existing = await store.load(project.id);
 
+  let phase53Backfilled = 0;
+
+  for (const memory of existing) {
+    phase53Backfilled += normalizeMemoryScopeMetadata(memory) ? 1 : 0;
+  }
+
   const engine = new MemoryEngine();
 
   engine.importRecords(existing);
@@ -283,7 +290,10 @@ export async function reconcileSessionMemoryJournal(
 
         const memory = memoriesByFingerprint.get(candidate.fingerprint);
 
-        evidenceUpdated += memory && mergeConfirmationEvidence(memory, candidate) ? 1 : 0;
+        const evidenceChanged = memory ? mergeConfirmationEvidence(memory, candidate) : false;
+        const phase53Changed = memory ? normalizeMemoryScopeMetadata(memory) : false;
+
+        evidenceUpdated += evidenceChanged || phase53Changed ? 1 : 0;
 
         continue;
       }
@@ -311,6 +321,12 @@ export async function reconcileSessionMemoryJournal(
           evidence: candidate.evidence,
           provenance: candidate.provenance,
           sourceCreatedAt: candidate.createdAt,
+          memoryScope: candidate.scope,
+          knowledgeClass: candidate.knowledgeClass,
+          observedAt: candidate.observedAt ?? candidate.createdAt,
+          verifiedAt: candidate.verifiedAt,
+          staleAfter: candidate.staleAfter,
+          sourceRef: candidate.sourceRef,
           sessionKey: candidate.sessionKey,
 
           agent: candidate.agent,
@@ -318,6 +334,8 @@ export async function reconcileSessionMemoryJournal(
           nativeSessionId: candidate.nativeSessionId,
         },
       });
+
+      normalizeMemoryScopeMetadata(remembered);
 
       fingerprints.add(candidate.fingerprint);
 
@@ -332,7 +350,7 @@ export async function reconcileSessionMemoryJournal(
     }
   }
 
-  if (added > 0 || evidenceUpdated > 0) {
+  if (added > 0 || evidenceUpdated > 0 || phase53Backfilled > 0) {
     await store.save(project.id, engine.exportProject(project.id));
     for (const item of addedAuditRecords) {
       await safeAppendAuditEvent(project, {

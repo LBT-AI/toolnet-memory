@@ -162,6 +162,16 @@ describe('Memory Pipeline v2', () => {
       true
     );
 
+    expect(result.candidates.every((candidate) => Boolean(candidate.scope))).toBe(true);
+    expect(result.candidates.every((candidate) => Boolean(candidate.observedAt))).toBe(true);
+    expect(result.retrievalIndex.every((entry) => Boolean(entry.scope))).toBe(true);
+    expect(
+      result.candidates.find((candidate) => candidate.knowledgeClass === 'permanent')?.staleAfter
+    ).toBeUndefined();
+    expect(
+      result.candidates.find((candidate) => candidate.knowledgeClass === 'task')?.staleAfter
+    ).toBeTruthy();
+
     expect(result.state.files.some((file) => file.includes('src/auth.ts'))).toBe(true);
 
     expect(result.state.blockers.join(' ')).toMatch(/cannot deploy/i);

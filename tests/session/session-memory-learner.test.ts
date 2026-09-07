@@ -167,6 +167,13 @@ describe('Session Memory Learner', () => {
     expect(memories[0].metadata?.nativeSessionId).toBe('ses_rule_test');
 
     expect(memories[0].metadata?.learningFingerprint).toBeTruthy();
+
+    expect(memories[0].scope).toBe('rule');
+    expect(memories[0].confidence).toBeGreaterThanOrEqual(0.9);
+    expect(memories[0].observedAt).toBeTruthy();
+    expect(memories[0].verifiedAt).toBeTruthy();
+    expect(memories[0].staleAfter).toBeUndefined();
+    expect(memories[0].metadata?.freshnessSchema).toBe(1);
   });
 
   it('deduplicates same knowledge across different agents', async () => {

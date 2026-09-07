@@ -1,4 +1,4 @@
-import type { ImportanceLevel, MemoryType } from '../../core/types.js';
+import type { ImportanceLevel, MemoryScope, MemoryType } from '../../core/types.js';
 
 import type { SessionAgent } from '../types.js';
 
@@ -35,6 +35,19 @@ export interface LearnedMemoryCandidate {
   type: MemoryType;
 
   content: string;
+
+  /** Phase 53 fields are optional so immutable v1 journal batches remain readable. */
+  scope?: MemoryScope;
+
+  observedAt?: string;
+
+  verifiedAt?: string;
+
+  staleAfter?: string;
+
+  sourceRef?: string;
+
+  knowledgeClass?: 'permanent' | 'task' | 'session' | 'transient';
 
   confidence: number;
 

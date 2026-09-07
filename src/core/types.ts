@@ -1,5 +1,9 @@
 export type MemoryType = 'code' | 'activity' | 'decision' | 'rule' | 'todo' | 'summary';
 
+export type MemoryScope = 'rule' | 'decision' | 'fact' | 'observation' | 'history';
+
+export type MemoryFreshnessState = 'fresh' | 'needs_verification' | 'stale';
+
 export type ImportanceLevel = 'critical' | 'high' | 'normal' | 'temporary';
 
 export interface MemoryRecord {
@@ -7,6 +11,19 @@ export interface MemoryRecord {
   projectId: string;
   type: MemoryType;
   content: string;
+
+  /** Semantic meaning of this note. Optional for legacy records. */
+  scope?: MemoryScope;
+  /** When the underlying fact/rule/work observation was observed. */
+  observedAt?: string;
+  /** Last time the note was explicitly/source/test verified. */
+  verifiedAt?: string;
+  /** Canonical confidence in the note, normalized to 0..1. */
+  confidence?: number;
+  /** Freshness boundary. Expiry and lifecycle remain separate concerns. */
+  staleAfter?: string;
+  /** Path/event/artifact reference supporting this note when available. */
+  sourceRef?: string;
 
   importance: ImportanceLevel;
   importanceScore: number;
