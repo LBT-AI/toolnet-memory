@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ProjectManifest } from '../core/types.js';
+import { currentTaskArtifactLines } from '../tasks/artifact-evidence.js';
 import { TaskStore } from '../tasks/store.js';
 import type { TaskRecord } from '../tasks/types.js';
 import { loadLocalWorkState } from './local-work-state.js';
@@ -215,14 +216,7 @@ function fromPersistentTasks(
       }),
     8
   );
-  const artifacts = unique(
-    task.evidence
-      .filter((item) => item.kind === 'artifact')
-      .slice(-6)
-      .reverse()
-      .map((item) => (item.ref ? `${item.summary} — ${item.ref}` : item.summary)),
-    6
-  );
+  const artifacts = unique(currentTaskArtifactLines(task.evidence, 6), 6);
   const nextAction =
     task.nextAction?.trim() ||
     task.activityProgress?.suggestedNextAction?.trim() ||

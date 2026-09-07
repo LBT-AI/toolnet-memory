@@ -10,6 +10,9 @@ import { ProjectTaskService } from './service.js';
 import { TaskReplicationService } from './replication/service.js';
 import type {
   TaskActor,
+  TaskArtifactEvidence,
+  TaskArtifactState,
+  TaskArtifactType,
   TaskEvidenceKind,
   TaskKind,
   TaskPatch,
@@ -38,6 +41,18 @@ const EVIDENCE_KINDS = new Set<TaskEvidenceKind>([
   'artifact',
   'review',
 ]);
+const ARTIFACT_TYPES = new Set<TaskArtifactType>([
+  'backup',
+  'report',
+  'build',
+  'deploy',
+  'verification',
+  'seo-audit',
+  'crawler-output',
+  'screenshot',
+  'release',
+]);
+const ARTIFACT_STATES = new Set<TaskArtifactState>(['planned', 'executed', 'verified', 'failed']);
 const TEST_OUTCOMES = new Set<TaskTestOutcome>(['pass', 'fail', 'skip']);
 function parseArgs(argv: string[]): ParsedArgs {
   const positionals: string[] = [];
@@ -127,6 +142,86 @@ function evidenceKind(value: string): TaskEvidenceKind {
     return value as TaskEvidenceKind;
   }
   throw new Error(`TASK_EVIDENCE_KIND_INVALID value=${value}`);
+}
+function artifactType(value: string): TaskArtifactType {
+  if (ARTIFACT_TYPES.has(value as TaskArtifactType)) {
+    return value as TaskArtifactType;
+  }
+  throw new Error(`TASK_ARTIFACT_TYPE_INVALID value=${value}`);
+}
+function artifactState(value: string): TaskArtifactState {
+  if (ARTIFACT_STATES.has(value as TaskArtifactState)) {
+    return value as TaskArtifactState;
+  }
+  throw new Error(`TASK_ARTIFACT_STATE_INVALID value=${value}`);
+}
+function artifactMetadata(
+  parsed: ParsedArgs,
+  kind: TaskEvidenceKind
+): TaskArtifactEvidence | undefined {
+  const artifactFlags = [
+    'artifact-type',
+    'artifact-state',
+    'artifact-key',
+    'artifact-path',
+    'artifact-command',
+    'executed-at',
+    'verified-at',
+    'exit-code',
+    'digest',
+  ];
+  const present = artifactFlags.some((name) => parsed.flags.has(name));
+  if (!present) {
+    /*
+     * Backward-compatible legacy:
+     *
+     * task:evidence --kind artifact --summary ... --ref ...
+     */
+    return undefined;
+  }
+  if (kind !== 'artifact') {
+    throw new Error('TASK_ARTIFACT_REQUIRES_ARTIFACT_EVIDENCE');
+  }
+  const exitCode = optionalNumber(parsed, 'exit-code');
+  return {
+    type: artifactType(requiredFlag(parsed, 'artifact-type')),
+    state: artifactState(requiredFlag(parsed, 'artifact-state')),
+    ...(flag(parsed, 'artifact-key')
+      ? {
+          key: flag(parsed, 'artifact-key'),
+        }
+      : {}),
+    ...(flag(parsed, 'artifact-path')
+      ? {
+          path: flag(parsed, 'artifact-path'),
+        }
+      : {}),
+    ...(flag(parsed, 'artifact-command')
+      ? {
+          command: flag(parsed, 'artifact-command'),
+        }
+      : {}),
+    ...(flag(parsed, 'executed-at')
+      ? {
+          executedAt: flag(parsed, 'executed-at'),
+        }
+      : {}),
+    ...(flag(parsed, 'verified-at')
+      ? {
+          verifiedAt: flag(parsed, 'verified-at'),
+        }
+      : {}),
+    ...(exitCode !== undefined
+      ? {
+          exitCode,
+        }
+      : {}),
+    ...(flag(parsed, 'digest')
+      ? {
+          digest: flag(parsed, 'digest'),
+        }
+      : {}),
+  };
 }
 function testOutcome(value: string): TaskTestOutcome {
   if (TEST_OUTCOMES.has(value as TaskTestOutcome)) {
@@ -383,14 +478,21 @@ export async function executeTaskCli(argv: string[]): Promise<unknown> {
     );
   }
   if (command === 'evidence') {
+    const kind = evidenceKind(requiredFlag(parsed, 'kind'));
+    const artifact = artifactMetadata(parsed, kind);
     return service.state.addEvidence(
       positional(parsed, 0, 'taskId'),
       {
-        kind: evidenceKind(requiredFlag(parsed, 'kind')),
+        kind,
         summary: requiredFlag(parsed, 'summary'),
         ...(flag(parsed, 'ref')
           ? {
               ref: flag(parsed, 'ref'),
+            }
+          : {}),
+        ...(artifact
+          ? {
+              artifact,
             }
           : {}),
       },

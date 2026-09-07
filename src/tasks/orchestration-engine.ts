@@ -1,4 +1,5 @@
 import { sanitizeDurableText } from '../security/durable-sanitizer.js';
+import { currentTaskArtifactLines } from './artifact-evidence.js';
 import { taskRecords, unresolvedTaskDependencies } from './projection.js';
 import { taskLeaseActiveAt } from './handoff-projection.js';
 import {
@@ -37,6 +38,11 @@ export interface TaskExecutionContext {
   filesTouched: string[];
   tests: TaskTestRecord[];
   evidence: string[];
+  /**
+   * Compact latest logical Artifact states.
+   * Omitted when the Task has no Artifact evidence.
+   */
+  artifacts?: string[];
   completion?: TaskRecord['completion'];
   lastAgentId?: string;
   handoffHistory: TaskHandoffRecord[];
@@ -371,6 +377,7 @@ export class TaskOrchestrationEngine {
   resumeContext(taskId: string): TaskExecutionContext {
     const task = this.task(taskId);
     const projection = this.store.projection();
+    const artifacts = currentTaskArtifactLines(task.evidence, 8);
     const dependencies = task.dependencies
       .map((id) => projection.tasks[id])
       .filter((item): item is TaskRecord => Boolean(item));
@@ -396,6 +403,11 @@ export class TaskOrchestrationEngine {
       filesTouched: [...task.filesTouched],
       tests: task.tests.map((item) => ({ ...item })),
       evidence: task.evidence.map((item) => item.summary),
+      ...(artifacts.length > 0
+        ? {
+            artifacts,
+          }
+        : {}),
       ...(task.completion ? { completion: task.completion } : {}),
       ...(task.lastAgentId ? { lastAgentId: task.lastAgentId } : {}),
       ...(this.sourceBinding(task.id) ? { sourceBinding: this.sourceBinding(task.id) } : {}),
@@ -528,6 +540,15 @@ export class TaskOrchestrationEngine {
             ...context.tests
               .slice(0, 16)
               .map((test) => `- [${test.outcome}] ${sanitizeDurableText(test.name)}`),
+          ]
+        : []),
+      ...(context.artifacts && context.artifacts.length > 0
+        ? [
+            '',
+            'Artifacts:',
+            ...context.artifacts
+              .slice(0, 8)
+              .map((artifact) => `- ${sanitizeDurableText(artifact)}`),
           ]
         : []),
       ...(context.handoffHistory.length > 0

@@ -14,6 +14,7 @@ import type {
 import { taskPayloadHash } from './operation-log.js';
 import { completionDigest } from './completion-snapshot.js';
 import { deriveTaskActivityProgress } from './activity-progress.js';
+import { materializeTaskArtifact } from './artifact-evidence.js';
 import { applyTaskAgentOperation, isTaskAgentOperationPayload } from './handoff-projection.js';
 const PRIORITIES = new Set<TaskPriority>(['critical', 'high', 'normal', 'low']);
 const STATUSES = new Set<TaskStatus>(['pending', 'active', 'blocked', 'completed', 'cancelled']);
@@ -653,6 +654,12 @@ export function applyTaskOperation(
       throw new Error('TASK_EVIDENCE_KIND_INVALID');
     }
     const summary = requiredText(payload.evidence.summary, 'TASK_EVIDENCE_SUMMARY_REQUIRED');
+    if (payload.evidence.artifact && payload.evidence.kind !== 'artifact') {
+      throw new Error('TASK_ARTIFACT_REQUIRES_ARTIFACT_EVIDENCE');
+    }
+    const artifact = payload.evidence.artifact
+      ? materializeTaskArtifact(payload.evidence.artifact, operation.occurredAt)
+      : undefined;
     if (current.evidence.some((evidence) => evidence.id === payload.evidence.id)) {
       throw new Error(`TASK_EVIDENCE_ALREADY_EXISTS id=${payload.evidence.id}`);
     }
@@ -667,6 +674,11 @@ export function applyTaskOperation(
           ...(payload.evidence.ref
             ? {
                 ref: payload.evidence.ref,
+              }
+            : {}),
+          ...(artifact
+            ? {
+                artifact,
               }
             : {}),
           createdAt: operation.occurredAt,

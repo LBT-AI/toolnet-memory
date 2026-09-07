@@ -41,11 +41,47 @@ export interface TaskBlocker {
   actor: TaskActor;
 }
 export type TaskEvidenceKind = 'note' | 'file' | 'test' | 'commit' | 'artifact' | 'review';
+export type TaskArtifactType =
+  | 'backup'
+  | 'report'
+  | 'build'
+  | 'deploy'
+  | 'verification'
+  | 'seo-audit'
+  | 'crawler-output'
+  | 'screenshot'
+  | 'release';
+export type TaskArtifactState = 'planned' | 'executed' | 'verified' | 'failed';
+export interface TaskArtifactEvidence {
+  /**
+   * Optional stable logical identity.
+   *
+   * Multiple immutable evidence records may use the same key
+   * while progressing:
+   *
+   * planned -> executed -> verified
+   */
+  key?: string;
+  type: TaskArtifactType;
+  state: TaskArtifactState;
+  path?: string;
+  command?: string;
+  executedAt?: string;
+  verifiedAt?: string;
+  exitCode?: number;
+  digest?: string;
+}
 export interface TaskEvidence {
   id: string;
   kind: TaskEvidenceKind;
   summary: string;
   ref?: string;
+  /**
+   * Optional for backward compatibility.
+   *
+   * Legacy kind=artifact evidence without this field remains valid.
+   */
+  artifact?: TaskArtifactEvidence;
   createdAt: string;
   actor: TaskActor;
 }
@@ -239,6 +275,7 @@ export interface TaskEvidenceAddPayload {
     kind: TaskEvidenceKind;
     summary: string;
     ref?: string;
+    artifact?: TaskArtifactEvidence;
   };
 }
 export interface TaskFileTouchedPayload {

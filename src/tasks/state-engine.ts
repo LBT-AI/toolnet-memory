@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { sanitizeDurableText } from '../security/durable-sanitizer.js';
+import { sanitizeTaskArtifactInput } from './artifact-evidence.js';
 import { computedTaskProgress, taskRecords, unresolvedTaskDependencies } from './projection.js';
 import type { TaskCompletionRecordInput } from './completion-snapshot.js';
 import { TaskStore } from './store.js';
 import type {
   TaskActor,
+  TaskArtifactEvidence,
   TaskEvidenceKind,
   TaskMutationOptions,
   TaskRecord,
@@ -22,6 +24,11 @@ export interface AddEvidenceInput {
   kind: TaskEvidenceKind;
   summary: string;
   ref?: string;
+  /**
+   * Structured metadata is only valid for kind=artifact.
+   * Legacy artifact evidence may omit this field.
+   */
+  artifact?: TaskArtifactEvidence;
 }
 export interface RecordTestInput {
   name: string;
@@ -223,12 +230,16 @@ export class TaskStateEngine {
       options.actor
     );
   }
-  addEvidence(
+  async addEvidence(
     taskId: string,
     input: AddEvidenceInput,
     options: TaskMutationOptions = {}
   ): Promise<TaskRecord> {
     const current = this.task(taskId);
+    if (input.artifact && input.kind !== 'artifact') {
+      throw new Error('TASK_ARTIFACT_REQUIRES_ARTIFACT_EVIDENCE');
+    }
+    const artifact = input.artifact ? sanitizeTaskArtifactInput(input.artifact) : undefined;
     return this.transitionResult(
       current.id,
       {
@@ -241,6 +252,11 @@ export class TaskStateEngine {
           ...(input.ref
             ? {
                 ref: text(input.ref, 'TASK_EVIDENCE_REF_REQUIRED'),
+              }
+            : {}),
+          ...(artifact
+            ? {
+                artifact,
               }
             : {}),
         },
