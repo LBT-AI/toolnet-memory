@@ -188,7 +188,13 @@ describe('Phase 47 autonomous Task recovery and session resume bootstrap', () =>
     const runtimeCli = readFileSync('src/work-continuity/context-runtime-cli.ts', 'utf8');
     const plugin = readFileSync('src/session/opencode/plugin-installer.ts', 'utf8');
     expect(codexHook).toContain('renderTaskSessionBootstrap');
-    expect(runtimeCli).toContain('renderTaskSessionBootstrap');
+    /*
+     * Phase 56: the context runtime print path derives Current Work from
+     * the canonical Persistent Task projection instead of prepending a
+     * second Task resume bootstrap on top of current.md.
+     */
+    expect(runtimeCli).not.toContain('renderTaskSessionBootstrap');
+    expect(runtimeCli).toContain('buildFastProjectContext');
     expect(plugin).toContain('context:print');
     expect(plugin).not.toContain('task_next');
   });

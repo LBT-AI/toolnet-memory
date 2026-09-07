@@ -6,6 +6,12 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import type { ProjectManifest } from '../../src/core/types.js';
+
+import { TaskStateEngine } from '../../src/tasks/state-engine.js';
+
+import { TaskStore } from '../../src/tasks/store.js';
+
 import {
   buildKiroPreToolGuard,
   buildKiroPromptContext,
@@ -16,7 +22,7 @@ import {
 describe('Kiro continuity and resume policy', () => {
   const roots: string[] = [];
 
-  function createProject(): string {
+  async function createProject(): Promise<string> {
     const root = mkdtempSync(join(tmpdir(), 'toolnet-kiro-continuity-'));
 
     roots.push(root);
@@ -25,47 +31,57 @@ describe('Kiro continuity and resume policy', () => {
       recursive: true,
     });
 
-    writeFileSync(
-      join(root, '.toolnet', 'project.json'),
-      JSON.stringify(
-        {
-          version: 1,
+    const manifest: ProjectManifest = {
+      id: 'kiro-continuity-test',
 
-          id: 'kiro-continuity-test',
+      name: 'kiro-continuity-test',
 
-          name: 'kiro-continuity-test',
+      remote: 'kiro-continuity-test',
 
-          remote: 'kiro-continuity-test',
+      rootPath: root,
 
-          rootPath: root,
+      createdAt: '2026-08-24T00:00:00.000Z',
 
-          createdAt: '2026-08-24T00:00:00.000Z',
+      updatedAt: '2026-08-24T00:00:00.000Z',
 
-          updatedAt: '2026-08-24T00:00:00.000Z',
+      graphVersion: 0,
 
-          graphVersion: 0,
+      memoryVersion: 0,
+    };
 
-          memoryVersion: 0,
-        },
-        null,
-        2
-      )
-    );
+    writeFileSync(join(root, '.toolnet', 'project.json'), JSON.stringify(manifest, null, 2));
 
     writeFileSync(
       join(root, '.toolnet', 'profile.md'),
       ['# Profile', '', 'ToolNet Memory project profile.'].join('\n')
     );
 
+    /*
+     * Phase 56: raw current.md is a derived rendering, not startup
+     * truth. Only Persistent Task state enters startup context.
+     */
     writeFileSync(
       join(root, '.toolnet', 'current.md'),
-      [
-        '# Current Work',
-        '',
-        '- Current task: add Kiro continuity.',
-        '- Next action: test Phase 04.',
-      ].join('\n')
+      'LEGACY CURRENT TASK TEXT MUST NOT APPEAR\n'
     );
+
+    const store = new TaskStore(manifest);
+
+    const state = new TaskStateEngine(store);
+
+    const task = await store.createTask({
+      id: 'kiro-current-task',
+
+      kind: 'task',
+
+      title: 'add Kiro continuity',
+
+      priority: 'high',
+    });
+
+    await state.start(task.id);
+
+    await state.setNextAction(task.id, 'test Phase 04');
 
     return root;
   }
@@ -99,8 +115,8 @@ describe('Kiro continuity and resume policy', () => {
     expect(isKiroResumePrompt('Create a new file from scratch')).toBe(false);
   });
 
-  it('builds compact local startup context with ToolNet memory guidance', () => {
-    const root = createProject();
+  it('builds compact local startup context with ToolNet memory guidance', async () => {
+    const root = await createProject();
 
     const context = buildKiroStartupContext(root);
 
@@ -110,15 +126,19 @@ describe('Kiro continuity and resume policy', () => {
 
     expect(context).toContain('add Kiro continuity');
 
+    expect(context).toContain('test Phase 04');
+
     expect(context).toContain('memory_agent_ask');
 
     expect(context).toContain('NEVER reconstruct prior work');
 
+    expect(context).not.toContain('LEGACY CURRENT TASK');
+
     expect(context.length).toBeLessThanOrEqual(6550);
   });
 
-  it('injects refreshed ToolNet continuity only for resume prompts', () => {
-    const root = createProject();
+  it('injects refreshed ToolNet continuity only for resume prompts', async () => {
+    const root = await createProject();
 
     const resume = buildKiroPromptContext({
       hook_event_name: 'UserPromptSubmit',
@@ -137,6 +157,8 @@ describe('Kiro continuity and resume policy', () => {
     expect(resume).toContain('mode="local"');
 
     expect(resume).toContain('add Kiro continuity');
+
+    expect(resume).not.toContain('LEGACY CURRENT TASK');
 
     const normal = buildKiroPromptContext({
       hook_event_name: 'UserPromptSubmit',

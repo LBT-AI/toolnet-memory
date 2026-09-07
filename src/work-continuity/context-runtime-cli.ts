@@ -1,20 +1,19 @@
 #!/usr/bin/env node
 /**
  * Context Runtime CLI
- * Fast context operations without deep memory access
+ *
+ * Fast context operations without deep Memory access.
  */
-
 import * as fs from 'fs';
 import * as path from 'path';
 import {
   buildFastProjectContext,
-  syncAgentInstructionFiles,
-  hashContext,
   findProjectRoot,
+  hashContext,
+  syncAgentInstructionFiles,
 } from './fast-context.js';
 import { refreshStartupBriefCache } from './brief-cache.js';
-import { ProjectManager, loadConfig } from '../core/index.js';
-import { renderTaskSessionBootstrap } from '../tasks/session-resume.js';
+import { loadConfig, ProjectManager } from '../core/index.js';
 import {
   createStorageProvider,
   ProjectScopedStorageProvider,
@@ -29,44 +28,61 @@ interface CliOptions {
   agent?: string;
 }
 
-function parseArgs(): { command: string; options: CliOptions } {
+function parseArgs(): {
+  command: string;
+  options: CliOptions;
+} {
   const args = process.argv.slice(2);
   const command = args[0] || 'print';
-  const options: CliOptions = { mode: 'minimal' };
-
-  for (let i = 1; i < args.length; i += 1) {
-    if (args[i] === '--project' && args[i + 1]) {
-      options.project = args[i + 1];
-      i += 1;
+  const options: CliOptions = {
+    mode: 'minimal',
+  };
+  for (let index = 1; index < args.length; index += 1) {
+    if (args[index] === '--project' && args[index + 1]) {
+      options.project = args[index + 1];
+      index += 1;
       continue;
     }
-    if (args[i] === '--limit' && args[i + 1]) {
-      options.limit = parseInt(args[i + 1], 10);
-      i += 1;
+    if (args[index] === '--limit' && args[index + 1]) {
+      options.limit = Number.parseInt(args[index + 1]!, 10);
+      index += 1;
       continue;
     }
-    if (args[i] === '--focused' && args[i + 1]) {
+    if (args[index] === '--focused' && args[index + 1]) {
       options.mode = 'focused';
-      options.query = args[i + 1];
-      i += 1;
+      options.query = args[index + 1];
+      index += 1;
       continue;
     }
-    if (args[i] === '--deep') {
+    if (args[index] === '--deep') {
       options.mode = 'deep';
       continue;
     }
-    if (args[i] === '--agent' && args[i + 1]) {
-      options.agent = args[i + 1];
-      i += 1;
+    if (args[index] === '--agent' && args[index + 1]) {
+      options.agent = args[index + 1];
+      index += 1;
     }
   }
+  return {
+    command,
+    options,
+  };
+}
 
-  return { command, options };
+function contextOptions(options: CliOptions) {
+  return {
+    projectPath: options.project,
+    ...(Number.isFinite(options.limit)
+      ? {
+          maxChars: options.limit,
+        }
+      : {}),
+    agentId: options.agent ?? process.env.TOOLNET_AGENT_ID ?? 'opencode',
+  };
 }
 
 async function main() {
   const { command, options } = parseArgs();
-
   try {
     switch (command) {
       case 'print':
@@ -97,27 +113,24 @@ async function main() {
 
 async function handlePrint(options: CliOptions) {
   const mode = options.mode || 'minimal';
-
   if (mode === 'minimal') {
-    const context = buildFastProjectContext({ projectPath: options.project });
-
+    /*
+     * Phase 56:
+     *
+     * Do not prepend Task Session Bootstrap here.
+     * That duplicated Task/Files/Tests with current.md.
+     *
+     * buildFastProjectContext() now derives canonical
+     * Current Work directly from Persistent Tasks.
+     */
+    const context = buildFastProjectContext(contextOptions(options));
     if (!context) {
       console.error('No ToolNet project found. Run toolnet-memory init first.');
       process.exit(1);
     }
-
-    const projectRoot = findProjectRoot(options.project ?? process.cwd());
-    const project = projectRoot ? new ProjectManager().requireExisting(projectRoot) : undefined;
-    const bootstrap = project
-      ? renderTaskSessionBootstrap(project, {
-          agentId: options.agent ?? process.env.TOOLNET_AGENT_ID ?? 'opencode',
-          maxChars: 4_000,
-        })
-      : undefined;
-    process.stdout.write(bootstrap ? `${bootstrap}\n\n${context}` : context);
+    process.stdout.write(context);
     return;
   }
-
   if (mode === 'focused' || mode === 'deep') {
     console.error('Focused and deep modes require storage access.');
     console.error('Use: toolnet-memory brief --deep for deep context');
@@ -126,13 +139,11 @@ async function handlePrint(options: CliOptions) {
 }
 
 async function handleSync(options: CliOptions) {
-  const context = buildFastProjectContext({ projectPath: options.project });
-
+  const context = buildFastProjectContext(contextOptions(options));
   if (!context) {
     console.error('No ToolNet project found.');
     process.exit(1);
   }
-
   const hash = hashContext(context);
   console.log(`Context hash: ${hash}`);
   console.log(`Context size: ${context.length} chars`);
@@ -140,15 +151,12 @@ async function handleSync(options: CliOptions) {
 
 async function handleRefresh(options: CliOptions) {
   console.log('Refreshing deep startup brief cache...');
-
   const projectPath = options.project || process.cwd();
   const projectRoot = findProjectRoot(projectPath);
-
   if (!projectRoot) {
     console.error('No ToolNet project found.');
     process.exit(1);
   }
-
   const project = new ProjectManager().detect(projectRoot);
   const config = loadConfig();
   const raw = withStorageRetry(
@@ -157,7 +165,9 @@ async function handleRefresh(options: CliOptions) {
       huggingface: config.storage.huggingface,
       localRoot: config.storage.localRoot,
     }),
-    { attempts: 2 }
+    {
+      attempts: 2,
+    }
   );
   const storage = new ProjectScopedStorageProvider(
     raw,
@@ -165,7 +175,6 @@ async function handleRefresh(options: CliOptions) {
     project.name,
     project.remote ?? project.name
   );
-
   await refreshStartupBriefCache(project, storage);
   console.log('Deep startup brief cache refreshed.');
 }
@@ -173,26 +182,20 @@ async function handleRefresh(options: CliOptions) {
 async function handleProfileShow(options: CliOptions) {
   const projectPath = options.project || process.cwd();
   const projectRoot = findProjectRoot(projectPath);
-
   if (!projectRoot) {
     console.error('No ToolNet project found.');
     process.exit(1);
   }
-
   const profilePath = path.join(projectRoot, '.toolnet', 'profile.md');
-
   if (!fs.existsSync(profilePath)) {
     console.error('No profile.md found in .toolnet directory.');
     process.exit(1);
   }
-
-  const content = fs.readFileSync(profilePath, 'utf-8');
-  process.stdout.write(content);
+  process.stdout.write(fs.readFileSync(profilePath, 'utf-8'));
 }
 
 async function handleProfileSync(options: CliOptions) {
-  const created = syncAgentInstructionFiles({ projectPath: options.project });
-
+  const created = syncAgentInstructionFiles(contextOptions(options));
   console.log('Created/updated:');
   for (const file of created) {
     console.log(`- ${file}`);

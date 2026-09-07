@@ -10,6 +10,17 @@ import { loadWorkState } from './reducer.js';
 
 import { loadSemanticWorkState } from './semantic-reducer.js';
 
+import { ConvergentMemoryStore } from '../multi-host/memory-projection.js';
+
+import { buildCurrentWorkProjection } from './current-work-projection.js';
+
+import {
+  renderCompactCurrentWork,
+  renderRankedContextSections,
+  selectCanonicalStartupMemories,
+  type StartupMemorySelection,
+} from './context-noise-filter.js';
+
 export interface StartupBrief {
   version: 1;
 
@@ -183,6 +194,168 @@ function fitLines(
   return output.join('\n').trim();
 }
 
+function uniqueText(
+  values: string[],
+
+  limit: number
+): string[] {
+  const output: string[] = [];
+
+  const seen = new Set<string>();
+
+  for (const raw of values) {
+    const value = raw.replace(/\s+/gu, ' ').trim();
+
+    if (!value) {
+      continue;
+    }
+
+    const key = value.toLocaleLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+
+    output.push(value);
+
+    if (output.length >= limit) {
+      break;
+    }
+  }
+
+  return output;
+}
+
+function buildTaskFirstBriefText(options: {
+  project: ProjectManifest;
+
+  maxTokens: number;
+
+  manualContent: string;
+
+  enforce: string[];
+
+  advisory: string[];
+
+  notes: string[];
+
+  memory: StartupMemorySelection;
+
+  current: ReturnType<typeof buildCurrentWorkProjection>;
+
+  now: number;
+}): string {
+  const header = [
+    '[TOOLNET PROJECT CONTEXT]',
+
+    `Project: ${options.project.name}`,
+
+    'Persistent Tasks are execution authority.',
+
+    'Stale/completed Task history is not current work.',
+
+    ...(options.manualContent
+      ? [`Full operating manual: ${projectManualPath(options.project)}`]
+      : []),
+  ];
+
+  const footer = [
+    'Before changing anything: verify repository evidence.',
+
+    'Use memory ask only when deeper historical context is necessary.',
+  ];
+
+  const fixedTokens = estimateTokens([...header, ...footer].join('\n'));
+
+  const bodyBudget = Math.max(96, options.maxTokens - fixedTokens - 12);
+
+  const ruleLines = uniqueText(
+    [
+      ...options.enforce.map((rule) => `[ENFORCE] ${clip(rule, 220)}`),
+
+      ...options.memory.rules.map((rule) => `[VERIFIED MEMORY RULE] ${clip(rule, 220)}`),
+    ],
+    10
+  );
+
+  const preferences = uniqueText(
+    options.advisory.map((rule) => clip(rule, 220)),
+    6
+  );
+
+  const current = renderCompactCurrentWork(options.current, {
+    now: options.now,
+
+    maxChars: 3_200,
+  });
+
+  const observations = uniqueText(
+    options.memory.observations.map((item) => clip(item, 260)),
+    5
+  );
+
+  const notes = uniqueText(options.notes, 5);
+
+  const body = renderRankedContextSections(
+    [
+      {
+        title: 'Long-term Rules',
+
+        content: ruleLines.map((item) => `- ${item}`).join('\n'),
+
+        priority: 130,
+
+        maxTokens: 240,
+      },
+
+      {
+        title: 'Current Work',
+
+        content: current,
+
+        priority: 120,
+
+        maxTokens: 420,
+      },
+
+      {
+        title: 'Project Preferences',
+
+        content: preferences.map((item) => `- ${item}`).join('\n'),
+
+        priority: 100,
+
+        maxTokens: 100,
+      },
+
+      {
+        title: 'Recent High-Confidence Memory',
+
+        content: observations.map((item) => `- ${item}`).join('\n'),
+
+        priority: 90,
+
+        maxTokens: 150,
+      },
+
+      {
+        title: 'Operating Notes',
+
+        content: notes.map((item) => `- ${item}`).join('\n'),
+
+        priority: 60,
+
+        maxTokens: 80,
+      },
+    ],
+    bodyBudget
+  );
+
+  return fitLines([...header, '', body, '', ...footer], options.maxTokens);
+}
+
 export async function buildStartupBrief(options: {
   project: ProjectManifest;
 
@@ -224,6 +397,92 @@ export async function buildStartupBrief(options: {
 
   const handoff = await loadLatestHandoff(options.project, options.storage);
 
+  const now = Date.now();
+
+  let startupMemory: StartupMemorySelection = {
+    rules: [],
+
+    observations: [],
+  };
+
+  /*
+   * Phase 56 canonical Memory ranking.
+   *
+   * This is READ ONLY.
+   * Full Memory remains available to toolnet-memory ask.
+   */
+  try {
+    const memories = await new ConvergentMemoryStore(options.storage).load(options.project.id);
+
+    startupMemory = selectCanonicalStartupMemories(memories, now);
+  } catch {
+    /*
+     * Startup Brief must remain available when Memory
+     * storage is temporarily unavailable.
+     */
+  }
+
+  const currentProjection = buildCurrentWorkProjection(options.project, {
+    fallback: state,
+
+    now,
+  });
+
+  /*
+   * Persistent Task authority suppresses legacy WorkState,
+   * Semantic current-work and Handoff injection.
+   *
+   * If all Tasks are terminal/stale, authority remains
+   * persistent-tasks and we still do NOT resurrect old session work.
+   */
+  if (currentProjection.authority === 'persistent-tasks') {
+    const text = buildTaskFirstBriefText({
+      project: options.project,
+
+      maxTokens,
+
+      manualContent,
+
+      enforce,
+
+      advisory,
+
+      notes,
+
+      memory: startupMemory,
+
+      current: currentProjection,
+
+      now,
+    });
+
+    return {
+      version: 1,
+
+      projectId: options.project.id,
+
+      projectName: options.project.name,
+
+      text,
+
+      estimatedTokens: estimateTokens(text),
+
+      maxTokens,
+
+      hasManual: Boolean(manualContent),
+
+      hasWorkState: true,
+
+      /*
+       * Handoff may physically exist for audit/history,
+       * but it is not injected over Persistent Task truth.
+       */
+      hasHandoff: Boolean(handoff),
+
+      generatedAt: new Date(now).toISOString(),
+    };
+  }
+
   const lines: string[] = [];
 
   lines.push('[TOOLNET PROJECT CONTEXT]');
@@ -256,6 +515,14 @@ export async function buildStartupBrief(options: {
     for (const rule of advisory.slice(0, 10)) {
       lines.push(`- ${clip(rule, 220)}`);
     }
+  }
+
+  if (startupMemory.rules.length) {
+    lines.push('', 'VERIFIED LONG-TERM MEMORY RULES');
+
+    startupMemory.rules.slice(0, 6).forEach((rule) => {
+      lines.push(`- ${clip(rule, 240)}`);
+    });
   }
 
   /*
@@ -411,6 +678,14 @@ export async function buildStartupBrief(options: {
 
   if (handoff) {
     lines.push(`Latest handoff: ${handoff.reason} / ${handoff.sourceSession.agent}`);
+  }
+
+  if (startupMemory.observations.length) {
+    lines.push('', 'RECENT HIGH-CONFIDENCE MEMORY');
+
+    startupMemory.observations.slice(0, 5).forEach((item) => {
+      lines.push(`- ${clip(item, 260)}`);
+    });
   }
 
   /*

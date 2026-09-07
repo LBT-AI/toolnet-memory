@@ -25,14 +25,20 @@ describe('Context Budget Enforcement', () => {
       }
     });
 
-    it('includes forbidden startup commands', () => {
+    it('includes startup safety guidance and no auto deep recovery', () => {
       const context = buildFastProjectContext();
 
       if (context) {
-        expect(context).toContain('Forbidden At Startup');
-        expect(context).toContain('session:agy-recover');
-        expect(context).toContain('handoff:latest');
-        expect(context).toContain('brief');
+        /*
+         * Phase 56: deep-recovery commands are explicitly rejected in the
+         * agent instruction files written by syncAgentInstructionFiles.
+         * The fast startup context instead forbids raw session replay and
+         * stale Task revival, and points deeper lookups at memory_agent_ask.
+         */
+        expect(context).toContain('Startup rules:');
+        expect(context).toContain('Do not replay raw sessions at startup.');
+        expect(context).toContain('Do not revive stale/completed Task history automatically.');
+        expect(context).toContain('memory_agent_ask');
       }
     });
 

@@ -57,7 +57,7 @@ describe('Memory Agent guidance', () => {
 
       expect(context).toContain('memory_agent_ask');
 
-      expect(context).toContain('resume previous work');
+      expect(context).toContain('For resume/continue requests');
     } finally {
       rmSync(root, {
         recursive: true,

@@ -41,6 +41,12 @@ export interface CurrentWorkProjectionV2 {
   version: 2;
   projectId: string;
   source: CurrentWorkProjectionSource;
+  /**
+   * Which durable system owns current-work truth.
+   *
+   * Optional so previously persisted/manual v2 objects remain readable.
+   */
+  authority?: 'persistent-tasks' | 'session-fallback' | 'none';
   task?: CurrentWorkTaskSummary;
   completed: string[];
   remaining: string[];
@@ -117,13 +123,33 @@ function affinityRank(task: TaskRecord, agentId: string | undefined, now: number
   }
   return 3;
 }
+function currentTaskFresh(task: TaskRecord, now: number): boolean {
+  /*
+   * Active lease is explicit current ownership and overrides age.
+   */
+  if (activeLease(task, now)) {
+    return true;
+  }
+  const updated = Date.parse(task.updatedAt);
+  if (!Number.isFinite(updated)) {
+    return false;
+  }
+  const age = now - updated;
+  /*
+   * Keep Task state immutable.
+   * Staleness only affects current-work selection.
+   *
+   * Phase 53 task-class freshness default = 30 days.
+   */
+  return age >= -86_400_000 && age <= 30 * 86_400_000;
+}
 function currentTask(
   tasks: TaskRecord[],
   agentId: string | undefined,
   now: number
 ): TaskRecord | undefined {
   return tasks
-    .filter((task) => !terminal(task))
+    .filter((task) => !terminal(task) && currentTaskFresh(task, now))
     .sort((left, right) => {
       const leftStatus = STATUS_RANK[left.status as keyof typeof STATUS_RANK] ?? 9;
       const rightStatus = STATUS_RANK[right.status as keyof typeof STATUS_RANK] ?? 9;
@@ -245,6 +271,7 @@ function fromPersistentTasks(
     version: 2,
     projectId: project.id,
     source: 'persistent-task',
+    authority: 'persistent-tasks',
     task: {
       id: task.id,
       title: task.title,
@@ -320,6 +347,7 @@ function fromFallback(
     version: 2,
     projectId: project.id,
     source: 'session-fallback',
+    authority: 'session-fallback',
     task: {
       id: state.currentTask?.id ?? 'session-fallback',
       title: compact(title),
@@ -346,11 +374,16 @@ function fromFallback(
     generatedAt: new Date(now).toISOString(),
   };
 }
-function emptyProjection(project: ProjectManifest, now: number): CurrentWorkProjectionV2 {
+function emptyProjection(
+  project: ProjectManifest,
+  now: number,
+  authority: CurrentWorkProjectionV2['authority'] = 'none'
+): CurrentWorkProjectionV2 {
   return {
     version: 2,
     projectId: project.id,
     source: 'empty',
+    authority,
     completed: [],
     remaining: [],
     blockers: [],
@@ -384,7 +417,12 @@ export function buildCurrentWorkProjection(
      * DO NOT resurrect an old session task from WorkState.
      */
     if (!selected) {
-      return emptyProjection(project, now);
+      /*
+       * Persistent Task state exists, but every candidate is
+       * terminal or stale. Session history must NOT become
+       * current again.
+       */
+      return emptyProjection(project, now, 'persistent-tasks');
     }
     return fromPersistentTasks(project, persistentTasks, selected, options.agentId, now);
   }
