@@ -494,6 +494,179 @@ export function convergeTaskOperations(
   };
 }
 
+export interface TaskReplicationOrderTraceStep {
+  index: number;
+  operationKey: string;
+  taskId?: string;
+  hostId: string;
+  localSequence: number;
+  operationId: string;
+  operationType: TaskOperationPayload['type'];
+  occurredAt: string;
+  sortKey: {
+    createPriority: number;
+    hostId: string;
+    sequence: number;
+    operationId: string;
+    payloadSha256: string;
+  };
+  foreignExpectedRevisionStripped: boolean;
+  effectiveProjectionSequence: number;
+  outcome: 'applied' | 'rejected';
+  beforeProjectionHash: string;
+  afterProjectionHash: string;
+  rejectionReason?: string;
+}
+
+export interface TaskReplicationOrderExplanation {
+  projectId: string;
+  localHostId?: string;
+  /*
+   * These strings are user-facing diagnostics.
+   * Keep them aligned with canonicalOperationOrder().
+   */
+  orderingRules: string[];
+  occurredAtUsedForOrdering: false;
+  totalInputOperations: number;
+  canonicalOperationCount: number;
+  finalProjectionHash: string;
+  conflicts: TaskReplicationConflict[];
+  steps: TaskReplicationOrderTraceStep[];
+}
+
+/**
+ * Explain the exact deterministic Task replication replay order.
+ *
+ * IMPORTANT:
+ * This function calls canonicalOperationOrder(), the same ordering
+ * primitive used by convergeTaskOperations().
+ * It is diagnostics only. It never mutates local Task state.
+ */
+export function explainTaskConvergence(
+  projectId: string,
+  operations: TaskOperation[],
+  localHostId?: string
+): TaskReplicationOrderExplanation {
+  /*
+   * Service-authored and imported operations are already validated.
+   * Validate again here so debug output never interprets malformed
+   * operation shapes.
+   */
+  const valid = operations
+    .map((operation) => validateTaskOperation(operation))
+    .filter((operation) => operation.projectId === projectId);
+
+  const deduped = dedupeOperations(valid);
+
+  /*
+   * This is the actual production ordering primitive.
+   * Do NOT reimplement ordering in the debug layer.
+   */
+  const ordered = canonicalOperationOrder(deduped.operations);
+
+  let state = emptyTaskProjection(projectId);
+
+  const steps: TaskReplicationOrderTraceStep[] = [];
+
+  for (let index = 0; index < ordered.length; index += 1) {
+    const operation = ordered[index]!;
+    const operationKey = replicationOperationKey(operation);
+    const taskId = operationTaskId(operation);
+    const payload = operation.payload as unknown as Record<string, unknown>;
+    const foreignExpectedRevisionStripped =
+      Object.prototype.hasOwnProperty.call(payload, 'expectedRevision') &&
+      (!localHostId || operation.hostId !== localHostId);
+    const effective =
+      localHostId && operation.hostId === localHostId
+        ? operation
+        : withoutForeignRevision(operation);
+    const effectiveProjectionSequence = state.lastSequence + 1;
+    const beforeProjectionHash = taskProjectionHash(state);
+    try {
+      state = applyTaskOperation(state, {
+        ...effective,
+        /*
+         * Host-local sequences are identity/order metadata.
+         * Projection replay gets one canonical sequence.
+         */
+        sequence: effectiveProjectionSequence,
+      });
+      steps.push({
+        index,
+        operationKey,
+        ...(taskId ? { taskId } : {}),
+        hostId: operation.hostId,
+        localSequence: operation.sequence,
+        operationId: operation.operationId,
+        operationType: operation.payload.type,
+        occurredAt: operation.occurredAt,
+        sortKey: {
+          createPriority: operation.payload.type === 'task.created' ? 0 : 1,
+          hostId: operation.hostId,
+          sequence: operation.sequence,
+          operationId: operation.operationId,
+          payloadSha256: operation.payloadSha256,
+        },
+        foreignExpectedRevisionStripped,
+        effectiveProjectionSequence,
+        outcome: 'applied',
+        beforeProjectionHash,
+        afterProjectionHash: taskProjectionHash(state),
+      });
+    } catch (error) {
+      steps.push({
+        index,
+        operationKey,
+        ...(taskId ? { taskId } : {}),
+        hostId: operation.hostId,
+        localSequence: operation.sequence,
+        operationId: operation.operationId,
+        operationType: operation.payload.type,
+        occurredAt: operation.occurredAt,
+        sortKey: {
+          createPriority: operation.payload.type === 'task.created' ? 0 : 1,
+          hostId: operation.hostId,
+          sequence: operation.sequence,
+          operationId: operation.operationId,
+          payloadSha256: operation.payloadSha256,
+        },
+        foreignExpectedRevisionStripped,
+        effectiveProjectionSequence,
+        outcome: 'rejected',
+        beforeProjectionHash,
+        /*
+         * Rejected operation does not mutate the projection.
+         */
+        afterProjectionHash: beforeProjectionHash,
+        rejectionReason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const converged = convergeTaskOperations(projectId, operations, localHostId);
+
+  return {
+    projectId,
+    ...(localHostId ? { localHostId } : {}),
+    orderingRules: [
+      'Preserve each host local sequence before cross-host selection.',
+      'Only the next unconsumed operation from each host is considered.',
+      'Prefer dependency-ready operations when possible.',
+      'Prefer task.created over non-create candidates when canonical identity must be established.',
+      'Remaining deterministic order: hostId, sequence, operationId, payloadSha256.',
+      'occurredAt is informational only and is not a merge-order key.',
+      'Foreign expectedRevision is removed during convergence; local expectedRevision remains enforced.',
+      'An operation that fails Task projection guards is rejected as TASK_REPLICATION_ORDER_CONFLICT.',
+    ],
+    occurredAtUsedForOrdering: false,
+    totalInputOperations: operations.length,
+    canonicalOperationCount: ordered.length,
+    finalProjectionHash: taskProjectionHash(converged.projection),
+    conflicts: converged.conflicts,
+    steps,
+  };
+}
+
 export function taskProjectionHash(projection: TaskProjection): string {
   return sha256(
     stableStringify({

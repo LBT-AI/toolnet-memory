@@ -259,6 +259,17 @@ export const COMMANDS: CommandMetadata[] = [
     usage: 'toolnet-memory task:next <rootTaskId> --agent AGENT [--claim]',
     category: 'tasks',
   },
+  {
+    name: 'task:conflicts',
+    description: 'Show Task replication conflicts and deterministic merge explanation',
+    usage: 'toolnet-memory task:conflicts [--explain] [--task TASK_ID] [--limit N] [--json]',
+    category: 'tasks',
+    examples: [
+      'toolnet-memory task:conflicts',
+      'toolnet-memory task:conflicts --explain',
+      'toolnet-memory task:conflicts --explain --task TASK_ID',
+    ],
+  },
   // Work Continuity (Advanced)
   {
     name: 'work:status',

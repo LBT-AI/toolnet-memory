@@ -594,7 +594,14 @@ export async function executeTaskCli(argv: string[]): Promise<unknown> {
     return replication.sync();
   }
   if (command === 'conflicts') {
-    return replicationService(parsed).converged().conflicts;
+    const replication = replicationService(parsed);
+    if (booleanFlag(parsed, 'explain')) {
+      return replication.explainConflicts(
+        flag(parsed, 'task'),
+        optionalNumber(parsed, 'limit') ?? 100
+      );
+    }
+    return replication.converged().conflicts;
   }
   if (command === 'next') {
     const rootTaskId = positional(parsed, 0, 'rootTaskId');

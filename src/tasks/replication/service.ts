@@ -3,7 +3,7 @@ import type { ProjectManifest } from '../../core/types.js';
 import { readTaskOperations, taskOperationLogPath } from '../operation-log.js';
 import { taskRecords } from '../projection.js';
 import type { TaskProjection } from '../types.js';
-import { convergeTaskOperations, taskProjectionHash } from './core.js';
+import { convergeTaskOperations, explainTaskConvergence, taskProjectionHash } from './core.js';
 import { downloadTaskOperations } from './download.js';
 import { readAllReplicatedTaskOperations, readTaskReplicationCursor } from './store.js';
 import type {
@@ -143,6 +143,49 @@ export class TaskReplicationService {
       pulledBatches: pulled.pulledBatches,
       pulledOperations: pulled.pulledOperations,
       conflicts: pulled.conflicts,
+    };
+  }
+
+  /**
+   * Read-only replication diagnostics.
+   *
+   * Shows the canonical merge trace that produced conflicts.
+   * No Task operations or projections are mutated.
+   */
+  explainConflicts(taskId?: string, limit = 100) {
+    const authored = this.authoredOperations();
+    const replicated = readAllReplicatedTaskOperations(this.project);
+    const explanation = explainTaskConvergence(
+      this.project.id,
+      [...authored, ...replicated],
+      this.hostId
+    );
+    const selectedTaskId = taskId?.trim() || undefined;
+    const conflicts = selectedTaskId
+      ? explanation.conflicts.filter((conflict) => conflict.taskId === selectedTaskId)
+      : explanation.conflicts;
+    const conflictTaskIds = new Set(
+      conflicts
+        .map((conflict) => conflict.taskId)
+        .filter((value): value is string => Boolean(value))
+    );
+    const conflictOperationKeys = new Set(conflicts.flatMap((conflict) => conflict.operationKeys));
+    const relatedSteps = explanation.steps.filter((step) => {
+      if (selectedTaskId) {
+        return step.taskId === selectedTaskId;
+      }
+      if (conflictTaskIds.size > 0) {
+        return Boolean(step.taskId && conflictTaskIds.has(step.taskId));
+      }
+      return step.outcome === 'rejected' || conflictOperationKeys.has(step.operationKey);
+    });
+    const boundedLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
+    return {
+      ...explanation,
+      conflicts,
+      totalTraceSteps: explanation.steps.length,
+      shownTraceSteps: Math.min(relatedSteps.length, boundedLimit),
+      steps: relatedSteps.slice(0, boundedLimit),
     };
   }
 

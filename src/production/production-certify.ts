@@ -43,6 +43,7 @@ export const PRODUCTION_PACK_REQUIRED_FILES = [
   'package.json',
   'release-manifest.json',
   '.release-target',
+  'docs/architecture.md',
   'bin/toolnet-memory',
   'bundle/init.js',
   'bundle/auto-integrate.js',
