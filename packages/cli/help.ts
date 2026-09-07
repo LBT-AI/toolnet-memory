@@ -503,8 +503,16 @@ export const COMMANDS: CommandMetadata[] = [
   },
   {
     name: 'memory:review',
-    description: 'Review memory entries',
-    category: 'session',
+    description: 'Review Memory freshness, confidence and verification state',
+    usage:
+      'toolnet-memory memory:review [--fresh|--stale|--needs-verification] [--scope rule|decision|fact|observation|history] [--limit N] [--json]',
+    category: 'memory',
+    examples: [
+      'toolnet-memory memory:review',
+      'toolnet-memory memory:review --needs-verification',
+      'toolnet-memory memory:review --stale',
+      'toolnet-memory memory:review --scope rule',
+    ],
   },
   {
     name: 'memory:reconcile',

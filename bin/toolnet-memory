@@ -591,13 +591,7 @@ case "$COMMAND" in
 
   memory:review)
     shift
-
-    if [ -x "${TSX:-}" ]; then
-      exec "$TSX" "$ROOT/src/session/memory-review-cli.ts" "$@"
-    fi
-
-    echo "Memory review not available."
-    exit 1
+    run bundle/memory-review.js src/session/memory-review-cli.ts "$@"
     ;;
 
   guard:check)

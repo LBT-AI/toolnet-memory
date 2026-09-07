@@ -70,6 +70,7 @@ const entries = {
   'handoff-refresh': 'src/work-continuity/handoff-cli.ts',
   'memory-query': 'src/work-continuity/memory-query-cli.ts',
   'memory-agent': 'src/work-continuity/memory-agent-cli.ts',
+  'memory-review': 'src/session/memory-review-cli.ts',
   context: 'src/work-continuity/context-cli.ts',
   'context-runtime': 'src/work-continuity/context-runtime-cli.ts',
 

@@ -6,7 +6,6 @@ import {
   createStorageProvider,
   withStorageRetry,
   ProjectScopedStorageProvider,
-  MemoryStore,
   PersistentCodeGraphStore,
   PersistentVectorStore,
   PersistentCodeChunkStore,
@@ -14,6 +13,9 @@ import {
 } from '../storage/index.js';
 
 import { SnapshotManager } from '../snapshot/index.js';
+import { ConvergentMemoryStore } from '../multi-host/memory-projection.js';
+import { inspectMemoryQuality, type MemoryQualityReport } from '../memory/quality.js';
+import { inspectActiveTaskArtifactPaths, type ArtifactPathHealth } from './artifact-path-health.js';
 
 import { checkProductionConfig } from './config-check.js';
 
@@ -42,10 +44,10 @@ type DoctorResult = {
   codeChunks?: number;
   codeVectors?: number;
   snapshots?: number;
-
   capture?: SessionCaptureHealth;
   tasks?: ProductionTaskHealth;
-
+  memoryQuality?: MemoryQualityReport;
+  artifactPaths?: ArtifactPathHealth;
   config?: {
     ok: boolean;
     errors?: string[];
@@ -198,6 +200,41 @@ function printHuman(result: DoctorResult): void {
     if (result.tasks.error) console.log(`${branch} ${red('!')} ${result.tasks.error}`);
   }
 
+  if (result.memoryQuality) {
+    console.log(pipe);
+    console.log(`${cyan('◇')} ${white('Memory Quality')}`);
+    console.log(`${branch} ${dim('Long-term rules')} ${white(String(result.memoryQuality.rules))}`);
+    console.log(`${branch} ${dim('Fresh')}           ${white(String(result.memoryQuality.fresh))}`);
+    console.log(
+      `${branch} ${dim('Need verify')}     ${white(String(result.memoryQuality.needsVerification))}`
+    );
+    console.log(`${branch} ${dim('Stale')}           ${white(String(result.memoryQuality.stale))}`);
+    console.log(
+      `${branch} ${dim('High confidence')} ${white(String(result.memoryQuality.highConfidence))}`
+    );
+    console.log(
+      `${branch} ${dim('Verified')}        ${white(String(result.memoryQuality.verified))}`
+    );
+  }
+  if (result.artifactPaths) {
+    console.log(pipe);
+    console.log(`${cyan('◇')} ${white('Active Artifact Paths')}`);
+    const artifactState = result.artifactPaths.ok ? green('healthy') : red('attention');
+    console.log(`${branch} ${dim('Health')}          ${artifactState}`);
+    console.log(`${branch} ${dim('Tracked')}         ${white(String(result.artifactPaths.total))}`);
+    console.log(
+      `${branch} ${dim('Existing')}        ${white(String(result.artifactPaths.existing))}`
+    );
+    console.log(
+      `${branch} ${dim('Missing')}         ${white(String(result.artifactPaths.missing))}`
+    );
+    console.log(
+      `${branch} ${dim('Remote refs')}     ${white(String(result.artifactPaths.remote))}`
+    );
+    if (result.artifactPaths.error) {
+      console.log(`${branch} ${red('!')} ${result.artifactPaths.error}`);
+    }
+  }
   const errors = result.config?.errors ?? [];
 
   if (errors.length > 0) {
@@ -285,9 +322,9 @@ async function main(): Promise<void> {
   );
 
   const health = await new ProductionHealth(rawStorage).run();
-
-  const memories = await new MemoryStore(storage).load(project.id);
-
+  const memories = await new ConvergentMemoryStore(storage).load(project.id);
+  const memoryQuality = inspectMemoryQuality(memories);
+  const artifactPaths = inspectActiveTaskArtifactPaths(project);
   const graph = await new PersistentCodeGraphStore(storage).load(project.id);
 
   const vectors = await new PersistentVectorStore(storage).load(project.id);
@@ -314,8 +351,14 @@ async function main(): Promise<void> {
       ]
     : [];
 
+  const artifactWarnings =
+    artifactPaths.missing > 0
+      ? [`Active Tasks reference ${artifactPaths.missing} missing local artifact path(s)`]
+      : artifactPaths.error
+        ? [`Artifact path health: ${artifactPaths.error}`]
+        : [];
   const result: DoctorResult = {
-    ok: health.ok && capture.ok && taskHealth.ok,
+    ok: health.ok && capture.ok && taskHealth.ok && artifactPaths.ok,
     project: project.name,
     storage: health.storage,
     memory: memories.length,
@@ -327,7 +370,9 @@ async function main(): Promise<void> {
     snapshots: snapshots.length,
     capture,
     tasks: taskHealth,
-    warnings: [...configCheck.warnings, ...captureWarnings, ...taskWarnings],
+    memoryQuality,
+    artifactPaths,
+    warnings: [...configCheck.warnings, ...captureWarnings, ...taskWarnings, ...artifactWarnings],
   };
 
   output(result);

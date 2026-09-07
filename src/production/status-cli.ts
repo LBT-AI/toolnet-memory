@@ -14,6 +14,8 @@ import { inspectSessionCaptureHealth } from './session-capture-health.js';
 import { detectAgentIntegrations } from './integration-detection.js';
 import { inspectKiroIntegrationStatus } from '../session/kiro/status.js';
 import { TaskReplicationService } from '../tasks/replication/service.js';
+import { ConvergentMemoryStore } from '../multi-host/memory-projection.js';
+import { inspectMemoryQuality } from '../memory/quality.js';
 import {
   renderHeader,
   renderSectionTitle,
@@ -70,13 +72,13 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
       project.name,
       project.remote ?? project.name
     );
-
     let memoryStatus = 'unknown';
+    let memoryQuality: ReturnType<typeof inspectMemoryQuality> | null = null;
     let indexStatus = 'unknown';
-
     try {
-      const memoryExists = await storage.exists(`${project.id}/memory.json`);
-      memoryStatus = memoryExists ? 'ready' : 'not initialized';
+      const memories = await new ConvergentMemoryStore(storage).load(project.id);
+      memoryStatus = memories.length > 0 ? `ready (${memories.length})` : 'not initialized';
+      memoryQuality = inspectMemoryQuality(memories);
     } catch {
       memoryStatus = 'error';
     }
@@ -89,6 +91,16 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
     }
 
     console.log(renderKeyValue('Memory', memoryStatus, 8, uiOpts));
+    if (memoryQuality) {
+      console.log(
+        renderKeyValue(
+          'Quality',
+          `fresh ${memoryQuality.fresh} / verify ${memoryQuality.needsVerification} / stale ${memoryQuality.stale}`,
+          8,
+          uiOpts
+        )
+      );
+    }
     console.log(renderKeyValue('Index', indexStatus, 8, uiOpts));
 
     const replication = new TaskReplicationService(project, storage);
