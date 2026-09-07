@@ -568,3 +568,78 @@ The design favors:
 - explicit conflict visibility
 - rebuildable projections
 - bounded context
+
+---
+
+## 17. Intent-Aware Retrieval Router
+
+Starting with Phase 59, `toolnet-memory ask` does not query every
+continuity source for every question.
+
+The question is classified before retrieval:
+
+```text
+Question
+   │
+   ▼
+Intent Router
+   │
+   ├── current work ─────► Persistent Tasks
+   │
+   ├── artifact ─────────► Task Artifact Evidence
+   │
+   ├── rules ────────────► verified/fresh canonical Memory
+   │
+   ├── recent state ─────► fresh high-confidence Memory
+   │
+   ├── decisions ────────► Decision Memory
+   │
+   ├── code ─────────────► persisted Code Intelligence / SQLite FTS5
+   │
+   ├── history ──────────► deep canonical Memory
+   │
+   └── continuity ───────► compact legacy continuity fallback
+   │
+   ▼
+Minimal deterministic answer
+```
+
+Routing is local and deterministic. No LLM is required.
+
+Sources are lazy. A source is not read unless the route selects it or a
+higher-priority source returned no usable result.
+
+Examples:
+
+- "task hiện tại là gì?" -> Persistent Tasks
+- "deploy production chạy chưa?" -> Task Artifact Evidence
+- "quy tắc deploy là gì?" -> canonical Rule Memory
+- "vì sao chọn append-only operation log?" -> Decision Memory
+- "TaskStore được định nghĩa ở đâu?" -> persisted Code Intelligence
+- "trước đây đã làm gì với replication?" -> historical canonical Memory
+
+For code questions the router uses persisted code chunks and the existing
+SQLite FTS5/BM25 engine. It does not trigger a full repository re-index.
+
+For historical questions stale Memory is intentionally searchable because the
+user explicitly requested history. Stale history remains excluded from normal
+current-work startup context.
+
+Debug routing without creating another top-level command:
+
+```bash
+toolnet-memory ask --debug-route "deploy production đã verified chưa?"
+```
+
+Structured output:
+
+```bash
+toolnet-memory ask --json "TaskStore được định nghĩa ở đâu?"
+```
+
+The central invariant remains:
+
+- current execution truth -> Persistent Tasks
+- durable knowledge -> canonical Memory
+- code structure -> Code Intelligence
+- production evidence -> Task Artifact Evidence

@@ -2,7 +2,10 @@ import { z } from 'zod';
 
 import type { MCPContext } from '../context.js';
 
-import { answerRetrievedMemoryQuestion } from '../../work-continuity/memory-local-answer.js';
+import {
+  retrieveIntentAwareAnswer,
+  type IntentAwareCodeHit,
+} from '../../work-continuity/intent-aware-retrieval.js';
 
 import {
   answerMemoryConversationFollowUp,
@@ -85,7 +88,10 @@ function structuredLocalHandoff(
   };
 }
 
-export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: MemoryAgentAskInput) {
+export async function memoryAgentAsk(
+  ctx: Pick<MCPContext, 'project' | 'storage' | 'codeSemantic'>,
+  input: MemoryAgentAskInput
+) {
   const conversation = prepareMemoryConversation(ctx.project, input.question);
 
   /*
@@ -116,12 +122,27 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
     };
   }
 
-  const direct = answerRetrievedMemoryQuestion(ctx.project, conversation.originalQuestion);
+  const searchCode = ctx.codeSemantic
+    ? async (query: string, limit: number): Promise<IntentAwareCodeHit[]> =>
+        (await ctx.codeSemantic!.search(query, limit)).map((hit) => ({
+          filePath: hit.chunk.filePath,
+          ...(hit.chunk.symbolName ? { symbolName: hit.chunk.symbolName } : {}),
+          startLine: hit.chunk.startLine,
+          endLine: hit.chunk.endLine,
+          content: hit.chunk.content,
+          score: hit.score,
+        }))
+    : undefined;
+
+  const direct = await retrieveIntentAwareAnswer(ctx.project, conversation.originalQuestion, {
+    ...(ctx.storage ? { storage: ctx.storage } : {}),
+    ...(searchCode ? { searchCode } : {}),
+  });
 
   const structured = structuredLocalHandoff(
     ctx,
     conversation.originalQuestion,
-    String(direct.intent),
+    direct.route.intent,
     direct.answer,
     input.detail
   );
@@ -136,9 +157,13 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
 
       source: direct.source,
 
-      intent: direct.intent,
+      intent: direct.route.intent,
 
       routing: 'deterministic-handoff' as const,
+
+      retrievalRoute: direct.route,
+
+      attemptedSources: direct.attemptedSources,
     };
   }
 
@@ -151,6 +176,12 @@ export async function memoryAgentAsk(ctx: Pick<MCPContext, 'project'>, input: Me
 
     source: direct.source,
 
-    intent: direct.intent,
+    intent: direct.route.intent,
+
+    routing: 'intent-aware' as const,
+
+    retrievalRoute: direct.route,
+
+    attemptedSources: direct.attemptedSources,
   };
 }

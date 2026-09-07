@@ -63,8 +63,15 @@ export const COMMANDS: CommandMetadata[] = [
   // Memory
   {
     name: 'ask',
-    description: 'Ask project memory',
-    usage: 'toolnet-memory ask <question>',
+    description: 'Ask project state using intent-aware Tasks, Memory, Artifact or Code retrieval',
+    usage: 'toolnet-memory ask [--debug-route] [--json] "<question>"',
+    examples: [
+      'toolnet-memory ask "task hiện tại là gì?"',
+      'toolnet-memory ask "deploy production đã verified chưa?"',
+      'toolnet-memory ask "quy tắc production là gì?"',
+      'toolnet-memory ask "TaskStore được định nghĩa ở đâu?"',
+      'toolnet-memory ask --debug-route "vì sao chọn append-only operation log?"',
+    ],
     category: 'memory',
   },
   {
