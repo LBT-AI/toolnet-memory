@@ -17,6 +17,7 @@ import { TaskReplicationService } from '../tasks/replication/service.js';
 import { ConvergentMemoryStore } from '../multi-host/memory-projection.js';
 import { inspectMemoryQuality } from '../memory/quality.js';
 import { summarizeRetrievalTelemetry } from '../work-continuity/retrieval-telemetry.js';
+import { summarizeRetrievalFeedback } from '../work-continuity/retrieval-feedback.js';
 import {
   renderHeader,
   renderSectionTitle,
@@ -129,6 +130,15 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
         retrievalTelemetry.eventsInWindow > 0
           ? `errors ${retrievalTelemetry.errors} / conflicts ${retrievalTelemetry.conflictEvents} / budget ${retrievalTelemetry.sourceBudgetViolations}`
           : 'n/a',
+        8,
+        uiOpts
+      )
+    );
+    const retrievalFeedback = summarizeRetrievalFeedback(project);
+    console.log(
+      renderKeyValue(
+        'Routing feedback',
+        `${retrievalFeedback.feedbackEvents} events / ${retrievalFeedback.activeRules} active rules`,
         8,
         uiOpts
       )

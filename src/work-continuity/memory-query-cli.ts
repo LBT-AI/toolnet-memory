@@ -13,11 +13,18 @@ import {
 import { findProjectRoot } from './fast-context.js';
 import { explainRetrievalPlan, measureRetrievalExecution } from './retrieval-quality.js';
 import { recordRetrievalTelemetry, recordRetrievalTelemetryError } from './retrieval-telemetry.js';
+import {
+  applyAdaptiveRetrievalRoute,
+  loadAdaptiveRetrievalOverrides,
+  recordRetrievalFeedback,
+} from './retrieval-feedback.js';
+import { isRetrievalIntent, type IntentAwareRetrievalIntent } from './intent-aware-retrieval.js';
 
 interface CliInput {
   question: string;
   json: boolean;
   debugRoute: boolean;
+  feedbackIntent?: IntentAwareRetrievalIntent;
 }
 
 function parseArgs(): CliInput {
@@ -25,7 +32,9 @@ function parseArgs(): CliInput {
   const question: string[] = [];
   let json = false;
   let debugRoute = false;
-  for (const arg of args) {
+  let feedbackIntent: IntentAwareRetrievalIntent | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]!;
     if (arg === '--json') {
       json = true;
       continue;
@@ -34,12 +43,21 @@ function parseArgs(): CliInput {
       debugRoute = true;
       continue;
     }
+    if (arg === '--feedback-intent') {
+      const value = args[++index];
+      if (!value || !isRetrievalIntent(value)) {
+        throw new Error('INVALID_RETRIEVAL_FEEDBACK_INTENT');
+      }
+      feedbackIntent = value;
+      continue;
+    }
     question.push(arg);
   }
   return {
     question: question.join(' ').trim(),
     json,
     debugRoute,
+    ...(feedbackIntent ? { feedbackIntent } : {}),
   };
 }
 
@@ -68,7 +86,9 @@ function projectStorage(project: ReturnType<ProjectManager['detect']>): StorageP
 async function main(): Promise<void> {
   const input = parseArgs();
   if (!input.question) {
-    console.error('Usage: toolnet-memory ask [--debug-route] [--json] "<question>"');
+    console.error(
+      'Usage: toolnet-memory ask [--debug-route] [--json] [--feedback-intent INTENT] "<question>"'
+    );
     process.exitCode = 1;
     return;
   }
@@ -87,7 +107,16 @@ async function main(): Promise<void> {
    * A local Task + Artifact composite query still performs
    * ZERO remote Memory / Code storage initialization.
    */
-  const plan = planCompositeRetrieval(input.question);
+  /*
+   * Baseline remains Phase 59/60 without adaptive feedback.
+   *
+   * This is what explicit feedback evaluates.
+   */
+  const baselinePlan = planCompositeRetrieval(input.question);
+  const adaptive = loadAdaptiveRetrievalOverrides(project);
+  const plan = planCompositeRetrieval(input.question, {
+    routeOverride: (route) => applyAdaptiveRetrievalRoute(route, adaptive),
+  });
   const storage = compositePlanNeedsStorage(plan) ? projectStorage(project) : undefined;
   const telemetryStarted = process.hrtime.bigint();
   let result;
@@ -111,6 +140,9 @@ async function main(): Promise<void> {
     surface: 'cli',
     durationMs,
   });
+  const feedback = input.feedbackIntent
+    ? recordRetrievalFeedback(project, baselinePlan, input.feedbackIntent, 'cli')
+    : undefined;
   if (input.debugRoute) {
     const execution = measureRetrievalExecution(result);
     const conflicts = result.conflicts.map((conflict) => conflict.code).join(',') || 'none';
@@ -125,15 +157,40 @@ async function main(): Promise<void> {
         `estimated_tokens=${execution.estimatedTokens}`,
         `provenance_coverage=${execution.provenanceCoverage.toFixed(2)}`,
         `conflicts=${conflicts}`,
+        `adaptive_rules=${adaptive.rules.length}`,
+        `feedback=${feedback ? feedback.status : 'none'}`,
+        ...(feedback?.refresh
+          ? [
+              `feedback_refresh=${feedback.refresh.status}`,
+              `feedback_active_rules=${feedback.refresh.activeRules}`,
+              `feedback_benchmark=${feedback.refresh.benchmarkPassed ? 'PASS' : 'FAIL'}`,
+            ]
+          : []),
         '',
       ].join('\n')
     );
   }
   if (input.json) {
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    process.stdout.write(
+      `${JSON.stringify(feedback ? { ...result, feedback } : result, null, 2)}\n`
+    );
     return;
   }
   process.stdout.write(`${result.answer}\n`);
+  if (feedback) {
+    process.stderr.write(
+      [
+        '',
+        '[ToolNet Retrieval Feedback]',
+        `status=${feedback.status}`,
+        `predicted=${feedback.predictedIntent ?? 'n/a'}`,
+        `expected=${feedback.expectedIntent ?? input.feedbackIntent ?? 'n/a'}`,
+        `promotion=${feedback.refresh?.status ?? 'n/a'}`,
+        `benchmark=${feedback.refresh ? (feedback.refresh.benchmarkPassed ? 'PASS' : 'FAIL') : 'n/a'}`,
+        '',
+      ].join('\n')
+    );
+  }
 }
 
 main().catch((error) => {

@@ -13,6 +13,10 @@ import {
 
 export type CompositeRetrievalMode = 'single' | 'composite';
 
+export type RetrievalRouteOverride = (
+  route: IntentAwareRetrievalRoute
+) => IntentAwareRetrievalRoute;
+
 export type CompositeRetrievalConflictCode = 'MEMORY_TASK_STATE_CONFLICT';
 
 export interface CompositeRetrievalStep {
@@ -175,17 +179,21 @@ function splitQuestion(question: string): string[] {
  *
  * alone may otherwise look too generic.
  */
-function routeClause(clause: string): IntentAwareRetrievalRoute {
-  const route = routeRetrievalIntent(clause);
+function routeClause(
+  clause: string,
+  routeOverride?: RetrievalRouteOverride
+): IntentAwareRetrievalRoute {
+  let route = routeRetrievalIntent(clause);
   if (route.intent !== 'summary') {
-    return route;
+    return routeOverride ? routeOverride(route) : route;
   }
   const q = normalize(clause);
   if (/(?:file (?:nào )?đang (?:sửa|đụng)|current file|files? touched)/u.test(q)) {
-    return routeForRetrievalIntent('current_work', {
+    route = routeForRetrievalIntent('current_work', {
       confidence: 0.94,
       reasons: ['composite-current-file'],
     });
+    return routeOverride ? routeOverride(route) : route;
   }
   if (
     /(?:artifact|backup|report|deploy|deployment|crawler|screenshot)/u.test(q) &&
@@ -193,21 +201,23 @@ function routeClause(clause: string): IntentAwareRetrievalRoute {
       q
     )
   ) {
-    return routeForRetrievalIntent('artifact', {
+    route = routeForRetrievalIntent('artifact', {
       confidence: 0.95,
       reasons: ['composite-artifact-state'],
     });
+    return routeOverride ? routeOverride(route) : route;
   }
   if (
     /(?:class|function|hàm|symbol|module)/u.test(q) &&
     /(?:ở đâu|where|defined|định nghĩa|caller|callers)/u.test(q)
   ) {
-    return routeForRetrievalIntent('code', {
+    route = routeForRetrievalIntent('code', {
       confidence: 0.95,
       reasons: ['composite-code-location'],
     });
+    return routeOverride ? routeOverride(route) : route;
   }
-  return route;
+  return routeOverride ? routeOverride(route) : route;
 }
 
 function sourceAuthority(source: IntentAwareRetrievalSource): number {
@@ -232,14 +242,18 @@ export function planCompositeRetrieval(
   question: string,
   options: {
     maxSources?: number;
+    routeOverride?: RetrievalRouteOverride;
   } = {}
 ): CompositeRetrievalPlan {
   const normalizedQuestion = question.trim();
-  const fullRoute = routeRetrievalIntent(normalizedQuestion);
+  const baselineFullRoute = routeRetrievalIntent(normalizedQuestion);
+  const fullRoute = options.routeOverride
+    ? options.routeOverride(baselineFullRoute)
+    : baselineFullRoute;
   const maxSources = Math.max(1, Math.min(3, Math.trunc(options.maxSources ?? 3)));
   const clauses = splitQuestion(normalizedQuestion);
   const rawCandidates: IntentCandidate[] = clauses.map((clause, index) => {
-    const route = routeClause(clause);
+    const route = routeClause(clause, options.routeOverride);
     return {
       intent: route.intent,
       question: clause,

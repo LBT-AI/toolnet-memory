@@ -19,6 +19,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { certifyMemoryQualityGA } from './memory-quality-ga-certify.js';
 import { certifyRetrievalProduction } from './retrieval-production-certify.js';
+import { certifyAdaptiveRetrieval } from './retrieval-adaptive-certify.js';
 
 export interface ProductionReadinessCheck {
   id: string;
@@ -683,6 +684,15 @@ export async function certifyProductionReadiness(
       'packaged retrieval telemetry is local and privacy-safe',
       retrieval.live.telemetryPassed,
       retrieval.live.telemetryDetail
+    )
+  );
+  const adaptive = certifyAdaptiveRetrieval();
+  checks.push(
+    check(
+      'phase64-adaptive-retrieval',
+      'feedback-driven adaptive routing is benchmark-gated and privacy-safe',
+      adaptive.passed,
+      adaptive.detail
     )
   );
 

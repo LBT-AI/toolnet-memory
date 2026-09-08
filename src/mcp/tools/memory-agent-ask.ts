@@ -6,11 +6,20 @@ import {
   planCompositeRetrieval,
   retrieveCompositeAnswer,
 } from '../../work-continuity/composite-retrieval.js';
-import type { IntentAwareCodeHit } from '../../work-continuity/intent-aware-retrieval.js';
+import {
+  RETRIEVAL_INTENTS,
+  type IntentAwareCodeHit,
+  type IntentAwareRetrievalIntent,
+} from '../../work-continuity/intent-aware-retrieval.js';
 import {
   recordRetrievalTelemetry,
   recordRetrievalTelemetryError,
 } from '../../work-continuity/retrieval-telemetry.js';
+import {
+  applyAdaptiveRetrievalRoute,
+  loadAdaptiveRetrievalOverrides,
+  recordRetrievalFeedback,
+} from '../../work-continuity/retrieval-feedback.js';
 
 import {
   answerMemoryConversationFollowUp,
@@ -45,6 +54,12 @@ export const memoryAgentAskSchema = {
     .describe(
       'Handoff detail level. compact=minimal, normal=standard, benchmark=deep evidence/files/tests for agent takeover.'
     ),
+  feedbackIntent: z
+    .enum(RETRIEVAL_INTENTS)
+    .optional()
+    .describe(
+      'Explicit correction for a single-intent retrieval. Feedback is stored locally as structural routing metadata only; question text is not persisted.'
+    ),
 };
 
 export interface MemoryAgentAskInput {
@@ -53,6 +68,7 @@ export interface MemoryAgentAskInput {
   mode?: 'local';
 
   detail?: StructuredHandoffDetail;
+  feedbackIntent?: IntentAwareRetrievalIntent;
 }
 
 function structuredLocalHandoff(
@@ -139,7 +155,11 @@ export async function memoryAgentAsk(
         }))
     : undefined;
 
-  const plan = planCompositeRetrieval(conversation.originalQuestion);
+  const baselinePlan = planCompositeRetrieval(conversation.originalQuestion);
+  const adaptive = loadAdaptiveRetrievalOverrides(ctx.project);
+  const plan = planCompositeRetrieval(conversation.originalQuestion, {
+    routeOverride: (route) => applyAdaptiveRetrievalRoute(route, adaptive),
+  });
   const telemetryStarted = process.hrtime.bigint();
   let direct;
   try {
@@ -162,6 +182,9 @@ export async function memoryAgentAsk(
     surface: 'mcp',
     durationMs,
   });
+  const retrievalFeedback = input.feedbackIntent
+    ? recordRetrievalFeedback(ctx.project, baselinePlan, input.feedbackIntent, 'mcp')
+    : undefined;
 
   const structured = structuredLocalHandoff(
     ctx,
@@ -194,6 +217,10 @@ export async function memoryAgentAsk(
       retrievalConflicts: direct.conflicts,
 
       attemptedSources: direct.attemptedSources,
+
+      adaptiveRules: adaptive.rules.length,
+
+      ...(retrievalFeedback ? { retrievalFeedback } : {}),
     };
   }
 

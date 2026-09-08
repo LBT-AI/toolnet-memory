@@ -11,16 +11,23 @@ import { buildCurrentWorkProjection } from './current-work-projection.js';
 import { renderCompactCurrentWork } from './context-noise-filter.js';
 import { answerRetrievedMemoryQuestion } from './memory-local-answer.js';
 
-export type IntentAwareRetrievalIntent =
-  | 'current_work'
-  | 'rules'
-  | 'recent_state'
-  | 'decision'
-  | 'code'
-  | 'artifact'
-  | 'history'
-  | 'continuity'
-  | 'summary';
+export const RETRIEVAL_INTENTS = [
+  'current_work',
+  'rules',
+  'recent_state',
+  'decision',
+  'code',
+  'artifact',
+  'history',
+  'continuity',
+  'summary',
+] as const;
+
+export type IntentAwareRetrievalIntent = (typeof RETRIEVAL_INTENTS)[number];
+
+export function isRetrievalIntent(value: string): value is IntentAwareRetrievalIntent {
+  return (RETRIEVAL_INTENTS as readonly string[]).includes(value);
+}
 
 export type IntentAwareRetrievalSource =
   | 'persistent-tasks'

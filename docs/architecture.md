@@ -1104,3 +1104,193 @@ retrieval success
     must never depend on
 telemetry success
 ```
+
+---
+
+## 22. Feedback and Guarded Adaptive Routing
+
+Phase 64 adds explicit feedback without turning retrieval into a nondeterministic
+self-learning system.
+
+```text
+Baseline Phase 59 route
+        │
+        ▼
+Explicit correction
+        │
+        ▼
+Structural route signature
+        │
+        ▼
+Local feedback votes
+        │
+        ▼
+minimum support = 3
+minimum agreement = 80%
+        │
+        ▼
+Candidate override
+        │
+        ▼
+Phase 62 65-case benchmark
+        │
+   ┌────┴────┐
+   ▼         ▼
+ PASS       FAIL
+   │         │
+activate    reject
+locally     candidate
+
+Feedback privacy
+
+Feedback does not persist the user question.
+
+It also does not persist a question hash.
+
+The persisted signature is built only from deterministic classifier structure:
+
+predicted intent
++
+static route reason codes
+
+Example:
+
+recent_state|recent-explicit+recent-fact
+
+It is not:
+
+SHA256(question)
+
+and it contains no raw query text.
+
+Feedback files:
+
+.toolnet/retrieval/feedback.jsonl
+.toolnet/retrieval/overrides.json
+
+Both are local project state and are not uploaded through canonical Memory or
+Task replication.
+
+Promotion guard
+
+One correction is not enough to modify routing.
+
+Default promotion requirements:
+
+support >= 3
+agreement >= 0.80
+Phase 62 benchmark = 65/65 PASS
+intent F1 = 1.0
+source F1 = 1.0
+extra reads = 0
+missing reads = 0
+budget violations = 0
+
+If an adaptive rule would break one fixed benchmark case, the complete new
+candidate override set is rejected.
+
+Previously approved rules remain active.
+
+Runtime path
+
+question
+   │
+   ├── baseline planner
+   │       └── used for feedback evaluation
+   │
+   ▼
+load local approved overrides
+   │
+   ▼
+Phase 59 route
+   │
+   ▼
+exact structural signature match
+   │
+   ├── no rule ──► original deterministic route
+   │
+   └── approved rule
+             │
+             ▼
+       corrected intent
+             │
+             ▼
+       Phase 60 planner
+
+Adaptive matching is exact on structural route signatures.
+
+It does not use embeddings, fuzzy query matching, user-text fingerprinting, or
+an LLM.
+
+Explicit feedback
+
+Existing CLI:
+
+toolnet-memory ask \
+  --feedback-intent artifact \
+  "QUESTION"
+
+The answer is still produced normally.
+
+The feedback applies to the baseline single-intent route and affects subsequent
+queries only after promotion requirements pass.
+
+For MCP, memory_agent_ask accepts:
+
+feedbackIntent
+
+with the same intent values used by the deterministic router.
+
+Composite questions are intentionally not corrected through one
+feedbackIntent, because a multi-intent plan cannot be safely represented by a
+single expected intent.
+
+Administration
+
+Local feedback summary:
+
+npm run retrieval:feedback
+
+Force candidate recompilation:
+
+npm run retrieval:feedback -- --refresh
+
+JSON:
+
+npm run retrieval:feedback -- --json
+
+The existing toolnet-memory status command reports the number of local
+feedback events and active adaptive rules.
+
+Authority
+
+Adaptive feedback may change retrieval routing.
+
+It may not change:
+
+Persistent Task state
+Artifact state
+Memory contents
+Task authority ordering
+replication rules
+source authority ordering
+
+Feedback decides where to look.
+
+It does not decide what is true.
+
+Production certification
+
+Phase 64 production certification proves:
+
+safe structural rule -> promoted
+approved rule         -> applied
+benchmark-breaking rule -> rejected
+previous safe rule    -> preserved
+question text         -> absent
+query hash            -> absent
+
+The release-blocking check is:
+
+phase64-adaptive-retrieval
+```
