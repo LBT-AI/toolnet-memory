@@ -18,6 +18,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 
 import { fileURLToPath } from 'node:url';
 import { certifyMemoryQualityGA } from './memory-quality-ga-certify.js';
+import { certifyRetrievalProduction } from './retrieval-production-certify.js';
 
 export interface ProductionReadinessCheck {
   id: string;
@@ -67,6 +68,7 @@ export const PRODUCTION_PACK_REQUIRED_FILES = [
   'bundle/integration-status.js',
   'bundle/background-refresh.js',
   'bundle/memory-review.js',
+  'bundle/memory-query.js',
   'bundle/mcp.js',
   'bundle/continuity-certify.js',
   'bundle/recovery-certify.js',
@@ -96,6 +98,7 @@ const PRODUCTION_BUNDLE_REQUIRED_FILES = [
   'integration-status.js',
   'background-refresh.js',
   'memory-review.js',
+  'memory-query.js',
   'mcp.js',
   'continuity-certify.js',
   'recovery-certify.js',
@@ -641,6 +644,37 @@ export async function certifyProductionReadiness(
             .filter((item) => !item.passed)
             .map((item) => `${item.id}: ${item.detail ?? 'failed'}`)
             .join('\n')
+    )
+  );
+
+  /*
+   * Phase 62 retrieval quality is now a production/release gate.
+   *
+   * This runs:
+   *   1. hardened deterministic benchmark
+   *   2. actual packaged ask CLI through bundle/memory-query.js
+   */
+  const retrieval = certifyRetrievalProduction(packageRoot);
+  checks.push(
+    check(
+      'phase62-retrieval-quality',
+      'Phase 62 retrieval benchmark passes production thresholds',
+      retrieval.gate.passed,
+      retrieval.gate.passed
+        ? undefined
+        : [
+            `benchmark=${retrieval.benchmark.benchmarkVersion}`,
+            `passed=${retrieval.benchmark.passedCases}/${retrieval.benchmark.totalCases}`,
+            ...retrieval.gate.failures,
+          ].join('\n')
+    )
+  );
+  checks.push(
+    check(
+      'phase62-packaged-ask',
+      'packaged ask CLI routes through production retrieval bundle',
+      retrieval.live.passed,
+      retrieval.live.detail
     )
   );
 

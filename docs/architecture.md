@@ -858,3 +858,100 @@ The benchmark is external ground truth. It must not be generated dynamically
 from router implementation rules, otherwise routing regressions could make both
 the implementation and its expected answers wrong at the same time.
 ```
+
+---
+
+## 20. Retrieval Production Certification
+
+Phase 62 moves retrieval quality from a development benchmark into the
+production release contract.
+The Phase 61 benchmark remains unchanged as historical ground truth.
+Phase 62 adds an adversarial layer:
+
+```text
+Phase 61 fixed benchmark
+        29 cases
+           │
+           ▼
+Phase 62 adversarial cases
+        36 cases
+           │
+           ▼
+      65 total cases
+
+Adversarial categories include:
+
+paraphrase
+negation
+ambiguous wording
+short questions
+punctuation changes
+connector changes
+same-source composite queries
+three-source queries
+four-intent source-budget pressure
+
+A release must satisfy:
+
+exact case accuracy = 1.0
+mode accuracy       = 1.0
+intent F1           = 1.0
+source F1           = 1.0
+unnecessary reads   = 0
+missing reads       = 0
+budget violations   = 0
+
+The production certification path is now:
+
+production:certify
+      │
+      ├── package/runtime checks
+      ├── cross-agent continuity
+      ├── crash recovery
+      ├── Memory Quality GA
+      │
+      ├── Phase 62 retrieval benchmark
+      │       │
+      │       └── 65 fixed deterministic cases
+      │
+      └── Packaged ask smoke
+              │
+              ▼
+      bin/toolnet-memory
+              │
+              ▼
+      bundle/memory-query.js
+              │
+              ▼
+      Phase 60 Composite Planner
+              │
+              ▼
+      Phase 59 Intent Router
+
+The packaged CLI smoke test deliberately creates a temporary production package
+without src/.
+
+It verifies both:
+
+single:
+  "task hiện tại là gì?"
+  -> persistent-tasks
+composite:
+  "task hiện tại là gì và deploy production verified chưa?"
+  -> persistent-tasks
+  -> task-artifacts
+
+The smoke questions only require local Task/Artifact routing. This proves that
+local retrieval does not accidentally initialize remote Memory storage.
+
+bundle/memory-query.js is now part of the required npm production package
+contract.
+
+Retrieval regressions therefore block production:certify, which in turn blocks
+release publication.
+
+No public benchmark command is added. Development evaluation remains:
+
+npm run retrieval:eval
+npm run retrieval:eval -- --strict
+```

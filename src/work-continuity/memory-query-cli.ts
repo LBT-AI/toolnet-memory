@@ -93,11 +93,6 @@ async function main(): Promise<void> {
     ...(storage ? { storage } : {}),
     agentId: process.env.TOOLNET_AGENT_ID ?? 'opencode',
   });
-  if (input.json) {
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    return;
-  }
-  process.stdout.write(`${result.answer}\n`);
   if (input.debugRoute) {
     const execution = measureRetrievalExecution(result);
     const conflicts = result.conflicts.map((conflict) => conflict.code).join(',') || 'none';
@@ -116,6 +111,11 @@ async function main(): Promise<void> {
       ].join('\n')
     );
   }
+  if (input.json) {
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    return;
+  }
+  process.stdout.write(`${result.answer}\n`);
 }
 
 main().catch((error) => {

@@ -123,6 +123,26 @@ export const PHASE61_STRICT_THRESHOLDS: RetrievalQualityThresholds = {
   maxSourceBudgetViolations: 0,
 };
 
+export const PHASE62_PRODUCTION_THRESHOLDS: RetrievalQualityThresholds = {
+  /*
+   * Phase 62 benchmark is release-blocking.
+   *
+   * Every fixed benchmark case must remain correct.
+   */
+  exactCaseAccuracy: 1,
+  modeAccuracy: 1,
+  intentF1: 1,
+  sourceF1: 1,
+  sourceExactAccuracy: 1,
+  maxUnnecessarySourceReads: 0,
+  maxMissingSourceReads: 0,
+  maxSourceBudgetViolations: 0,
+};
+
+export interface RetrievalQualityEvaluationOptions {
+  benchmarkVersion?: string;
+}
+
 function uniqueSorted<T extends string>(values: T[]): T[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
@@ -194,7 +214,8 @@ function countsForSets<T extends string>(
  */
 export function evaluateRetrievalPlanner(
   cases: RetrievalQualityBenchmarkCase[] = RETRIEVAL_QUALITY_BENCHMARK,
-  planner: RetrievalPlanner = planCompositeRetrieval
+  planner: RetrievalPlanner = planCompositeRetrieval,
+  options: RetrievalQualityEvaluationOptions = {}
 ): RetrievalQualityReport {
   let modeCorrect = 0;
   let intentExact = 0;
@@ -288,7 +309,7 @@ export function evaluateRetrievalPlanner(
   const total = cases.length;
   const passedCases = results.filter((result) => result.passed).length;
   return {
-    benchmarkVersion: RETRIEVAL_QUALITY_BENCHMARK_VERSION,
+    benchmarkVersion: options.benchmarkVersion ?? RETRIEVAL_QUALITY_BENCHMARK_VERSION,
     totalCases: total,
     passedCases,
     failedCases: total - passedCases,

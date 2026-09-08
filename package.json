@@ -198,7 +198,8 @@
     "phase59:certify": "vitest run tests/work-continuity/phase59-intent-aware-retrieval.test.ts tests/production/phase59-intent-router-wiring.test.ts",
     "phase60:certify": "vitest run tests/work-continuity/phase60-composite-retrieval.test.ts tests/production/phase60-composite-retrieval-wiring.test.ts tests/production/phase59-intent-router-wiring.test.ts",
     "retrieval:eval": "tsx src/production/retrieval-quality-eval-cli.ts",
-    "phase61:certify": "vitest run tests/work-continuity/phase61-retrieval-quality.test.ts tests/production/phase61-retrieval-quality-wiring.test.ts tests/production/phase60-composite-retrieval-wiring.test.ts tests/production/phase59-intent-router-wiring.test.ts"
+    "phase61:certify": "vitest run tests/work-continuity/phase61-retrieval-quality.test.ts tests/production/phase61-retrieval-quality-wiring.test.ts tests/production/phase60-composite-retrieval-wiring.test.ts tests/production/phase59-intent-router-wiring.test.ts",
+    "phase62:certify": "npm run retrieval:eval -- --strict && vitest run tests/work-continuity/phase62-retrieval-hardening.test.ts tests/production/phase62-retrieval-production.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

@@ -259,7 +259,7 @@ export function routeRetrievalIntent(question: string): IntentAwareRetrievalRout
   addSignal(
     code,
     q,
-    /(?:where is|defined where|nằm ở file nào|file nào định nghĩa)/u,
+    /(?:where is|defined where|nằm (?:ở )?file nào|file nào định nghĩa|which file (?:implements?|contains?|defines?)|where .* (?:defined|implemented))/u,
     5,
     'code-location'
   );
@@ -268,7 +268,7 @@ export function routeRetrievalIntent(question: string): IntentAwareRetrievalRout
   addSignal(
     decision,
     q,
-    /(?:quyết định|đã chốt|decision|rationale|reason for|why did|tại sao chọn|vì sao chọn)/u,
+    /(?:quyết định|đã chốt|decision|rationale|reason for|reason behind|why did|tại sao chọn|vì sao chọn|lý do chọn)/u,
     9,
     'decision-explicit'
   );
@@ -278,7 +278,7 @@ export function routeRetrievalIntent(question: string): IntentAwareRetrievalRout
   addSignal(
     rules,
     q,
-    /(?:quy tắc|rule|rules|convention|coding standard|policy|project rule|nguyên tắc)/u,
+    /(?:quy tắc|rule|rules|convention|coding standard|policy|project rule|nguyên tắc|project constraints?|mandatory constraints?|mandatory rules?|required guidelines?|guidelines? bắt buộc|constraint bắt buộc|các constraint bắt buộc)/u,
     9,
     'rule-explicit'
   );
@@ -288,7 +288,7 @@ export function routeRetrievalIntent(question: string): IntentAwareRetrievalRout
   addSignal(
     history,
     q,
-    /(?:lịch sử|history|trước đây|hồi trước|old history|historical|đã từng|previous work)/u,
+    /(?:lịch sử|history|trước đây|trước kia|hồi trước|old history|historical|đã từng|previous work|earlier work|worked on before|what did we do before|what was done before)/u,
     9,
     'history-explicit'
   );
@@ -304,7 +304,7 @@ export function routeRetrievalIntent(question: string): IntentAwareRetrievalRout
   addSignal(
     continuity,
     q,
-    /(?:agent trước|previous agent|session trước|previous session|handoff|bàn giao|tiếp quản)/u,
+    /(?:agent trước|previous agent|last agent|session trước|previous session|last session|handoff|handover|bàn giao|tiếp quản|session vừa rồi)/u,
     10,
     'continuity-explicit'
   );
@@ -313,14 +313,14 @@ export function routeRetrievalIntent(question: string): IntentAwareRetrievalRout
   addSignal(
     current,
     q,
-    /(?:task hiện tại|current task|đang làm gì|đang làm task|todo còn lại|việc còn lại|chưa làm|chưa xong)/u,
+    /(?:task hiện tại|current task|active task|đang làm gì|đang làm task|việc đang làm|đang xử lý gì|what are we working on|what am i working on|todo còn lại|việc còn lại|chưa làm|chưa xong)/u,
     9,
     'current-task'
   );
   addSignal(
     current,
     q,
-    /(?:next action|next step|tiếp theo|làm gì tiếp|blocker|đang vướng|đang kẹt)/u,
+    /(?:next action|next step|tiếp theo|làm gì tiếp|what should i do next|what do i do next|blocker|đang vướng|đang kẹt|còn vướng|kẹt gì)/u,
     8,
     'current-action'
   );
@@ -343,7 +343,7 @@ export function routeRetrievalIntent(question: string): IntentAwareRetrievalRout
   addSignal(
     recent,
     q,
-    /(?:production hiện tại|hiện đang dùng|current production|current config)/u,
+    /(?:production hiện tại|production hiện giờ|hiện đang dùng|hiện giờ.*(?:production|config)|current production|current config|currently using|using now)/u,
     6,
     'recent-fact'
   );
@@ -367,6 +367,22 @@ export function routeRetrievalIntent(question: string): IntentAwareRetrievalRout
     /(?:chạy chưa|xong chưa|verify|verified|executed|status|trạng thái)/u.test(q)
   ) {
     artifact.score += 8;
+  }
+
+  /*
+   * Phase 62 adversarial negation handling.
+   *
+   * A user explicitly rejecting a retrieval source/intent must
+   * not accidentally boost that intent merely because its name
+   * appears in the question.
+   */
+  if (
+    /(?:không cần|đừng lấy|không hỏi|không muốn|don't need|do not need|don't use|do not use|not asking for|not asking about).{0,40}(?:lịch sử|history)/u.test(
+      q
+    )
+  ) {
+    history.score = Math.max(0, history.score - 20);
+    history.reasons.push('history-explicitly-negated');
   }
 
   const tieOrder: IntentAwareRetrievalIntent[] = [

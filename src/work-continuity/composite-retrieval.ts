@@ -152,7 +152,9 @@ function uniqueSources(values: IntentAwareRetrievalSource[]): IntentAwareRetriev
 
 function splitQuestion(question: string): string[] {
   const parts = question
-    .split(/(?:[,;\n]+|\?+\s+|\s+(?:và|and|plus|đồng thời|cùng với|as well as)\s+)/giu)
+    .split(
+      /(?:[,;\n]+|\?+\s+|\s+(?:và|and|plus|also|ngoài ra|đồng thời|cùng với|as well as)\s+|\s+&\s+)/giu
+    )
     .map((part) => part.trim())
     .filter((part) => part.length >= 3);
   if (parts.length === 0) {

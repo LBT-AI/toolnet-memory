@@ -7,6 +7,10 @@ import {
   PHASE61_STRICT_THRESHOLDS,
   renderRetrievalQualityReport,
 } from '../work-continuity/retrieval-quality.js';
+import {
+  RETRIEVAL_QUALITY_PHASE62_BENCHMARK,
+  RETRIEVAL_QUALITY_PHASE62_BENCHMARK_VERSION,
+} from '../work-continuity/retrieval-quality-adversarial.js';
 
 interface EvalCliInput {
   strict: boolean;
@@ -42,7 +46,9 @@ function parseArgs(): EvalCliInput {
 
 function main(): void {
   const input = parseArgs();
-  const report = evaluateRetrievalPlanner();
+  const report = evaluateRetrievalPlanner(RETRIEVAL_QUALITY_PHASE62_BENCHMARK, undefined, {
+    benchmarkVersion: RETRIEVAL_QUALITY_PHASE62_BENCHMARK_VERSION,
+  });
   const gate = evaluateRetrievalQualityGate(
     report,
     input.strict ? PHASE61_STRICT_THRESHOLDS : PHASE61_DEFAULT_THRESHOLDS
