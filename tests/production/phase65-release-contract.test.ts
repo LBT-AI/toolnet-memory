@@ -3,19 +3,18 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 describe('Phase 65 release contract', () => {
-  it('keeps every release version source at 0.5.2', () => {
+  it('keeps every release version source synchronized', () => {
     const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
     const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
     const manifest = JSON.parse(readFileSync('release-manifest.json', 'utf8'));
     const target = readFileSync('.release-target', 'utf8').trim();
     const readme = readFileSync('README.md', 'utf8');
-    expect(pkg.version).toBe('0.5.2');
-    expect(lock.version).toBe('0.5.2');
-    expect(lock.packages?.['']?.version).toBe('0.5.2');
-    expect(manifest.version).toBe('0.5.2');
+    expect(pkg.version).toBe(target);
+    expect(lock.version).toBe(target);
+    expect(lock.packages?.['']?.version).toBe(target);
+    expect(manifest.version).toBe(target);
     expect(manifest.releaseSeries).toBe('0.5.x');
-    expect(target).toBe('0.5.2');
-    expect(readme).toContain('Current release: **v0.5.2**');
+    expect(readme).toContain(`Current release: **v${target}**`);
     expect(readme).toContain('### v0.5.2 Retrieval GA');
   });
 
