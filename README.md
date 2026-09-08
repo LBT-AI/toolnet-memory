@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.5.2**
+Current release: **v0.5.3**
 
 </div>
 
@@ -125,6 +125,16 @@ v0.5.2 completes the intent-aware retrieval roadmap and promotes the retrieval r
 - CLI and MCP use the same planner, authority rules, feedback layer, and telemetry model.
 - Retrieval remains local and deterministic with no LLM or embedding requirement.
 - Production certification is release-blocking and executes before npm publication.
+
+### v0.5.3 Disaster Recovery
+
+- Adds Phase 67 backup, restore, and disaster-recovery certification.
+- Backs up authoritative Task operations, per-source Session WALs, retrieval advisory state, and the complete remote project namespace.
+- Adds SHA-256 integrity verification for every backup object plus the recovery manifest.
+- Restore is dry-run by default and always creates a pre-restore safety backup before apply.
+- Rebuilds Task projection and shared Session journal from authoritative logs.
+- Remote restore is additive and never deletes newer immutable operations.
+- Production certification now includes the Phase 67 disaster-recovery gate.
 
 ## Supported Coding Agents
 

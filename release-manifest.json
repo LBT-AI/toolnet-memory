@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "releaseSeries": "0.5.x",
   "runtime": {
     "node": ">=22",
@@ -391,6 +391,20 @@
       "adaptiveCertification": true,
       "productionReleaseBlocking": true,
       "npmPackageRuntimeVerified": true
+    },
+    "disasterRecovery": {
+      "phase67": true,
+      "authoritativeLocalBackup": true,
+      "remoteNamespaceBackup": true,
+      "sha256Integrity": true,
+      "mandatorySafetyBackup": true,
+      "taskProjectionRebuild": true,
+      "sessionWalRecovery": true,
+      "sharedJournalRebuild": true,
+      "adaptiveRecertification": true,
+      "remoteRestoreAdditive": true,
+      "remoteDeleteDuringRestore": false,
+      "productionReleaseBlocking": true
     }
   }
 }
