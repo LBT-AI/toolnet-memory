@@ -238,6 +238,36 @@ export function validatePackedRuntimeFiles(files: string[]): PackedRuntimeValida
   };
 }
 
+/**
+ * Parse `npm pack --dry-run --json` output into the packed file paths.
+ *
+ * npm <= 11 emits an array of results, e.g. [ { files: [...] } ].
+ * npm >= 12 emits an object keyed by package name, e.g.
+ * { 'toolnet-memory': { files: [...] } }.
+ */
+export function parsePackedFiles(stdout: string): string[] {
+  try {
+    const parsed = JSON.parse(stdout) as unknown;
+    let entry: { files?: Array<{ path?: string }> } | undefined;
+    if (Array.isArray(parsed)) {
+      entry = parsed[0] as { files?: Array<{ path?: string }> };
+    } else if (parsed && typeof parsed === 'object') {
+      const values = Object.values(parsed as Record<string, unknown>);
+      const first = values[0];
+      if (first && typeof first === 'object' && !Array.isArray(first)) {
+        entry = first as { files?: Array<{ path?: string }> };
+      }
+    }
+    return (
+      entry?.files
+        ?.map((item) => item.path)
+        .filter((value): value is string => typeof value === 'string') ?? []
+    );
+  } catch {
+    return [];
+  }
+}
+
 function npmPackedFiles(packageRoot: string): {
   files: string[];
 
@@ -254,27 +284,8 @@ function npmPackedFiles(packageRoot: string): {
   }
 
   try {
-    const parsed = JSON.parse(result.stdout) as
-      | {
-          files?: Array<{
-            path?: string;
-          }>;
-        }
-      | Array<{
-          files?: Array<{
-            path?: string;
-          }>;
-        }>;
-
-    const entry = Array.isArray(parsed) ? parsed[0] : parsed;
-
-    const files =
-      entry?.files
-        ?.map((item) => item.path)
-        .filter((value): value is string => typeof value === 'string') ?? [];
-
     return {
-      files,
+      files: parsePackedFiles(result.stdout),
     };
   } catch (error) {
     return {
