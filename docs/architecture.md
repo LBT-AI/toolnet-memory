@@ -1294,3 +1294,111 @@ The release-blocking check is:
 
 phase64-adaptive-retrieval
 ```
+
+---
+
+## 23. Retrieval GA
+
+Phase 65 closes the Retrieval roadmap introduced in Phase 59.
+
+```text
+Phase 59 — Intent-Aware Retrieval Router
+                │
+Phase 60 — Composite Retrieval Planner
+                │
+Phase 61 — Retrieval Quality Evaluation
+                │
+Phase 62 — Hardened Production Certification
+                │
+Phase 63 — Privacy-safe Runtime Telemetry
+                │
+Phase 64 — Benchmark-gated Adaptive Routing
+                │
+Phase 65 — Retrieval GA
+
+The GA architecture is:
+
+Question
+   │
+   ▼
+Baseline deterministic classifier
+   │
+   ▼
+Approved local adaptive overrides
+   │
+   ▼
+Composite Retrieval Planner
+   │
+   ├── Persistent Tasks
+   ├── Task Artifact Evidence
+   ├── Code Intelligence
+   ├── Canonical Memory
+   └── Legacy Continuity
+   │
+   ▼
+Authority-aware bounded merge
+   │
+   ▼
+Answer + provenance
+   │
+   └── privacy-safe local telemetry
+
+Final authority remains:
+
+Persistent Tasks
+      >
+Task Artifact Evidence
+      >
+Code Intelligence
+      >
+Canonical Memory
+      >
+Legacy Continuity
+
+Adaptive routing changes where ToolNet looks.
+
+It does not change what is authoritative.
+
+GA production requirements:
+
+65 / 65 hardened benchmark cases
+exact accuracy = 1.0
+intent F1 = 1.0
+source F1 = 1.0
+unnecessary reads = 0
+missing reads = 0
+source-budget violations = 0
+CLI production smoke = PASS
+MCP end-to-end = PASS
+telemetry privacy = PASS
+adaptive promotion = PASS
+bad adaptive override rejection = PASS
+production package contract = PASS
+
+The Retrieval runtime requires:
+
+LLM        no
+embeddings no
+vector DB  no
+network    no for local retrieval
+
+Release publication is guarded by:
+
+npm test
+      │
+      ▼
+build:release
+      │
+      ▼
+bundle/production-certify.js
+      │
+      ▼
+npm pack
+      │
+      ▼
+npm publish
+
+A failed Retrieval GA check therefore prevents npm publication.
+
+Phase 65 closes the Phase 59-65 Retrieval roadmap.
+```

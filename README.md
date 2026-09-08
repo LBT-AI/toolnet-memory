@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.5.1**
+Current release: **v0.5.2**
 
 </div>
 
@@ -106,6 +106,25 @@ Persistent Tasks:
 - `docs/architecture.md` documents Session WAL → Task Mirror → Persistent Task Core → Replication → Current Work → CLI/MCP.
 - Persistent Tasks remain execution authority.
 - Current Work and Task `state.json` remain rebuildable projections rather than independent sources of truth.
+
+### v0.5.2 Retrieval GA
+
+v0.5.2 completes the intent-aware retrieval roadmap and promotes the retrieval runtime to GA.
+
+- Deterministic intent-aware routing before source retrieval.
+- Composite retrieval planning for multi-intent questions with a hard three-source budget.
+- Persistent Tasks remain execution authority.
+- Task Artifact Evidence remains authoritative for production execution and verification state.
+- Fresh verified Memory is separated from stale historical Memory.
+- Persisted Code Intelligence uses the existing local SQLite FTS5/BM25 index.
+- Fixed bilingual retrieval quality benchmark with precision, recall, F1, source-cost, and regression gates.
+- 65-case hardened production benchmark covering paraphrase, ambiguity, negation, punctuation, composite routing, and budget pressure.
+- Privacy-safe local retrieval telemetry with no question, answer, file path, Task ID, source reference, or query hash storage.
+- Explicit benchmark-gated adaptive routing with minimum support and agreement requirements.
+- Bad adaptive rules are rejected without replacing previously approved rules.
+- CLI and MCP use the same planner, authority rules, feedback layer, and telemetry model.
+- Retrieval remains local and deterministic with no LLM or embedding requirement.
+- Production certification is release-blocking and executes before npm publication.
 
 ## Supported Coding Agents
 

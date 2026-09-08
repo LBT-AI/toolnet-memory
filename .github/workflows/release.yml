@@ -117,6 +117,8 @@ jobs:
         run: npm test
       - name: Build production release
         run: npm run build:release
+      - name: Certify production release
+        run: node bundle/production-certify.js
       - name: Pack release artifact
         shell: bash
         run: |

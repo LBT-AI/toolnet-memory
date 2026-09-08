@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { certifyMemoryQualityGA } from './memory-quality-ga-certify.js';
 import { certifyRetrievalProduction } from './retrieval-production-certify.js';
 import { certifyAdaptiveRetrieval } from './retrieval-adaptive-certify.js';
+import { certifyRetrievalGa } from './retrieval-ga-certify.js';
 
 export interface ProductionReadinessCheck {
   id: string;
@@ -693,6 +694,16 @@ export async function certifyProductionReadiness(
       'feedback-driven adaptive routing is benchmark-gated and privacy-safe',
       adaptive.passed,
       adaptive.detail
+    )
+  );
+
+  const retrievalGa = await certifyRetrievalGa();
+  checks.push(
+    check(
+      'phase65-retrieval-ga',
+      'Retrieval GA end-to-end certification passes',
+      retrievalGa.passed,
+      retrievalGa.detail
     )
   );
 

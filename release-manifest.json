@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "releaseSeries": "0.5.x",
   "runtime": {
     "node": ">=22",
@@ -11,7 +11,10 @@
     "retrieval": ["BM25", "SQLite FTS5"],
     "sharedProjectMemory": true,
     "multiHostConvergence": true,
-    "storageImplementationFrozen": true
+    "storageImplementationFrozen": true,
+    "intentAwareRetrieval": true,
+    "adaptiveRetrieval": true,
+    "retrievalRequiresLlm": false
   },
   "continuity": {
     "sharedJournal": ".toolnet/journal/events.jsonl",
@@ -337,6 +340,57 @@
       "threeHostConvergence": true,
       "restartAfterDivergence": true,
       "replicationOrderExplainability": true
+    },
+    "retrievalSystem": {
+      "ga": true,
+      "phase59IntentAwareRouter": true,
+      "phase60CompositePlanner": true,
+      "phase61QualityEvaluation": true,
+      "phase62ProductionBenchmark": true,
+      "phase63PrivacySafeTelemetry": true,
+      "phase64GuardedAdaptiveRouting": true,
+      "phase65GaCertification": true,
+      "singleIntentLazyRetrieval": true,
+      "compositeMaxSources": 3,
+      "sourceAuthority": [
+        "persistent-tasks",
+        "task-artifacts",
+        "code-intelligence",
+        "canonical-memory",
+        "legacy-continuity"
+      ],
+      "benchmarkVersion": "phase62-v2",
+      "benchmarkCases": 65,
+      "benchmarkExactAccuracy": 1,
+      "intentF1": 1,
+      "sourceF1": 1,
+      "unnecessarySourceReads": 0,
+      "missingSourceReads": 0,
+      "sourceBudgetViolations": 0,
+      "telemetryLocalOnly": true,
+      "telemetryStoresQuestion": false,
+      "telemetryStoresAnswer": false,
+      "telemetryStoresQueryHash": false,
+      "adaptiveMinimumSupport": 3,
+      "adaptiveMinimumAgreement": 0.8,
+      "adaptiveBenchmarkGated": true,
+      "requiresLlm": false,
+      "requiresEmbeddings": false
+    },
+    "retrievalReleaseCertification": {
+      "phase59": true,
+      "phase60": true,
+      "phase61": true,
+      "phase62": true,
+      "phase63": true,
+      "phase64": true,
+      "phase65": true,
+      "cliProductionSmoke": true,
+      "mcpEndToEnd": true,
+      "privacyCertification": true,
+      "adaptiveCertification": true,
+      "productionReleaseBlocking": true,
+      "npmPackageRuntimeVerified": true
     }
   }
 }
