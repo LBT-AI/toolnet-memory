@@ -427,3 +427,221 @@ export const RETRIEVAL_TELEMETRY_FORBIDDEN_KEYS = [
   'memoryContent',
   'sourceRef',
 ] as const;
+
+// ============================================================================
+// Phase 66 — telemetry lifecycle
+// ============================================================================
+export const RETRIEVAL_TELEMETRY_DEFAULT_MAX_AGE_DAYS = 30;
+
+export interface RetrievalTelemetryFileHealth {
+  exists: boolean;
+  bytes: number;
+  totalLines: number;
+  validEvents: number;
+  invalidLines: number;
+  oldestEventAt?: string;
+  newestEventAt?: string;
+  overMaxEvents: boolean;
+  overMaxBytes: boolean;
+  overMaxAge: boolean;
+}
+
+export interface RetrievalTelemetryMaintenanceOptions {
+  now?: number;
+  maxAgeDays?: number;
+  maxEvents?: number;
+  maxBytes?: number;
+}
+
+export interface RetrievalTelemetryMaintenanceResult {
+  before: RetrievalTelemetryFileHealth;
+  after: RetrievalTelemetryFileHealth;
+  removedExpired: number;
+  removedMalformed: number;
+  removedOverflow: number;
+  changed: boolean;
+}
+
+function rawTelemetryLines(project: Pick<ProjectManifest, 'rootPath'>): string[] {
+  const file = retrievalTelemetryPath(project);
+  if (!existsSync(file)) {
+    return [];
+  }
+  try {
+    return readFileSync(file, 'utf8')
+      .split(/\r?\n/u)
+      .filter((line) => line.trim());
+  } catch {
+    return [];
+  }
+}
+
+function parseTelemetryLines(lines: string[]): {
+  valid: RetrievalTelemetryEvent[];
+  invalid: number;
+} {
+  const valid: RetrievalTelemetryEvent[] = [];
+  let invalid = 0;
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (validEvent(parsed)) {
+        valid.push(parsed);
+      } else {
+        invalid += 1;
+      }
+    } catch {
+      invalid += 1;
+    }
+  }
+  return { valid, invalid };
+}
+
+export function inspectRetrievalTelemetryFile(
+  project: Pick<ProjectManifest, 'rootPath'>,
+  options: RetrievalTelemetryMaintenanceOptions = {}
+): RetrievalTelemetryFileHealth {
+  const file = retrievalTelemetryPath(project);
+  const now = options.now ?? Date.now();
+  const maxAgeDays = Math.max(
+    1,
+    Math.trunc(options.maxAgeDays ?? RETRIEVAL_TELEMETRY_DEFAULT_MAX_AGE_DAYS)
+  );
+  const maxEvents = Math.max(
+    10,
+    Math.trunc(options.maxEvents ?? RETRIEVAL_TELEMETRY_DEFAULT_MAX_EVENTS)
+  );
+  const maxBytes = Math.max(
+    1_024,
+    Math.trunc(options.maxBytes ?? RETRIEVAL_TELEMETRY_DEFAULT_MAX_BYTES)
+  );
+  if (!existsSync(file)) {
+    return {
+      exists: false,
+      bytes: 0,
+      totalLines: 0,
+      validEvents: 0,
+      invalidLines: 0,
+      overMaxEvents: false,
+      overMaxBytes: false,
+      overMaxAge: false,
+    };
+  }
+  const lines = rawTelemetryLines(project);
+  const parsed = parseTelemetryLines(lines);
+  const ordered = [...parsed.valid].sort((left, right) =>
+    left.occurredAt.localeCompare(right.occurredAt)
+  );
+  let bytes = 0;
+  try {
+    bytes = statSync(file).size;
+  } catch {
+    bytes = 0;
+  }
+  const oldest = ordered[0]?.occurredAt;
+  const newest = ordered[ordered.length - 1]?.occurredAt;
+  const cutoff = now - maxAgeDays * 24 * 60 * 60 * 1_000;
+  return {
+    exists: true,
+    bytes,
+    totalLines: lines.length,
+    validEvents: parsed.valid.length,
+    invalidLines: parsed.invalid,
+    ...(oldest ? { oldestEventAt: oldest } : {}),
+    ...(newest ? { newestEventAt: newest } : {}),
+    overMaxEvents: parsed.valid.length > maxEvents,
+    overMaxBytes: bytes > maxBytes,
+    overMaxAge: Boolean(oldest && Date.parse(oldest) < cutoff),
+  };
+}
+
+/**
+ * Phase 66 local maintenance.
+ *
+ * Telemetry is diagnostic/non-authoritative, so:
+ *
+ * - malformed records may be discarded;
+ * - old records may be discarded;
+ * - newest records are retained within count/byte bounds.
+ */
+export function maintainRetrievalTelemetry(
+  project: Pick<ProjectManifest, 'rootPath'>,
+  options: RetrievalTelemetryMaintenanceOptions = {}
+): RetrievalTelemetryMaintenanceResult {
+  const file = retrievalTelemetryPath(project);
+  const before = inspectRetrievalTelemetryFile(project, options);
+  if (!before.exists) {
+    return {
+      before,
+      after: before,
+      removedExpired: 0,
+      removedMalformed: 0,
+      removedOverflow: 0,
+      changed: false,
+    };
+  }
+  const now = options.now ?? Date.now();
+  const maxAgeDays = Math.max(
+    1,
+    Math.trunc(options.maxAgeDays ?? RETRIEVAL_TELEMETRY_DEFAULT_MAX_AGE_DAYS)
+  );
+  const maxEvents = Math.max(
+    10,
+    Math.trunc(options.maxEvents ?? RETRIEVAL_TELEMETRY_DEFAULT_MAX_EVENTS)
+  );
+  const maxBytes = Math.max(
+    1_024,
+    Math.trunc(options.maxBytes ?? RETRIEVAL_TELEMETRY_DEFAULT_MAX_BYTES)
+  );
+  const lines = rawTelemetryLines(project);
+  const parsed = parseTelemetryLines(lines);
+  const cutoff = now - maxAgeDays * 24 * 60 * 60 * 1_000;
+  const recent = parsed.valid
+    .filter((event) => Date.parse(event.occurredAt) >= cutoff)
+    .sort(
+      (left, right) =>
+        left.occurredAt.localeCompare(right.occurredAt) || left.eventId.localeCompare(right.eventId)
+    );
+  const removedExpired = parsed.valid.length - recent.length;
+  const kept: RetrievalTelemetryEvent[] = [];
+  let bytes = 0;
+  for (let index = recent.length - 1; index >= 0; index -= 1) {
+    if (kept.length >= maxEvents) {
+      break;
+    }
+    const event = recent[index]!;
+    const line = `${JSON.stringify(event)}\n`;
+    const lineBytes = Buffer.byteLength(line, 'utf8');
+    if (kept.length > 0 && bytes + lineBytes > maxBytes) {
+      break;
+    }
+    kept.unshift(event);
+    bytes += lineBytes;
+  }
+  const removedOverflow = recent.length - kept.length;
+  const temporary = `${file}.phase66.tmp`;
+  createDirectory(file);
+  writeFileSync(
+    temporary,
+    kept.length ? `${kept.map((event) => JSON.stringify(event)).join('\n')}\n` : '',
+    {
+      encoding: 'utf8',
+      mode: 0o600,
+    }
+  );
+  renameSync(temporary, file);
+  try {
+    chmodSync(file, 0o600);
+  } catch {
+    // best effort
+  }
+  const after = inspectRetrievalTelemetryFile(project, options);
+  return {
+    before,
+    after,
+    removedExpired,
+    removedMalformed: parsed.invalid,
+    removedOverflow,
+    changed: removedExpired > 0 || parsed.invalid > 0 || removedOverflow > 0,
+  };
+}

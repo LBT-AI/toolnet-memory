@@ -204,7 +204,10 @@
     "phase63:certify": "vitest run tests/work-continuity/phase63-retrieval-telemetry.test.ts tests/production/phase63-retrieval-telemetry-wiring.test.ts",
     "retrieval:feedback": "tsx src/production/retrieval-feedback-cli.ts",
     "phase64:certify": "vitest run tests/work-continuity/phase64-adaptive-retrieval.test.ts tests/production/phase64-adaptive-retrieval-wiring.test.ts",
-    "phase65:certify": "vitest run tests/production/phase65-retrieval-ga.test.ts tests/production/phase65-release-contract.test.ts"
+    "phase65:certify": "vitest run tests/production/phase65-retrieval-ga.test.ts tests/production/phase65-release-contract.test.ts",
+    "lifecycle:inspect": "tsx src/production/lifecycle-cli.ts",
+    "lifecycle:maintain": "tsx src/production/lifecycle-cli.ts --apply",
+    "phase66:certify": "vitest run tests/work-continuity/phase66-lifecycle-drift.test.ts tests/production/phase66-lifecycle-certification.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

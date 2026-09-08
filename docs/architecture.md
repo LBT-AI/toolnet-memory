@@ -1402,3 +1402,161 @@ A failed Retrieval GA check therefore prevents npm publication.
 
 Phase 65 closes the Phase 59-65 Retrieval roadmap.
 ```
+
+---
+
+## 24. Post-GA Lifecycle & Drift Control
+
+Phase 66 adds lifecycle management for the post-GA runtime without
+changing what is authoritative.
+
+Canonical Memory is read-only here:
+
+- Memory is only inspected and classified.
+- There is NO automatic canonical Memory deletion or tombstone.
+- Stale non-rule Memory becomes an archive candidate.
+- Long-term rules are always protected; a stale rule means
+  "verify this rule", never "delete it".
+
+What can be decayed / repaired safely:
+
+- Adaptive routing rules (local, advisory)
+- Retrieval telemetry (local, diagnostic)
+
+### Memory lifecycle
+
+```text
+MemoryRecord
+   │
+   ▼
+freshness inspection
+   │
+   ├── fresh
+   ├── needs-verification
+   └── stale
+          │
+          ├── scope = rule  → protected (verify only)
+          └── scope ≠ rule  → archive candidate (>= 90 days)
+```
+
+### Adaptive rule lifecycle
+
+```text
+rule activated
+   │
+   ▼
+30 days  → re-certification warning
+   │
+   ▼
+90 days  → expiry (no confirmation for 90 days)
+   │
+   ▼
+maintenance removes expired rules
+   │
+   ▼
+remaining rules re-certified against 65-case benchmark
+   │
+   ├── PASS → kept
+   └── FAIL → individual rollback, else fail closed to baseline
+```
+
+- Feedback window: 90 days (older corrections no longer count).
+- Expired rules are removed from `overrides.json`.
+- Rules are re-certified against the Phase 62 65-case production
+  benchmark; any set that breaks the benchmark is rolled back —
+  one rule at a time, then fail-closed to the deterministic
+  Phase 59/60 baseline.
+
+### Telemetry lifecycle
+
+- 30-day age retention (default).
+- Existing 5000-event / 2 MiB bounds preserved.
+- Malformed JSONL lines are repaired (discarded).
+- Fail-soft: retrieval success never depends on maintenance.
+
+### Drift health
+
+```text
+Memory freshness
+Memory projection conflicts
+invalid multi-host keys
+adaptive benchmark drift
+telemetry corruption / oversize
+```
+
+Soft health signals:
+
+```text
+Memory stale/verification state
+stale long-term rules
+old non-rule archive candidates
+Memory projection conflicts
+invalid multi-host Memory keys
+expired adaptive rules
+adaptive benchmark regression
+telemetry malformed records
+telemetry retention drift
+```
+
+Hard health failures are limited to integrity failures:
+
+```text
+Memory projection conflicts
+invalid projection keys
+malformed telemetry
+adaptive benchmark regression
+```
+
+A stale Memory record itself is not corruption.
+
+### Maintenance surfaces
+
+Read-only:
+
+```text
+npm run lifecycle:inspect
+```
+
+Local maintenance:
+
+```text
+npm run lifecycle:maintain
+```
+
+JSON:
+
+```text
+npm run lifecycle:inspect -- --json
+npm run lifecycle:maintain -- --json
+```
+
+Maintenance may modify only:
+
+```text
+.toolnet/retrieval/telemetry.jsonl
+.toolnet/retrieval/feedback.jsonl
+.toolnet/retrieval/overrides.json
+```
+
+It does not delete or rewrite canonical Memory.
+
+### Doctor and status
+
+`toolnet-memory doctor` now exposes Lifecycle & Drift health.
+`toolnet-memory status` exposes a compact Lifecycle/Drift line.
+
+### Production certification
+
+Phase 66 adds `phase66-lifecycle-drift`. The certification proves:
+
+```text
+stale rules remain protected
+old observations become archive candidates
+canonical Memory is untouched
+old telemetry is removed
+malformed telemetry is repaired
+telemetry remains bounded
+expired adaptive rules disappear
+65-case benchmark remains green
+projection conflicts are detected
+```

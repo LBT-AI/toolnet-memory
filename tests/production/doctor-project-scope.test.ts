@@ -21,8 +21,10 @@ describe('doctor project namespace', () => {
       'const graph = await new PersistentCodeGraphStore(storage).load(project.id);'
     );
 
-    expect(source).toContain(
-      'const memories = await new ConvergentMemoryStore(storage).load(project.id);'
-    );
+    expect(source).toContain('const memoryStore = new ConvergentMemoryStore(storage);');
+
+    expect(source).toContain('const memories = await memoryStore.load(project.id);');
+
+    expect(source).toContain('memoryStore.getDiagnostics()');
   });
 });

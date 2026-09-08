@@ -15,6 +15,10 @@ import {
 import { SnapshotManager } from '../snapshot/index.js';
 import { ConvergentMemoryStore } from '../multi-host/memory-projection.js';
 import { inspectMemoryQuality, type MemoryQualityReport } from '../memory/quality.js';
+import {
+  inspectLifecycleDrift,
+  type LifecycleDriftReport,
+} from '../work-continuity/lifecycle-drift.js';
 import { inspectActiveTaskArtifactPaths, type ArtifactPathHealth } from './artifact-path-health.js';
 
 import { checkProductionConfig } from './config-check.js';
@@ -48,6 +52,7 @@ type DoctorResult = {
   tasks?: ProductionTaskHealth;
   memoryQuality?: MemoryQualityReport;
   artifactPaths?: ArtifactPathHealth;
+  lifecycle?: LifecycleDriftReport;
   config?: {
     ok: boolean;
     errors?: string[];
@@ -216,6 +221,31 @@ function printHuman(result: DoctorResult): void {
       `${branch} ${dim('Verified')}        ${white(String(result.memoryQuality.verified))}`
     );
   }
+  if (result.lifecycle) {
+    console.log(pipe);
+    console.log(`${cyan('◇')} ${white('Lifecycle & Drift')}`);
+    const lifecycleState = result.lifecycle.ok ? green('healthy') : red('attention');
+    console.log(`${branch} ${dim('Health')}          ${lifecycleState}`);
+    console.log(
+      `${branch} ${dim('Archive candidates')} ${white(String(result.lifecycle.memory.archiveCandidates))}`
+    );
+    console.log(
+      `${branch} ${dim('Stale rules')}     ${white(String(result.lifecycle.memory.staleRules))}`
+    );
+    console.log(
+      `${branch} ${dim('Adaptive active')} ${white(String(result.lifecycle.adaptive.effectiveRules))}`
+    );
+    console.log(
+      `${branch} ${dim('Adaptive expired')} ${white(String(result.lifecycle.adaptive.expiredRules))}`
+    );
+    console.log(
+      `${branch} ${dim('Telemetry invalid')} ${white(String(result.lifecycle.telemetry.invalidLines))}`
+    );
+    console.log(
+      `${branch} ${dim('Projection drift')} ${white(`${result.lifecycle.projection.conflicts} conflicts / ${result.lifecycle.projection.invalidKeys} invalid`)}`
+    );
+  }
+
   if (result.artifactPaths) {
     console.log(pipe);
     console.log(`${cyan('◇')} ${white('Active Artifact Paths')}`);
@@ -322,8 +352,10 @@ async function main(): Promise<void> {
   );
 
   const health = await new ProductionHealth(rawStorage).run();
-  const memories = await new ConvergentMemoryStore(storage).load(project.id);
+  const memoryStore = new ConvergentMemoryStore(storage);
+  const memories = await memoryStore.load(project.id);
   const memoryQuality = inspectMemoryQuality(memories);
+  const lifecycle = inspectLifecycleDrift(project, memories, memoryStore.getDiagnostics());
   const artifactPaths = inspectActiveTaskArtifactPaths(project);
   const graph = await new PersistentCodeGraphStore(storage).load(project.id);
 
@@ -357,8 +389,9 @@ async function main(): Promise<void> {
       : artifactPaths.error
         ? [`Artifact path health: ${artifactPaths.error}`]
         : [];
+  const lifecycleWarnings = lifecycle.warnings.map((warning) => `Lifecycle: ${warning}`);
   const result: DoctorResult = {
-    ok: health.ok && capture.ok && taskHealth.ok && artifactPaths.ok,
+    ok: health.ok && capture.ok && taskHealth.ok && artifactPaths.ok && lifecycle.ok,
     project: project.name,
     storage: health.storage,
     memory: memories.length,
@@ -372,7 +405,14 @@ async function main(): Promise<void> {
     tasks: taskHealth,
     memoryQuality,
     artifactPaths,
-    warnings: [...configCheck.warnings, ...captureWarnings, ...taskWarnings, ...artifactWarnings],
+    lifecycle,
+    warnings: [
+      ...configCheck.warnings,
+      ...captureWarnings,
+      ...taskWarnings,
+      ...artifactWarnings,
+      ...lifecycleWarnings,
+    ],
   };
 
   output(result);

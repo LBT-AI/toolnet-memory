@@ -32,6 +32,9 @@ export const RETRIEVAL_FEEDBACK_SCHEMA_VERSION = 1;
 export const RETRIEVAL_ADAPTIVE_OVERRIDE_SCHEMA_VERSION = 1;
 export const RETRIEVAL_ADAPTIVE_MIN_SUPPORT = 3;
 export const RETRIEVAL_ADAPTIVE_MIN_CONFIDENCE = 0.8;
+export const RETRIEVAL_ADAPTIVE_RECERTIFY_DAYS = 30;
+export const RETRIEVAL_ADAPTIVE_MAX_AGE_DAYS = 90;
+export const RETRIEVAL_FEEDBACK_RETENTION_DAYS = 90;
 
 export type RetrievalFeedbackSurface = 'cli' | 'mcp';
 
@@ -59,6 +62,12 @@ export interface AdaptiveRetrievalRule {
   totalFeedback: number;
   confidence: number;
   activatedAt: string;
+  /**
+   * Newest explicit correction supporting this rule.
+   *
+   * Phase 66 uses this for rule decay.
+   */
+  lastConfirmedAt?: string;
   benchmarkVersion: string;
 }
 
@@ -292,7 +301,11 @@ function buildCandidates(
   existing: AdaptiveRetrievalOverrides
 ): AdaptiveRetrievalRule[] {
   const bySignature = new Map<string, RetrievalFeedbackEvent[]>();
+  const feedbackCutoff = Date.now() - RETRIEVAL_FEEDBACK_RETENTION_DAYS * 24 * 60 * 60 * 1_000;
   for (const event of events) {
+    if (Date.parse(event.occurredAt) < feedbackCutoff) {
+      continue;
+    }
     const list = bySignature.get(event.routeSignature) ?? [];
     list.push(event);
     bySignature.set(event.routeSignature, list);
@@ -329,6 +342,15 @@ function buildCandidates(
     const expectedRoute = routeForRetrievalIntent(expectedIntent);
     const id = ruleId(signature, expectedIntent);
     const previous = existing.rules.find((rule) => rule.ruleId === id);
+    const supporting = group
+      .filter((event) => event.expectedIntent === expectedIntent)
+      .map((event) => event.occurredAt)
+      .sort();
+    const lastConfirmedAt =
+      supporting[supporting.length - 1] ??
+      previous?.lastConfirmedAt ??
+      previous?.activatedAt ??
+      new Date().toISOString();
     output.push({
       ruleId: id,
       routeSignature: signature,
@@ -340,10 +362,23 @@ function buildCandidates(
       totalFeedback: group.length,
       confidence: rounded(confidence),
       activatedAt: previous?.activatedAt ?? new Date().toISOString(),
+      lastConfirmedAt,
       benchmarkVersion: RETRIEVAL_QUALITY_PHASE62_BENCHMARK_VERSION,
     });
   }
   return output.sort((left, right) => left.routeSignature.localeCompare(right.routeSignature));
+}
+
+function adaptiveRuleReferenceTime(rule: AdaptiveRetrievalRule): number {
+  const value = rule.lastConfirmedAt ?? rule.activatedAt;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function adaptiveRuleExpired(rule: AdaptiveRetrievalRule, now = Date.now()): boolean {
+  return (
+    now - adaptiveRuleReferenceTime(rule) > RETRIEVAL_ADAPTIVE_MAX_AGE_DAYS * 24 * 60 * 60 * 1_000
+  );
 }
 
 export function applyAdaptiveRetrievalRoute(
@@ -352,7 +387,10 @@ export function applyAdaptiveRetrievalRoute(
 ): IntentAwareRetrievalRoute {
   const signature = retrievalRouteSignature(route);
   const rule = overrides.rules.find(
-    (candidate) => candidate.routeSignature === signature && candidate.fromIntent === route.intent
+    (candidate) =>
+      candidate.routeSignature === signature &&
+      candidate.fromIntent === route.intent &&
+      !adaptiveRuleExpired(candidate)
   );
   if (!rule) {
     return route;
@@ -516,3 +554,179 @@ export const RETRIEVAL_FEEDBACK_FORBIDDEN_KEYS = [
   'memoryContent',
   'sourceRef',
 ] as const;
+
+// ============================================================================
+// Phase 66 — adaptive rule lifecycle
+// ============================================================================
+export interface AdaptiveRetrievalLifecycleHealth {
+  totalRules: number;
+  effectiveRules: number;
+  expiredRules: number;
+  recertifyDue: number;
+  benchmarkPassed: boolean;
+  benchmarkCases: number;
+  feedbackEvents: number;
+  oldFeedbackEvents: number;
+}
+
+export interface AdaptiveRetrievalMaintenanceResult {
+  before: AdaptiveRetrievalLifecycleHealth;
+  after: AdaptiveRetrievalLifecycleHealth;
+  expiredRuleIds: string[];
+  rolledBackRuleIds: string[];
+  removedFeedbackEvents: number;
+  benchmarkPassed: boolean;
+  changed: boolean;
+}
+
+function ruleAgeDays(rule: AdaptiveRetrievalRule, now: number): number {
+  return Math.max(0, (now - adaptiveRuleReferenceTime(rule)) / (24 * 60 * 60 * 1_000));
+}
+
+function benchmarkAdaptiveRules(rules: AdaptiveRetrievalRule[]) {
+  const config: AdaptiveRetrievalOverrides = {
+    version: RETRIEVAL_ADAPTIVE_OVERRIDE_SCHEMA_VERSION,
+    updatedAt: new Date().toISOString(),
+    benchmarkVersion: RETRIEVAL_QUALITY_PHASE62_BENCHMARK_VERSION,
+    rules,
+  };
+  const report = evaluateRetrievalPlanner(
+    RETRIEVAL_QUALITY_PHASE62_BENCHMARK,
+    (question, options) =>
+      planCompositeRetrieval(question, {
+        maxSources: options?.maxSources,
+        routeOverride: (route) => applyAdaptiveRetrievalRoute(route, config),
+      }),
+    {
+      benchmarkVersion: `${RETRIEVAL_QUALITY_PHASE62_BENCHMARK_VERSION}+phase66-lifecycle`,
+    }
+  );
+  const gate = evaluateRetrievalQualityGate(report, PHASE62_PRODUCTION_THRESHOLDS);
+  return { report, gate };
+}
+
+export function inspectAdaptiveRetrievalLifecycle(
+  project: Pick<ProjectManifest, 'rootPath'>,
+  now = Date.now()
+): AdaptiveRetrievalLifecycleHealth {
+  const overrides = loadAdaptiveRetrievalOverrides(project);
+  const feedback = readRetrievalFeedback(project);
+  const feedbackCutoff = now - RETRIEVAL_FEEDBACK_RETENTION_DAYS * 24 * 60 * 60 * 1_000;
+  const effective = overrides.rules.filter((rule) => !adaptiveRuleExpired(rule, now));
+  const certification = benchmarkAdaptiveRules(effective);
+  return {
+    totalRules: overrides.rules.length,
+    effectiveRules: effective.length,
+    expiredRules: overrides.rules.length - effective.length,
+    recertifyDue: effective.filter(
+      (rule) =>
+        ruleAgeDays(rule, now) >= RETRIEVAL_ADAPTIVE_RECERTIFY_DAYS ||
+        rule.benchmarkVersion !== RETRIEVAL_QUALITY_PHASE62_BENCHMARK_VERSION
+    ).length,
+    benchmarkPassed: certification.gate.passed,
+    benchmarkCases: certification.report.totalCases,
+    feedbackEvents: feedback.length,
+    oldFeedbackEvents: feedback.filter((event) => Date.parse(event.occurredAt) < feedbackCutoff)
+      .length,
+  };
+}
+
+function writeFeedbackEvents(
+  project: Pick<ProjectManifest, 'rootPath'>,
+  events: RetrievalFeedbackEvent[]
+): void {
+  const file = feedbackPath(project);
+  ensureDirectory(file);
+  const temporary = `${file}.phase66.tmp`;
+  writeFileSync(
+    temporary,
+    events.length ? `${events.map((event) => JSON.stringify(event)).join('\n')}\n` : '',
+    {
+      encoding: 'utf8',
+      mode: 0o600,
+    }
+  );
+  renameSync(temporary, file);
+  try {
+    chmodSync(file, 0o600);
+  } catch {
+    // best effort
+  }
+}
+
+/**
+ * Re-certifies currently effective local overrides.
+ *
+ * Canonical Task/Memory state is never touched.
+ */
+export function maintainAdaptiveRetrievalOverrides(
+  project: Pick<ProjectManifest, 'rootPath'>,
+  now = Date.now()
+): AdaptiveRetrievalMaintenanceResult {
+  const before = inspectAdaptiveRetrievalLifecycle(project, now);
+  const existing = loadAdaptiveRetrievalOverrides(project);
+  const feedback = readRetrievalFeedback(project);
+  const feedbackCutoff = now - RETRIEVAL_FEEDBACK_RETENTION_DAYS * 24 * 60 * 60 * 1_000;
+  const recentFeedback = feedback.filter((event) => Date.parse(event.occurredAt) >= feedbackCutoff);
+  const removedFeedbackEvents = feedback.length - recentFeedback.length;
+  if (removedFeedbackEvents > 0) {
+    writeFeedbackEvents(project, recentFeedback);
+  }
+  const expired = existing.rules
+    .filter((rule) => adaptiveRuleExpired(rule, now))
+    .map((rule) => rule.ruleId);
+  let rules = existing.rules
+    .filter((rule) => !adaptiveRuleExpired(rule, now))
+    .sort((left, right) => left.ruleId.localeCompare(right.ruleId));
+  const rolledBack: string[] = [];
+  let certification = benchmarkAdaptiveRules(rules);
+  /*
+   * If software/router drift makes the existing adaptive set
+   * fail the 65-case production benchmark, remove only enough
+   * rules to restore the production invariant.
+   */
+  while (!certification.gate.passed && rules.length > 0) {
+    let repaired = false;
+    for (const rule of rules) {
+      const trial = rules.filter((candidate) => candidate.ruleId !== rule.ruleId);
+      const trialCertification = benchmarkAdaptiveRules(trial);
+      if (trialCertification.gate.passed) {
+        rolledBack.push(rule.ruleId);
+        rules = trial;
+        certification = trialCertification;
+        repaired = true;
+        break;
+      }
+    }
+    if (repaired) {
+      continue;
+    }
+    /*
+     * Multiple interacting adaptive rules may be responsible.
+     *
+     * Adaptive routing is advisory, so fail closed to the
+     * deterministic Phase 59/60 baseline.
+     */
+    rolledBack.push(...rules.map((rule) => rule.ruleId));
+    rules = [];
+    certification = benchmarkAdaptiveRules([]);
+    break;
+  }
+  const updated: AdaptiveRetrievalOverrides = {
+    version: RETRIEVAL_ADAPTIVE_OVERRIDE_SCHEMA_VERSION,
+    updatedAt: new Date(now).toISOString(),
+    benchmarkVersion: RETRIEVAL_QUALITY_PHASE62_BENCHMARK_VERSION,
+    rules,
+  };
+  safeJsonWrite(adaptiveOverridesPath(project), updated);
+  const after = inspectAdaptiveRetrievalLifecycle(project, now);
+  return {
+    before,
+    after,
+    expiredRuleIds: expired,
+    rolledBackRuleIds: rolledBack,
+    removedFeedbackEvents,
+    benchmarkPassed: certification.gate.passed,
+    changed: expired.length > 0 || rolledBack.length > 0 || removedFeedbackEvents > 0,
+  };
+}

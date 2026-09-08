@@ -21,6 +21,7 @@ import { certifyMemoryQualityGA } from './memory-quality-ga-certify.js';
 import { certifyRetrievalProduction } from './retrieval-production-certify.js';
 import { certifyAdaptiveRetrieval } from './retrieval-adaptive-certify.js';
 import { certifyRetrievalGa } from './retrieval-ga-certify.js';
+import { certifyLifecycleDriftControl } from './lifecycle-certify.js';
 
 export interface ProductionReadinessCheck {
   id: string;
@@ -715,6 +716,16 @@ export async function certifyProductionReadiness(
       'Retrieval GA end-to-end certification passes',
       retrievalGa.passed,
       retrievalGa.detail
+    )
+  );
+
+  const lifecycle = certifyLifecycleDriftControl();
+  checks.push(
+    check(
+      'phase66-lifecycle-drift',
+      'post-GA lifecycle and drift control passes',
+      lifecycle.passed,
+      lifecycle.detail
     )
   );
 

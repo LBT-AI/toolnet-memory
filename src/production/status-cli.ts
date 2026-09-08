@@ -19,6 +19,10 @@ import { inspectMemoryQuality } from '../memory/quality.js';
 import { summarizeRetrievalTelemetry } from '../work-continuity/retrieval-telemetry.js';
 import { summarizeRetrievalFeedback } from '../work-continuity/retrieval-feedback.js';
 import {
+  inspectLifecycleDrift,
+  type LifecycleDriftReport,
+} from '../work-continuity/lifecycle-drift.js';
+import {
   renderHeader,
   renderSectionTitle,
   renderKeyValue,
@@ -76,11 +80,14 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
     );
     let memoryStatus = 'unknown';
     let memoryQuality: ReturnType<typeof inspectMemoryQuality> | null = null;
+    let lifecycle: LifecycleDriftReport | null = null;
     let indexStatus = 'unknown';
     try {
-      const memories = await new ConvergentMemoryStore(storage).load(project.id);
+      const memoryStore = new ConvergentMemoryStore(storage);
+      const memories = await memoryStore.load(project.id);
       memoryStatus = memories.length > 0 ? `ready (${memories.length})` : 'not initialized';
       memoryQuality = inspectMemoryQuality(memories);
+      lifecycle = inspectLifecycleDrift(project, memories, memoryStore.getDiagnostics());
     } catch {
       memoryStatus = 'error';
     }
@@ -143,6 +150,17 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
         uiOpts
       )
     );
+    if (lifecycle) {
+      console.log(renderKeyValue('Lifecycle', lifecycle.ok ? 'healthy' : 'attention', 8, uiOpts));
+      console.log(
+        renderKeyValue(
+          'Drift',
+          `memory ${lifecycle.memory.archiveCandidates} archive / rules ${lifecycle.adaptive.expiredRules} expired / telemetry ${lifecycle.telemetry.invalidLines} invalid`,
+          8,
+          uiOpts
+        )
+      );
+    }
     console.log('');
 
     const integrations = detectAgentIntegrations();
