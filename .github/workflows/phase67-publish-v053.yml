@@ -1,3 +1,7 @@
+# One-shot publisher for v0.5.3 (Phase 67 Disaster Recovery).
+# First run failed on e512bc2 because the Phase 65 release-contract
+# test still hardcoded 0.5.2; the contract is now patch-safe (18b3173).
+# Re-triggered from a clean main to complete the publish.
 name: Phase 67 Publish v0.5.3
 
 on:
