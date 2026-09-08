@@ -2,8 +2,15 @@ import { z } from 'zod';
 
 import type { MCPContext } from '../context.js';
 
-import { retrieveCompositeAnswer } from '../../work-continuity/composite-retrieval.js';
+import {
+  planCompositeRetrieval,
+  retrieveCompositeAnswer,
+} from '../../work-continuity/composite-retrieval.js';
 import type { IntentAwareCodeHit } from '../../work-continuity/intent-aware-retrieval.js';
+import {
+  recordRetrievalTelemetry,
+  recordRetrievalTelemetryError,
+} from '../../work-continuity/retrieval-telemetry.js';
 
 import {
   answerMemoryConversationFollowUp,
@@ -132,9 +139,28 @@ export async function memoryAgentAsk(
         }))
     : undefined;
 
-  const direct = await retrieveCompositeAnswer(ctx.project, conversation.originalQuestion, {
-    ...(ctx.storage ? { storage: ctx.storage } : {}),
-    ...(searchCode ? { searchCode } : {}),
+  const plan = planCompositeRetrieval(conversation.originalQuestion);
+  const telemetryStarted = process.hrtime.bigint();
+  let direct;
+  try {
+    direct = await retrieveCompositeAnswer(ctx.project, conversation.originalQuestion, {
+      plan,
+      ...(ctx.storage ? { storage: ctx.storage } : {}),
+      ...(searchCode ? { searchCode } : {}),
+    });
+  } catch (error) {
+    const durationMs = Number(process.hrtime.bigint() - telemetryStarted) / 1_000_000;
+    recordRetrievalTelemetryError(ctx.project, plan, {
+      surface: 'mcp',
+      durationMs,
+      error,
+    });
+    throw error;
+  }
+  const durationMs = Number(process.hrtime.bigint() - telemetryStarted) / 1_000_000;
+  recordRetrievalTelemetry(ctx.project, direct, {
+    surface: 'mcp',
+    durationMs,
   });
 
   const structured = structuredLocalHandoff(

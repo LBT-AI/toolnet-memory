@@ -677,6 +677,14 @@ export async function certifyProductionReadiness(
       retrieval.live.detail
     )
   );
+  checks.push(
+    check(
+      'phase63-retrieval-telemetry',
+      'packaged retrieval telemetry is local and privacy-safe',
+      retrieval.live.telemetryPassed,
+      retrieval.live.telemetryDetail
+    )
+  );
 
   const passedCount = checks.filter((item) => item.passed).length;
 

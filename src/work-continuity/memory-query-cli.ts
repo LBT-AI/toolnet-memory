@@ -12,6 +12,7 @@ import {
 } from './composite-retrieval.js';
 import { findProjectRoot } from './fast-context.js';
 import { explainRetrievalPlan, measureRetrievalExecution } from './retrieval-quality.js';
+import { recordRetrievalTelemetry, recordRetrievalTelemetryError } from './retrieval-telemetry.js';
 
 interface CliInput {
   question: string;
@@ -88,10 +89,27 @@ async function main(): Promise<void> {
    */
   const plan = planCompositeRetrieval(input.question);
   const storage = compositePlanNeedsStorage(plan) ? projectStorage(project) : undefined;
-  const result = await retrieveCompositeAnswer(project, input.question, {
-    plan,
-    ...(storage ? { storage } : {}),
-    agentId: process.env.TOOLNET_AGENT_ID ?? 'opencode',
+  const telemetryStarted = process.hrtime.bigint();
+  let result;
+  try {
+    result = await retrieveCompositeAnswer(project, input.question, {
+      plan,
+      ...(storage ? { storage } : {}),
+      agentId: process.env.TOOLNET_AGENT_ID ?? 'opencode',
+    });
+  } catch (error) {
+    const durationMs = Number(process.hrtime.bigint() - telemetryStarted) / 1_000_000;
+    recordRetrievalTelemetryError(project, plan, {
+      surface: 'cli',
+      durationMs,
+      error,
+    });
+    throw error;
+  }
+  const durationMs = Number(process.hrtime.bigint() - telemetryStarted) / 1_000_000;
+  recordRetrievalTelemetry(project, result, {
+    surface: 'cli',
+    durationMs,
   });
   if (input.debugRoute) {
     const execution = measureRetrievalExecution(result);

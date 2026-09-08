@@ -955,3 +955,152 @@ No public benchmark command is added. Development evaluation remains:
 npm run retrieval:eval
 npm run retrieval:eval -- --strict
 ```
+
+---
+
+## 21. Real-world Retrieval Telemetry
+
+Phase 63 adds local runtime telemetry for the Phase 59/60 retrieval system.
+The purpose is to measure whether benchmark quality also holds during real
+project usage.
+
+```text
+toolnet-memory ask / MCP memory_agent_ask
+                    │
+                    ▼
+          Retrieval Planner
+                    │
+                    ▼
+             Retrieval Result
+                    │
+             ┌──────┴──────┐
+             ▼             ▼
+          Answer      Local telemetry
+                           │
+                           ▼
+          .toolnet/retrieval/telemetry.jsonl
+
+Telemetry is diagnostic only.
+
+It is not a source of execution truth, Memory truth, or Task truth.
+
+Privacy contract
+
+Telemetry stores structural metrics only:
+
+timestamp
+surface: cli | mcp
+outcome
+latency
+mode
+intent names
+planned source names
+attempted source names
+selected source
+omitted intent names
+route confidence
+result count
+answer character count
+estimated token count
+provenance coverage
+conflict codes
+source-budget violation
+safe machine error code
+
+Telemetry NEVER stores:
+
+question text
+answer text
+prompts
+file paths
+Task IDs
+Memory contents
+source references
+user content
+
+No query hash is stored either.
+
+A hash of user text can still leak information through dictionary attacks, so
+Phase 63 intentionally does not fingerprint questions.
+
+Local only
+
+Telemetry lives under:
+
+.toolnet/retrieval/telemetry.jsonl
+
+It is not uploaded through Memory storage and is not part of Task replication.
+
+Directory/file permissions are hardened to 0700 / 0600 where supported.
+
+Telemetry may be disabled:
+
+TOOLNET_RETRIEVAL_TELEMETRY=0
+
+Retrieval behavior is unchanged when telemetry is disabled or when telemetry
+writing fails.
+
+Bounded retention
+
+Telemetry is non-authoritative and may be compacted.
+
+Default bounds:
+
+max file size before compaction: 2 MiB
+retained events:                5000
+
+This prevents long-running projects from accumulating an unbounded telemetry
+log.
+
+Operational metrics
+
+Phase 63 measures:
+
+query count
+success / no-result / error
+single vs composite ratio
+average latency
+p95 latency
+average estimated tokens
+average attempted sources
+average provenance coverage
+conflict events
+source-budget violations
+source distribution
+intent distribution
+CLI vs MCP distribution
+
+The existing toolnet-memory status command shows a compact 7-day summary.
+
+Development/admin detail:
+
+npm run retrieval:telemetry
+npm run retrieval:telemetry -- \
+  --hours 24
+npm run retrieval:telemetry -- \
+  --json
+
+No new public toolnet-memory command is introduced.
+
+Production certification
+
+The packaged ask smoke test now verifies that the real production binary:
+
+bin/toolnet-memory
+      │
+      ▼
+bundle/memory-query.js
+
+creates local telemetry for single and composite retrieval while never writing
+the question or answer into the telemetry file.
+
+Phase 63 adds the release-blocking production check:
+
+phase63-retrieval-telemetry
+
+The telemetry system remains fail-soft:
+
+retrieval success
+    must never depend on
+telemetry success
+```

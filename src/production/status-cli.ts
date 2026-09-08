@@ -16,6 +16,7 @@ import { inspectKiroIntegrationStatus } from '../session/kiro/status.js';
 import { TaskReplicationService } from '../tasks/replication/service.js';
 import { ConvergentMemoryStore } from '../multi-host/memory-projection.js';
 import { inspectMemoryQuality } from '../memory/quality.js';
+import { summarizeRetrievalTelemetry } from '../work-continuity/retrieval-telemetry.js';
 import {
   renderHeader,
   renderSectionTitle,
@@ -109,6 +110,29 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
       renderKeyValue('Task sync', replicationStatus.enabled ? 'enabled' : 'disabled', 8, uiOpts)
     );
     console.log(renderKeyValue('Task conflicts', String(replicationStatus.conflicts), 8, uiOpts));
+    const retrievalTelemetry = summarizeRetrievalTelemetry(project, {
+      windowHours: 24 * 7,
+    });
+    console.log(
+      renderKeyValue(
+        'Retrieval 7d',
+        retrievalTelemetry.eventsInWindow > 0
+          ? `${retrievalTelemetry.eventsInWindow} queries / ${retrievalTelemetry.averageDurationMs}ms avg / ${retrievalTelemetry.averageEstimatedTokens} tok`
+          : 'no local samples',
+        8,
+        uiOpts
+      )
+    );
+    console.log(
+      renderKeyValue(
+        'Retrieval health',
+        retrievalTelemetry.eventsInWindow > 0
+          ? `errors ${retrievalTelemetry.errors} / conflicts ${retrievalTelemetry.conflictEvents} / budget ${retrievalTelemetry.sourceBudgetViolations}`
+          : 'n/a',
+        8,
+        uiOpts
+      )
+    );
     console.log('');
 
     const integrations = detectAgentIntegrations();

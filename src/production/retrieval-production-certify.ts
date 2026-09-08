@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
 } from 'node:fs';
@@ -40,6 +41,10 @@ export interface PackagedRetrievalSmoke {
   singleSources: string[];
   compositeSources: string[];
   debugPlannerVisible: boolean;
+  telemetryPassed: boolean;
+  telemetryEvents: number;
+  telemetryPrivacySafe: boolean;
+  telemetryDetail?: string;
   detail?: string;
 }
 
@@ -150,6 +155,10 @@ export function runPackagedRetrievalSmoke(packageRoot: string): PackagedRetrieva
         singleSources: [],
         compositeSources: [],
         debugPlannerVisible: false,
+        telemetryPassed: false,
+        telemetryEvents: 0,
+        telemetryPrivacySafe: false,
+        telemetryDetail: 'node_modules missing; telemetry smoke was not executed.',
         detail: 'node_modules missing; run npm ci before production certification.',
       };
     }
@@ -165,6 +174,10 @@ export function runPackagedRetrievalSmoke(packageRoot: string): PackagedRetrieva
        * remote storage.
        */
       TOOLNET_AGENT_ID: 'phase62-production-smoke',
+      /*
+       * Phase 63 packaged telemetry smoke.
+       */
+      TOOLNET_RETRIEVAL_TELEMETRY: '1',
     };
 
     const init = run(
@@ -195,6 +208,45 @@ export function runPackagedRetrievalSmoke(packageRoot: string): PackagedRetrieva
       composite.stderr.includes('[ToolNet Retrieval Planner]') &&
       composite.stderr.includes('source_budget=2/3');
     const sourceAbsent = !existsSync(join(runtimeRoot, 'src'));
+    const telemetryFile = join(projectRoot, '.toolnet', 'retrieval', 'telemetry.jsonl');
+    let telemetryRaw = '';
+    let telemetryEvents: Array<Record<string, unknown>> = [];
+    try {
+      telemetryRaw = readFileSync(telemetryFile, 'utf8');
+      telemetryEvents = telemetryRaw
+        .split(/\r?\n/u)
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+    } catch {
+      telemetryRaw = '';
+      telemetryEvents = [];
+    }
+    const telemetryPrivacySafe =
+      !telemetryRaw.includes('task hiện tại là gì?') &&
+      !telemetryRaw.includes('task hiện tại là gì và deploy production verified chưa?') &&
+      !/"question"\s*:/u.test(telemetryRaw) &&
+      !/"answer"\s*:/u.test(telemetryRaw) &&
+      !/"filePath"\s*:/u.test(telemetryRaw) &&
+      !/"taskId"\s*:/u.test(telemetryRaw) &&
+      !/"sourceRef"\s*:/u.test(telemetryRaw);
+    const telemetryModes = telemetryEvents
+      .map((event) => event.mode)
+      .filter((value): value is string => typeof value === 'string');
+    const telemetrySurfaces = telemetryEvents.map((event) => event.surface);
+    const telemetryPassed =
+      telemetryEvents.length >= 2 &&
+      telemetryPrivacySafe &&
+      telemetryModes.includes('single') &&
+      telemetryModes.includes('composite') &&
+      telemetrySurfaces.every((surface) => surface === 'cli');
+    const telemetryDetail = telemetryPassed
+      ? undefined
+      : [
+          `file=${telemetryFile}`,
+          `events=${telemetryEvents.length}`,
+          `modes=${telemetryModes.join(',')}`,
+          `privacySafe=${String(telemetryPrivacySafe)}`,
+        ].join('\n');
 
     const passed =
       init.status === 0 &&
@@ -218,6 +270,10 @@ export function runPackagedRetrievalSmoke(packageRoot: string): PackagedRetrieva
       singleSources,
       compositeSources,
       debugPlannerVisible,
+      telemetryPassed,
+      telemetryEvents: telemetryEvents.length,
+      telemetryPrivacySafe,
+      ...(telemetryDetail ? { telemetryDetail } : {}),
       ...(passed
         ? {}
         : {
@@ -250,6 +306,6 @@ export function certifyRetrievalProduction(packageRoot: string): RetrievalProduc
     benchmark: benchmark.report,
     gate: benchmark.gate,
     live,
-    passed: benchmark.gate.passed && live.passed,
+    passed: benchmark.gate.passed && live.passed && live.telemetryPassed,
   };
 }
