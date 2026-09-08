@@ -1560,3 +1560,223 @@ expired adaptive rules disappear
 65-case benchmark remains green
 projection conflicts are detected
 ```
+
+---
+
+## 25. Backup, Restore and Disaster Recovery
+
+Phase 67 adds a disaster-recovery layer above the existing snapshot system.
+
+The legacy SnapshotManager remains useful for compatibility snapshots, but a
+complete recovery point must also include the newer append-only authority
+layers introduced after Persistent Tasks and multi-host Memory.
+
+### Source-of-truth backup
+
+Local:
+
+```text
+.toolnet/tasks/events.jsonl
+.toolnet/tasks/replication/replicated/**
+.toolnet/runtime/sources/**/events.jsonl
+.toolnet/retrieval/feedback.jsonl
+.toolnet/retrieval/overrides.json
+.toolnet/retrieval/telemetry.jsonl
+```
+
+Remote:
+
+```text
+projects/<project>/**
+```
+
+excluding historical snapshot trees.
+
+This includes immutable multi-host Memory operations and Task replication
+objects.
+
+### Not backed up as authority
+
+```text
+.toolnet/tasks/state.json
+.toolnet/tasks/replication/cursor.json
+.toolnet/journal/**
+.toolnet/runtime/locks/**
+```
+
+These are rebuilt or reset after restore.
+
+### Recovery package
+
+Default recovery location is outside the project:
+
+```text
+~/.toolnet-memory/recovery/<project-id>/<backup-id>/
+```
+
+A recovery package contains:
+
+```text
+manifest.json
+manifest.sha256
+local/**
+remote/*.bin
+```
+
+Every local file and remote object has an individual SHA-256 digest.
+
+The manifest itself also has a SHA-256 digest.
+
+### Restore policy
+
+Restore is dry-run by default.
+
+```text
+verify
+  │
+  ▼
+dry-run
+  │
+  ▼
+--apply
+  │
+  ▼
+mandatory pre-restore safety backup
+  │
+  ▼
+restore authoritative files
+  │
+  ├── rebuild Task projection
+  ├── rebuild shared session journal
+  ├── reset derived cursors/locks
+  └── re-certify adaptive routing
+```
+
+There is deliberately no `--no-safety` option.
+
+### Remote recovery
+
+Remote restoration is additive.
+
+```text
+backup immutable operations
+         +
+current remote operations created after backup
+         =
+converged state
+```
+
+Phase 67 never deletes remote objects during restore.
+
+Therefore newer immutable Memory/Task operations that appeared after a backup
+are not destroyed by recovery.
+
+### Integrity
+
+A backup must pass all checks before restore:
+
+```text
+project id match
+manifest SHA-256
+every local file SHA-256
+every remote blob SHA-256
+```
+
+A single mismatch blocks restore.
+
+### Commands
+
+Create complete recovery point:
+
+```bash
+npm run recovery:backup
+```
+
+Local-only during remote outage:
+
+```bash
+npm run recovery:backup -- --local-only
+```
+
+Custom reason:
+
+```bash
+npm run recovery:backup -- \
+  --reason "before production migration"
+```
+
+List:
+
+```bash
+npm run recovery:list
+```
+
+Verify:
+
+```bash
+npm run recovery:verify -- BACKUP_ID
+```
+
+Restore dry-run:
+
+```bash
+npm run recovery:restore -- BACKUP_ID
+```
+
+Apply:
+
+```bash
+npm run recovery:restore -- \
+  BACKUP_ID \
+  --apply
+```
+
+Custom external backup disk:
+
+```bash
+npm run recovery:backup -- \
+  --root /mnt/backups/toolnet-memory
+```
+
+Environment equivalent:
+
+```bash
+TOOLNET_RECOVERY_ROOT=/mnt/backups/toolnet-memory
+```
+
+### Disaster drill certification
+
+Phase 67 certification simulates:
+
+```text
+Task operation log created
+Session WAL created
+Remote Memory objects created
+        │
+        ▼
+backup
+        │
+        ├── corrupt Task state
+        ├── delete source WAL
+        ├── corrupt remote projection
+        └── add newer immutable remote object
+        │
+        ▼
+restore
+        │
+        ├── Task restored
+        ├── Task projection rebuilt
+        ├── WAL restored
+        ├── shared journal rebuilt
+        ├── remote state repaired
+        └── newer remote object preserved
+```
+
+It separately modifies one backup blob and verifies that restore integrity
+validation detects the tampering.
+
+The production release gate is:
+
+```text
+phase67-disaster-recovery
+```

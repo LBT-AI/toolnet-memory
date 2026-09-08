@@ -22,6 +22,7 @@ import { certifyRetrievalProduction } from './retrieval-production-certify.js';
 import { certifyAdaptiveRetrieval } from './retrieval-adaptive-certify.js';
 import { certifyRetrievalGa } from './retrieval-ga-certify.js';
 import { certifyLifecycleDriftControl } from './lifecycle-certify.js';
+import { certifyDisasterRecovery } from './disaster-recovery-certify.js';
 
 export interface ProductionReadinessCheck {
   id: string;
@@ -726,6 +727,16 @@ export async function certifyProductionReadiness(
       'post-GA lifecycle and drift control passes',
       lifecycle.passed,
       lifecycle.detail
+    )
+  );
+
+  const recovery = await certifyDisasterRecovery();
+  checks.push(
+    check(
+      'phase67-disaster-recovery',
+      'backup restore and disaster recovery certification passes',
+      recovery.passed,
+      recovery.detail
     )
   );
 

@@ -207,7 +207,13 @@
     "phase65:certify": "vitest run tests/production/phase65-retrieval-ga.test.ts tests/production/phase65-release-contract.test.ts",
     "lifecycle:inspect": "tsx src/production/lifecycle-cli.ts",
     "lifecycle:maintain": "tsx src/production/lifecycle-cli.ts --apply",
-    "phase66:certify": "vitest run tests/work-continuity/phase66-lifecycle-drift.test.ts tests/production/phase66-lifecycle-certification.test.ts"
+    "phase66:certify": "vitest run tests/work-continuity/phase66-lifecycle-drift.test.ts tests/production/phase66-lifecycle-certification.test.ts",
+    "recovery:backup": "tsx src/production/recovery-cli.ts backup",
+    "recovery:list": "tsx src/production/recovery-cli.ts list",
+    "recovery:verify": "tsx src/production/recovery-cli.ts verify",
+    "recovery:restore": "tsx src/production/recovery-cli.ts restore",
+    "recovery:health": "tsx src/production/recovery-cli.ts health",
+    "phase67:certify": "vitest run tests/production/phase67-disaster-recovery.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",
