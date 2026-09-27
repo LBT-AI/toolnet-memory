@@ -66,6 +66,11 @@ case "$COMMAND" in
     run bundle/update.js src/production/update.ts "$@"
     ;;
 
+  identity)
+    shift
+    run bundle/identity.js src/production/identity-cli.ts "$@"
+    ;;
+
   config)
     shift
     run bundle/config.js src/production/config-cli.ts "$@"
@@ -244,6 +249,31 @@ case "$COMMAND" in
   service:remove)
     shift
     run bundle/service-cli.js src/service/cli.ts remove "$@"
+    ;;
+
+  daemon)
+    shift
+    run bundle/daemon-cli.js src/daemon/cli.ts "$@"
+    ;;
+
+  daemon:status)
+    shift
+    run bundle/daemon-cli.js src/daemon/cli.ts status "$@"
+    ;;
+
+  daemon:start)
+    shift
+    run bundle/daemon-cli.js src/daemon/cli.ts start "$@"
+    ;;
+
+  daemon:stop)
+    shift
+    run bundle/daemon-cli.js src/daemon/cli.ts stop "$@"
+    ;;
+
+  daemon:restart)
+    shift
+    run bundle/daemon-cli.js src/daemon/cli.ts restart "$@"
     ;;
 
   production:certify)

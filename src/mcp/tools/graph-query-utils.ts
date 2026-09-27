@@ -24,7 +24,23 @@ export function resolveGraphSymbol(ctx: MCPContext, value: string): CodeSymbol |
   return query.findSymbols(ctx.project.id, value)[0] ?? null;
 }
 
-export function compactSymbol(symbol: CodeSymbol) {
+export interface CompactSymbol {
+  id: string;
+
+  name: string;
+
+  qualifiedName?: string;
+
+  type: CodeSymbol['type'];
+
+  filePath: string;
+
+  startLine?: number;
+
+  endLine?: number;
+}
+
+export function compactSymbol(symbol: CodeSymbol): CompactSymbol {
   return {
     id: symbol.id,
 

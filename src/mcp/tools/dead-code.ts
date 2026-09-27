@@ -2,7 +2,12 @@ import { z } from 'zod';
 
 import { DeadCodeAnalyzer } from '../../code-intelligence/analysis/dead-code-analyzer.js';
 
-import type { DeadCodeConfidence } from '../../code-intelligence/analysis/types.js';
+import type {
+  DeadCodeCandidate,
+  DeadCodeConfidence,
+} from '../../code-intelligence/analysis/types.js';
+
+import { attachToolCoverage, type ToolCoverageOutput } from '../coverage.js';
 
 import type { MCPContext } from '../context.js';
 
@@ -20,6 +25,22 @@ const RANK: Record<DeadCodeConfidence, number> = {
   low: 1,
 };
 
+export interface DeadCodeResult {
+  total: number;
+
+  high: number;
+
+  medium: number;
+
+  low: number;
+
+  warning: string;
+
+  candidates: DeadCodeCandidate[];
+
+  coverage?: ToolCoverageOutput;
+}
+
 export async function deadCode(
   ctx: MCPContext,
   input: {
@@ -29,7 +50,7 @@ export async function deadCode(
 
     limit?: number;
   }
-) {
+): Promise<DeadCodeResult> {
   const analyzer = new DeadCodeAnalyzer(ctx.graph);
 
   let result = analyzer.analyze(ctx.project.id);
@@ -48,6 +69,16 @@ export async function deadCode(
 
   const limit = input.limit ?? 100;
 
+  /*
+   * Dead code is a negative claim about usage edges (calls + imports).
+   * Candidate trust requires structural coverage, and an empty candidate
+   * set is only meaningful when the source is still fresh.
+   */
+  const coverage = await attachToolCoverage(ctx, {
+    capability: 'call_graph',
+    negative: total === 0,
+  });
+
   return {
     total,
 
@@ -60,5 +91,7 @@ export async function deadCode(
     warning: 'Dead-code results are candidates only. Verify before deleting code.',
 
     candidates: result.slice(0, limit),
+
+    ...(coverage ? { coverage } : {}),
   };
 }

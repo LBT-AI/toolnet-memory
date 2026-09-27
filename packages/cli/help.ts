@@ -156,6 +156,11 @@ export const COMMANDS: CommandMetadata[] = [
     description: 'Update ToolNet Memory',
     category: 'system',
   },
+  {
+    name: 'identity',
+    description: 'Print this runtime build identity and capability inventory',
+    category: 'system',
+  },
 
   // Context & Memory (Advanced)
   {

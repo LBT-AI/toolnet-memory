@@ -19,6 +19,13 @@ const CURRENT_OBJECTS = [
   'code/analysis/dead-code.json',
   'code/analysis/dependencies.json',
   'code/visualization/graph.json',
+  /*
+   * Phase 75: ADR authority (records + revision history).
+   *
+   * The Markdown projection is derived and rebuildable, so it is intentionally
+   * not part of the backup authority set.
+   */
+  'knowledge/adr/state.v1.json',
 ];
 
 export class SnapshotManager {

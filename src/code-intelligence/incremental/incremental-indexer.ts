@@ -8,9 +8,23 @@ import type { CodeGraphSnapshot, ParsedFile } from '../types.js';
 
 import { GraphBuilder } from '../graph/graph-builder.js';
 
+import { CodeGraphStore } from '../graph/graph-store.js';
+
 import { repairPreservedEdges } from '../graph/graph-repair.js';
 
-import { parseTypeScriptFile } from '../parsers/typescript-parser.js';
+import { parseCodeFile } from '../parsers/parse-code-file.js';
+
+import { parserFingerprintDigest } from '../parsers/fingerprint.js';
+
+import { semanticFingerprint } from '../graph/graph-semantics.js';
+
+import { assertValidGraph } from '../graph/graph-validator.js';
+
+import { CrossServiceEngine } from '../cross-service/cross-service-engine.js';
+
+import { PersistentCrossServiceStore } from '../../storage/cross-service-store.js';
+
+import { PersistentFleetExportStore } from '../../storage/fleet-export-store.js';
 
 import { TypeScriptModulePathResolver } from '../resolution/typescript-module-resolver.js';
 
@@ -97,13 +111,38 @@ export class IncrementalRepositoryIndexer {
       diff.added.length > 0 || diff.deleted.length > 0 || diff.renamed.length > 0;
 
     /*
+     * Phase 69: parser identity is separate from source identity.
+     *
+     * If the structural parser generation changed (adapter set, grammar
+     * asset hash, normalization schema version) a previously indexed graph
+     * cannot be trusted even when every source hash is unchanged.
+     */
+    const parserFingerprint = parserFingerprintDigest();
+
+    const parserFingerprintChanged =
+      previousGraph !== null && previousGraph.parserFingerprint !== parserFingerprint;
+
+    const graphSemanticFingerprint = semanticFingerprint();
+
+    /*
+     * Semantic rule changes invalidate the previous graph generation even when
+     * every source hash and the parser generation are unchanged.
+     */
+    const semanticFingerprintChanged =
+      previousGraph !== null && previousGraph.semanticFingerprint !== graphSemanticFingerprint;
+
+    /*
      * File-set changes can make previously unresolved
      * imports/calls valid or invalidate global fallback.
      *
      * Correctness-first:
      * rebuild all graph relations for add/delete/rename.
      */
-    const fullRebuild = previousGraph === null || structuralChange;
+    const fullRebuild =
+      previousGraph === null ||
+      structuralChange ||
+      parserFingerprintChanged ||
+      semanticFingerprintChanged;
 
     const parseTargets = fullRebuild
       ? Object.keys(currentManifest.files).sort()
@@ -129,7 +168,7 @@ export class IncrementalRepositoryIndexer {
 
     const parsed = await mapWithConcurrency(
       parseTargets,
-      async (filePath): Promise<ParsedFile> => parseTypeScriptFile(projectId, rootPath, filePath),
+      async (filePath): Promise<ParsedFile> => parseCodeFile(projectId, rootPath, filePath),
       {
         concurrency: options.parseConcurrency ?? DEFAULT_PARSE_CONCURRENCY,
         signal: options.signal,
@@ -195,6 +234,22 @@ export class IncrementalRepositoryIndexer {
       });
     }
 
+    /*
+     * Phase 72: cross-service links are part of the authoritative generation.
+     *
+     * Correctness over optimisation: after a structural change the
+     * cross-service layer is re-derived from the freshly built graph, so a
+     * renamed/deleted route or channel can never leave a stale
+     * HTTP_CALLS/EMITS/LISTENS_ON edge behind.
+     */
+    const crossService = await new CrossServiceEngine({ graph: finalGraph }).analyze({
+      projectId,
+      rootPath,
+      files: Object.keys(currentManifest.files),
+      graphGeneration: `${parserFingerprint}:${graphSemanticFingerprint}`,
+      graphFingerprint: graphSemanticFingerprint,
+    });
+
     const symbols = finalGraph.allSymbols(projectId);
 
     const symbolIds = new Set(symbols.map((symbol) => symbol.id));
@@ -213,7 +268,18 @@ export class IncrementalRepositoryIndexer {
       files: Object.keys(currentManifest.files).length,
       symbols,
       edges,
+      parserFingerprint,
+      semanticFingerprint: graphSemanticFingerprint,
     };
+
+    /*
+     * No dangling or semantically invalid edge may be persisted. The snapshot
+     * carries the filtered edge set, so validation runs against exactly what
+     * will be written instead of the unfiltered builder output.
+     */
+    const validationStore = new CodeGraphStore();
+    validationStore.import(snapshot.symbols, snapshot.edges);
+    assertValidGraph(validationStore, projectId);
 
     options.onProgress?.({
       phase: 'save',
@@ -228,6 +294,11 @@ export class IncrementalRepositoryIndexer {
       current: 1,
       total: 2,
     });
+
+    await new PersistentCrossServiceStore(this.storage).save(crossService.snapshot);
+
+    /* Phase 73: keep the project's Fleet export in sync with its generation. */
+    await new PersistentFleetExportStore(this.storage).save(crossService.export);
 
     await manifestStore.save(currentManifest);
 

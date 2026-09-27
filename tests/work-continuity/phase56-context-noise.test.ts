@@ -17,7 +17,16 @@ import { buildStartupBrief } from '../../src/work-continuity/brief.js';
 import { writeFastHandoff } from '../../src/work-continuity/fast-handoff.js';
 
 const roots: string[] = [];
-const NOW = Date.parse('2026-09-08T00:00:00.000Z');
+/*
+ * Derived from the real clock. Tasks are created through TaskStore, which
+ * stamps them with the wall clock, so a hardcoded anchor would silently
+ * expire once the current work projection's freshness window (Phase 53
+ * default = 30 days, with a 1 day future skew allowance) drifts past it.
+ */
+const NOW = Date.now();
+/* Fixture timestamps track NOW so freshness windows never silently expire. */
+const DAY_MS = 86_400_000;
+const isoDays = (days: number): string => new Date(NOW + days * DAY_MS).toISOString();
 
 class MemoryStorage implements StorageProvider {
   readonly name = 'memory';
@@ -115,8 +124,8 @@ describe('Phase 56 Context Noise Filter and Ranking', () => {
         type: 'rule',
         scope: 'rule',
         content: 'Keep PostgreSQL.',
-        observedAt: '2025-01-01T00:00:00.000Z',
-        verifiedAt: '2026-08-01T00:00:00.000Z',
+        observedAt: isoDays(-600),
+        verifiedAt: isoDays(-20),
         confidence: 0.98,
         staleAfter: undefined,
         metadata: {
@@ -131,16 +140,16 @@ describe('Phase 56 Context Noise Filter and Ranking', () => {
         content: 'Current production API uses v2.',
         scope: 'fact',
         confidence: 0.96,
-        observedAt: '2026-09-07T00:00:00.000Z',
-        staleAfter: '2026-09-20T00:00:00.000Z',
+        observedAt: isoDays(-1),
+        staleAfter: isoDays(10),
       }),
       memory({
         id: 'stale-observation',
         content: 'OLD API endpoint should not inject.',
         scope: 'observation',
         confidence: 0.99,
-        observedAt: '2026-07-01T00:00:00.000Z',
-        staleAfter: '2026-08-01T00:00:00.000Z',
+        observedAt: isoDays(-60),
+        staleAfter: isoDays(-30),
       }),
       memory({
         id: 'low-confidence',

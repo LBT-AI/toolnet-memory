@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.5.3**
+Current release: **v0.6.0**
 
 </div>
 
@@ -135,6 +135,16 @@ v0.5.2 completes the intent-aware retrieval roadmap and promotes the retrieval r
 - Rebuilds Task projection and shared Session journal from authoritative logs.
 - Remote restore is additive and never deletes newer immutable operations.
 - Production certification now includes the Phase 67 disaster-recovery gate.
+
+### v0.6.0 Code Intelligence, Daemon & Release Engineering
+
+- Adds code-intelligence graph trust and coverage reporting, multi-language structural parsing, deterministic symbol resolution, graph semantics v2, and cross-service/cross-repository (Fleet) intelligence.
+- Adds a versioned graph query/schema surface, Architecture Decision Records, and portable shared graph artifacts.
+- Adds a local coordination daemon with a build/protocol admission barrier and deterministic restart ordering during upgrades.
+- Adds evidence profiles and runtime trace evidence, plus change, contract, test, and release-readiness intelligence tools.
+- Adds install/upgrade/migration intelligence: storage compatibility classification, upgrade orchestration, packaged build identity, upgrade recovery, and live daemon upgrade handling.
+- Unifies build identity across the dispatcher, standalone binary, and daemon.
+- Purely additive from v0.5.3 with no public breaking changes; authority stores are protected by backup/verify and derived stores are rebuilt when required.
 
 ## Supported Coding Agents
 
@@ -768,18 +778,169 @@ removed in this release:
 
 ### Parser support
 
-| Language family              | Status      |
-| ---------------------------- | ----------- |
-| TypeScript / TSX             | supported   |
-| JavaScript / JSX / MJS / CJS | supported   |
-| Python                       | unsupported |
-| Go                           | unsupported |
-| Rust                         | unsupported |
-| C / C++                      | unsupported |
+Two layers are always kept distinct:
 
-The supported TypeScript/JavaScript family uses the TypeScript Compiler API.
+- **Lexical search** — SQLite FTS5/BM25 over sanitized file chunks.
+- **Structural graph** — AST-derived symbols, imports, calls, and heritage.
 
-Tree-sitter is not implemented in this release.
+| Language family              | Lexical | Structural | Cross-file resolver |
+| ---------------------------- | ------- | ---------- | ------------------- |
+| TypeScript / TSX             | yes     | yes        | deterministic       |
+| JavaScript / JSX / MJS / CJS | yes     | yes        | deterministic       |
+| Python                       | yes     | yes        | deterministic       |
+| Go                           | yes     | yes        | deterministic       |
+| Rust                         | yes     | yes        | deterministic       |
+| C                            | yes     | yes        | deterministic       |
+| C++                          | yes     | yes        | deterministic       |
+
+TypeScript/JavaScript use the TypeScript Compiler API. Python, Go, Rust, C, and
+C++ use package-owned tree-sitter grammars. Grammar assets ship with the
+package and are resolved offline — no grammar is downloaded at index time.
+
+Parsing and resolution are separate capabilities. Resolution is deterministic:
+every graph edge requires proven evidence (lexical scope, explicit import,
+module target, receiver type, or inheritance). Identically named symbols are
+never merged, ambiguous references stay unresolved, and no confidence score or
+fuzzy matching is used. Graph coverage reflects that evidence, so a structural
+negative claim is only reported as safe when the relevant capability is fully
+resolved and fresh.
+
+The authoritative graph has standardized edge semantics (`DEFINES`, `IMPORTS`,
+`CALLS`, `CALL_REFERENCE`, `USES_TYPE`, `INHERITS`, `IMPLEMENTS`, `READS`,
+`WRITES`, `HANDLES`, `CONFIGURES`). Each edge records its producer, evidence and
+whether it is deterministic or a reference; `CALLS` means a proven callee,
+`CALL_REFERENCE` means the runtime implementation is unknown. The graph is
+validated and carries its own semantic fingerprint before it is persisted.
+See [`docs/architecture.md`](docs/architecture.md).
+
+Cross-service linkage is deterministic static analysis inside one project:
+HTTP routes and clients, and event channels, are extracted from real syntax
+and linked only when exactly one canonical endpoint matches. Two services
+declaring the same `POST /orders` stay ambiguous with zero edges, dynamic URLs
+stay unresolved, and credentials in URLs are redacted before anything is
+retained. Cross-service relationships keep their own edge types
+(`HTTP_CALLS`, `HANDLES`, `EMITS`, `LISTENS_ON`) — a caller is never linked
+directly to a cross-service handler, and producers are never linked directly
+to consumers.
+
+| Language   | HTTP server                      | HTTP client        | Event channels        |
+| ---------- | -------------------------------- | ------------------ | --------------------- |
+| TypeScript | Express/Fastify/Koa/Hono, NestJS | `fetch`, `axios`   | `emit`/`on`           |
+| Python     | FastAPI/Flask                    | `requests`/`httpx` | `emit`/`publish`/`on` |
+| Go         | `net/http`, Gin/Echo/Fiber       | `http.Get/Post`    | `Publish`/`Subscribe` |
+
+GraphQL, gRPC and tRPC are **not** linked in this phase. A service that
+declares one of those frameworks is reported through
+`UNSUPPORTED_SERVICE_FRAMEWORK` and its cross-service coverage is `partial`,
+never silently treated as complete. No network request, DNS lookup, package
+manager or source execution is performed.
+
+Cross-repository relationships are a derived overlay, not a merged graph. A
+Fleet contains only the ToolNet projects this install knows about; project
+graphs stay isolated and are consumed through a minimal, sanitized export view.
+Cross-project edges are deterministic (`CROSS_HTTP_CALLS`, `CROSS_EMITS`,
+`CROSS_LISTENS_ON`, `CROSS_PACKAGE_DEPENDS_ON`) and carry evidence, never a
+confidence score. Two repositories declaring the same endpoint with no host
+evidence stay ambiguous with zero edges, event channels match only within the
+same provider, and an external dependency is never mapped onto a project that
+happens to share its name. Fleet generation is deterministic, stale projects
+contribute no current links, and cross-repo impact is opt-in so local impact
+semantics never change. Inspect it with `fleet_status` and `fleet_projects`,
+and pass `includeCrossRepo: true` to `analyze_impact`.
+
+Ad-hoc graph questions use **TGQL**, a bounded, read-only graph query subset
+(`MATCH`, `WHERE`, `RETURN`, `ORDER BY`, `LIMIT`, `SKIP`) served by the
+`query_graph` MCP tool. It queries either the current project graph (default)
+or the Fleet overlay, and `get_graph_schema` publishes the machine-readable
+node types, edge types, allowlisted properties, supported clauses and hard
+limits. Mutation clauses (`CREATE`, `MERGE`, `DELETE`, `SET`, `REMOVE`, `DROP`,
+`CALL`, `UNWIND`, `FOREACH`, `LOAD CSV`) are rejected before planning, values
+are bound as parameters instead of string interpolation, and every traversal
+is depth-, row- and expansion-bounded so it can be cancelled. Schema
+vocabulary is reported honestly: edges with no producer yet (for example
+`CROSS_RPC_CALLS`) stay queryable but are marked `status: "reserved"` and
+`currentlyProduced: false`. Every result carries coverage metadata, and an
+empty result is only a negative claim when `negativeClaimSafe` is true.
+
+Architecture Decision Records capture the durable **why** behind the code.
+Each ADR is a structured, project-scoped record (`ADR-0001`) with an explicit
+lifecycle (`proposed`, `accepted`, `deprecated`, `superseded`, `rejected`), an
+optimistic-concurrency revision, an append-only audit history and deterministic
+supersession links. The structured store is the authority; Markdown is a
+deterministic, server-controlled projection. Manage them with the `manage_adr`
+MCP tool (`create`, `get`, `list`, `search`, `update`, `set_sections`,
+`change_status`, `supersede`, `history`, `chain`, `export`, `import`): searches
+are local lexical ranking (no embeddings, no vector database, no LLM), a stale
+`expectedRevision` fails with `ADR_CONFLICT` instead of a silent
+last-write-wins, and supersession cycles are rejected. Accepted ADRs that affect
+the targeted files/symbols are surfaced by `project_context`
+(`architectureDecisions`) and `analyze_impact` (`relevantADRs`) — as context,
+never as impact calculation. Nothing is auto-accepted and no decision is ever
+inferred from a conversation. See [`docs/adr.md`](docs/adr.md) for the
+full operational contract.
+
+A **portable code-intelligence artifact** lets a machine that already indexed a
+repository hand its derived graph to another machine so it does not have to
+re-parse. `manage_graph_artifact` (`status`, `publish`, `pull`, `verify`,
+`list`, `prune`) builds an immutable generation, uploads it through the existing
+storage provider (local, R2, S3 or legacy Hugging Face — with the retry and
+client-side encryption wrappers reused unchanged) and only then moves the
+current pointer. An artifact is **derived state**: it never carries or
+overwrites memory, tasks, sessions, ADRs, the Wiki or the Project Manual, and
+the fixed component table means archive bytes can never choose a write target.
+Adoption is verify-first — schema and fingerprint compatibility, canonical
+project identity, an exact hash-only source manifest match, SHA-256 of the
+archive and of every component, then semantic graph validation — so a failed
+pull leaves the current graph intact and falls back to local indexing. The local
+FTS5/BM25 search cache is never shipped; it is rebuilt locally. No absolute path
+or machine identity is ever persisted, so artifacts work across root paths, and
+no LLM, embeddings or vector database is involved. See
+[`docs/code-intelligence-artifacts.md`](docs/code-intelligence-artifacts.md) for
+the full operational contract.
+
+Agents sharing one machine also share one **local coordination daemon**. Instead
+of every MCP session, CLI invocation and agent integration repeating an index, a
+hydration and a graph build, they connect to a single local runtime over a Unix
+domain socket (a named pipe on Windows) on a `0700` directory. One watcher runs
+per project, indexing and artifact hydration are single-flight (ten sessions
+asking at once cause one pass and one download, and zero parser invocations when
+a compatible artifact exists), Fleet relinks are coalesced, and progress is fanned
+out to subscribers. Exactly one daemon is elected per runtime identity through a
+real instance lock that validates instance identity, not just a pid, so a reused
+pid is treated as stale and an unrelated process is never killed. Admission is an
+exact build barrier — protocol version, package version, build marker and every
+schema fingerprint must match — and a mismatched daemon is reported, never killed.
+The daemon is **runtime coordination only**: Memory, Tasks, the Task WAL,
+Sessions, ADRs, the Wiki and the Project Manual stay in their own persistent
+stores, and the daemon can be killed and restarted at any time. `daemon_status`
+is the only MCP surface and it is read-only; start, stop and restart are trusted
+local CLI actions (`toolnet-memory daemon status|start|stop|restart`). If the
+daemon is unavailable, ToolNet falls back to an in-process runtime with identical
+generation, coverage and query semantics. No public port, no remote protocol, no
+LLM, no embeddings and no vector database. See
+[`docs/local-daemon.md`](docs/local-daemon.md) for the full operational contract.
+
+Finding a caller is not the same as proving there are no callers. **Evidence
+profiles** make the required level of proof explicit: Scout is fast discovery
+whose results are always `provisional`; Verify checks coverage, freshness and
+pagination before a task-critical conclusion; Auditor is bounded exhaustive and is
+required for absence, uniqueness, exhaustive and dead-code claims. `verify_evidence`
+takes an explicit claim (`positive`, `negative`, `absence`, `uniqueness`,
+`exhaustive`, `impact`, `dead_code`) and returns a structured bundle with
+generation, per-capability coverage, bounded evidence, pagination state, a
+source-fallback report for recorded gaps, unresolved/ambiguity counts and a
+`claimSafety` decision (`allowed` / `provisional` / `blocked`) with reason codes.
+Reserved edge vocabulary has no producer and can never ground an absence claim;
+dead code is never automatically deletable; Auditor means bounded, not omniscient
+— exceeding a limit reports `complete: false`, never a silent truncation. Source
+fallback reads only the affected project file, refuses escapes and sensitive
+files, executes nothing and makes no network calls. `query_graph` accepts an
+optional `evidenceProfile`, and `get_graph_schema` reports which capabilities
+each profile can use and what blocks an audit. Evidence is derived state and runs
+through the shared runtime, so a daemon shares and single-flights identical
+audits; bundles never touch Memory, Tasks, Sessions, the Task WAL or ADR
+authority. No LLM, no embeddings and no vector database. See
+[`docs/evidence-profiles.md`](docs/evidence-profiles.md) for the full contract.
 
 ### Cross-machine project identity
 
@@ -1373,12 +1534,18 @@ unless `TOOLNET_AUTO_GC_REMOTE=on` is explicitly configured.
 See [`docs/audit-log.md`](docs/audit-log.md) and
 [`docs/auto-gc.md`](docs/auto-gc.md).
 
-Non-TypeScript local code search
+Non-TypeScript code intelligence
 
-Structural graph parsing remains TypeScript/JavaScript-only.
+Python, Go, Rust, C, and C++ are included in deterministic local code search
+through sanitized file chunks indexed by SQLite FTS5/BM25, and are parsed
+structurally with package-owned tree-sitter grammars.
 
-Python, Go, Rust, C, and C++ files are now included in deterministic local
-code search through sanitized file chunks indexed by SQLite FTS5/BM25.
+Structural parsing does not by itself imply a complete cross-file call graph.
+Cross-file symbol resolution for these languages is deterministic: references
+are resolved through lexical scope, explicit imports, module targets, receiver
+types and inheritance, and anything unproven stays unresolved. Graph coverage
+guards structural negative claims until the relevant capability is fully
+resolved and fresh.
 
 ```bash
 toolnet-memory code:capabilities

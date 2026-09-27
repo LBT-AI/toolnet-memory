@@ -301,7 +301,14 @@ async function captureRemote(
          * Old SnapshotManager snapshots are not source of truth.
          * Do not recursively back up historical snapshots.
          */
-        !item.key.includes('/snapshots/')
+        !item.key.includes('/snapshots/') &&
+        /*
+         * Phase 76: portable code-intelligence artifacts are DERIVED and fully
+         * rebuildable. They are intentionally excluded from the disaster
+         * recovery authority backup so a cache of historical graph generations
+         * can never inflate it. Retention/GC owns them instead.
+         */
+        !item.key.includes('/graph/artifacts/')
     )
     .sort((left, right) => left.key.localeCompare(right.key))) {
     const data = await storage.get(object.key);

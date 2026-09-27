@@ -118,7 +118,11 @@ export interface CodeSymbol {
     | 'method'
     | 'route'
     | 'property'
-    | 'service';
+    | 'service'
+    /*
+     * Phase 72: deterministic pub/sub channel node.
+     */
+    | 'event';
 
   filePath: string;
 
@@ -137,19 +141,25 @@ export interface GraphEdge {
   to: string;
 
   type:
-    | 'CALLS'
-    | 'IMPORTS'
-    | 'ROUTE'
-    | 'TESTS'
-    | 'USES_TYPE'
-    | 'WRITES'
-    | 'CALL_REFERENCE'
     | 'DEFINES'
+    | 'IMPORTS'
+    | 'CALLS'
+    | 'CALL_REFERENCE'
+    | 'USES_TYPE'
     | 'INHERITS'
     | 'IMPLEMENTS'
-    | 'HTTP_CALLS'
     | 'READS'
-    | 'WRITES';
+    | 'WRITES'
+    | 'HANDLES'
+    | 'CONFIGURES'
+    | 'ROUTE'
+    | 'TESTS'
+    | 'HTTP_CALLS'
+    | 'RPC_CALLS'
+    | 'GRAPHQL_CALLS'
+    | 'TRPC_CALLS'
+    | 'EMITS'
+    | 'LISTENS_ON';
 
   metadata?: Record<string, unknown>;
 }

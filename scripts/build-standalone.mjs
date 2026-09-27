@@ -4,6 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
+import { buildMarkerFor, runtimeSourceDigest } from './source-digest.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const args = process.argv.slice(2);
@@ -59,6 +61,12 @@ function defaultFilename(target) {
 }
 
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+
+/*
+ * Phase 84D1 — the standalone binary must advertise the same build identity as
+ * the npm bundle built from the same source: same version, same source digest.
+ */
+const buildMarker = buildMarkerFor(pkg.version, runtimeSourceDigest(root));
 const target = valueAfter('--target') ?? hostTarget();
 targetParts(target);
 const stage = join(root, '.standalone-build');
@@ -89,6 +97,8 @@ await build({
   legalComments: 'none',
   define: {
     __TOOLNET_VERSION__: JSON.stringify(pkg.version),
+    __TOOLNET_PACKAGE_VERSION__: JSON.stringify(pkg.version),
+    __TOOLNET_BUILD_ID__: JSON.stringify(buildMarker),
   },
   // Bundled dependencies are required because a standalone target must not
   // depend on node_modules on the target host.
@@ -127,4 +137,5 @@ const { exec } = await import('@yao-pkg/pkg');
 await exec([stage, '--targets', target, '--output', output, '--compress', 'Brotli', '--sea']);
 
 console.log(`STANDALONE_BUILD=PASS target=${target}`);
+console.log(`STANDALONE_BUILD_MARKER=${buildMarker}`);
 console.log(`STANDALONE_BINARY=${output}`);

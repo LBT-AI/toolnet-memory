@@ -15,17 +15,13 @@ export type ParserLanguage =
   | 'c'
   | 'cpp';
 
-export type ParserEngine = 'typescript-compiler-api' | 'unsupported';
+export type ParserEngine = 'typescript-compiler-api' | 'tree-sitter' | 'unsupported';
 
 export type LexicalEngine = 'file-chunk-fts5-bm25';
 
 export interface ParserCapability {
   language: ParserLanguage;
   extensions: readonly string[];
-  /*
-   * Backward-compatible meaning:
-   * true only when ToolNet has structural parsing.
-   */
   supported: boolean;
   engine: ParserEngine;
   structural: boolean;
@@ -42,6 +38,17 @@ const STRUCTURAL_LEXICAL: Pick<
   structural: true,
   lexicalSearch: true,
   engine: 'typescript-compiler-api',
+  lexicalEngine: 'file-chunk-fts5-bm25',
+};
+
+const TREE_SITTER_LEXICAL: Pick<
+  ParserCapability,
+  'supported' | 'structural' | 'lexicalSearch' | 'engine' | 'lexicalEngine'
+> = {
+  supported: true,
+  structural: true,
+  lexicalSearch: true,
+  engine: 'tree-sitter',
   lexicalEngine: 'file-chunk-fts5-bm25',
 };
 
@@ -100,31 +107,31 @@ export const PARSER_CAPABILITIES: readonly ParserCapability[] = [
   {
     language: 'python',
     extensions: ['.py'],
-    ...LEXICAL_ONLY,
+    ...TREE_SITTER_LEXICAL,
     lspServer: 'pyright-langserver',
   },
   {
     language: 'go',
     extensions: ['.go'],
-    ...LEXICAL_ONLY,
+    ...TREE_SITTER_LEXICAL,
     lspServer: 'gopls',
   },
   {
     language: 'rust',
     extensions: ['.rs'],
-    ...LEXICAL_ONLY,
+    ...TREE_SITTER_LEXICAL,
     lspServer: 'rust-analyzer',
   },
   {
     language: 'c',
     extensions: ['.c', '.h'],
-    ...LEXICAL_ONLY,
+    ...TREE_SITTER_LEXICAL,
     lspServer: 'clangd',
   },
   {
     language: 'cpp',
     extensions: ['.cc', '.cpp', '.cxx', '.hpp', '.hh'],
-    ...LEXICAL_ONLY,
+    ...TREE_SITTER_LEXICAL,
     lspServer: 'clangd',
   },
 ];
@@ -156,4 +163,16 @@ export function searchableParserExtensions(): string[] {
       )
     ),
   ];
+}
+
+export function structuralLanguages(): ParserLanguage[] {
+  return PARSER_CAPABILITIES.filter((capability) => capability.structural).map(
+    (capability) => capability.language
+  );
+}
+
+export function treeSitterLanguages(): ParserLanguage[] {
+  return PARSER_CAPABILITIES.filter((capability) => capability.engine === 'tree-sitter').map(
+    (capability) => capability.language
+  );
 }

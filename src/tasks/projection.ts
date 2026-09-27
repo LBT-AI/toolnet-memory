@@ -298,6 +298,17 @@ export function unresolvedTaskDependencies(
     .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
 }
 function completionGuard(tasks: Record<string, TaskRecord>, task: TaskRecord): void {
+  /*
+   * Phase 85G1 reachability: INTERNAL DEFENSIVE INVARIANT.
+   *
+   * `lifecycleAllowed` only lets `active -> completed`, and the canonical
+   * `active` transition always deletes `blocker`, so a Task shaped by the
+   * supported engine can never be both active and blocked (a blocked Task must
+   * be resumed first and fails with TASK_LIFECYCLE_INVALID). This guard stays
+   * so a legacy, replayed or replicated operation can never quietly complete a
+   * blocked Task. Do not remove it; do not construct fake operations to
+   * exercise it.
+   */
   if (task.blocker) {
     throw new Error('TASK_COMPLETE_BLOCKED');
   }

@@ -8,9 +8,23 @@ import type { CodeSymbol, GraphEdge } from '../../core/types.js';
 
 import type { CodeGraphStore } from '../graph/graph-store.js';
 
+import { canonicalResolutionKind } from '../resolution/legacy.js';
+
+import type { ResolutionSnapshot, ResolutionResult } from '../resolution/types.js';
 import type { TypeResolutionSnapshot } from '../resolution/types.js';
 
 import type { StageProgressCallback } from '../types.js';
+
+import { createGraphEdge } from '../graph/edge-factory.js';
+import { createEdgeProvenance } from '../graph/edge-provenance.js';
+import {
+  getEdgeSemanticDefinition,
+  isEdgeTypeAllowed,
+  type GraphEdgeType,
+} from '../graph/edge-semantic-registry.js';
+
+const WRITABLE_TARGET_TYPES: readonly CodeSymbol['type'][] =
+  getEdgeSemanticDefinition('WRITES')?.allowedTargetTypes ?? [];
 
 function normalize(value: string): string {
   return value.replaceAll('\\', '/').replace(/^\.\//, '');
@@ -42,6 +56,7 @@ export interface RichGraphStats {
   routes: number;
   tests: number;
   usesType: number;
+  reads: number;
   writes: number;
   callReferences: number;
   properties: number;
@@ -53,13 +68,14 @@ export class RichGraphEnricher {
   enrich(
     projectId: string,
     rootPath: string,
-    resolution?: TypeResolutionSnapshot | null,
+    resolution?: ResolutionSnapshot | TypeResolutionSnapshot | null,
     onProgress?: StageProgressCallback
   ): RichGraphStats {
     const stats: RichGraphStats = {
       routes: 0,
       tests: 0,
       usesType: 0,
+      reads: 0,
       writes: 0,
       callReferences: 0,
       properties: 0,
@@ -69,13 +85,11 @@ export class RichGraphEnricher {
 
     const program = ts.createProgram({
       rootNames: config.fileNames,
-
       options: config.options,
     });
 
     const checker = program.getTypeChecker();
 
-    // Collect valid source files first for accurate total
     const validSources = program.getSourceFiles().filter((source) => {
       if (source.isDeclarationFile) {
         return false;
@@ -101,6 +115,12 @@ export class RichGraphEnricher {
         continue;
       }
 
+      /*
+       * Write targets are tracked so `this.value = x` produces a WRITES edge
+       * without a duplicate READS edge for the same property access.
+       */
+      const writeTargets = new Set<ts.Node>();
+
       const visit = (node: ts.Node) => {
         if (ts.isCallExpression(node)) {
           if (this.addRoute(projectId, rootPath, source, fileNode, node, checker)) {
@@ -115,6 +135,8 @@ export class RichGraphEnricher {
         }
 
         if (ts.isBinaryExpression(node) && ASSIGNMENTS.has(node.operatorToken.kind)) {
+          writeTargets.add(node.left);
+
           const result = this.addWrite(projectId, rootPath, source, node.left, checker);
 
           if (result.added) {
@@ -131,10 +153,24 @@ export class RichGraphEnricher {
           (node.operator === ts.SyntaxKind.PlusPlusToken ||
             node.operator === ts.SyntaxKind.MinusMinusToken)
         ) {
+          writeTargets.add(node.operand);
+
           const result = this.addWrite(projectId, rootPath, source, node.operand, checker);
 
           if (result.added) {
             stats.writes++;
+
+            if (result.propertyCreated) {
+              stats.properties++;
+            }
+          }
+        }
+
+        if (ts.isPropertyAccessExpression(node) && !writeTargets.has(node)) {
+          const result = this.addRead(projectId, rootPath, source, node, checker);
+
+          if (result.added) {
+            stats.reads++;
 
             if (result.propertyCreated) {
               stats.properties++;
@@ -201,23 +237,26 @@ export class RichGraphEnricher {
     if (!this.graph.getSymbol(routeId)) {
       this.graph.addSymbol({
         id: routeId,
-
         projectId,
-
         name: `${method.toUpperCase()} ${path}`,
-
         qualifiedName: `${method.toUpperCase()} ${path}`,
-
         type: 'route',
-
         filePath: fileNode.filePath,
-
         startLine: sourceLine,
-
         endLine: sourceLine,
       });
 
-      this.graph.addEdge(this.edge(projectId, fileNode.id, 'DEFINES', routeId));
+      this.graph.addEdge(
+        createGraphEdge({
+          projectId,
+          from: fileNode.id,
+          to: routeId,
+          type: 'DEFINES',
+          provenance: createEdgeProvenance('parser', 'syntax', 'deterministic', {
+            filePath: fileNode.filePath,
+          }),
+        })
+      );
     }
 
     const handler = node.arguments.at(-1);
@@ -227,10 +266,18 @@ export class RichGraphEnricher {
 
       if (target) {
         this.graph.addEdge(
-          this.edge(projectId, routeId, 'ROUTE', target.id, {
-            method: method.toUpperCase(),
-
-            path,
+          createGraphEdge({
+            projectId,
+            from: routeId,
+            to: target.id,
+            type: 'ROUTE',
+            provenance: createEdgeProvenance('enricher', 'route_declaration', 'deterministic', {
+              filePath: fileNode.filePath,
+            }),
+            metadata: {
+              method: method.toUpperCase(),
+              path,
+            },
           })
         );
       }
@@ -262,9 +309,119 @@ export class RichGraphEnricher {
       return false;
     }
 
-    this.graph.addEdge(this.edge(projectId, sourceSymbol.id, 'USES_TYPE', target.id));
+    /*
+     * Semantic contract: USES_TYPE is a symbol-level type relationship.
+     * File-scoped type references (type aliases, ambient declarations) are not
+     * a proven symbol relationship, so the edge is dropped rather than written
+     * with a source/target that the registry forbids.
+     */
+    if (!isEdgeTypeAllowed('USES_TYPE', sourceSymbol.type, target.type)) {
+      return false;
+    }
+
+    this.graph.addEdge(
+      createGraphEdge({
+        projectId,
+        from: sourceSymbol.id,
+        to: target.id,
+        type: 'USES_TYPE',
+        provenance: createEdgeProvenance('enricher', 'resolved_symbol', 'deterministic', {
+          filePath: sourceSymbol.filePath,
+          line: lineOf(source, node),
+        }),
+      })
+    );
 
     return true;
+  }
+
+  /**
+   * Resolve a property/field/variable target for READS/WRITES.
+   *
+   * Returns null when no project-local declaration can be proven. A line
+   * lookup can land on the enclosing class because fields are not always
+   * modelled as symbols, so any non-writable hit falls through to a
+   * deterministic synthetic property symbol instead of a forbidden edge.
+   */
+  private resolveDataTarget(
+    projectId: string,
+    rootPath: string,
+    source: ts.SourceFile,
+    targetNode: ts.Node,
+    checker: ts.TypeChecker
+  ): { target: CodeSymbol; propertyCreated: boolean } | null {
+    const symbol = this.resolveTsSymbol(targetNode, checker);
+
+    const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+
+    if (!declaration) {
+      return null;
+    }
+
+    const declarationSource = declaration.getSourceFile();
+
+    if (declarationSource.isDeclarationFile) {
+      return null;
+    }
+
+    const targetFile = normalize(relative(rootPath, resolve(declarationSource.fileName)));
+
+    if (targetFile.startsWith('../') || targetFile.includes('node_modules/')) {
+      return null;
+    }
+
+    const targetLine = lineOf(declarationSource, declaration);
+
+    let target = this.findSymbolAt(projectId, targetFile, targetLine);
+
+    let propertyCreated = false;
+
+    if (!target || !WRITABLE_TARGET_TYPES.includes(target.type)) {
+      const name = symbol?.getName() ?? targetNode.getText(source);
+
+      const propertyId = id(projectId, targetFile, 'property', name, targetLine);
+
+      target = this.graph.getSymbol(propertyId);
+
+      if (!target) {
+        target = {
+          id: propertyId,
+          projectId,
+          name,
+          qualifiedName: name,
+          type: 'property',
+          filePath: targetFile,
+          startLine: targetLine,
+          endLine: targetLine,
+        };
+
+        this.graph.addSymbol(target);
+
+        const targetFileNode = this.fileNode(projectId, targetFile);
+
+        if (targetFileNode) {
+          this.graph.addEdge(
+            createGraphEdge({
+              projectId,
+              from: targetFileNode.id,
+              to: target.id,
+              type: 'DEFINES',
+              provenance: createEdgeProvenance('enricher', 'declaration', 'deterministic', {
+                filePath: targetFile,
+              }),
+            })
+          );
+        }
+
+        propertyCreated = true;
+      }
+    }
+
+    if (!target) {
+      return null;
+    }
+
+    return { target, propertyCreated };
   }
 
   private addWrite(
@@ -277,107 +434,94 @@ export class RichGraphEnricher {
     added: boolean;
     propertyCreated: boolean;
   } {
-    const symbol = this.resolveTsSymbol(targetNode, checker);
+    const resolved = this.resolveDataTarget(projectId, rootPath, source, targetNode, checker);
 
-    const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
-
-    if (!declaration) {
-      return {
-        added: false,
-        propertyCreated: false,
-      };
+    if (!resolved) {
+      return { added: false, propertyCreated: false };
     }
 
-    const declarationSource = declaration.getSourceFile();
-
-    if (declarationSource.isDeclarationFile) {
-      return {
-        added: false,
-        propertyCreated: false,
-      };
-    }
-
-    const targetFile = normalize(relative(rootPath, resolve(declarationSource.fileName)));
-
-    if (targetFile.startsWith('../') || targetFile.includes('node_modules/')) {
-      return {
-        added: false,
-        propertyCreated: false,
-      };
-    }
-
-    const targetLine = lineOf(declarationSource, declaration);
-
-    let target = this.findSymbolAt(projectId, targetFile, targetLine);
-
-    let propertyCreated = false;
-
-    if (!target || target.type === 'file') {
-      const name = symbol?.getName() ?? targetNode.getText(source);
-
-      const propertyId = id(projectId, targetFile, 'property', name, targetLine);
-
-      target = this.graph.getSymbol(propertyId);
-
-      if (!target) {
-        target = {
-          id: propertyId,
-
-          projectId,
-
-          name,
-
-          qualifiedName: name,
-
-          type: 'property',
-
-          filePath: targetFile,
-
-          startLine: targetLine,
-
-          endLine: targetLine,
-        };
-
-        this.graph.addSymbol(target);
-
-        const targetFileNode = this.fileNode(projectId, targetFile);
-
-        if (targetFileNode) {
-          this.graph.addEdge(this.edge(projectId, targetFileNode.id, 'DEFINES', target.id));
-        }
-
-        propertyCreated = true;
-      }
-    }
-
-    if (!target) {
-      return {
-        added: false,
-        propertyCreated,
-      };
-    }
+    const { target, propertyCreated } = resolved;
 
     const sourceFile = normalize(relative(rootPath, resolve(source.fileName)));
 
     const writer = this.containingSymbol(projectId, sourceFile, lineOf(source, targetNode));
 
     if (!writer || writer.id === target.id) {
-      return {
-        added: false,
-        propertyCreated,
-      };
+      return { added: false, propertyCreated };
+    }
+
+    /*
+     * WRITES targets a property/field/variable. If resolution produced a
+     * type symbol instead, the assignment relationship is not proven, so the
+     * edge is dropped rather than emitted against a forbidden target type.
+     */
+    if (!isEdgeTypeAllowed('WRITES', writer.type, target.type)) {
+      return { added: false, propertyCreated };
     }
 
     this.graph.addEdge(
-      this.edge(projectId, writer.id, 'WRITES', target.id, {
-        expression: targetNode.getText(source),
+      createGraphEdge({
+        projectId,
+        from: writer.id,
+        to: target.id,
+        type: 'WRITES',
+        provenance: createEdgeProvenance('enricher', 'assignment', 'deterministic', {
+          filePath: sourceFile,
+          line: lineOf(source, targetNode),
+        }),
+        metadata: {
+          expression: targetNode.getText(source),
+        },
       })
     );
 
-    return {
-      added: true,
-      propertyCreated,
-    };
+    return { added: true, propertyCreated };
+  }
+
+  private addRead(
+    projectId: string,
+    rootPath: string,
+    source: ts.SourceFile,
+    targetNode: ts.Node,
+    checker: ts.TypeChecker
+  ): {
+    added: boolean;
+    propertyCreated: boolean;
+  } {
+    const resolved = this.resolveDataTarget(projectId, rootPath, source, targetNode, checker);
+
+    if (!resolved) {
+      return { added: false, propertyCreated: false };
+    }
+
+    const { target, propertyCreated } = resolved;
+
+    const sourceFile = normalize(relative(rootPath, resolve(source.fileName)));
+
+    const reader = this.containingSymbol(projectId, sourceFile, lineOf(source, targetNode));
+
+    if (!reader || reader.id === target.id) {
+      return { added: false, propertyCreated };
+    }
+
+    if (!isEdgeTypeAllowed('READS', reader.type, target.type)) {
+      return { added: false, propertyCreated };
+    }
+
+    this.graph.addEdge(
+      createGraphEdge({
+        projectId,
+        from: reader.id,
+        to: target.id,
+        type: 'READS',
+        provenance: createEdgeProvenance('enricher', 'resolved_symbol', 'deterministic', {
+          filePath: sourceFile,
+          line: lineOf(source, targetNode),
+        }),
+      })
+    );
+
+    return { added: true, propertyCreated };
   }
 
   private addTestEdges(projectId: string): number {
@@ -398,7 +542,17 @@ export class RichGraphEnricher {
         continue;
       }
 
-      this.graph.addEdge(this.edge(projectId, from.id, 'TESTS', to.id));
+      this.graph.addEdge(
+        createGraphEdge({
+          projectId,
+          from: from.id,
+          to: to.id,
+          type: 'TESTS',
+          provenance: createEdgeProvenance('enricher', 'explicit_import', 'reference', {
+            filePath: from.filePath,
+          }),
+        })
+      );
 
       added++;
     }
@@ -406,11 +560,54 @@ export class RichGraphEnricher {
     return added;
   }
 
-  private addResolvedCalls(projectId: string, resolution: TypeResolutionSnapshot): number {
+  private addResolvedCalls(
+    projectId: string,
+    resolution: ResolutionSnapshot | TypeResolutionSnapshot
+  ): number {
     let added = 0;
 
-    for (const item of resolution.resolutions) {
-      if (item.kind !== 'CALL' || !item.targetSymbolId) {
+    const items: Array<{
+      sourceFile?: string;
+      sourceLine?: number;
+      targetSymbolId?: string;
+      expression?: string;
+    }> = [];
+
+    if ('results' in resolution && Array.isArray(resolution.results)) {
+      for (const item of resolution.results as ResolutionResult[]) {
+        if (item.status !== 'resolved' || !item.targetSymbolId) {
+          continue;
+        }
+        items.push({
+          sourceFile: item.sourceFile,
+          sourceLine: item.sourceLine,
+          targetSymbolId: item.targetSymbolId,
+          expression: item.expression,
+        });
+      }
+    }
+
+    if (
+      'resolutions' in resolution &&
+      Array.isArray((resolution as TypeResolutionSnapshot).resolutions)
+    ) {
+      for (const item of (resolution as TypeResolutionSnapshot).resolutions) {
+        /* The archived vocabulary (CALL/...) is resolved through the shared
+         * normalizer so a legacy snapshot can never be skipped silently. */
+        if (canonicalResolutionKind(item.kind) !== 'call' || !item.targetSymbolId) {
+          continue;
+        }
+        items.push({
+          sourceFile: item.sourceFile,
+          sourceLine: item.sourceLine,
+          targetSymbolId: item.targetSymbolId,
+          expression: item.expression,
+        });
+      }
+    }
+
+    for (const item of items) {
+      if (!item.targetSymbolId) {
         continue;
       }
 
@@ -420,31 +617,69 @@ export class RichGraphEnricher {
         continue;
       }
 
-      const source = this.containingSymbol(projectId, item.sourceFile, item.sourceLine);
+      let sourceSymbol: CodeSymbol | undefined;
+      if (item.sourceFile && item.sourceLine) {
+        sourceSymbol = this.containingSymbol(projectId, item.sourceFile, item.sourceLine);
+      }
 
-      if (!source || source.id === target.id) {
+      if (!sourceSymbol || sourceSymbol.id === target.id) {
         continue;
       }
 
       /*
-       * Nếu CALLS hiện tại đã đúng target
-       * thì không tạo edge trùng.
+       * Deterministic resolved target -> CALLS.
+       *
+       * A target that is only a declaration/interface does not prove a runtime
+       * implementation, so it stays CALL_REFERENCE. Nothing is created for
+       * ambiguous or unresolved references.
        */
+      const callableSource =
+        sourceSymbol.type === 'function' ||
+        sourceSymbol.type === 'method' ||
+        sourceSymbol.type === 'class' ||
+        sourceSymbol.type === 'route';
+
+      /*
+       * A file/module is not a caller. Top-level call sites that resolve to a
+       * file symbol are not a proven call relationship and are dropped.
+       */
+      if (!callableSource) {
+        continue;
+      }
+
+      const concreteTarget =
+        target.type === 'function' || target.type === 'method' || target.type === 'class';
+      const edgeType: GraphEdgeType =
+        target.type === 'interface' || !concreteTarget ? 'CALL_REFERENCE' : 'CALLS';
+
+      if (!isEdgeTypeAllowed(edgeType, sourceSymbol.type, target.type)) {
+        continue;
+      }
+
       const exactAlreadyExists = this.graph
         .allEdges(projectId)
-        .some((edge) => edge.type === 'CALLS' && edge.from === source.id && edge.to === target.id);
+        .some(
+          (edge) => edge.type === edgeType && edge.from === sourceSymbol.id && edge.to === target.id
+        );
 
       if (exactAlreadyExists) {
         continue;
       }
 
       this.graph.addEdge(
-        this.edge(projectId, source.id, 'CALL_REFERENCE', target.id, {
-          expression: item.expression,
-
-          confidence: item.confidence,
-
-          resolver: item.resolver,
+        createGraphEdge({
+          projectId,
+          from: sourceSymbol.id,
+          to: target.id,
+          type: edgeType,
+          provenance: createEdgeProvenance('resolver', 'resolved_symbol', 'deterministic', {
+            filePath: item.sourceFile,
+            line: item.sourceLine,
+          }),
+          metadata: {
+            expression: item.expression,
+            resolver: 'deterministic',
+          },
         })
       );
 
@@ -581,15 +816,15 @@ export class RichGraphEnricher {
     to: string,
     metadata?: Record<string, unknown>
   ): GraphEdge {
-    return {
-      id: id(projectId, from, type, to, JSON.stringify(metadata ?? {})),
-
+    const provenance = createEdgeProvenance('enricher', 'syntax', 'deterministic');
+    return createGraphEdge({
       projectId,
       from,
       to,
-      type,
+      type: type as GraphEdgeType,
+      provenance,
       metadata,
-    };
+    });
   }
 
   private loadConfig(rootPath: string) {
@@ -612,11 +847,8 @@ export class RichGraphEnricher {
         allowJs: true,
         noEmit: true,
         skipLibCheck: true,
-
         target: ts.ScriptTarget.ES2022,
-
         module: ts.ModuleKind.NodeNext,
-
         moduleResolution: ts.ModuleResolutionKind.NodeNext,
       } satisfies ts.CompilerOptions,
     };

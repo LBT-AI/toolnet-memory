@@ -201,7 +201,7 @@ describe('Phase 57 Memory Quality', () => {
      * Completed historical artifacts should not
      * keep doctor red forever.
      */
-    await store.setTaskStatus(task.id, 'completed');
+    await state.complete(task.id);
     const after = inspectActiveTaskArtifactPaths(manifest);
     expect(after.total).toBe(0);
     expect(after.missing).toBe(0);

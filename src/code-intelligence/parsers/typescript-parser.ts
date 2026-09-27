@@ -259,5 +259,11 @@ export async function parseTypeScriptFile(
     imports,
     calls,
     heritage,
+    parser: {
+      id: 'typescript-compiler-api',
+      engine: 'typescript-compiler-api',
+      language: filePath.endsWith('.tsx') || filePath.endsWith('.jsx') ? 'tsx' : 'typescript',
+      structural: true,
+    },
   };
 }

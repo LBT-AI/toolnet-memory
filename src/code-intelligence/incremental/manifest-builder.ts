@@ -21,21 +21,18 @@ export interface BuildManifestOptions {
   onProgress?: (event: BuildManifestProgress) => void;
 }
 
-export async function buildManifest(
+/*
+ * Build a CodeManifest from an already-scanned path list.
+ *
+ * Used by the index pipeline so coverage freshness can reuse the scan
+ * without scanning the repository a second time.
+ */
+export async function buildManifestFromPaths(
   projectId: string,
   rootPath: string,
+  paths: readonly string[],
   options: BuildManifestOptions = {}
 ): Promise<CodeManifest> {
-  const scanOptions: RepositoryScanOptions = {
-    ...options.scan,
-  };
-
-  if (options.signal) {
-    scanOptions.signal = options.signal;
-  }
-
-  const paths = await scanRepository(rootPath, scanOptions);
-
   const entries = await mapWithConcurrency(
     paths,
     async (path) => ({
@@ -70,4 +67,22 @@ export async function buildManifest(
     updatedAt: new Date().toISOString(),
     files,
   };
+}
+
+export async function buildManifest(
+  projectId: string,
+  rootPath: string,
+  options: BuildManifestOptions = {}
+): Promise<CodeManifest> {
+  const scanOptions: RepositoryScanOptions = {
+    ...options.scan,
+  };
+
+  if (options.signal) {
+    scanOptions.signal = options.signal;
+  }
+
+  const paths = await scanRepository(rootPath, scanOptions);
+
+  return buildManifestFromPaths(projectId, rootPath, paths, options);
 }

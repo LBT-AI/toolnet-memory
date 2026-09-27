@@ -1,0 +1,3 @@
+export const MAX_CANDIDATES = 16;
+export const MAX_MODULE_TRAVERSAL_DEPTH = 4;
+export const MAX_INHERITANCE_TRAVERSAL_DEPTH = 4;

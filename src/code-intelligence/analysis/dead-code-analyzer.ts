@@ -6,16 +6,22 @@ import type { CodeGraphStore } from '../graph/graph-store.js';
 
 import type { DeadCodeCandidate, DeadCodeConfidence } from './types.js';
 
+import {
+  getCallEdgeTypes,
+  getDataEdgeTypes,
+  getDependencyEdgeTypes,
+  getRouteEdgeTypes,
+  getTestEdgeTypes,
+  getTypeEdgeTypes,
+} from '../graph/edge-semantic-registry.js';
+
 const USAGE_EDGES = new Set<GraphEdge['type']>([
-  'CALLS',
-  'CALL_REFERENCE',
-  'IMPORTS',
-  'USES_TYPE',
-  'WRITES',
-  'INHERITS',
-  'IMPLEMENTS',
-  'ROUTE',
-  'TESTS',
+  ...getCallEdgeTypes(),
+  ...getDependencyEdgeTypes(),
+  ...getDataEdgeTypes(),
+  ...getTypeEdgeTypes(),
+  ...getRouteEdgeTypes(),
+  ...getTestEdgeTypes(),
 ]);
 
 function normalize(value: string): string {

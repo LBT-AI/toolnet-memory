@@ -3,7 +3,21 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
+import { ProjectManager } from '../core/project-manager.js';
+
+import { daemonRuntimeRoot } from '../daemon/paths.js';
+
 import { UpdateView } from './update-view.js';
+
+import {
+  collectLocalStoreObservations,
+  createDaemonOnlyUpgradePorts,
+  createRealUpgradePorts,
+  currentBuildDescriptor,
+  orchestratePackageUpgrade,
+} from './upgrade/index.js';
+
+import type { BuildDescriptor, PackageUpgradeOutcome } from './upgrade/index.js';
 
 const PACKAGE = 'toolnet-memory';
 
@@ -74,6 +88,37 @@ function detectPrefix(root: string): string | null {
   return null;
 }
 
+/**
+ * Phase 84C — bring local state up to the build that was just installed.
+ *
+ * `before` is captured by the caller before the package on disk changes; the
+ * runtime schema fingerprints belong to the code this process already loaded,
+ * and the package version is read from the installed package.json, so `after`
+ * carries the one change this process can honestly observe. The daemon
+ * re-derives its own fingerprint when it starts — which is also why a package
+ * upgrade always requires a daemon restart.
+ *
+ * Read-only against the project: the project is located, never created.
+ */
+async function orchestrateLocalUpgrade(
+  before: BuildDescriptor,
+  latest: string
+): Promise<PackageUpgradeOutcome> {
+  const after = { ...before, packageVersion: latest };
+
+  const project = new ProjectManager().findExisting(process.cwd());
+
+  const observations = project ? collectLocalStoreObservations(project.rootPath) : [];
+
+  return orchestratePackageUpgrade({
+    observations,
+    before,
+    after,
+    ports: project ? createRealUpgradePorts({ project }) : createDaemonOnlyUpgradePorts(),
+    dryRun: false,
+  });
+}
+
 async function main(): Promise<void> {
   const root = localPackageRoot();
   const current = readVersion(root);
@@ -131,6 +176,18 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
+
+  /*
+   * Capture the runtime build identity BEFORE the package on disk changes.
+   *
+   * This is the only moment it can be observed: the fingerprint reads the
+   * installed package.json and the code already loaded in this process. Reading
+   * it after the install would report the new version on both sides of the
+   * comparison and silently skip the daemon restart the upgrade requires.
+   */
+  const runtimeRoot = daemonRuntimeRoot();
+
+  const beforeBuild = currentBuildDescriptor(runtimeRoot);
 
   view.startStep({
     step: 2,
@@ -196,6 +253,56 @@ async function main(): Promise<void> {
   }
 
   view.completeStep(99);
+
+  let upgrade: PackageUpgradeOutcome;
+
+  try {
+    upgrade = await orchestrateLocalUpgrade(beforeBuild, latest);
+  } catch (error) {
+    view.fail('Local upgrade orchestration failed');
+
+    console.error('');
+    console.error(error instanceof Error ? error.message : String(error));
+    console.error('');
+
+    process.exitCode = 1;
+    return;
+  }
+
+  if (!upgrade.ok) {
+    const { result, plan } = upgrade;
+
+    view.fail(result.outcome === 'blocked' ? 'Upgrade blocked' : 'Upgrade failed');
+
+    console.error('');
+
+    for (const blocker of plan.blockers) {
+      console.error(`  blocker: ${blocker}`);
+    }
+
+    if (result.failure) {
+      for (const code of result.failure.codes) {
+        console.error(`  ${code}`);
+      }
+
+      console.error(`  phase: ${result.failure.phase}`);
+      console.error(`  ${result.failure.message}`);
+    }
+
+    if (result.backupId) {
+      console.error(`  authority backup: ${result.backupId}`);
+    }
+
+    console.error('');
+
+    process.exitCode = 1;
+    return;
+  }
+
+  if (upgrade.result.daemonRestarted) {
+    console.error('[toolnet-memory] local daemon restarted for the new build');
+  }
+
   view.succeed(latest);
 }
 

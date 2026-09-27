@@ -362,13 +362,19 @@ async function certifyStaleHistorySuppression(): Promise<boolean> {
   try {
     const completedProject = project(completedRoot, 'phase58-completed');
     const completedStore = new TaskStore(completedProject);
+    const completedState = new TaskStateEngine(completedStore);
     const completed = await completedStore.createTask({
       id: 'finished',
       kind: 'task',
       title: 'Completed canonical Task',
       priority: 'normal',
     });
-    await completedStore.setTaskStatus(completed.id, 'completed');
+    /*
+     * Complete through the canonical lifecycle engine: the Task must be
+     * started before it can pass the completion guard.
+     */
+    await completedState.start(completed.id);
+    await completedState.complete(completed.id);
     const completedProjection = buildCurrentWorkProjection(completedProject, {
       fallback: fallbackState(completedProject),
       now: Date.now(),

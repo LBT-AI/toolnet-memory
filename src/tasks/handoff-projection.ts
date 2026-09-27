@@ -183,6 +183,16 @@ export function applyTaskAgentOperation(
     return;
   }
   if (payload.type === 'task.agent.handoff') {
+    /*
+     * Phase 85G1 reachability: INTERNAL DEFENSIVE INVARIANT.
+     *
+     * The canonical `TaskHandoffEngine.handoff` path cannot reach this branch:
+     * terminal transitions delete `activeLease`, so the engine fails first with
+     * TASK_LEASE_NOT_FOUND. It is kept because a replayed, replicated or
+     * directly applied handoff operation must still fail closed rather than
+     * move a terminal Task's lease. Do not remove it; do not construct fake
+     * operations to exercise it.
+     */
     if (terminal(current)) {
       throw new Error(`TASK_HANDOFF_TERMINAL status=${current.status}`);
     }

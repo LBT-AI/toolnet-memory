@@ -7,6 +7,9 @@ import type { CodeSymbol, GraphEdge } from '../../core/types.js';
 import type { ParsedFile } from '../types.js';
 
 import { CodeGraphStore } from './graph-store.js';
+import { createGraphEdge } from './edge-factory.js';
+import { createEdgeProvenance } from './edge-provenance.js';
+import { EDGE_SEMANTIC_REGISTRY, type GraphEdgeType } from './edge-semantic-registry.js';
 
 export type GraphModuleResolver = (
   fromFile: string,
@@ -15,21 +18,12 @@ export type GraphModuleResolver = (
 ) => string | undefined;
 
 export interface GraphBuildOptions {
-  /**
-   * Existing symbols may be seeded during incremental
-   * reconstruction so modified files can resolve calls
-   * against unchanged files without reparsing them.
-   */
   seedSymbols?: readonly CodeSymbol[];
-
   resolveModule?: GraphModuleResolver;
-}
-
-function edgeId(projectId: string, from: string, type: string, to: string): string {
-  return createHash('sha256')
-    .update(`${projectId}:${from}:${type}:${to}`)
-    .digest('hex')
-    .slice(0, 24);
+  projectId?: string;
+  rootPath?: string;
+  runResolution?: boolean;
+  onResolutionProgress?: (event: { current: number; total: number; detail?: string }) => void;
 }
 
 function cleanPath(value: string): string {
@@ -109,11 +103,6 @@ export class GraphBuilder {
   build(projectId: string, parsed: ParsedFile[], options: GraphBuildOptions = {}): CodeGraphStore {
     const graph = new CodeGraphStore();
 
-    /*
-     * Seed unchanged symbols first.
-     * Parsed/new symbols are added afterwards and therefore
-     * become authoritative if IDs happen to overlap.
-     */
     for (const symbol of options.seedSymbols ?? []) {
       graph.addSymbol(symbol);
     }
@@ -145,16 +134,24 @@ export class GraphBuilder {
         continue;
       }
 
-      // DEFINES
       for (const symbol of file.symbols) {
         if (symbol.id === fileNode.id) {
           continue;
         }
 
-        graph.addEdge(this.edge(projectId, fileNode.id, 'DEFINES', symbol.id));
+        graph.addEdge(
+          createGraphEdge({
+            projectId,
+            from: fileNode.id,
+            to: symbol.id,
+            type: 'DEFINES',
+            provenance: createEdgeProvenance('parser', 'syntax', 'deterministic', {
+              filePath: filePath,
+            }),
+          })
+        );
       }
 
-      // IMPORTS
       for (const item of file.imports) {
         const targetPath = resolveImportFile(
           filePath,
@@ -174,25 +171,42 @@ export class GraphBuilder {
         }
 
         graph.addEdge(
-          this.edge(projectId, fileNode.id, 'IMPORTS', targetFile.id, {
-            source: item.source,
-            resolvedFile: targetPath,
+          createGraphEdge({
+            projectId,
+            from: fileNode.id,
+            to: targetFile.id,
+            type: 'IMPORTS',
+            provenance: createEdgeProvenance('parser', 'explicit_import', 'deterministic', {
+              filePath: filePath,
+            }),
+            metadata: {
+              source: item.source,
+              resolvedFile: targetPath,
+            },
           })
         );
       }
 
-      // INHERITS / IMPLEMENTS
       for (const relation of file.heritage) {
         const targets = graph
           .findByName(projectId, relation.targetName)
           .filter((symbol) => symbol.type === 'class' || symbol.type === 'interface');
 
         for (const target of targets) {
-          graph.addEdge(this.edge(projectId, relation.fromId, relation.type, target.id));
+          graph.addEdge(
+            createGraphEdge({
+              projectId,
+              from: relation.fromId,
+              to: target.id,
+              type: relation.type as GraphEdgeType,
+              provenance: createEdgeProvenance('parser', 'inheritance', 'deterministic', {
+                filePath: filePath,
+              }),
+            })
+          );
         }
       }
 
-      // CALLS
       for (const call of file.calls) {
         if (!call.callerId) {
           continue;
@@ -214,13 +228,48 @@ export class GraphBuilder {
           }
 
           graph.addEdge(
-            this.edge(projectId, call.callerId, 'CALLS', target.id, {
-              line: call.line,
-              qualifier: call.qualifier,
+            createGraphEdge({
+              projectId,
+              from: call.callerId,
+              to: target.id,
+              type: 'CALLS',
+              provenance: createEdgeProvenance('resolver', 'resolved_symbol', 'deterministic', {
+                filePath: filePath,
+                line: call.line,
+              }),
+              metadata: {
+                qualifier: call.qualifier,
+              },
             })
           );
         }
       }
+    }
+
+    return graph;
+  }
+
+  async buildWithResolution(
+    projectId: string,
+    parsed: ParsedFile[],
+    options: GraphBuildOptions & {
+      rootPath: string;
+      onResolutionProgress?: (event: { current: number; total: number; detail?: string }) => void;
+    }
+  ): Promise<CodeGraphStore> {
+    const graph = this.build(projectId, parsed, options);
+
+    if (options.rootPath) {
+      const { ResolutionEngine } = await import('../resolution/resolution-engine.js');
+      const engine = new ResolutionEngine({
+        projectId,
+        rootPath: options.rootPath,
+        graph,
+        parsedFiles: parsed,
+        onProgress: options.onResolutionProgress,
+      });
+
+      const result = await engine.resolve();
     }
 
     return graph;
@@ -237,6 +286,11 @@ export class GraphBuilder {
   ): CodeSymbol[] {
     const filePath = cleanPath(file.filePath);
 
+    // Phase 69: tree-sitter languages only resolve same-file calls.
+    // Cross-file resolution is intentionally conservative and is
+    // expanded in Phase 70 — Deterministic Symbol Resolution.
+    const isTreeSitter = file.parser?.engine === 'tree-sitter';
+
     // Same-file symbol first.
     const sameFile = graph
       .findByName(projectId, calleeName)
@@ -244,6 +298,11 @@ export class GraphBuilder {
 
     if (!qualifier && sameFile.length) {
       return sameFile;
+    }
+
+    // For tree-sitter languages, do not attempt cross-file resolution.
+    if (isTreeSitter) {
+      return [];
     }
 
     // Namespace import: api.login()
@@ -311,13 +370,14 @@ export class GraphBuilder {
     to: string,
     metadata?: Record<string, unknown>
   ): GraphEdge {
-    return {
-      id: edgeId(projectId, from, type, to),
+    const provenance = createEdgeProvenance('parser', 'syntax', 'deterministic');
+    return createGraphEdge({
       projectId,
       from,
       to,
-      type,
+      type: type as GraphEdgeType,
+      provenance,
       metadata,
-    };
+    });
   }
 }

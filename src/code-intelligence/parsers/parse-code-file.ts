@@ -6,6 +6,8 @@ import type { CodeSymbol } from '../../core/types.js';
 import type { ParsedFile } from '../types.js';
 import { parserCapabilityForPath } from './capabilities.js';
 import { parseTypeScriptFile } from './typescript-parser.js';
+import { findStructuralAdapter, parseWithStructuralAdapter } from './registry.js';
+import type { ParserLanguage } from './capabilities.js';
 
 function makeId(projectId: string, value: string): string {
   return createHash('sha256').update(`${projectId}:${value}`).digest('hex').slice(0, 24);
@@ -57,11 +59,73 @@ export async function parseCodeFile(
   if (!capability) {
     throw new Error(`No parser capability for: ${filePath}`);
   }
-  if (capability.supported) {
+
+  // TypeScript/JavaScript via TypeScript Compiler API.
+  if (capability.engine === 'typescript-compiler-api') {
     return parseTypeScriptFile(projectId, rootPath, filePath);
   }
+
+  // Tree-sitter structural languages (Python, Go, Rust, C, C++).
+  if (capability.engine === 'tree-sitter') {
+    const text = await readFile(join(rootPath, filePath), 'utf8');
+    const parsed = await parseWithStructuralAdapter({
+      projectId,
+      rootPath,
+      filePath,
+      source: text,
+      language: capability.language,
+    });
+    if (parsed) {
+      return parsed;
+    }
+    // Grammar unavailable — fall back to lexical.
+    return parseLexicalOnlyFile(projectId, rootPath, filePath);
+  }
+
+  // Lexical-only fallback.
   if (capability.lexicalSearch) {
     return parseLexicalOnlyFile(projectId, rootPath, filePath);
   }
+
   throw new Error(`Structural and lexical parsing unsupported for: ${filePath}`);
+}
+
+export async function parseCodeFileRaw(
+  projectId: string,
+  rootPath: string,
+  filePath: string,
+  source: string
+): Promise<ParsedFile> {
+  const capability = parserCapabilityForPath(filePath);
+  if (!capability) {
+    throw new Error(`No parser capability for: ${filePath}`);
+  }
+
+  if (capability.engine === 'typescript-compiler-api') {
+    return parseTypeScriptFile(projectId, rootPath, filePath);
+  }
+
+  if (capability.engine === 'tree-sitter') {
+    const parsed = await parseWithStructuralAdapter({
+      projectId,
+      rootPath,
+      filePath,
+      source,
+      language: capability.language,
+    });
+    if (parsed) {
+      return parsed;
+    }
+    return parseLexicalOnlyFile(projectId, rootPath, filePath);
+  }
+
+  if (capability.lexicalSearch) {
+    return parseLexicalOnlyFile(projectId, rootPath, filePath);
+  }
+
+  throw new Error(`Structural and lexical parsing unsupported for: ${filePath}`);
+}
+
+export function getLanguageForPath(filePath: string): ParserLanguage | undefined {
+  return parserCapabilityForPath(filePath)?.language;
 }

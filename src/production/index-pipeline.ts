@@ -6,11 +6,22 @@ import {
   ArchitectureEngine,
   CodeAnalysisEngine,
   CodeGraphStore,
+  CrossServiceEngine,
+  FleetProjectRegistry,
+  GraphCoverageBuilder,
   RepositoryIndexer,
   RichGraphEnricher,
+  ResolutionEngine,
   SemanticCodeEngine,
   TypeScriptTypeResolver,
   VisualizationBuilder,
+  buildManifestFromPaths,
+  parserFingerprintDigest,
+  semanticFingerprint,
+  searchableParserExtensions,
+  summarizeResolution,
+  assertValidGraph,
+  type CrossServiceCoverageInput,
 } from '../code-intelligence/index.js';
 
 import {
@@ -18,6 +29,10 @@ import {
   PersistentArchitectureStore,
   PersistentCodeAnalysisStore,
   PersistentCodeGraphStore,
+  PersistentCodeManifestStore,
+  PersistentCrossServiceStore,
+  PersistentFleetExportStore,
+  PersistentGraphCoverageStore,
   PersistentTypeResolutionStore,
   PersistentVisualizationStore,
   ProjectScopedStorageProvider,
@@ -28,6 +43,8 @@ export type IndexStageId =
   | 'source-index'
   | 'type-resolution'
   | 'rich-graph'
+  | 'cross-service'
+  | 'graph-coverage'
   | 'semantic-index'
   | 'architecture'
   | 'analysis'
@@ -88,15 +105,25 @@ export interface ProductionIndexResult {
 
   resolution: {
     total: number;
-    exact: number;
-    high: number;
-    fallback: number;
+    resolved: number;
+    ambiguous: number;
+    unresolved: number;
+    external: number;
   };
 
   semantic: unknown;
   architecture: unknown;
   analysis: unknown;
   visualization: unknown;
+
+  /* Phase 72 additive cross-service summary. */
+  crossService?: {
+    services: number;
+    routes: number;
+    links: number;
+    crossServiceLinks: number;
+    unresolved: number;
+  };
 }
 
 export async function runProductionIndex(
@@ -160,6 +187,11 @@ export async function runProductionIndex(
       },
     });
 
+    /*
+     * Never persist a corrupt semantic graph generation.
+     */
+    assertValidGraph(result.graph, project.id);
+
     await graphStore.save({
       version: 1,
 
@@ -172,21 +204,61 @@ export async function runProductionIndex(
       symbols: result.graph.allSymbols(project.id),
 
       edges: result.graph.allEdges(project.id),
+
+      parserFingerprint: parserFingerprintDigest(),
+
+      semanticFingerprint: semanticFingerprint(),
     });
+
+    /*
+     * Phase 68/70: the freshness baseline manifest is persisted here and
+     * reuses the already-scanned accepted file list, so no second repository
+     * scan is performed.
+     *
+     * The graph coverage snapshot is persisted AFTER deterministic resolution
+     * so it can carry real resolution evidence instead of a blanket
+     * "cross-file resolution pending" marker.
+     */
+    const manifest = await buildManifestFromPaths(
+      project.id,
+      project.rootPath,
+      result.acceptedFiles,
+      {
+        scan: {
+          extensions: searchableParserExtensions(),
+        },
+      }
+    );
+
+    await new PersistentCodeManifestStore(storage).save(manifest);
 
     return result;
   });
 
   const graph = indexed.graph;
 
+  let crossServiceCoverage: CrossServiceCoverageInput | undefined;
+
+  let crossServiceSummary:
+    | {
+        services: number;
+        routes: number;
+        links: number;
+        crossServiceLinks: number;
+        unresolved: number;
+      }
+    | undefined;
+
   /*
    * 2. TYPE RESOLUTION
    */
   const resolution = await stage('type-resolution', 'Type Resolution', async () => {
-    const result = await new TypeScriptTypeResolver(graph).resolveProject(
-      project.id,
-      project.rootPath,
-      (progress) => {
+    const result = await new ResolutionEngine({
+      projectId: project.id,
+      rootPath: project.rootPath,
+      graph,
+      parsedFiles: indexed.parsedFiles ?? [],
+      onProgress: (progress) => {
         options.onStageProgress?.({
           stage: 'type-resolution',
           current: progress.current,
@@ -194,12 +266,12 @@ export async function runProductionIndex(
           phase: progress.phase,
           detail: progress.detail,
         });
-      }
-    );
+      },
+    }).resolve();
 
-    await new PersistentTypeResolutionStore(storage).save(result);
+    await new PersistentTypeResolutionStore(storage).save(result.snapshot);
 
-    return result;
+    return result.snapshot;
   });
 
   /*
@@ -225,6 +297,12 @@ export async function runProductionIndex(
 
     const edges = graph.allEdges(project.id);
 
+    /*
+     * The enriched graph is the authoritative generation. It must validate
+     * before it replaces the structural generation.
+     */
+    assertValidGraph(graph, project.id);
+
     await graphStore.save({
       version: 1,
 
@@ -236,9 +314,120 @@ export async function runProductionIndex(
 
       symbols,
       edges,
+
+      parserFingerprint: parserFingerprintDigest(),
+
+      semanticFingerprint: semanticFingerprint(),
     });
 
     return stats;
+  });
+
+  /*
+   * 3a. CROSS-SERVICE (Phase 72)
+   *
+   * Deterministic static linkage of HTTP routes/clients and event channels
+   * across service boundaries inside this project. The enriched graph is the
+   * authoritative generation, so it is re-validated and re-persisted here.
+   */
+  await stage('cross-service', 'Cross-Service Intelligence', async () => {
+    const graphGeneration = `${parserFingerprintDigest()}:${semanticFingerprint()}`;
+
+    const result = await new CrossServiceEngine({ graph }).analyze({
+      projectId: project.id,
+      rootPath: project.rootPath,
+      files: indexed.acceptedFiles,
+      projectName: project.name,
+      ...(project.remote ? { projectRemote: project.remote } : {}),
+      graphGeneration,
+      graphFingerprint: semanticFingerprint(),
+    });
+
+    crossServiceCoverage = result.coverage;
+
+    crossServiceSummary = {
+      services: result.snapshot.stats.services,
+      routes: result.snapshot.stats.routes,
+      links: result.snapshot.stats.links,
+      crossServiceLinks: result.snapshot.stats.crossServiceLinks,
+      unresolved: result.snapshot.stats.unresolved,
+    };
+
+    assertValidGraph(graph, project.id);
+
+    const symbols = graph.allSymbols(project.id);
+    const edges = graph.allEdges(project.id);
+
+    await graphStore.save({
+      version: 1,
+
+      projectId: project.id,
+
+      updatedAt: new Date().toISOString(),
+
+      files: symbols.filter((item) => item.type === 'file').length,
+
+      symbols,
+      edges,
+
+      parserFingerprint: parserFingerprintDigest(),
+
+      semanticFingerprint: semanticFingerprint(),
+    });
+
+    await new PersistentCrossServiceStore(storage).save(result.snapshot);
+
+    /*
+     * Phase 73: persist the minimal, sanitized Fleet export for this project
+     * and register it so the Fleet Graph can discover it. The registry is a
+     * Fleet-namespace record, never project storage.
+     */
+    await new PersistentFleetExportStore(storage).save(result.export);
+
+    try {
+      await new FleetProjectRegistry(rawStorage).register({
+        projectId: project.id,
+        name: project.name,
+        ...(project.remote ? { remote: project.remote } : {}),
+        rootPath: project.rootPath,
+        pinnedGeneration: result.export.generation,
+      });
+    } catch {
+      /*
+       * Fleet registration is derived-state bookkeeping. A storage failure
+       * must never fail a project index.
+       */
+    }
+
+    return result.snapshot.stats;
+  });
+
+  /*
+   * 3b. GRAPH COVERAGE (Phase 68 contract, Phase 70 evidence)
+   *
+   * Persisted after structural parsing and deterministic resolution so the
+   * trust contract reflects what was actually proven, not what was assumed.
+   */
+  await stage('graph-coverage', 'Graph Coverage', async () => {
+    const coverage = new GraphCoverageBuilder().build({
+      projectId: project.id,
+      scan: indexed.scan,
+      acceptedFiles: indexed.acceptedFiles,
+      languages: indexed.languages,
+      indexedFiles: indexed.files,
+      structuralFiles: indexed.structuralFiles,
+      lexicalOnlyFiles: indexed.lexicalOnlyFiles,
+      parseFailures: indexed.parseFailures,
+      crossFileResolutionLanguages: indexed.crossFileResolutionLanguages,
+      structuralParserUnavailable: indexed.structuralFallbacks,
+      structuralParseFailed: indexed.structuralDiagnostics,
+      resolution: summarizeResolution(resolution),
+      ...(crossServiceCoverage ? { crossService: crossServiceCoverage } : {}),
+    });
+
+    await new PersistentGraphCoverageStore(storage).save(coverage);
+
+    return coverage;
   });
 
   /*
@@ -338,21 +527,19 @@ export async function runProductionIndex(
     },
 
     resolution: {
-      total: resolution.total,
-
-      exact: resolution.exact,
-
-      high: resolution.high,
-
-      fallback: resolution.fallback,
+      total: resolution.stats.total,
+      resolved: resolution.stats.resolved,
+      ambiguous: resolution.stats.ambiguous,
+      unresolved: resolution.stats.unresolved,
+      external: resolution.stats.external,
     },
 
     semantic,
 
     architecture: architecture.summary,
-
     analysis: analysis.summary,
-
     visualization: visualization.summary,
+
+    ...(crossServiceSummary ? { crossService: crossServiceSummary } : {}),
   };
 }

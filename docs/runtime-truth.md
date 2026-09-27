@@ -116,25 +116,35 @@ always zero.
 
 ## Code parser support
 
-| Language / extension | Status                                           | Engine                  |
-| -------------------- | ------------------------------------------------ | ----------------------- |
-| TypeScript `.ts`     | supported                                        | TypeScript Compiler API |
-| TSX `.tsx`           | supported                                        | TypeScript Compiler API |
-| JavaScript `.js`     | supported                                        | TypeScript Compiler API |
-| JSX `.jsx`           | supported                                        | TypeScript Compiler API |
-| MTS `.mts`           | supported                                        | TypeScript Compiler API |
-| CTS `.cts`           | supported                                        | TypeScript Compiler API |
-| MJS `.mjs`           | supported                                        | TypeScript Compiler API |
-| CJS `.cjs`           | supported                                        | TypeScript Compiler API |
-| Python `.py`         | lexical FTS5/BM25; structural parser unsupported | none                    |
-| Go `.go`             | lexical FTS5/BM25; structural parser unsupported | none                    |
-| Rust `.rs`           | lexical FTS5/BM25; structural parser unsupported | none                    |
-| C / C++              | unsupported                                      | none                    |
+| Language / extension | Lexical   | Structural | Engine                  |
+| -------------------- | --------- | ---------- | ----------------------- |
+| TypeScript `.ts`     | supported | supported  | TypeScript Compiler API |
+| TSX `.tsx`           | supported | supported  | TypeScript Compiler API |
+| JavaScript `.js`     | supported | supported  | TypeScript Compiler API |
+| JSX `.jsx`           | supported | supported  | TypeScript Compiler API |
+| MTS `.mts`           | supported | supported  | TypeScript Compiler API |
+| CTS `.cts`           | supported | supported  | TypeScript Compiler API |
+| MJS `.mjs`           | supported | supported  | TypeScript Compiler API |
+| CJS `.cjs`           | supported | supported  | TypeScript Compiler API |
+| Python `.py`         | supported | supported  | tree-sitter             |
+| Go `.go`             | supported | supported  | tree-sitter             |
+| Rust `.rs`           | supported | supported  | tree-sitter             |
+| C `.c` / `.h`        | supported | supported  | tree-sitter             |
+| C++ `.cc`/`.cpp`     | supported | supported  | tree-sitter             |
 
-Unsupported languages are not silently represented as fully parsed structural
-code intelligence.
+Structural parsing is not the same as cross-file semantic resolution. Python,
+Go, Rust, C, and C++ parse structural syntax offline with package-owned
+tree-sitter grammars, and their cross-file resolver is deterministic: a
+reference resolves only through proven evidence (lexical scope, explicit
+import, module target, receiver type, inheritance). Unproven references stay
+unresolved, and graph coverage reports the affected capability as `partial`
+rather than treating a structural negative result as safe.
 
-Tree-sitter runtime support is not implemented in this release.
+Grammar assets are package-owned. No grammar is downloaded from the network
+during indexing, and a missing/corrupt grammar makes the parser unavailable
+rather than silently pretending structural support.
+
+Structural graph parsing for TypeScript/JavaScript is unchanged.
 
 ---
 
@@ -285,7 +295,7 @@ Not implemented:
 
 | Storage                | Status      |
 | ---------------------- | ----------- |
-| Google Drive | unsupported |
+| Google Drive           | unsupported |
 | GitHub storage backend | unsupported |
 
 Frozen zero-byte placeholders under `src/storage/**` do not represent working
@@ -392,11 +402,17 @@ Repository truth rules:
 4. Planned functionality is called unsupported until implemented.
 5. Compatibility names are preserved when removing them would break clients.
 
-Non-TypeScript lexical search
+Non-TypeScript code intelligence
 
 Python, Go, Rust, C, and C++ are eligible for Local Code Search through
 file-level sanitized chunks and SQLite FTS5/BM25.
 
-Their structural parser status remains unsupported.
+They are also parsed structurally by package-owned tree-sitter grammars.
+Cross-file symbol resolution for these languages is deterministic: references
+resolve through proven lexical-scope, import, module, receiver-type or
+inheritance evidence, and anything unproven stays unresolved. Structural
+negative claims stay guarded by graph coverage.
 
-LSP capability detection is informational only in v0.3.17.
+LSP capability detection is informational only. Detected language servers
+(`activeInStructuralGraph: false`) are never used as the structural
+graph source of truth.

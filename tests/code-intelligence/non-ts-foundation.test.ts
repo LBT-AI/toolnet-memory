@@ -30,12 +30,13 @@ afterEach(() => {
 });
 
 describe('Phase 30 non-TypeScript foundation', () => {
-  it('keeps Python structurally unsupported but lexically searchable', () => {
+  it('keeps Python structurally supported via tree-sitter and lexically searchable', () => {
     const capability = parserCapabilityForPath('app/main.py');
-    expect(capability?.supported).toBe(false);
-    expect(capability?.structural).toBe(false);
+    expect(capability?.supported).toBe(true);
+    expect(capability?.structural).toBe(true);
+    expect(capability?.engine).toBe('tree-sitter');
     expect(capability?.lexicalSearch).toBe(true);
-    expect(parserSupportsPath('app/main.py')).toBe(false);
+    expect(parserSupportsPath('app/main.py')).toBe(true);
     expect(parserLexicallySearchesPath('app/main.py')).toBe(true);
   });
 
@@ -46,7 +47,7 @@ describe('Phase 30 non-TypeScript foundation', () => {
     }
   });
 
-  it('creates only a truthful file node for Python', async () => {
+  it('creates structural symbols for Python (not just a file node)', async () => {
     const repo = root();
     mkdirSync(join(repo, 'app'), { recursive: true });
     writeFileSync(
@@ -54,14 +55,16 @@ describe('Phase 30 non-TypeScript foundation', () => {
       ['def authenticate(user):', '    return user is not None', ''].join('\n')
     );
     const parsed = await parseCodeFile('project', repo, 'app/main.py');
-    expect(parsed.symbols).toHaveLength(1);
-    expect(parsed.symbols[0].type).toBe('file');
-    expect(parsed.symbols[0].metadata?.structuralParser).toBe(false);
+    expect(parsed.symbols.length).toBeGreaterThan(1);
+    const fn = parsed.symbols.find((s) => s.name === 'authenticate');
+    expect(fn).toBeDefined();
+    expect(fn?.type).toBe('function');
+    expect(fn?.metadata?.structuralParser).not.toBe(false);
     expect(parsed.imports).toEqual([]);
     expect(parsed.calls).toEqual([]);
   });
 
-  it('indexes Python as a file node without fake graph edges', async () => {
+  it('indexes Python structural symbols without fake graph edges', async () => {
     const repo = root();
     writeFileSync(
       join(repo, 'auth.py'),
@@ -70,7 +73,11 @@ describe('Phase 30 non-TypeScript foundation', () => {
     const result = await new RepositoryIndexer().index('project', repo);
     const files = result.graph.allSymbols('project').filter((symbol) => symbol.type === 'file');
     expect(files.map((symbol) => symbol.filePath)).toContain('auth.py');
-    expect(result.graph.allEdges('project')).toHaveLength(0);
+    // Phase 69: no fake resolved CALLS edges for cross-file calls.
+    // Only legitimate DEFINES edges (file -> symbol) exist.
+    const edges = result.graph.allEdges('project');
+    expect(edges.every((edge) => edge.type === 'DEFINES')).toBe(true);
+    expect(edges.filter((edge) => edge.type === 'CALLS')).toHaveLength(0);
   });
 
   it('feeds lexical-only files into bounded chunks', async () => {

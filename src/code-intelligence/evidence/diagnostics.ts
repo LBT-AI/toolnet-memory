@@ -1,0 +1,122 @@
+/*
+ * Phase 78 — deterministic evidence reason codes.
+ *
+ * Every blocked/provisional decision carries machine-readable codes. Prose
+ * warnings are never the only signal.
+ */
+
+export const EVIDENCE_REASON_CODES = [
+  /* Profile gating */
+  'SCOUT_PROVISIONAL_ONLY',
+  'PROFILE_REQUIRED_AUDITOR',
+  'PROFILE_REQUIRED_VERIFY',
+  'PROFILE_CANNOT_SUPPORT_CLAIM',
+
+  /* Claim shape */
+  'SCOPE_REQUIRED',
+  'SCOPE_NOT_BOUNDED',
+  'CLAIM_NOT_SUPPORTED_BY_OPERATION',
+
+  /* Coverage / freshness */
+  'COVERAGE_PARTIAL',
+  'COVERAGE_UNAVAILABLE',
+  'COVERAGE_STALE',
+  'GENERATION_STALE',
+  'EVIDENCE_STALE_GENERATION',
+
+  /* Evidence quality */
+  'UNRESOLVED_REFERENCES',
+  'AMBIGUOUS_REFERENCES',
+  'DYNAMIC_TARGETS',
+  'PARSE_GAP_RELEVANT',
+  'SOURCE_GAP_UNCLOSED',
+  'SOURCE_REFERENCE_FOUND',
+  'SOURCE_FALLBACK_SENSITIVE',
+  'SOURCE_FALLBACK_SKIPPED',
+  'SOURCE_FALLBACK_UNAVAILABLE',
+  'SOURCE_FALLBACK_REJECTED_ABSOLUTE',
+  'SOURCE_FALLBACK_REJECTED_ESCAPE',
+  'SOURCE_FALLBACK_FAILED',
+
+  /* Pagination / limits */
+  'PAGINATION_INCOMPLETE',
+  'AUDIT_LIMIT_REACHED',
+  'AUDIT_INCOMPLETE_LIMIT_REACHED',
+  'AUDIT_GENERATION_CHANGED',
+  'EVIDENCE_CURSOR_STALE',
+
+  /* Fleet / cross-service */
+  'FLEET_EMPTY',
+  'FLEET_PROJECT_STALE',
+  'FLEET_PROJECT_MISSING',
+  'FLEET_SCOPE_NOT_BOUNDED',
+  'CROSS_SERVICE_PARTIAL',
+  'CROSS_SERVICE_AMBIGUOUS',
+  'CROSS_SERVICE_UNRESOLVED',
+
+  /* Dead code guards */
+  'DEAD_CODE_PARTICIPATION_EDGE',
+  'DEAD_CODE_REQUIRES_AUDITOR',
+  'DEAD_CODE_NEVER_SAFE_TO_DELETE',
+
+  /* Phase 79 runtime trace evidence */
+  'RUNTIME_SYMBOL_OBSERVED',
+  'RUNTIME_TRACE_STALE_GENERATION',
+  'RUNTIME_TRACE_NOT_IN_STATIC_GRAPH',
+
+  /* Reserved vocabulary */
+  'RESERVED_CAPABILITY_NO_PRODUCER',
+
+  /* Positive evidence */
+  'POSITIVE_EVIDENCE_ONLY',
+] as const;
+
+export type EvidenceReasonCode = (typeof EVIDENCE_REASON_CODES)[number];
+
+export function dedupeReasons(codes: readonly string[]): EvidenceReasonCode[] {
+  const seen = new Set<string>();
+  const output: EvidenceReasonCode[] = [];
+
+  for (const code of codes) {
+    if (!seen.has(code)) {
+      seen.add(code);
+      output.push(code as EvidenceReasonCode);
+    }
+  }
+
+  return output;
+}
+
+/** Reason codes that must never be softened into prose. */
+export const BLOCKING_REASON_CODES: readonly EvidenceReasonCode[] = [
+  'SCOUT_PROVISIONAL_ONLY',
+  'PROFILE_REQUIRED_AUDITOR',
+  'PROFILE_REQUIRED_VERIFY',
+  'SCOPE_REQUIRED',
+  'SCOPE_NOT_BOUNDED',
+  'COVERAGE_PARTIAL',
+  'COVERAGE_UNAVAILABLE',
+  'COVERAGE_STALE',
+  'GENERATION_STALE',
+  'EVIDENCE_STALE_GENERATION',
+  'UNRESOLVED_REFERENCES',
+  'AMBIGUOUS_REFERENCES',
+  'DYNAMIC_TARGETS',
+  'PARSE_GAP_RELEVANT',
+  'SOURCE_GAP_UNCLOSED',
+  'SOURCE_REFERENCE_FOUND',
+  'PAGINATION_INCOMPLETE',
+  'AUDIT_LIMIT_REACHED',
+  'AUDIT_INCOMPLETE_LIMIT_REACHED',
+  'AUDIT_GENERATION_CHANGED',
+  'EVIDENCE_CURSOR_STALE',
+  'FLEET_EMPTY',
+  'FLEET_PROJECT_STALE',
+  'FLEET_PROJECT_MISSING',
+  'FLEET_SCOPE_NOT_BOUNDED',
+  'CROSS_SERVICE_PARTIAL',
+  'CROSS_SERVICE_AMBIGUOUS',
+  'CROSS_SERVICE_UNRESOLVED',
+  'RUNTIME_SYMBOL_OBSERVED',
+  'RESERVED_CAPABILITY_NO_PRODUCER',
+];

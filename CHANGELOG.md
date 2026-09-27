@@ -4,6 +4,41 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.6.0]
+
+### Added
+
+- Code intelligence graph trust and coverage reporting, with index-coverage checks that never treat missing data as trust.
+- Multi-language structural parsing and deterministic symbol resolution, with cross-service and cross-repository (Fleet) intelligence.
+- Graph semantics v2 with a versioned graph query/schema surface and explicit artifact schema versioning.
+- Architecture Decision Records (ADR) with deterministic governance and portable, shared graph artifacts.
+- Local coordination daemon with a build/protocol admission barrier and deterministic restart behavior.
+- Evidence profiles and runtime trace evidence that keep the static blast radius separate from observed runtime paths.
+- Change, contract, test, and release-readiness intelligence exposed through deterministic, read-only MCP tools.
+- Install/upgrade/migration intelligence: storage-store compatibility classification, upgrade orchestration, packaged build identity, upgrade recovery, and live daemon upgrade handling.
+- Deterministic MCP startup-timing hardening for the fast-startup release contract.
+
+### Changed
+
+- Unified build identity across the shell dispatcher, standalone binary, and local daemon (one package version plus a source-digest build marker).
+- Daemon admission and restart safety: a build/protocol mismatch is rejected, and an in-flight upgrade restarts the daemon last, once, after migrate, verify, and rebuild.
+- Derived-store compatibility: derived stores are rebuilt when their contract requires it, while authority stores are protected.
+
+### Compatibility
+
+- Purely additive from v0.5.3: 0 public breaking changes across MCP tools, CLI commands, the daemon protocol, and the artifact schema.
+- Additive and backward-compatible; existing authority data remains readable.
+
+### Migration
+
+- Authority stores are protected by backup and verification before any upgrade.
+- Derived stores are rebuilt when required; no authority migration is declared.
+
+### Known limitations
+
+- No distributed lock is claimed; coordination remains local same-filesystem exclusive.
+- The internal MCP server identity remains `0.1.0` and is non-authoritative (not a release version source).
+
 ## [0.4.0]
 
 - Added Persistent Shared Tasks with project-scoped Goal, Task, and Subtask hierarchy backed by an append-only authoritative operation log and deterministic rebuildable projection.

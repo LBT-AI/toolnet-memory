@@ -13,7 +13,7 @@ describe('Phase 65 release contract', () => {
     expect(lock.version).toBe(target);
     expect(lock.packages?.['']?.version).toBe(target);
     expect(manifest.version).toBe(target);
-    expect(manifest.releaseSeries).toBe('0.5.x');
+    expect(manifest.releaseSeries).toBe('0.6.x');
     expect(readme).toContain(`Current release: **v${target}**`);
     expect(readme).toContain('### v0.5.2 Retrieval GA');
   });

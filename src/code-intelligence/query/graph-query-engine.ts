@@ -10,12 +10,33 @@ const DEPENDENCY_EDGES = new Set<GraphEdge['type']>([
   'IMPORTS',
   'USES_TYPE',
   'WRITES',
+  'READS',
   'INHERITS',
   'IMPLEMENTS',
   'ROUTE',
+  'HANDLES',
+  /*
+   * Phase 72: protocol-aware dependency traversal.
+   *
+   * Caller -> route -> handler and producer -> channel <- consumer paths stay
+   * distinct edge types; they are never collapsed into language CALLS.
+   */
+  'HTTP_CALLS',
+  'RPC_CALLS',
+  'GRAPHQL_CALLS',
+  'TRPC_CALLS',
+  'EMITS',
+  'LISTENS_ON',
 ]);
 
 const CALL_EDGES = new Set<GraphEdge['type']>(['CALLS', 'CALL_REFERENCE']);
+
+import {
+  getCallEdgeTypes,
+  getDependencyEdgeTypes,
+  getStructureEdgeTypes,
+  type GraphEdgeType,
+} from '../graph/edge-semantic-registry.js';
 
 export class GraphQueryEngine {
   constructor(private readonly graph: CodeGraphStore) {}
@@ -233,9 +254,11 @@ export class GraphQueryEngine {
     projectId: string,
     symbolId: string,
     direction: 'incoming' | 'outgoing',
-    maxDepth: number
+    maxDepth: number,
+    edgeTypes?: Set<GraphEdgeType>
   ): GraphQueryNode[] {
-    const edges = this.graph.allEdges(projectId).filter((edge) => DEPENDENCY_EDGES.has(edge.type));
+    const allowedTypes = edgeTypes ?? DEPENDENCY_EDGES;
+    const edges = this.graph.allEdges(projectId).filter((edge) => allowedTypes.has(edge.type));
 
     const queue: {
       id: string;
@@ -332,5 +355,20 @@ export class GraphQueryEngine {
     return [...ids]
       .map((id) => this.graph.getSymbol(id))
       .filter((symbol): symbol is CodeSymbol => Boolean(symbol));
+  }
+
+  neighborsByType(
+    projectId: string,
+    symbolId: string,
+    direction: 'incoming' | 'outgoing',
+    edgeTypes: GraphEdgeType[]
+  ): GraphQueryNode[] {
+    const types = new Set(edgeTypes);
+    const depth = 1;
+    return this.walk(projectId, symbolId, direction, depth, types);
+  }
+
+  getEdgeTypes(projectId: string): GraphEdgeType[] {
+    return [...new Set(this.graph.allEdges(projectId).map((edge) => edge.type as GraphEdgeType))];
   }
 }

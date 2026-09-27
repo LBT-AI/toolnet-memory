@@ -1,5 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -9,29 +8,21 @@ import {
   generateFullHelp,
 } from '../../packages/cli/help.js';
 
+import { resolvePackageVersion } from '../runtime/build-identity.js';
+
+/**
+ * Phase 84D1 — help reports the same version truth as the daemon and the
+ * standalone binary, resolved by the shared build-identity module rather than by
+ * its own package.json search.
+ */
 function readVersion(): string {
-  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const resolved = resolvePackageVersion({
+    from: dirname(fileURLToPath(import.meta.url)),
+  });
 
-  const candidates = [
-    resolve(moduleDir, '../package.json'),
-    resolve(moduleDir, '../../package.json'),
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      const pkg = JSON.parse(readFileSync(candidate, 'utf8')) as {
-        version?: string;
-      };
-
-      if (pkg.version) {
-        return pkg.version;
-      }
-    } catch {
-      // Try next package.json location.
-    }
-  }
-
-  return process.env.npm_package_version ?? 'unknown';
+  return resolved.source === 'fallback'
+    ? (process.env.npm_package_version ?? 'unknown')
+    : resolved.value;
 }
 
 const args = process.argv.slice(2);

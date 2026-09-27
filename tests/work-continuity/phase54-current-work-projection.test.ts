@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ProjectManifest } from '../../src/core/types.js';
+import { TaskStateEngine } from '../../src/tasks/state-engine.js';
 import { TaskStore } from '../../src/tasks/store.js';
 import {
   buildCurrentWorkProjection,
@@ -100,13 +101,15 @@ describe('Phase 54 Current Work Projection v2', () => {
   it('uses Persistent Tasks instead of stale session task history', async () => {
     const manifest = project();
     const store = new TaskStore(manifest);
+    const state = new TaskStateEngine(store);
     const old = await store.createTask({
       id: 'old-completed',
       kind: 'task',
       title: 'Old completed production task',
       priority: 'normal',
     });
-    await store.setTaskStatus(old.id, 'completed');
+    await state.start(old.id);
+    await state.complete(old.id);
     const dependency = await store.createTask({
       id: 'dependency',
       kind: 'task',
@@ -155,7 +158,8 @@ describe('Phase 54 Current Work Projection v2', () => {
       priority: 'normal',
       order: 0,
     });
-    await store.setTaskStatus(completedChild.id, 'completed');
+    await state.start(completedChild.id);
+    await state.complete(completedChild.id);
     const remainingChild = await store.createTask({
       id: 'remaining-child',
       kind: 'subtask',
@@ -168,7 +172,8 @@ describe('Phase 54 Current Work Projection v2', () => {
     const projection = buildCurrentWorkProjection(manifest, {
       fallback: staleFallback(manifest),
       agentId: 'opencode',
-      now: Date.parse('2026-09-08T00:00:00.000Z'),
+      /* Real clock: Tasks are stamped by TaskStore with the wall clock. */
+      now: Date.now(),
     });
     expect(projection.source).toBe('persistent-task');
     expect(projection.task?.id).toBe(current.id);
@@ -187,13 +192,15 @@ describe('Phase 54 Current Work Projection v2', () => {
   it('does not resurrect session history after every Persistent Task is terminal', async () => {
     const manifest = project();
     const store = new TaskStore(manifest);
+    const state = new TaskStateEngine(store);
     const task = await store.createTask({
       id: 'terminal-task',
       kind: 'task',
       title: 'Finished Task',
       priority: 'normal',
     });
-    await store.setTaskStatus(task.id, 'completed');
+    await state.start(task.id);
+    await state.complete(task.id);
     const projection = buildCurrentWorkProjection(manifest, {
       fallback: staleFallback(manifest),
       agentId: 'opencode',

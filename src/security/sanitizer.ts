@@ -1,5 +1,28 @@
 import { SecretScanner, type SecretScannerOptions } from './secret-scanner.js';
 
+/*
+ * Phase 85G1 — hostile own-key boundary.
+ *
+ * `__proto__` is an inherited accessor, not a plain key: `target['__proto__']
+ * = value` rewrites the output object's prototype instead of copying a
+ * property, so a hostile persisted object could make sanitized output inherit
+ * attacker data. A sanitizer must never carry a prototype key forward, so the
+ * key is refused outright (documented, never a prototype mutation).
+ *
+ * Every other key is defined as an own data property rather than assigned, so
+ * no inherited setter can ever run and no prototype — including
+ * Object.prototype — is mutated. For ordinary keys this is exactly the
+ * property a plain assignment would have created.
+ */
+function defineSafeProperty(target: Record<string, unknown>, key: string, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+}
+
 export interface SanitizeResult {
   text: string;
   redacted: number;
@@ -59,6 +82,14 @@ export class Sanitizer {
       const output: Record<string, unknown> = {};
 
       for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+        /*
+         * Refuse the prototype accessor key: it can only rewrite a prototype,
+         * never represent safe data.
+         */
+        if (key === '__proto__') {
+          continue;
+        }
+
         const normalized = key
           .normalize('NFKC')
           .toLowerCase()
@@ -79,11 +110,11 @@ export class Sanitizer {
           normalized.includes('credential');
 
         if (sensitiveKey) {
-          output[key] = '[REDACTED]';
+          defineSafeProperty(output, key, '[REDACTED]');
           continue;
         }
 
-        output[key] = this.sanitizeValue(item);
+        defineSafeProperty(output, key, this.sanitizeValue(item));
       }
 
       return output;

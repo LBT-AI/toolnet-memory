@@ -1,8 +1,24 @@
-declare const __TOOLNET_VERSION__: string;
+import { resolvePackageVersion } from '../runtime/build-identity.js';
+
+declare const __TOOLNET_VERSION__: string | undefined;
 
 type ModuleLoader = () => Promise<unknown>;
 
-const VERSION = __TOOLNET_VERSION__;
+/*
+ * The standalone build injects `__TOOLNET_VERSION__`; the npm bundle injects
+ * `__TOOLNET_PACKAGE_VERSION__`. Both feed the one resolver in
+ * src/runtime/build-identity.ts, so the standalone binary, the CLI and the local
+ * daemon cannot disagree about which version they are.
+ *
+ * `typeof` is used deliberately: the constant is undeclared outside a standalone
+ * build, and `typeof` is the one expression that is safe on an undeclared
+ * identifier — the value itself is only read once the check has passed.
+ */
+function injectedStandaloneVersion(): string | undefined {
+  return typeof __TOOLNET_VERSION__ === 'string' ? __TOOLNET_VERSION__ : undefined;
+}
+
+const VERSION = resolvePackageVersion({ injected: injectedStandaloneVersion }).value;
 
 process.env.TOOLNET_STANDALONE = '1';
 process.title = 'toolnet-memory';

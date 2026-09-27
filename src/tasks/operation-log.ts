@@ -140,11 +140,26 @@ export function readTaskOperations(
     const lastNewline = text.lastIndexOf('\n');
     const tail = text.slice(lastNewline + 1);
     if (tail.trim()) {
+      let tailFailed = false;
+      let tailError: unknown;
       try {
         validateTaskOperation(JSON.parse(tail));
       } catch (error) {
+        tailFailed = true;
+        tailError = error;
+      }
+      if (tailFailed) {
         if (!options.repairCorruptTail) {
-          throw error;
+          /*
+           * Phase 85G1 — a truncated final write is a domain-level
+           * corruption, not a JavaScript parse bug. Never leak a raw
+           * SyntaxError; report the same structured code the complete-line
+           * branch uses. Recovery semantics are unchanged: callers that ask
+           * for repair still truncate the unterminated fragment below.
+           */
+          throw tailError instanceof SyntaxError
+            ? new Error('TASK_OPERATION_LOG_CORRUPT tail=unterminated')
+            : tailError;
         }
         const safePrefix = lastNewline >= 0 ? text.slice(0, lastNewline + 1) : '';
         truncateSync(file, Buffer.byteLength(safePrefix, 'utf8'));

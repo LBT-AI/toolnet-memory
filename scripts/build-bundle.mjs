@@ -2,7 +2,20 @@ import { build } from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { buildMarkerFor, runtimeSourceDigest } from './source-digest.mjs';
+
 const out = 'bundle';
+
+/*
+ * Phase 84D1 — packaged build identity.
+ *
+ * The version comes from package.json and the marker from a digest of the
+ * runtime source, so an artifact built from different source can never claim the
+ * same identity even when the version is unchanged. Both are injected as build
+ * constants; nothing reads a hard-coded version at runtime.
+ */
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+const buildMarker = buildMarkerFor(pkg.version, runtimeSourceDigest(path.resolve('.')));
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
@@ -10,6 +23,7 @@ fs.mkdirSync(out, { recursive: true });
 const entries = {
   init: 'src/production/init.ts',
   update: 'src/production/update.ts',
+  identity: 'src/production/identity-cli.ts',
   config: 'src/production/config-cli.ts',
   setup: 'src/production/setup.ts',
   'status-cli': 'src/production/status-cli.ts',
@@ -30,6 +44,7 @@ const entries = {
   api: 'src/api/bootstrap.ts',
   service: 'src/service/daemon.ts',
   'service-cli': 'src/service/cli.ts',
+  'daemon-cli': 'src/daemon/cli.ts',
   'docker-healthcheck': 'src/service/docker-healthcheck.ts',
   snapshot: 'src/production/snapshot-cli.ts',
   gc: 'src/retention/cli.ts',
@@ -89,6 +104,10 @@ await build({
   sourcemap: false,
   minify: true,
   legalComments: 'none',
+  define: {
+    __TOOLNET_PACKAGE_VERSION__: JSON.stringify(pkg.version),
+    __TOOLNET_BUILD_ID__: JSON.stringify(buildMarker),
+  },
 });
 
 // Package the existing ToolNet Graph UI with the production bundle.
@@ -107,4 +126,4 @@ fs.copyFileSync(
   path.join(graphVendorDir, '3d-force-graph.min.js')
 );
 
-console.log('✓ production bundles created');
+console.log(`✓ production bundles created (version ${pkg.version}, build ${buildMarker})`);

@@ -12,6 +12,7 @@ import type { MCPContext } from './context.js';
 
 import { startMCPServer } from './server.js';
 import { hydrateMCPContext } from './hydration.js';
+import { attachCodeIntelligenceRuntime } from './runtime.js';
 
 import { createMCPRuntimeState, markMCPConnected, markRuntimeFailed } from './runtime-state.js';
 
@@ -70,6 +71,9 @@ async function main() {
   const hydrate = async (): Promise<void> => {
     try {
       await hydrateMCPContext(ctx);
+
+      /* Phase 77: prefer the shared daemon runtime; falls back in place. */
+      await attachCodeIntelligenceRuntime(ctx);
 
       if (runtime.phase === 'degraded') {
         const timer = setTimeout(() => {

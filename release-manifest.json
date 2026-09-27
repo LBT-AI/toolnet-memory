@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.5.3",
-  "releaseSeries": "0.5.x",
+  "version": "0.6.0",
+  "releaseSeries": "0.6.x",
   "runtime": {
     "node": ">=22",
     "localMemoryRuntime": true,
@@ -339,7 +339,30 @@
       "phase58bArchitectureReplicationE2E": true,
       "threeHostConvergence": true,
       "restartAfterDivergence": true,
-      "replicationOrderExplainability": true
+      "replicationOrderExplainability": true,
+      "phase68GraphCoverageTrust": true,
+      "phase69MultilanguageStructuralParser": true,
+      "phase70DeterministicSymbolResolution": true,
+      "phase71GraphSemanticsV2": true,
+      "phase72CrossServiceIntelligence": true,
+      "phase73CrossRepoFleetIntelligence": true,
+      "phase74GraphQuerySchema": true,
+      "phase75ArchitectureDecisions": true,
+      "phase76SharedGraphArtifacts": true,
+      "phase77LocalCoordinationDaemon": true,
+      "phase78EvidenceProfiles": true,
+      "phase79RuntimeTraceEvidence": true,
+      "phase80ChangeIntelligence": true,
+      "phase81ContractIntelligence": true,
+      "phase82TestIntelligence": true,
+      "phase83ReleaseIntelligence": true,
+      "phase84InstallUpgradeMigration": true,
+      "phase84bStorageCompatibility": true,
+      "phase84cUpgradeOrchestration": true,
+      "phase84d1PackagedBuildIdentity": true,
+      "phase84d2aUpgradeRecovery": true,
+      "phase84d2bLiveDaemonUpgrade": true,
+      "phase85bFastStartupHardening": true
     },
     "retrievalSystem": {
       "ga": true,
@@ -405,6 +428,37 @@
       "remoteRestoreAdditive": true,
       "remoteDeleteDuringRestore": false,
       "productionReleaseBlocking": true
+    },
+    "releaseEngineering": {
+      "sourcePhase": 84,
+      "certificationThrough": "Phase85B",
+      "releaseBaseline": "v0.5.3",
+      "targetVersion": "0.6.0",
+      "additiveFromBaseline": true,
+      "publicBreakingChanges": 0,
+      "capabilities": {
+        "graphCoverageTrust": true,
+        "multiLanguageStructuralParser": true,
+        "deterministicSymbolResolution": true,
+        "graphSemanticsV2": true,
+        "crossServiceIntelligence": true,
+        "crossRepoFleetIntelligence": true,
+        "graphQuerySchema": true,
+        "architectureDecisions": true,
+        "sharedGraphArtifacts": true,
+        "localCoordinationDaemon": true,
+        "evidenceProfiles": true,
+        "runtimeTraceEvidence": true,
+        "changeIntelligence": true,
+        "contractIntelligence": true,
+        "testIntelligence": true,
+        "releaseIntelligence": true,
+        "storageCompatibility": true,
+        "upgradeOrchestration": true,
+        "packagedBuildIdentity": true,
+        "upgradeRecovery": true,
+        "liveDaemonUpgrade": true
+      }
     }
   }
 }

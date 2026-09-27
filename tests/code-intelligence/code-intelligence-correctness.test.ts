@@ -45,11 +45,15 @@ describe('Phase 14 code intelligence correctness', () => {
 
     expect(parserSupportsPath('src/app.jsx')).toBe(true);
 
-    expect(parserSupportsPath('main.py')).toBe(false);
+    // Phase 69: tree-sitter structural parsers are now supported.
+    expect(parserSupportsPath('main.py')).toBe(true);
+    expect(parserCapabilityForPath('main.py')?.structural).toBe(true);
+    expect(parserCapabilityForPath('main.py')?.engine).toBe('tree-sitter');
 
-    expect(parserSupportsPath('main.go')).toBe(false);
+    expect(parserSupportsPath('main.go')).toBe(true);
+    expect(parserCapabilityForPath('main.go')?.engine).toBe('tree-sitter');
 
-    expect(parserCapabilityForPath('main.rs')?.engine).toBe('unsupported');
+    expect(parserCapabilityForPath('main.rs')?.engine).toBe('tree-sitter');
   });
 
   it('resolves tsconfig path aliases', () => {

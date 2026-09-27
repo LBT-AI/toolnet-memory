@@ -32,6 +32,11 @@ export class ProjectTaskService {
   patch(taskId: string, patch: TaskPatch, options: TaskMutationOptions = {}): Promise<TaskRecord> {
     return this.store.patchTask(taskId, patch, options);
   }
+  /**
+   * @deprecated Phase 85G1 — delegates to the canonical lifecycle transition
+   * (`this.state`), so lifecycle, completion, dependency and child-completion
+   * guards always apply. Prefer `this.state.start/block/resume/complete/cancel`.
+   */
   setStatus(
     taskId: string,
     status: TaskStatus,

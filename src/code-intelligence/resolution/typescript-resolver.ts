@@ -10,7 +10,7 @@ import type { CodeGraphStore } from '../graph/graph-store.js';
 
 import type { CodeSymbol } from '../../core/types.js';
 
-import type { TypeResolution, TypeResolutionSnapshot } from './types.js';
+import type { ResolutionKind, TypeResolution, TypeResolutionSnapshot } from './types.js';
 
 import type { StageProgressCallback } from '../types.js';
 
@@ -186,7 +186,7 @@ export class TypeScriptTypeResolver {
 
       expression: node.expression.getText(source),
 
-      kind: 'CALL',
+      kind: 'call',
     });
   }
 
@@ -225,7 +225,7 @@ export class TypeScriptTypeResolver {
 
           expression: item.getText(source),
 
-          kind: clause.token === ts.SyntaxKind.ExtendsKeyword ? 'EXTENDS' : 'IMPLEMENTS',
+          kind: clause.token === ts.SyntaxKind.ExtendsKeyword ? 'inheritance' : 'implementation',
         });
 
         if (result) {
@@ -340,7 +340,7 @@ export class TypeScriptTypeResolver {
 
       projectId,
 
-      kind: 'CALL',
+      kind: 'call',
 
       sourceFile,
 

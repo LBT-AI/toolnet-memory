@@ -1,4 +1,4 @@
-import type { CodeSymbol } from '../../core/types.js';
+import type { CodeSymbol, GraphEdge } from '../../core/types.js';
 
 import { CodeGraphStore } from '../graph/graph-store.js';
 
@@ -8,6 +8,8 @@ export interface ImpactResult {
   depth: number;
 
   relation: string;
+
+  edgeType?: GraphEdge['type'];
 }
 
 export class ImpactAnalyzer {
@@ -42,7 +44,29 @@ export class ImpactAnalyzer {
       const incoming = edges.filter(
         (edge) =>
           edge.to === current.id &&
-          ['CALLS', 'IMPORTS', 'INHERITS', 'IMPLEMENTS'].includes(edge.type)
+          [
+            'CALLS',
+            'CALL_REFERENCE',
+            'IMPORTS',
+            'INHERITS',
+            'IMPLEMENTS',
+            'USES_TYPE',
+            'WRITES',
+            'READS',
+            /*
+             * Phase 72: cross-service blast radius. Changing a route must
+             * surface its callers and handlers; changing an event channel must
+             * surface producers and consumers.
+             */
+            'HTTP_CALLS',
+            'RPC_CALLS',
+            'GRAPHQL_CALLS',
+            'TRPC_CALLS',
+            'EMITS',
+            'LISTENS_ON',
+            'HANDLES',
+            'ROUTE',
+          ].includes(edge.type)
       );
 
       for (const edge of incoming) {
@@ -64,6 +88,7 @@ export class ImpactAnalyzer {
           symbol,
           depth,
           relation: edge.type,
+          edgeType: edge.type,
         });
 
         queue.push({

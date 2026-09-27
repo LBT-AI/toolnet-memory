@@ -14,6 +14,8 @@ import {
 
 import { tryHydrateFromService } from '../service/client.js';
 
+import { GraphCoverageEvaluator } from '../code-intelligence/graph-coverage/coverage-evaluator.js';
+
 export interface MCPHydrationResult {
   memory: 'ready' | 'failed';
   graph: 'ready' | 'failed';
@@ -143,7 +145,10 @@ export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationRe
     const memoryStore = new storageModule.MemoryStore(storage);
 
     ctx.storage = storage;
+    ctx.rootStorage = retryStorage;
     ctx.memoryStore = memoryStore;
+
+    let graphSnapshotPresent = false;
 
     const memoryTask =
       runtime.dependencies.memory.state === 'ready'
@@ -200,6 +205,8 @@ export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationRe
                 }
               );
 
+              graphSnapshotPresent = graph !== null;
+
               if (graph) {
                 ctx.graph.import(graph.symbols, graph.edges);
               }
@@ -211,6 +218,43 @@ export async function hydrateMCPContext(ctx: MCPContext): Promise<MCPHydrationRe
           })();
 
     await Promise.all([memoryTask, graphTask]);
+
+    /*
+     * Phase 68: hydrate the derived coverage snapshot and expose a
+     * single central GraphCoverageEvaluator to every MCP tool.
+     *
+     * Missing/invalid coverage must never crash hydration; the evaluator
+     * reports 'unavailable' instead.
+     */
+    const coverageStore = new storageModule.PersistentGraphCoverageStore(storage);
+
+    let coverageSnapshot = null;
+
+    try {
+      coverageSnapshot = await coverageStore.load(ctx.project.id);
+    } catch {
+      coverageSnapshot = null;
+    }
+
+    ctx.coverage = new GraphCoverageEvaluator({
+      projectId: ctx.project.id,
+      rootPath: ctx.project.rootPath,
+      storage,
+      snapshot: coverageSnapshot,
+      graphAvailable: graphSnapshotPresent,
+    });
+
+    /*
+     * Phase 72: derived cross-service snapshot. Missing/invalid data must
+     * never crash hydration.
+     */
+    try {
+      ctx.crossService = await new storageModule.PersistentCrossServiceStore(storage).load(
+        ctx.project.id
+      );
+    } catch {
+      ctx.crossService = null;
+    }
 
     if (runtime.dependencies.semantic.state !== 'ready') {
       markDependencyLoading(runtime, 'semantic');

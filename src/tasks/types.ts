@@ -196,6 +196,15 @@ export interface TaskPatch {
 export interface TaskMutationOptions {
   expectedRevision?: number;
   actor?: TaskActor;
+  /**
+   * Phase 85G1 — canonical lifecycle metadata.
+   *
+   * Only the canonical `task.lifecycle.transition` payload uses these;
+   * `blockerReason` is required when transitioning to `blocked` and
+   * `nextAction` accompanies a resume/block transition.
+   */
+  blockerReason?: string;
+  nextAction?: string;
 }
 export interface TaskCreatedPayload {
   type: 'task.created';

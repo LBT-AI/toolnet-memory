@@ -1,6 +1,8 @@
-import { createHash } from 'node:crypto';
-
 import type { CodeSymbol, GraphEdge } from '../../core/types.js';
+
+import { createGraphEdge } from './edge-factory.js';
+import { createEdgeProvenance } from './edge-provenance.js';
+import type { GraphEdgeType } from './edge-semantic-registry.js';
 
 export interface GraphRepairOptions {
   projectId: string;
@@ -13,13 +15,6 @@ export interface GraphRepairOptions {
 
 function cleanPath(value: string): string {
   return value.replaceAll('\\', '/');
-}
-
-function edgeId(projectId: string, from: string, type: string, to: string): string {
-  return createHash('sha256')
-    .update(`${projectId}:${from}:${type}:${to}`)
-    .digest('hex')
-    .slice(0, 24);
 }
 
 function stableSymbolIdentity(symbol: CodeSymbol): string {
@@ -121,12 +116,15 @@ export function repairPreservedEdges(options: GraphRepairOptions): GraphEdge[] {
       continue;
     }
 
-    output.push({
-      ...edge,
-      id: edgeId(options.projectId, from, edge.type, to),
-      from,
-      to,
-    });
+    output.push(
+      createGraphEdge({
+        projectId: options.projectId,
+        from,
+        to,
+        type: edge.type as GraphEdgeType,
+        provenance: createEdgeProvenance('analysis', 'resolved_symbol', 'deterministic'),
+      })
+    );
   }
 
   return output;

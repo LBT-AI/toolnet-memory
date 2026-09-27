@@ -15,6 +15,16 @@ export const DEFAULT_CODE_EXTENSIONS = new Set([
   '.cjs',
   '.mts',
   '.cts',
+  '.py',
+  '.go',
+  '.rs',
+  '.c',
+  '.h',
+  '.cc',
+  '.cpp',
+  '.cxx',
+  '.hpp',
+  '.hh',
 ]);
 
 export const DEFAULT_IGNORED_DIRECTORIES = new Set([

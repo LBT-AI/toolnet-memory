@@ -422,10 +422,20 @@ export class TaskStore {
     return next.tasks[id]!;
   }
   /*
-   * Phase 33 exposes the primitive.
+   * Phase 85G1 — canonical status writer.
    *
-   * Phase 34 will wrap this with the full deterministic
-   * lifecycle transition policy and evidence rules.
+   * Before Phase 85G1 this emitted the unguarded Phase 33 `task.status.set`
+   * primitive, which skipped `lifecycleAllowed`, `completionGuard`, the
+   * dependency/child-completion guards and the terminal-state rules.
+   *
+   * It now delegates to the single canonical lifecycle transition, so there is
+   * exactly one status-mutation engine and no duplicated lifecycle policy.
+   * The `task.status.set` reducer branch remains only so historical Phase 33
+   * operations stay replayable; nothing authors it any more.
+   *
+   * @deprecated Use `TaskStateEngine` (start / block / resume / complete /
+   * cancel) instead. This method is kept for compatibility and fails closed for
+   * every transition the lifecycle policy rejects.
    */
   async setTaskStatus(
     taskId: string,
@@ -442,9 +452,19 @@ export class TaskStore {
         sequence: projection.lastSequence + 1,
         actor: normalizedActor(options.actor),
         payload: {
-          type: 'task.status.set',
+          type: 'task.lifecycle.transition',
           taskId: id,
           status,
+          ...(options.blockerReason !== undefined
+            ? {
+                blockerReason: options.blockerReason,
+              }
+            : {}),
+          ...(options.nextAction !== undefined
+            ? {
+                nextAction: options.nextAction,
+              }
+            : {}),
           ...(options.expectedRevision !== undefined
             ? {
                 expectedRevision: options.expectedRevision,
