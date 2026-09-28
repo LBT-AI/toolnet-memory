@@ -4,6 +4,26 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.6.1]
+
+### Fixed
+
+- npm 12 `npm pack --json` object-shaped output compatibility: the release package audit and the production certifier share one parser that handles npm 10/11 array output, npm 12 name-keyed object output, and a bare entry object.
+- Shared package audit parser fail-closed behavior: shipped paths are normalized, duplicate entries are detected, the report is ordered deterministically, and malformed, empty or valueless npm output is reported as an unauditable package instead of an empty one.
+- Docker `linux/arm64` native tree-sitter build toolchain: the builder stage installs Python, make and g++ before `npm ci`, while the runtime image stays minimal and the multi-platform amd64 + arm64 build is preserved.
+- Release pipeline determinism: the release workflow pins its npm version (11.20.0) instead of floating on the newest npm major.
+- Release tag certification follows the release-commit architecture: a release tag must target the certified release commit on the release line.
+
+### Compatibility
+
+- Purely additive from v0.6.0: 0 public breaking changes across MCP tools, CLI commands, the daemon protocol, and the artifact schema.
+- Patch release: release-repair fixes only, no new capability phases.
+
+### Known limitations
+
+- v0.6.0 was published to npm and GitHub without a container image; the corrected multi-architecture image ships with v0.6.1.
+- The internal MCP server identity remains `0.1.0` and is non-authoritative (not a release version source).
+
 ## [0.6.0]
 
 ### Added

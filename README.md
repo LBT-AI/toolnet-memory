@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.6.0**
+Current release: **v0.6.1**
 
 </div>
 
@@ -135,6 +135,12 @@ v0.5.2 completes the intent-aware retrieval roadmap and promotes the retrieval r
 - Rebuilds Task projection and shared Session journal from authoritative logs.
 - Remote restore is additive and never deletes newer immutable operations.
 - Production certification now includes the Phase 67 disaster-recovery gate.
+
+### v0.6.1 Release Repair
+
+- Fixes npm 12 compatibility in the release package audit (`npm pack --json` now returns a name-keyed object), with normalized paths, duplicate detection and fail-closed behavior on malformed output.
+- Fixes the `linux/arm64` container build by installing the native build toolchain in the Docker builder stage only; the runtime image stays minimal.
+- Pins the npm version used by the release pipeline so publishing stays deterministic.
 
 ### v0.6.0 Code Intelligence, Daemon & Release Engineering
 

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "toolnet-memory",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "releaseSeries": "0.6.x",
   "runtime": {
     "node": ">=22",
@@ -433,7 +433,7 @@
       "sourcePhase": 84,
       "certificationThrough": "Phase85B",
       "releaseBaseline": "v0.5.3",
-      "targetVersion": "0.6.0",
+      "targetVersion": "0.6.1",
       "additiveFromBaseline": true,
       "publicBreakingChanges": 0,
       "capabilities": {

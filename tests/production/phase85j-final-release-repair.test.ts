@@ -1,8 +1,9 @@
 /*
  * Phase 85J — final release workflow repair.
  *
- * Certifies the two blockers that stopped the v0.6.0 tag release plus the release
- * invariants that must hold around them:
+ * Certifies the two blockers that stopped the v0.6.0 tag release — retained
+ * unchanged for the v0.6.1 recovery release — plus the release invariants that
+ * must hold around them:
  *
  *   1. npm 12 compatibility — npm 12 changed `npm pack --json` from an array of
  *      entries to an object keyed by package name; the release audit assumed
@@ -43,7 +44,7 @@ import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
 const PHASE85J_MARKER = 'PHASE85J_FINAL_RELEASE_REPAIR=PASS';
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 
 const REQUIRED_PACKAGE_FILES = ['package.json', 'bundle/mcp.js', 'release-manifest.json'];
 const AUDIT_LIMITS = { maxPackageFiles: 20_000, maxPackageJsonBytes: 16 * 1024 * 1024 };
@@ -305,7 +306,7 @@ describe('Phase 85J — Docker builder dependencies', () => {
  * ================================================================== */
 
 describe('Phase 85J — version truth', () => {
-  it('agrees on 0.6.0 across every authoritative source', () => {
+  it('agrees on 0.6.1 across every authoritative source', () => {
     const pkg = JSON.parse(readText('package.json')) as { version?: string };
     const lock = JSON.parse(readText('package-lock.json')) as {
       version?: string;
@@ -324,10 +325,11 @@ describe('Phase 85J — version truth', () => {
 
   it('leaves the MCP server identity inactive and non-authoritative', () => {
     /* The protocol/server identity is intentionally separate from the release
-     * version and must not be rewritten to match 0.6.0: it is reported as the
-     * single recorded divergence instead of being treated as release truth. */
+     * version and must not be rewritten to match the release: it is reported as
+     * the single recorded divergence instead of being treated as release
+     * truth. */
     expect(readText('src/mcp/server.ts')).toContain("version: '0.1.0'");
-    expect(readText('src/mcp/server.ts')).not.toContain("version: '0.6.0'");
+    expect(readText('src/mcp/server.ts')).not.toContain(`version: '${VERSION}'`);
   });
 
   it('tags the certified release commit when a release tag exists', () => {
@@ -345,8 +347,8 @@ describe('Phase 85J — version truth', () => {
     };
 
     /* A CI clone may carry no tags, and a shallow clone may lack the tagged
-     * commit; when both are present the tag must be the 0.6.0 release commit on
-     * the certified line, never a side branch. */
+     * commit; when both are present the tag must be the certified release
+     * commit on the certified line, never a side branch. */
     if (!git(['tag', '--list', `v${VERSION}`]).stdout.trim()) return;
 
     const tagged = git(['rev-list', '-n', '1', `v${VERSION}`]).stdout.trim();
@@ -367,8 +369,8 @@ describe('Phase 85J — build identity', () => {
   const marker = `${VERSION}+${digest.slice(0, 16)}`;
 
   it('derives the build marker from version + source digest', () => {
-    expect(VERSION).toBe('0.6.0');
-    expect(marker).toMatch(/^0\.6\.0\+[0-9a-f]{16}$/u);
+    expect(VERSION).toBe('0.6.1');
+    expect(marker).toMatch(/^0\.6\.1\+[0-9a-f]{16}$/u);
     expect(readText('bundle/mcp.js')).toContain(marker);
     expect(readText('bundle/identity.js')).toContain(marker);
   });

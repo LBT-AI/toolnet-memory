@@ -1,7 +1,7 @@
 /*
  * Phase 85E — Pre-Commit Release Certification.
  *
- * Certifies the whole v0.6.0 working tree before a release commit exists.
+ * Certifies the whole v0.6.1 working tree before a release commit exists.
  * This suite is read-only: it never stages, commits, pushes, tags or publishes,
  * and it never mutates release metadata. Its only job is to prove the tree is
  * releasable at HEAD + working changes.
@@ -38,7 +38,7 @@ import {
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 const PHASE85E_MARKER = 'PHASE85E_PRECOMMIT_RELEASE=PASS';
 
 function readJson(relativePath: string): Record<string, any> {
@@ -90,6 +90,13 @@ const PENDING_HARDENING_PATHS = new Set([
   'Dockerfile',
   'src/code-intelligence/release/types.ts',
   'tests/production/phase85j-final-release-repair.test.ts',
+  /* Phase 85K — release-recovery version bump and its certification. */
+  'package-lock.json',
+  '.release-target',
+  'release-manifest.json',
+  'README.md',
+  'CHANGELOG.md',
+  'tests/production/phase85k-v061-release-recovery.test.ts',
 ]);
 
 function isPendingHardeningPath(path: string): boolean {
@@ -121,7 +128,7 @@ const blockerCodes = report.blockers.map((blocker) => blocker.code);
  * ================================================================== */
 
 describe('Phase 85E — version truth', () => {
-  it('agrees on 0.6.0 across every authoritative version source', () => {
+  it('agrees on 0.6.1 across every authoritative version source', () => {
     const pkg = readJson('package.json');
     const lock = readJson('package-lock.json');
     const target = readFileSync(join(REPO_ROOT, '.release-target'), 'utf8').trim();
@@ -154,7 +161,7 @@ describe('Phase 85E — version truth', () => {
  * ================================================================== */
 
 describe('Phase 85E — manifest truth', () => {
-  it('declares 0.6.0 on the 0.6.x series', () => {
+  it('declares 0.6.1 on the 0.6.x series', () => {
     const manifest = readJson('release-manifest.json');
 
     expect(manifest.version).toBe(VERSION);
@@ -221,13 +228,17 @@ describe('Phase 85E — manifest truth', () => {
  * ================================================================== */
 
 describe('Phase 85E — changelog truth', () => {
-  it('documents the 0.6.0 release exactly once', () => {
+  it('documents the 0.6.1 release exactly once', () => {
     const changelog = readFileSync(join(REPO_ROOT, 'CHANGELOG.md'), 'utf8');
-    const headings = changelog.match(/^## \[0\.6\.0\]/gmu) ?? [];
+    const headings =
+      changelog.match(new RegExp(`^## \\[${VERSION.replace(/\./gu, '\\.')}\\]`, 'gmu')) ?? [];
 
     expect(headings).toHaveLength(1);
     expect(changelog).toContain('### Compatibility');
     expect(changelog).toContain('### Known limitations');
+
+    /* The published 0.6.0 section is history and stays exactly once. */
+    expect(changelog.match(/^## \[0\.6\.0\]/gmu) ?? []).toHaveLength(1);
   });
 
   it('leaves historical release entries intact', () => {
@@ -247,11 +258,11 @@ describe('Phase 85E — changelog truth', () => {
  * ================================================================== */
 
 describe('Phase 85E — README current release', () => {
-  it('advertises 0.6.0 as the current release', () => {
+  it('advertises 0.6.1 as the current release', () => {
     const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
 
-    expect(readme).toContain('Current release: **v0.6.0**');
-    expect(readme).toContain('### v0.6.0');
+    expect(readme).toContain('Current release: **v0.6.1**');
+    expect(readme).toContain('### v0.6.1');
   });
 
   it('never claims 0.5.3 is the current release anywhere in the README', () => {
@@ -272,11 +283,11 @@ describe('Phase 85E — README current release', () => {
  * ================================================================== */
 
 describe('Phase 85E — source / bundle parity', () => {
-  it('stamps the packaged runtime with the fresh 0.6.0 source digest', () => {
+  it('stamps the packaged runtime with the fresh 0.6.1 source digest', () => {
     const digest = runtimeSourceDigest(REPO_ROOT);
     const expectedMarker = `${VERSION}+${digest.slice(0, 16)}`;
 
-    expect(expectedMarker.startsWith('0.6.0+')).toBe(true);
+    expect(expectedMarker.startsWith('0.6.1+')).toBe(true);
 
     const bundle = readFileSync(join(REPO_ROOT, 'bundle', 'mcp.js'), 'utf8');
 
@@ -592,9 +603,9 @@ describe('Phase 85E — no stale artifact', () => {
  * ================================================================== */
 
 describe('Phase 85E — no release mutation', () => {
-  it('never creates the 0.6.0 release tag; the release tag targets the release commit', () => {
+  it('never creates the 0.6.1 release tag; the release tag targets the release commit', () => {
     /*
-     * Read-only. The authorized release tag must target the certified 0.6.0
+     * Read-only. The authorized release tag must target the certified 0.6.1
      * release commit — HEAD before any follow-up hardening commit, an ancestor
      * of HEAD afterwards. This certification never creates, moves or pushes a
      * tag.
@@ -623,13 +634,13 @@ describe('Phase 85E — no release mutation', () => {
     expect(manifest.releasePolicy?.npmPublishTrigger).toBe('git-tag-workflow-trusted-publishing');
   });
   it('reports the release-commit state truthfully without assuming it exists', () => {
-    /* HEAD carries the 0.5.3 baseline before the release commit lands and the
-     * 0.6.0 release afterwards; neither state may contradict the certification.
-     * This keeps the suite valid on both sides of Phase 85G. */
+    /* HEAD carries the published baseline before the release commit lands and
+     * the target release afterwards; neither state may contradict the
+     * certification. This keeps the suite valid on both sides of Phase 85G. */
     const headVersion = JSON.parse(git(['show', 'HEAD:package.json']).stdout || '{}').version as
       string | undefined;
 
-    expect(['0.5.3', VERSION]).toContain(headVersion);
+    expect(['0.5.3', '0.6.0', VERSION]).toContain(headVersion);
   });
 
   it('never stages anything while certifying', () => {
@@ -661,10 +672,16 @@ describe('Phase 85E — dirty-tree state', () => {
     const porcelain = git(['status', '--porcelain']).stdout.split(/\r?\n/u).filter(Boolean);
 
     if (headVersion !== VERSION) {
-      /* Pre-commit: the whole 0.6.0 release set is still pending in the tree. */
-      const tracked = porcelain.filter((line) => !line.startsWith('??') && /^ ?[MARD]/u.test(line));
+      /* Pre-commit: the release set is still pending in the tree. The pending
+       * tracked delta must be non-empty and bounded to recognised release
+       * paths — for a patch recovery release that is the authoritative version
+       * sources plus their regenerated artifacts, never the whole tree. */
+      const pendingPaths = porcelain
+        .filter((line) => !line.startsWith('??') && /^ ?[MARD]/u.test(line))
+        .map((line) => line.slice(3).trim().replace(/^"|"$/gu, ''));
 
-      expect(tracked.length).toBeGreaterThan(50);
+      expect(pendingPaths.length).toBeGreaterThan(0);
+      expect(pendingPaths.every((path) => isPendingHardeningPath(path))).toBe(true);
     } else {
       /* Post-commit: the release set is recorded, so the only tracked delta may
        * be certification tooling plus the known Phase 85G1 hardening set. */

@@ -1,7 +1,7 @@
 /*
  * Phase 85G — Release Commit certification.
  *
- * Certifies the v0.6.0 release commit itself: HEAD carries 0.6.0, the release
+ * Certifies the v0.6.1 release commit itself: HEAD carries 0.6.1, the release
  * metadata is committed, the release set is recorded with no unexpected paths,
  * the static release contract passes (including the `src/storage frozen` gate
  * that could only clear once the commit existed), source/bundle parity holds,
@@ -28,7 +28,7 @@ import {
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 const PHASE85G_MARKER = 'PHASE85G_RELEASE_COMMIT=PASS';
 
 function git(args: string[]): { status: number; stdout: string } {
@@ -74,6 +74,35 @@ function committedTree(): string[] {
 }
 
 /*
+ * Phase 85K — the release set under certification.
+ *
+ * Once the recovery commit lands, HEAD carries the target version and the
+ * release set is recorded in git. Until it lands, the target version only
+ * exists in the working tree, exactly as Phase 85E certifies it pre-commit.
+ * Both states are valid; a version mismatch is never tolerated. CI always
+ * certifies the committed state, because the release commit is pushed and the
+ * branch build must pass before the release tag is ever created.
+ */
+function headPackageVersion(): string | undefined {
+  return (JSON.parse(git(['show', 'HEAD:package.json']).stdout || '{}') as { version?: string })
+    .version;
+}
+
+function releaseSetPackageVersion(): string | undefined {
+  const head = headPackageVersion();
+
+  if (head === VERSION) return head;
+
+  return (
+    JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as {
+      version?: string;
+    }
+  ).version;
+}
+
+const RELEASE_SET_COMMITTED = headPackageVersion() === VERSION;
+
+/*
  * Phase 85G1 — pending hardening delta.
  *
  * The release commit is frozen except for certification tooling and the
@@ -105,6 +134,13 @@ const PENDING_HARDENING_PATHS = new Set([
   'Dockerfile',
   'src/code-intelligence/release/types.ts',
   'tests/production/phase85j-final-release-repair.test.ts',
+  /* Phase 85K — release-recovery version bump and its certification. */
+  'package-lock.json',
+  '.release-target',
+  'release-manifest.json',
+  'README.md',
+  'CHANGELOG.md',
+  'tests/production/phase85k-v061-release-recovery.test.ts',
 ]);
 
 function isPendingHardeningPath(path: string): boolean {
@@ -134,24 +170,40 @@ const report = runReleaseAnalysis({
  * ================================================================== */
 
 describe('Phase 85G — HEAD version truth', () => {
-  it('ships package version 0.6.0 at HEAD', () => {
-    const headPackage = JSON.parse(git(['show', 'HEAD:package.json']).stdout || '{}');
+  it('ships package version 0.6.1 at HEAD or in the pending release set', () => {
+    expect(releaseSetPackageVersion()).toBe(VERSION);
 
-    expect(headPackage.version).toBe(VERSION);
+    if (RELEASE_SET_COMMITTED) {
+      /* The release commit is HEAD itself: it must carry the target version. */
+      expect(headPackageVersion()).toBe(VERSION);
+    } else {
+      /* The release set is still pending: HEAD must still carry the previously
+       * published release, never an arbitrary value. */
+      expect(headPackageVersion()).toBe('0.6.0');
+    }
   });
 
-  it('introduced the release on top of the 0.5.3 baseline', () => {
+  it('introduced the release on top of the previous published release', () => {
+    if (!RELEASE_SET_COMMITTED) {
+      /* The recovery commit does not exist yet, so HEAD is its future parent
+       * and must carry the previous published release version. */
+      expect(headPackageVersion()).toBe('0.6.0');
+      return;
+    }
+
     const release = releaseCommit();
     const releasePackage = JSON.parse(git(['show', `${release}:package.json`]).stdout || '{}');
 
     expect(releasePackage.version).toBe(VERSION);
 
     /* A shallow CI checkout carries no parent commit; when history is present
-     * the release commit's parent must be the published 0.5.3 baseline. */
+     * the release commit's parent must carry the previously published release
+     * on the certified line — the v0.5.3 baseline for the 0.6.0 cut, or the
+     * preceding 0.6.x release for a recovery patch such as v0.6.1. */
     if (git(['rev-parse', `${release}^`]).status === 0) {
       const parentPackage = JSON.parse(git(['show', `${release}^:package.json`]).stdout || '{}');
 
-      expect(parentPackage.version).toBe('0.5.3');
+      expect(parentPackage.version).toMatch(/^(0\.5\.3|0\.6\.\d+)$/u);
     }
   });
 });
@@ -162,29 +214,43 @@ describe('Phase 85G — HEAD version truth', () => {
 
 describe('Phase 85G — release metadata committed', () => {
   it('records every authoritative version source in the commit', () => {
-    const committed = committedPaths();
-
-    for (const path of [
+    const committedSources = [
       'package.json',
       'package-lock.json',
       '.release-target',
       'release-manifest.json',
       'CHANGELOG.md',
       'README.md',
-      'bin/toolnet-memory',
-    ]) {
-      expect(committed, path).toContain(path);
+    ];
+
+    /* Every authoritative source (and the shell dispatcher that reads it) is
+     * part of the release set. */
+    for (const path of [...committedSources, 'bin/toolnet-memory']) {
+      expect(existsSync(join(REPO_ROOT, path)), path).toBe(true);
     }
 
-    expect(git(['show', `HEAD:.release-target`]).stdout.trim()).toBe(VERSION);
-    expect(JSON.parse(git(['show', 'HEAD:release-manifest.json']).stdout || '{}').version).toBe(
-      VERSION
-    );
+    /* The pending release set already agrees on the target version. */
+    expect(readFileSync(join(REPO_ROOT, '.release-target'), 'utf8').trim()).toBe(VERSION);
+
+    /* Once the release commit exists, every source must be recorded in it. */
+    if (RELEASE_SET_COMMITTED) {
+      const committed = committedPaths();
+
+      for (const path of committedSources) {
+        expect(committed, path).toContain(path);
+      }
+
+      expect(git(['show', `HEAD:.release-target`]).stdout.trim()).toBe(VERSION);
+      expect(JSON.parse(git(['show', 'HEAD:release-manifest.json']).stdout || '{}').version).toBe(
+        VERSION
+      );
+    }
   });
 
-  it('records the release source, tests, docs and bundle artifacts', () => {
-    const committed = committedPaths();
-
+  it('records the release artifacts, source and certification tooling', () => {
+    /* The recovery commit regenerates the packaged bundles and adds its own
+     * certification; the release source and documentation set recorded by the
+     * earlier release commits must remain present in the committed tree. */
     for (const path of [
       'src/runtime/build-identity.ts',
       'src/code-intelligence/release/report.ts',
@@ -195,7 +261,22 @@ describe('Phase 85G — release metadata committed', () => {
       'bundle/daemon-cli.js',
       'bundle/identity.js',
     ]) {
-      expect(committed, path).toContain(path);
+      expect(committedTree(), path).toContain(path);
+    }
+
+    /* Once committed, the regenerated bundles and the Phase 85K certification
+     * travel inside the release commit itself. */
+    if (RELEASE_SET_COMMITTED) {
+      const committed = committedPaths();
+
+      for (const path of [
+        'bundle/mcp.js',
+        'bundle/daemon-cli.js',
+        'bundle/identity.js',
+        'tests/production/phase85k-v061-release-recovery.test.ts',
+      ]) {
+        expect(committed, path).toContain(path);
+      }
     }
   });
 
@@ -215,6 +296,16 @@ describe('Phase 85G — release metadata committed', () => {
 
 describe('Phase 85G — commit contents', () => {
   it('contains no unexpected paths', () => {
+    if (!RELEASE_SET_COMMITTED) {
+      /* The release commit is still pending, so the commit diff cannot be
+       * enumerated yet. Audit the pending tracked delta instead: it must be
+       * limited to recognised release paths. */
+      const pending = git(['diff', '--name-only', 'HEAD']).stdout.split(/\r?\n/u).filter(Boolean);
+
+      expect(pending.every((path) => isPendingHardeningPath(path))).toBe(true);
+      return;
+    }
+
     if (!parentAvailable()) {
       /*
        * Shallow CI checkout: the parent commit is unavailable, so the release
@@ -326,7 +417,7 @@ describe('Phase 85G — source / bundle parity', () => {
     const digest = runtimeSourceDigest(REPO_ROOT);
     const expectedMarker = `${VERSION}+${digest.slice(0, 16)}`;
 
-    expect(expectedMarker.startsWith('0.6.0+')).toBe(true);
+    expect(expectedMarker.startsWith('0.6.1+')).toBe(true);
     expect(readFileSync(join(REPO_ROOT, 'bundle', 'mcp.js'), 'utf8')).toContain(expectedMarker);
     expect(readFileSync(join(REPO_ROOT, 'bundle', 'identity.js'), 'utf8')).toContain(
       expectedMarker
@@ -349,7 +440,7 @@ describe('Phase 85G — source / bundle parity', () => {
  * ================================================================== */
 
 describe('Phase 85G — no tag, push or publish', () => {
-  it('never creates the v0.6.0 tag; any existing tag targets the release commit', () => {
+  it('never creates the v0.6.1 tag; any existing tag targets the release commit', () => {
     const tag = git(['tag', '--list', `v${VERSION}`]).stdout.trim();
 
     if (!tag) return;

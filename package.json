@@ -1,6 +1,6 @@
 {
   "name": "toolnet-memory",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Persistent project memory, work continuity, and code intelligence for AI coding agents.",
   "type": "module",
   "license": "MIT",
@@ -243,7 +243,8 @@
     "phase85f2:certify": "vitest run tests/production/phase85f2-product-capability-audit.test.ts",
     "phase85g1:certify": "vitest run tests/production/phase85g1-task-invariant-hardening.test.ts",
     "phase85j1:certify": "vitest run tests/production/phase85j1-npm12-package-audit.test.ts",
-    "phase85j:certify": "vitest run tests/production/phase85j-final-release-repair.test.ts"
+    "phase85j:certify": "vitest run tests/production/phase85j-final-release-repair.test.ts",
+    "phase85k:certify": "vitest run tests/production/phase85k-v061-release-recovery.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",
