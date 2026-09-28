@@ -27,6 +27,21 @@ export interface PackageAuditResult {
   note?: string;
 }
 
+/** A single packed file as reported by `npm pack --json`. */
+export interface PackManifestFile {
+  path: string;
+  size?: number;
+}
+
+/** One packed package as reported by `npm pack --json`. */
+export interface PackManifestEntry {
+  id?: string;
+  name?: string;
+  version?: string;
+  unpackedSize?: number;
+  files: PackManifestFile[];
+}
+
 /** Required runtime entrypoints the package must ship. */
 const REQUIRED_PACKAGE_FILES = ['package.json', 'bundle/mcp.js', 'release-manifest.json'] as const;
 
@@ -57,6 +72,133 @@ const UNEXPECTED_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /(^|\/)_t\.ts$/u, label: 'scratch_file' },
 ];
 
+/**
+ * Normalize a packed path so comparisons are stable across platforms and npm
+ * versions: separators, leading `./`, repeated separators and trailing slashes
+ * never change the identity of a shipped file.
+ */
+export function normalizeManifestPath(raw: string): string {
+  let path = raw.replace(/\\/gu, '/');
+
+  while (path.startsWith('./')) {
+    path = path.slice(2);
+  }
+
+  path = path.replace(/\/{2,}/gu, '/');
+
+  while (path.startsWith('/')) {
+    path = path.slice(1);
+  }
+
+  return path.length > 1 ? path.replace(/\/+$/u, '') : path;
+}
+
+function readFileEntry(item: unknown): PackManifestFile | undefined {
+  /* npm reports packed files as objects with a `path`; a bare string is
+   * tolerated so a future simplification still parses. */
+  const raw = typeof item === 'string' ? item : undefined;
+
+  if (raw === undefined) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return undefined;
+    }
+  }
+
+  const record = (raw === undefined ? item : undefined) as Record<string, unknown> | undefined;
+
+  const candidate = raw ?? (typeof record?.path === 'string' ? record.path : undefined);
+
+  if (candidate === undefined) {
+    return undefined;
+  }
+
+  const path = normalizeManifestPath(candidate);
+
+  if (!path) {
+    return undefined;
+  }
+
+  return typeof record?.size === 'number' ? { path, size: record.size } : { path };
+}
+
+function toPackManifestEntry(candidate: unknown): PackManifestEntry | undefined {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    return undefined;
+  }
+
+  const record = candidate as Record<string, unknown>;
+
+  /* An entry without a `files` array carries no auditable content. */
+  if (!Array.isArray(record.files)) {
+    return undefined;
+  }
+
+  const files: PackManifestFile[] = [];
+
+  for (const item of record.files) {
+    const file = readFileEntry(item);
+
+    if (file) {
+      files.push(file);
+    }
+  }
+
+  return {
+    ...(typeof record.id === 'string' ? { id: record.id } : {}),
+    ...(typeof record.name === 'string' ? { name: record.name } : {}),
+    ...(typeof record.version === 'string' ? { version: record.version } : {}),
+    ...(typeof record.unpackedSize === 'number' ? { unpackedSize: record.unpackedSize } : {}),
+    files,
+  };
+}
+
+/**
+ * Normalize `npm pack --json` output across npm majors.
+ *
+ * npm <= 11 emits an array of package entries, e.g. `[{ files: [...] }]`.
+ * npm >= 12 emits the same shape as `npm publish --json`: an object keyed by
+ * package name, e.g. `{ 'toolnet-memory': { files: [...] } }`. A single entry
+ * object carrying its own `files` array is accepted too, so the parser never
+ * depends on which of those two spellings npm picked.
+ *
+ * Anything that does not resolve to at least one entry with a `files` array
+ * yields no entries, so callers fail closed instead of auditing an empty
+ * package and reporting a misleading release blocker.
+ */
+export function parsePackManifestEntries(stdout: string): PackManifestEntry[] {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    return [];
+  }
+
+  let candidates: unknown[];
+
+  if (Array.isArray(parsed)) {
+    candidates = parsed;
+  } else if (parsed && typeof parsed === 'object') {
+    const record = parsed as Record<string, unknown>;
+
+    candidates = Array.isArray(record.files) ? [parsed] : Object.values(record);
+  } else {
+    candidates = [];
+  }
+
+  const entries: PackManifestEntry[] = [];
+
+  for (const candidate of candidates) {
+    const entry = toPackManifestEntry(candidate);
+
+    if (entry) {
+      entries.push(entry);
+    }
+  }
+
+  return entries;
+}
+
 export function auditPackageContents(input: PackageAuditInput): PackageAuditResult {
   const result = spawnSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
     cwd: input.projectRoot,
@@ -64,13 +206,20 @@ export function auditPackageContents(input: PackageAuditInput): PackageAuditResu
     timeout: 120_000,
     windowsHide: true,
     maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, npm_config_progress: 'false' },
+    env: {
+      ...process.env,
+      npm_config_progress: 'false',
+      /* Never depend on ANSI/localized output: the manifest is JSON only. */
+      npm_config_color: 'false',
+      NO_COLOR: '1',
+    },
   });
 
   if (result.status !== 0 || !result.stdout.trim()) {
     return {
       audit: {
         fileCount: 0,
+        duplicatePaths: [],
         sensitivePaths: [],
         unexpectedPaths: [],
         requiredPresent: [],
@@ -83,18 +232,17 @@ export function auditPackageContents(input: PackageAuditInput): PackageAuditResu
     };
   }
 
-  let parsed: Array<{
-    files?: Array<{ path: string; size?: number }>;
-    size?: number;
-    unpackedSize?: number;
-  }>;
+  const entries = parsePackManifestEntries(result.stdout);
+  const entry = entries[0];
 
-  try {
-    parsed = JSON.parse(result.stdout) as typeof parsed;
-  } catch {
+  /* An unrecognized manifest shape is a failed audit, never an empty package:
+   * silently reporting zero files would surface as a missing-capability
+   * blocker with a misleading cause. */
+  if (!entry) {
     return {
       audit: {
         fileCount: 0,
+        duplicatePaths: [],
         sensitivePaths: [],
         unexpectedPaths: [],
         requiredPresent: [],
@@ -103,17 +251,15 @@ export function auditPackageContents(input: PackageAuditInput): PackageAuditResu
       },
       truncated: false,
       available: false,
-      note: 'npm pack manifest was not parseable JSON',
+      note: 'npm pack manifest shape was not recognized',
     };
   }
 
-  const entry = parsed[0] ?? {};
-  const files = (entry.files ?? []).slice(0, input.maxPackageFiles);
-  const truncated = (entry.files ?? []).length > input.maxPackageFiles;
+  const files = entry.files.slice(0, input.maxPackageFiles);
+  const truncated = entry.files.length > input.maxPackageFiles;
 
   const sensitivePaths: string[] = [];
   const unexpectedPaths: string[] = [];
-  const labels: string[] = [];
 
   for (const file of files) {
     const path = file.path;
@@ -131,17 +277,28 @@ export function auditPackageContents(input: PackageAuditInput): PackageAuditResu
         break;
       }
     }
-
-    labels.push(path);
   }
 
-  const shipped = new Set(files.map((file) => file.path));
+  /* Deterministic, order-independent inventory: a file listed twice would
+   * otherwise be invisible to a Set-based required check. */
+  const occurrences = new Map<string, number>();
+
+  for (const file of files) {
+    occurrences.set(file.path, (occurrences.get(file.path) ?? 0) + 1);
+  }
+
+  const duplicatePaths = [...occurrences.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([path]) => path)
+    .sort();
+
+  const shipped = new Set(occurrences.keys());
   const requiredPresent = REQUIRED_PACKAGE_FILES.filter((file) => shipped.has(file));
   const requiredMissing = REQUIRED_PACKAGE_FILES.filter((file) => !shipped.has(file));
 
   const pkgPath = join(input.projectRoot, 'package.json');
 
-  let complete = !truncated && requiredMissing.length === 0;
+  let complete = !truncated && requiredMissing.length === 0 && duplicatePaths.length === 0;
 
   if (complete && existsSync(pkgPath)) {
     try {
@@ -161,8 +318,10 @@ export function auditPackageContents(input: PackageAuditInput): PackageAuditResu
     audit: {
       fileCount: files.length,
       ...(entry.unpackedSize !== undefined ? { unpackedBytes: entry.unpackedSize } : {}),
-      sensitivePaths: sensitivePaths.slice(0, input.maxPackageFiles),
-      unexpectedPaths: unexpectedPaths.slice(0, input.maxPackageFiles),
+      duplicatePaths,
+      /* Sorted and de-duplicated so the report never depends on npm's ordering. */
+      sensitivePaths: [...new Set(sensitivePaths)].sort().slice(0, input.maxPackageFiles),
+      unexpectedPaths: [...new Set(unexpectedPaths)].sort().slice(0, input.maxPackageFiles),
       requiredPresent,
       requiredMissing,
       complete,

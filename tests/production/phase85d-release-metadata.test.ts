@@ -190,22 +190,39 @@ describe('Phase 85D — release metadata', () => {
 
   it('never creates a release tag or an automatic publish step for the target', () => {
     /*
-     * Read-only. Before Phase 85H no tag exists; once the authorized Phase 85H
-     * tag exists it must point exactly at the certified commit. Tag creation and
-     * publishing always stay outside this certification, and the tag is never
-     * automatic.
+     * Read-only. The authorized release tag must target the certified 0.6.0
+     * release commit — HEAD before any follow-up hardening commit, an ancestor
+     * of HEAD afterwards. Tag creation and publishing always stay outside this
+     * certification, and the tag is never automatic.
      */
     const tag = execFileSync('git', ['tag', '--list', `v${VERSION}`], {
       encoding: 'utf8',
     }).trim();
 
     if (tag) {
-      const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
       const tagged = execFileSync('git', ['rev-list', '-n', '1', `v${VERSION}`], {
         encoding: 'utf8',
       }).trim();
 
-      expect(tagged).toBe(head);
+      let objectPresent = false;
+
+      try {
+        execFileSync('git', ['cat-file', '-e', tagged], { stdio: 'pipe' });
+        objectPresent = true;
+      } catch {
+        /* A shallow CI checkout may not contain the tagged release commit. */
+      }
+
+      if (objectPresent) {
+        const taggedPackage = JSON.parse(
+          execFileSync('git', ['show', `${tagged}:package.json`], { encoding: 'utf8' })
+        ) as { version?: string };
+
+        expect(taggedPackage.version).toBe(VERSION);
+
+        /* The tag must lie on the certified release line, never on a side branch. */
+        execFileSync('git', ['merge-base', '--is-ancestor', tagged, 'HEAD'], { stdio: 'pipe' });
+      }
     }
 
     const manifest = readJson('release-manifest.json');

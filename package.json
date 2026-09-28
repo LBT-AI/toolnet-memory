@@ -241,7 +241,9 @@
     "phase85e:certify": "vitest run tests/production/phase85e-precommit-release.test.ts",
     "phase85g:certify": "vitest run tests/production/phase85g-release-commit.test.ts",
     "phase85f2:certify": "vitest run tests/production/phase85f2-product-capability-audit.test.ts",
-    "phase85g1:certify": "vitest run tests/production/phase85g1-task-invariant-hardening.test.ts"
+    "phase85g1:certify": "vitest run tests/production/phase85g1-task-invariant-hardening.test.ts",
+    "phase85j1:certify": "vitest run tests/production/phase85j1-npm12-package-audit.test.ts",
+    "phase85j:certify": "vitest run tests/production/phase85j-final-release-repair.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

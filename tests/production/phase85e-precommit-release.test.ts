@@ -82,6 +82,14 @@ const PENDING_HARDENING_PATHS = new Set([
   'tests/production/phase85e-precommit-release.test.ts',
   'tests/production/phase85g-release-commit.test.ts',
   'tests/production/phase85g1-task-invariant-hardening.test.ts',
+  /* Phase 85J1 — npm 12 package-audit compatibility + release npm pin. */
+  '.github/workflows/release.yml',
+  'src/code-intelligence/release/package-audit.ts',
+  'src/production/production-certify.ts',
+  'tests/production/phase85j1-npm12-package-audit.test.ts',
+  'Dockerfile',
+  'src/code-intelligence/release/types.ts',
+  'tests/production/phase85j-final-release-repair.test.ts',
 ]);
 
 function isPendingHardeningPath(path: string): boolean {
@@ -584,19 +592,28 @@ describe('Phase 85E — no stale artifact', () => {
  * ================================================================== */
 
 describe('Phase 85E — no release mutation', () => {
-  it('never creates the 0.6.0 release tag; any existing tag targets HEAD', () => {
+  it('never creates the 0.6.0 release tag; the release tag targets the release commit', () => {
     /*
-     * Read-only. Before Phase 85H no tag exists; once the authorized Phase 85H
-     * tag exists it must point exactly at the certified release commit. This
-     * certification never creates, moves or pushes a tag.
+     * Read-only. The authorized release tag must target the certified 0.6.0
+     * release commit — HEAD before any follow-up hardening commit, an ancestor
+     * of HEAD afterwards. This certification never creates, moves or pushes a
+     * tag.
      */
     const tag = git(['tag', '--list', `v${VERSION}`]).stdout.trim();
 
-    if (tag) {
-      expect(git(['rev-list', '-n', '1', `v${VERSION}`]).stdout.trim()).toBe(
-        git(['rev-parse', 'HEAD']).stdout.trim()
-      );
-    }
+    if (!tag) return;
+
+    const tagged = git(['rev-list', '-n', '1', `v${VERSION}`]).stdout.trim();
+
+    /* A shallow CI checkout may not contain the tagged release commit. */
+    if (git(['cat-file', '-e', tagged]).status !== 0) return;
+
+    const taggedPackage = JSON.parse(git(['show', `${tagged}:package.json`]).stdout || '{}') as {
+      version?: string;
+    };
+
+    expect(taggedPackage.version).toBe(VERSION);
+    expect(git(['merge-base', '--is-ancestor', tagged, 'HEAD']).status).toBe(0);
   });
 
   it('keeps tag creation and publishing outside this certification', () => {

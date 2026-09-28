@@ -2,6 +2,16 @@
 FROM node:22-bookworm-slim AS builder
 WORKDIR /opt/toolnet-memory
 ENV NODE_ENV=development
+# The tree-sitter grammar modules ship prebuilds for amd64 but not for arm64, so
+# node-gyp compiles them from source during `npm ci`: the builder needs Python
+# and a C/C++ toolchain. These stay in this stage only — the runtime image ships
+# the compiled artifacts and stays minimal.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       python3 \
+       make \
+       g++ \
+    && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .

@@ -51,6 +51,23 @@ function parentAvailable(): boolean {
   return git(['rev-parse', 'HEAD^']).status === 0;
 }
 
+/*
+ * The certified release commit: the tagged commit when an authorized release
+ * tag exists in this checkout, otherwise HEAD. Follow-up hardening commits land
+ * on top of it, so the release commit is HEAD before them and an ancestor after.
+ */
+function releaseCommit(): string {
+  const tagged = git(['tag', '--list', `v${VERSION}`]).stdout.trim()
+    ? git(['rev-list', '-n', '1', `v${VERSION}`]).stdout.trim()
+    : '';
+
+  if (tagged && git(['cat-file', '-e', tagged]).status === 0) {
+    return tagged;
+  }
+
+  return git(['rev-parse', 'HEAD']).stdout.trim();
+}
+
 /* The commit's tracked tree — stable in shallow and full checkouts. */
 function committedTree(): string[] {
   return git(['ls-tree', '-r', '--name-only', 'HEAD']).stdout.split(/\r?\n/u).filter(Boolean);
@@ -80,6 +97,14 @@ const PENDING_HARDENING_PATHS = new Set([
   'tests/production/phase85e-precommit-release.test.ts',
   'tests/production/phase85g-release-commit.test.ts',
   'tests/production/phase85g1-task-invariant-hardening.test.ts',
+  /* Phase 85J1 — npm 12 package-audit compatibility + release npm pin. */
+  '.github/workflows/release.yml',
+  'src/code-intelligence/release/package-audit.ts',
+  'src/production/production-certify.ts',
+  'tests/production/phase85j1-npm12-package-audit.test.ts',
+  'Dockerfile',
+  'src/code-intelligence/release/types.ts',
+  'tests/production/phase85j-final-release-repair.test.ts',
 ]);
 
 function isPendingHardeningPath(path: string): boolean {
@@ -116,14 +141,15 @@ describe('Phase 85G — HEAD version truth', () => {
   });
 
   it('introduced the release on top of the 0.5.3 baseline', () => {
-    const headPackage = JSON.parse(git(['show', 'HEAD:package.json']).stdout || '{}');
+    const release = releaseCommit();
+    const releasePackage = JSON.parse(git(['show', `${release}:package.json`]).stdout || '{}');
 
-    expect(headPackage.version).toBe(VERSION);
+    expect(releasePackage.version).toBe(VERSION);
 
     /* A shallow CI checkout carries no parent commit; when history is present
-     * the parent must be the published 0.5.3 baseline. */
-    if (git(['rev-parse', 'HEAD^']).status === 0) {
-      const parentPackage = JSON.parse(git(['show', 'HEAD^:package.json']).stdout || '{}');
+     * the release commit's parent must be the published 0.5.3 baseline. */
+    if (git(['rev-parse', `${release}^`]).status === 0) {
+      const parentPackage = JSON.parse(git(['show', `${release}^:package.json`]).stdout || '{}');
 
       expect(parentPackage.version).toBe('0.5.3');
     }
@@ -326,11 +352,17 @@ describe('Phase 85G — no tag, push or publish', () => {
   it('never creates the v0.6.0 tag; any existing tag targets the release commit', () => {
     const tag = git(['tag', '--list', `v${VERSION}`]).stdout.trim();
 
-    if (tag) {
-      expect(git(['rev-list', '-n', '1', `v${VERSION}`]).stdout.trim()).toBe(
-        git(['rev-parse', 'HEAD']).stdout.trim()
-      );
-    }
+    if (!tag) return;
+
+    const tagged = git(['rev-list', '-n', '1', `v${VERSION}`]).stdout.trim();
+
+    /* A shallow CI checkout may not contain the tagged release commit. */
+    if (git(['cat-file', '-e', tagged]).status !== 0) return;
+
+    expect(JSON.parse(git(['show', `${tagged}:package.json`]).stdout || '{}').version).toBe(
+      VERSION
+    );
+    expect(git(['merge-base', '--is-ancestor', tagged, 'HEAD']).status).toBe(0);
   });
 
   it('only ever records the release commit on the remote main branch', () => {
@@ -362,14 +394,20 @@ describe('Phase 85G — no tag, push or publish', () => {
     expect(manifest.releasePolicy?.gitTagAutomatic).toBe(false);
     expect(manifest.releasePolicy?.npmPublishTrigger).toBe('git-tag-workflow-trusted-publishing');
 
-    /* The tag, when it exists (Phase 85H), must target this exact release
-     * commit; publishing can only follow an explicit authorized tag push. */
+    /* The tag, when it exists, must target the certified release commit on the
+     * certified release line; publishing can only follow an explicit authorized
+     * tag push. */
     const tag = git(['tag', '--list', `v${VERSION}`]).stdout.trim();
 
     if (tag) {
-      expect(git(['rev-list', '-n', '1', `v${VERSION}`]).stdout.trim()).toBe(
-        git(['rev-parse', 'HEAD']).stdout.trim()
-      );
+      const tagged = git(['rev-list', '-n', '1', `v${VERSION}`]).stdout.trim();
+
+      if (git(['cat-file', '-e', tagged]).status === 0) {
+        expect(JSON.parse(git(['show', `${tagged}:package.json`]).stdout || '{}').version).toBe(
+          VERSION
+        );
+        expect(git(['merge-base', '--is-ancestor', tagged, 'HEAD']).status).toBe(0);
+      }
     }
   });
 });

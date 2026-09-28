@@ -177,6 +177,8 @@ export interface PackageContentAudit {
   fileCount: number;
   /** Total unpacked bytes reported by npm, when available. */
   unpackedBytes?: number;
+  /** Normalized shipped paths reported more than once (never legitimate). */
+  duplicatePaths: string[];
   /** Sensitive file paths detected in the pack (never their contents). */
   sensitivePaths: string[];
   /** Unexpected derived-state/cache/tests paths detected. */

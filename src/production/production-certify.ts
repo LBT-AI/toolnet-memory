@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import { fileURLToPath } from 'node:url';
+import { parsePackManifestEntries } from '../code-intelligence/release/package-audit.js';
 import { certifyMemoryQualityGA } from './memory-quality-ga-certify.js';
 import { certifyRetrievalProduction } from './retrieval-production-certify.js';
 import { certifyAdaptiveRetrieval } from './retrieval-adaptive-certify.js';
@@ -243,31 +244,14 @@ export function validatePackedRuntimeFiles(files: string[]): PackedRuntimeValida
 /**
  * Parse `npm pack --dry-run --json` output into the packed file paths.
  *
- * npm <= 11 emits an array of results, e.g. [ { files: [...] } ].
- * npm >= 12 emits an object keyed by package name, e.g.
- * { 'toolnet-memory': { files: [...] } }.
+ * The shape normalization lives in one place (`parsePackManifestEntries`), so
+ * npm <= 11 array output and npm >= 12 name-keyed object output are handled
+ * identically here and in the release package audit. Malformed or unrecognized
+ * output yields no paths, which makes the caller's required-file check fail
+ * closed.
  */
 export function parsePackedFiles(stdout: string): string[] {
-  try {
-    const parsed = JSON.parse(stdout) as unknown;
-    let entry: { files?: Array<{ path?: string }> } | undefined;
-    if (Array.isArray(parsed)) {
-      entry = parsed[0] as { files?: Array<{ path?: string }> };
-    } else if (parsed && typeof parsed === 'object') {
-      const values = Object.values(parsed as Record<string, unknown>);
-      const first = values[0];
-      if (first && typeof first === 'object' && !Array.isArray(first)) {
-        entry = first as { files?: Array<{ path?: string }> };
-      }
-    }
-    return (
-      entry?.files
-        ?.map((item) => item.path)
-        .filter((value): value is string => typeof value === 'string') ?? []
-    );
-  } catch {
-    return [];
-  }
+  return parsePackManifestEntries(stdout).flatMap((entry) => entry.files.map((file) => file.path));
 }
 
 function npmPackedFiles(packageRoot: string): {
