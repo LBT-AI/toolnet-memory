@@ -185,7 +185,13 @@ describe('Claude Code integration', () => {
 
       const occurrences = secondText.match(/session:claude-hook/gu) ?? [];
 
-      expect(occurrences).toHaveLength(3);
+      expect(occurrences).toHaveLength(4);
+
+      const installed = JSON.parse(secondText);
+
+      expect(installed.hooks.UserPromptSubmit).toBeDefined();
+
+      expect(installed.hooks.Stop.at(-1).hooks[0].timeout).toBe(30);
     } finally {
       rmSync(root, {
         recursive: true,

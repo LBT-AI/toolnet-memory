@@ -21,7 +21,7 @@ async function readInput(): Promise<Record<string, unknown>> {
 async function main(): Promise<void> {
   const input = await readInput();
 
-  const output = handleClaudeHookInput(input);
+  const output = await handleClaudeHookInput(input);
 
   process.stdout.write(JSON.stringify(output));
 }

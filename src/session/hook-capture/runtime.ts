@@ -18,6 +18,8 @@ import { refreshFastHandoffFromCurrent } from '../../work-continuity/handoff-ref
 
 import { SessionCore } from '../core.js';
 
+import type { SessionAgent, SessionFlushResult } from '../types.js';
+
 import { createSessionIdentity } from '../identity.js';
 
 import { checkpointLocalSession } from '../local-checkpoint.js';
@@ -97,10 +99,10 @@ function captureLocal(project: ProjectManifest, input: NormalizedHookInput): num
 
 export async function flushHookCaptureSession(
   project: ProjectManifest,
-  agent: HookCaptureAgent,
+  agent: SessionAgent,
   sessionId: string,
   cwd: string
-): Promise<void> {
+): Promise<SessionFlushResult> {
   const config = loadConfig();
 
   const raw = withStorageRetry(
@@ -135,7 +137,7 @@ export async function flushHookCaptureSession(
     },
   });
 
-  await core.flush();
+  return core.flush();
 }
 
 export async function handleNormalizedHookInput(

@@ -104,13 +104,13 @@ function cleanManagedGroups(value: unknown): unknown[] {
   return output;
 }
 
-function handler(command: string): JsonObject {
+function handler(command: string, timeout = 10): JsonObject {
   return {
     type: 'command',
 
     command,
 
-    timeout: 10,
+    timeout,
   };
 }
 
@@ -171,6 +171,14 @@ export function installClaudeHooks(
 
   hooks.SessionStart = sessionStart;
 
+  const userPromptSubmit = cleanManagedGroups(hooks.UserPromptSubmit);
+
+  userPromptSubmit.push({
+    hooks: [handler(command)],
+  });
+
+  hooks.UserPromptSubmit = userPromptSubmit;
+
   const postToolUse = cleanManagedGroups(hooks.PostToolUse);
 
   postToolUse.push({
@@ -183,8 +191,13 @@ export function installClaudeHooks(
 
   const stop = cleanManagedGroups(hooks.Stop);
 
+  /*
+   * Stop is the durable boundary: it runs SessionCore.flush() which
+   * materializes canonical memory. Give it headroom above the default
+   * 10s so a slow storage round-trip does not abort durable work.
+   */
   stop.push({
-    hooks: [handler(command)],
+    hooks: [handler(command, 30)],
   });
 
   hooks.Stop = stop;

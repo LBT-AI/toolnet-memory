@@ -4,6 +4,8 @@ import { isAbsolute, join, relative } from 'node:path';
 
 import { ProjectManager } from '../../core/index.js';
 
+import type { ProjectManifest } from '../../core/types.js';
+
 import { triggerProjectBackgroundRefresh } from '../../multi-host/refresh-trigger.js';
 
 import { buildFastProjectContext, findProjectRoot } from '../../work-continuity/fast-context.js';
@@ -12,9 +14,13 @@ import { refreshFastHandoffFromCurrent } from '../../work-continuity/handoff-ref
 
 import { createSessionIdentity } from '../identity.js';
 
+import type { SessionFlushResult } from '../types.js';
+
 import { SessionWal } from '../wal.js';
 
 import { checkpointLocalSession } from '../local-checkpoint.js';
+
+import { flushHookCaptureSession } from '../hook-capture/runtime.js';
 
 import { mapClaudeHookToSessionEvents } from './event-mapper.js';
 
@@ -64,11 +70,14 @@ function safeRelativeFile(project: DetectedProject, file: string): string {
   return resolved;
 }
 
+function resolveClaudeSessionId(input: JsonObject): string {
+  return typeof input.session_id === 'string' && input.session_id.trim()
+    ? input.session_id.trim()
+    : 'claude';
+}
+
 function captureClaudeSession(project: DetectedProject, input: JsonObject): void {
-  const nativeSessionId =
-    typeof input.session_id === 'string' && input.session_id.trim()
-      ? input.session_id.trim()
-      : 'claude';
+  const nativeSessionId = resolveClaudeSessionId(input);
 
   const events = mapClaudeHookToSessionEvents(input, project);
 
@@ -165,7 +174,42 @@ function recordClaudeOrigin(project: DetectedProject, input: JsonObject): void {
   }
 }
 
-export function handleClaudeHookInput(input: JsonObject): JsonObject {
+export interface ClaudeHookDependencies {
+  flushSession?: (
+    project: ProjectManifest,
+    sessionId: string,
+    cwd: string
+  ) => Promise<SessionFlushResult>;
+
+  logDiagnostic?: (message: string) => void;
+}
+
+function flushClaudeSession(
+  project: ProjectManifest,
+  sessionId: string,
+  cwd: string
+): Promise<SessionFlushResult> {
+  /*
+   * Canonical materialization is owned by SessionCore.flush().
+   * This adapter only attaches a SessionCore to the EXISTING Claude WAL:
+   * same project, agent and native session id resolve to the same
+   * identity, so no event is appended twice.
+   */
+  return flushHookCaptureSession(project, 'claude', sessionId, cwd);
+}
+
+function writeDiagnostic(message: string): void {
+  try {
+    process.stderr.write(`${message}\n`);
+  } catch {
+    // Diagnostics must never break the hook.
+  }
+}
+
+export async function handleClaudeHookInput(
+  input: JsonObject,
+  dependencies: ClaudeHookDependencies = {}
+): Promise<JsonObject> {
   const event = typeof input.hook_event_name === 'string' ? input.hook_event_name : '';
 
   const cwd = typeof input.cwd === 'string' ? input.cwd : '';
@@ -235,6 +279,35 @@ export function handleClaudeHookInput(input: JsonObject): JsonObject {
       }
 
       triggerProjectBackgroundRefresh(project.rootPath);
+
+      /*
+       * Durable boundary. SessionCore.flush() runs the canonical learner +
+       * materialization pipeline. The Claude session id only resolves the
+       * shared WAL; no event is recorded here, so Stop is not appended twice.
+       */
+      const sessionId = resolveClaudeSessionId(input);
+
+      const flush = dependencies.flushSession ?? flushClaudeSession;
+
+      const log = dependencies.logDiagnostic ?? writeDiagnostic;
+
+      try {
+        const result = await flush(project, sessionId, cwd);
+
+        if (result.materialization?.status === 'failed') {
+          log(
+            `[toolnet-memory] claude stop materialization failed: ${
+              result.materialization.errorCode ?? 'materialize-failed'
+            }`
+          );
+        }
+      } catch {
+        /*
+         * WAL + learned journal remain durable for the next retry.
+         * Only a domain-safe code is surfaced; never content or stack traces.
+         */
+        log('[toolnet-memory] claude stop materialization failed: flush-failed');
+      }
 
       return {};
     }

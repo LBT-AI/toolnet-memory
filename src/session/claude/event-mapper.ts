@@ -2,6 +2,8 @@ import type { ProjectManifest } from '../../core/types.js';
 
 import type { SessionEventInput } from '../types.js';
 
+import { sha256 } from '../utils.js';
+
 type JsonObject = Record<string, unknown>;
 
 function object(value: unknown): JsonObject {
@@ -83,6 +85,30 @@ export function mapClaudeHookToSessionEvents(
     ];
   }
 
+  if (hookEvent === 'UserPromptSubmit') {
+    const prompt = text(input.prompt);
+
+    if (!prompt) {
+      return [];
+    }
+
+    return [
+      {
+        ...common,
+
+        type: 'user_prompt',
+
+        role: 'user',
+
+        sourceEventId: `${sourceEventBase}:prompt:${sha256(prompt).slice(0, 16)}`,
+
+        data: {
+          content: prompt,
+        },
+      },
+    ];
+  }
+
   if (hookEvent === 'PostToolUse') {
     if ((toolName === 'Edit' || toolName === 'Write') && filePath) {
       return [
@@ -122,19 +148,39 @@ export function mapClaudeHookToSessionEvents(
   }
 
   if (hookEvent === 'Stop') {
-    return [
-      {
+    const events: SessionEventInput[] = [];
+
+    const assistant = text(input.last_assistant_message);
+
+    if (assistant) {
+      events.push({
         ...common,
 
-        type: 'session_idle',
+        type: 'assistant_message',
 
-        sourceEventId: `${sourceEventBase}:idle`,
+        role: 'assistant',
+
+        sourceEventId: `${sourceEventBase}:assistant:${sha256(assistant).slice(0, 16)}`,
 
         data: {
-          sessionId,
+          content: assistant,
         },
+      });
+    }
+
+    events.push({
+      ...common,
+
+      type: 'session_idle',
+
+      sourceEventId: `${sourceEventBase}:idle`,
+
+      data: {
+        sessionId,
       },
-    ];
+    });
+
+    return events;
   }
 
   return [
