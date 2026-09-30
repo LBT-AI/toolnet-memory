@@ -274,6 +274,8 @@ export interface SessionFlushResult {
   status: SessionStatus;
 
   materialization?: {
+    status: 'ok' | 'noop' | 'failed';
+
     batchesScanned: number;
 
     candidates: number;
@@ -284,9 +286,13 @@ export interface SessionFlushResult {
 
     memories: number;
 
+    evidenceUpdated: number;
+
     operationId: string;
 
     durationMs: number;
+
+    errorCode?: string;
   };
 }
 

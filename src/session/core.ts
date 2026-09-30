@@ -342,8 +342,11 @@ export class SessionCore {
       try {
         materialization = await this.materializer.materialize(this.project, this.identity);
       } catch {
-        // Materialization is best-effort downstream of durable capture.
-        // WAL + journal remain intact for retry.
+        /*
+         * Materialization is downstream of durable capture and normally
+         * reports failures through its own result. This guard only keeps an
+         * unexpected throw from breaking fingerprinting of session state.
+         */
       }
     }
 
@@ -410,6 +413,8 @@ export class SessionCore {
 
       materialization: materialization
         ? {
+            status: materialization.status,
+
             batchesScanned: materialization.batchesScanned,
 
             candidates: materialization.candidates,
@@ -420,9 +425,13 @@ export class SessionCore {
 
             memories: materialization.memories,
 
+            evidenceUpdated: materialization.evidenceUpdated,
+
             operationId: materialization.operationId,
 
             durationMs: materialization.durationMs,
+
+            ...(materialization.errorCode ? { errorCode: materialization.errorCode } : {}),
           }
         : undefined,
     };

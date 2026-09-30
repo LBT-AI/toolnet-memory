@@ -13,6 +13,11 @@ import { safeAppendAuditEvent } from '../../audit/log.js';
 import { normalizeMemoryScopeMetadata } from '../../memory/scope-freshness.js';
 
 import type { LearnedMemoryBatch, LearnedMemoryCandidate, MemoryReconcileResult } from './types.js';
+import { MaterializationError } from './materialization-error.js';
+
+function failureMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 function pad(value: number): string {
   return String(value).padStart(12, '0');
@@ -171,6 +176,19 @@ function mergeConfirmationEvidence(
     return false;
   }
 
+  /*
+   * Evidence-only changes must move updatedAt forward, otherwise the
+   * convergent store's newest-wins merge can resurrect the stale operation
+   * snapshot and silently drop the confirmation.
+   */
+  const candidateUpdatedAt = Date.parse(candidate.createdAt);
+
+  const memoryUpdatedAt = Date.parse(memory.updatedAt);
+
+  if (Number.isFinite(candidateUpdatedAt) && candidateUpdatedAt > memoryUpdatedAt) {
+    memory.updatedAt = candidate.createdAt;
+  }
+
   memory.metadata = {
     ...(memory.metadata ?? {}),
 
@@ -192,21 +210,39 @@ function mergeConfirmationEvidence(
   return true;
 }
 
-async function loadBatches(
+/**
+ * Single reader for learned journal batches.
+ *
+ * Every entrypoint (session flush, startup reconcile, manual reconcile)
+ * reads batches through this function so there is exactly one on-disk shape.
+ */
+export async function loadSessionMemoryBatches(
   project: ProjectManifest,
 
   storage: StorageProvider
 ): Promise<LearnedMemoryBatch[]> {
   const prefix = `projects/${project.id}/memory/learned/`;
 
-  const objects = await storage.list(prefix);
+  let objects: Awaited<ReturnType<StorageProvider['list']>>;
+
+  try {
+    objects = await storage.list(prefix);
+  } catch (error) {
+    throw new MaterializationError('journal-read-failed', failureMessage(error));
+  }
 
   const batches: LearnedMemoryBatch[] = [];
 
   for (const object of objects
     .filter((item) => item.key.includes('/batches/') && item.key.endsWith('.json'))
     .sort((left, right) => left.key.localeCompare(right.key))) {
-    const text = await storage.getText(object.key);
+    let text: string | null;
+
+    try {
+      text = await storage.getText(object.key);
+    } catch (error) {
+      throw new MaterializationError('journal-read-failed', failureMessage(error));
+    }
 
     if (!text) {
       continue;
@@ -237,7 +273,13 @@ export async function reconcileJournalBatches(
 ): Promise<MemoryReconcileResult> {
   const store = new ConvergentMemoryStore(storage);
 
-  const existing = await store.load(project.id);
+  let existing: Awaited<ReturnType<ConvergentMemoryStore['load']>>;
+
+  try {
+    existing = await store.load(project.id);
+  } catch (error) {
+    throw new MaterializationError('memory-store-read-failed', failureMessage(error));
+  }
 
   let phase53Backfilled = 0;
 
@@ -355,7 +397,12 @@ export async function reconcileJournalBatches(
   }
 
   if (added > 0 || evidenceUpdated > 0 || phase53Backfilled > 0) {
-    await store.save(project.id, engine.exportProject(project.id));
+    try {
+      await store.save(project.id, engine.exportProject(project.id));
+    } catch (error) {
+      throw new MaterializationError('memory-store-save-failed', failureMessage(error));
+    }
+
     for (const item of addedAuditRecords) {
       await safeAppendAuditEvent(project, {
         action: 'memory.save',
@@ -391,7 +438,7 @@ export async function reconcileSessionMemoryJournal(
 
   storage: StorageProvider
 ): Promise<MemoryReconcileResult> {
-  const batches = await loadBatches(project, storage);
+  const batches = await loadSessionMemoryBatches(project, storage);
 
   return reconcileJournalBatches(project, storage, batches);
 }

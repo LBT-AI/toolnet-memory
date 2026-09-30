@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 
 import { tmpdir } from 'node:os';
 
@@ -10,22 +10,40 @@ import type { ProjectManifest } from '../../src/core/types.js';
 
 import type { StorageObject, StorageProvider } from '../../src/storage/types.js';
 
+import { ConvergentMemoryStore } from '../../src/multi-host/memory-projection.js';
+
 import { MemoryStore } from '../../src/storage/memory-store.js';
 
 import { SessionCore } from '../../src/session/core.js';
 
 import { SessionMemoryMaterializer } from '../../src/session/learner/materializer.js';
 
+import { SessionMemoryLearner } from '../../src/session/learner/learner.js';
+
 import { reconcileSessionMemoryJournal } from '../../src/session/learner/index.js';
 
 import { TaskStore } from '../../src/tasks/store.js';
+
+const RULE = 'Từ giờ luôn chỉ edit source, không được edit production trực tiếp.';
+
+const TEST_RULE = 'Luôn luôn chạy test trước khi commit.';
 
 class MemoryStorage implements StorageProvider {
   readonly name = 'memory';
 
   readonly objects = new Map<string, Uint8Array>();
 
+  readonly putCounts = new Map<string, number>();
+
+  failWrite: (key: string) => boolean = () => false;
+
   async put(key: string, data: string | Uint8Array) {
+    if (this.failWrite(key)) {
+      throw new Error('storage write failed');
+    }
+
+    this.putCounts.set(key, (this.putCounts.get(key) ?? 0) + 1);
+
     this.objects.set(key, typeof data === 'string' ? Buffer.from(data) : data);
   }
 
@@ -56,15 +74,44 @@ class MemoryStorage implements StorageProvider {
       }));
   }
 
-  snapshot(): Map<string, Uint8Array> {
-    return new Map(this.objects);
+  memoryKey(projectId: string): string {
+    return `projects/${projectId}/memories/current.json`;
+  }
+
+  memoryWriteCount(projectId: string): number {
+    return this.putCounts.get(this.memoryKey(projectId)) ?? 0;
+  }
+
+  operationKeys(projectId: string): string[] {
+    return Array.from(this.objects.keys()).filter((key) =>
+      key.startsWith(`projects/${projectId}/operations/memory/`)
+    );
+  }
+
+  textValues(): string {
+    return Array.from(this.objects.values())
+      .map((value) => Buffer.from(value).toString('utf8'))
+      .join('\n');
   }
 }
 
-class FailingMemoryStorage extends MemoryStorage {
-  async put(key: string, data: string | Uint8Array): Promise<void> {
-    if (key.includes('/memories/current.json')) {
-      throw new Error('MemoryStore save failed');
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+/* Widen the read-then-write window so concurrent materializations overlap. */
+class SlowMemoryReadStorage extends MemoryStorage {
+  async getText(key: string) {
+    if (key.endsWith('/memories/current.json')) {
+      await delay(15);
+    }
+
+    return super.getText(key);
+  }
+
+  async put(key: string, data: string | Uint8Array) {
+    if (key.includes('/operations/memory/') || key.endsWith('/memories/current.json')) {
+      await delay(15);
     }
 
     return super.put(key, data);
@@ -99,6 +146,38 @@ function project(name = 'materializer-test'): ProjectManifest {
   };
 }
 
+function startCore(
+  p: ProjectManifest,
+  storage: StorageProvider,
+  nativeSessionId: string
+): SessionCore {
+  const core = new SessionCore({
+    project: p,
+
+    storage,
+
+    agent: 'opencode',
+
+    nativeSessionId,
+  });
+
+  core.start();
+
+  return core;
+}
+
+function recordPrompt(core: SessionCore, sourceEventId: string, content: string): void {
+  core.record({
+    type: 'user_prompt',
+
+    role: 'user',
+
+    sourceEventId,
+
+    data: { content },
+  });
+}
+
 afterEach(() => {
   while (roots.length) {
     rmSync(roots.pop()!, {
@@ -110,317 +189,267 @@ afterEach(() => {
 });
 
 describe('SessionMemoryMaterializer', () => {
-  it('materializes learned journal into MemoryStore after SessionCore.flush()', async () => {
+  it('materializes learned journal into MemoryStore before flush returns', async () => {
     const p = project('materialize-flush');
 
     const storage = new MemoryStorage();
 
-    const core = new SessionCore({
-      project: p,
+    const core = startCore(p, storage, 'mat-flush-1');
 
-      storage,
-
-      agent: 'opencode',
-
-      nativeSessionId: 'mat-flush-1',
-    });
-
-    core.start();
-
-    core.record({
-      type: 'user_prompt',
-
-      role: 'user',
-
-      sourceEventId: 'prompt-1',
-
-      data: {
-        content: 'Từ giờ luôn chỉ edit source, không được edit production trực tiếp.',
-      },
-    });
+    recordPrompt(core, 'prompt-1', RULE);
 
     const flushed = await core.flush();
 
-    expect(flushed.materialization).toBeDefined();
+    expect(flushed.materialization?.status).toBe('ok');
 
     expect(flushed.materialization?.added).toBeGreaterThanOrEqual(1);
 
-    const store = new MemoryStore(storage);
-
-    const memories = await store.load(p.id);
+    const memories = await new MemoryStore(storage).load(p.id);
 
     expect(memories.length).toBeGreaterThanOrEqual(1);
 
     expect(memories[0].metadata?.nativeSessionId).toBe('mat-flush-1');
   });
 
-  it('replays same input without creating duplicate memories', async () => {
+  it('replays the same session/materialization without creating duplicate memories', async () => {
     const p = project('materialize-replay');
 
     const storage = new MemoryStorage();
 
-    const core = new SessionCore({
-      project: p,
+    const first = startCore(p, storage, 'mat-replay-1');
 
-      storage,
+    recordPrompt(first, 'prompt-replay', RULE);
 
-      agent: 'opencode',
-
-      nativeSessionId: 'mat-replay-1',
-    });
-
-    core.start();
-
-    core.record({
-      type: 'user_prompt',
-
-      role: 'user',
-
-      sourceEventId: 'prompt-replay',
-
-      data: {
-        content: 'Từ giờ luôn chỉ edit source, không được edit production trực tiếp.',
-      },
-    });
-
-    await core.flush();
+    await first.flush();
 
     const store = new MemoryStore(storage);
 
-    const afterFirst = await store.load(p.id);
+    expect(await store.load(p.id)).toHaveLength(1);
 
-    expect(afterFirst).toHaveLength(1);
+    const second = startCore(p, storage, 'mat-replay-1');
 
-    const secondCore = new SessionCore({
-      project: p,
+    recordPrompt(second, 'prompt-replay', RULE);
 
-      storage,
+    await second.flush();
 
-      agent: 'opencode',
+    expect(await store.load(p.id)).toHaveLength(1);
 
-      nativeSessionId: 'mat-replay-1',
-    });
+    const replay = await new SessionMemoryMaterializer(storage).materialize(p, second.identity);
 
-    secondCore.start();
+    expect(replay.status).toBe('noop');
 
-    secondCore.record({
-      type: 'user_prompt',
+    expect(replay.added).toBe(0);
 
-      role: 'user',
-
-      sourceEventId: 'prompt-replay',
-
-      data: {
-        content: 'Từ giờ luôn chỉ edit source, không được edit production trực tiếp.',
-      },
-    });
-
-    await secondCore.flush();
-
-    const afterSecond = await store.load(p.id);
-
-    expect(afterSecond).toHaveLength(1);
+    expect(await store.load(p.id)).toHaveLength(1);
   });
 
-  it('recovers from crash after journal by retrying materialization', async () => {
+  it('recovers exactly once after a failed MemoryStore save', async () => {
     const p = project('materialize-crash-journal');
 
     const storage = new MemoryStorage();
 
-    const core = new SessionCore({
-      project: p,
+    const core = startCore(p, storage, 'mat-crash-1');
 
-      storage,
+    recordPrompt(core, 'prompt-crash', RULE);
 
-      agent: 'opencode',
+    storage.failWrite = (key) => key.includes('/memories/') || key.includes('/operations/memory/');
 
-      nativeSessionId: 'mat-crash-1',
-    });
+    const failed = await core.flush();
 
-    core.start();
+    expect(failed.materialization?.status).toBe('failed');
 
-    core.record({
-      type: 'user_prompt',
+    expect(failed.materialization?.errorCode).toBe('memory-store-save-failed');
 
-      role: 'user',
+    expect(await new MemoryStore(storage).load(p.id)).toHaveLength(0);
 
-      sourceEventId: 'prompt-crash',
+    expect(storage.operationKeys(p.id)).toHaveLength(0);
 
-      data: {
-        content: 'Từ giờ luôn chỉ edit source, không được edit production trực tiếp.',
-      },
-    });
-
-    await core.flush();
-
-    const journalKeys = Array.from(storage.objects.keys()).filter((key) =>
+    const learnedBatches = Array.from(storage.objects.keys()).filter((key) =>
       key.includes('/memory/learned/')
     );
 
-    expect(journalKeys.length).toBeGreaterThanOrEqual(1);
+    expect(learnedBatches.length).toBeGreaterThanOrEqual(1);
 
-    const store = new MemoryStore(storage);
+    storage.failWrite = () => false;
 
-    const memories = await store.load(p.id);
+    const retried = await core.flush();
 
-    expect(memories).toHaveLength(1);
+    expect(retried.materialization?.status).toBe('ok');
+
+    expect(retried.materialization?.added).toBe(1);
+
+    expect(await new MemoryStore(storage).load(p.id)).toHaveLength(1);
   });
 
-  it('does not advance cursor when MemoryStore.save fails', async () => {
-    const p = project('materialize-fail-cursor');
-
-    const storage = new FailingMemoryStorage();
-
-    const core = new SessionCore({
-      project: p,
-
-      storage,
-
-      agent: 'opencode',
-
-      nativeSessionId: 'mat-fail-1',
-    });
-
-    core.start();
-
-    core.record({
-      type: 'user_prompt',
-
-      role: 'user',
-
-      sourceEventId: 'prompt-fail',
-
-      data: {
-        content: 'Từ giờ luôn chỉ edit source, không được edit production trực tiếp.',
-      },
-    });
-
-    const flushed = await core.flush();
-
-    expect(flushed.materialization).toBeDefined();
-
-    expect(flushed.materialization?.added).toBe(0);
-  });
-
-  it('serializes concurrent materialization safely', async () => {
-    const p = project('materialize-concurrent');
+  it('does not create duplicate memory when only the memory cache write fails', async () => {
+    const p = project('materialize-cache-failure');
 
     const storage = new MemoryStorage();
 
-    const core1 = new SessionCore({
-      project: p,
+    const core = startCore(p, storage, 'mat-cache-1');
 
-      storage,
+    recordPrompt(core, 'prompt-cache', RULE);
 
-      agent: 'opencode',
+    storage.failWrite = (key) => key.endsWith('/memories/current.json');
 
-      nativeSessionId: 'mat-concurrent-1',
-    });
+    const failed = await core.flush();
 
-    core1.start();
+    expect(failed.materialization?.status).toBe('failed');
 
-    core1.record({
-      type: 'user_prompt',
+    const convergent = await new ConvergentMemoryStore(storage).load(p.id);
 
-      role: 'user',
+    expect(convergent).toHaveLength(1);
 
-      sourceEventId: 'prompt-concurrent',
+    storage.failWrite = () => false;
 
-      data: {
-        content: 'Từ giờ luôn chỉ edit source, không được edit production trực tiếp.',
-      },
-    });
+    const retried = await core.flush();
 
-    const core2 = new SessionCore({
-      project: p,
+    expect(retried.materialization?.status).not.toBe('failed');
 
-      storage,
+    const convergentAfter = await new ConvergentMemoryStore(storage).load(p.id);
 
-      agent: 'opencode',
-
-      nativeSessionId: 'mat-concurrent-2',
-    });
-
-    core2.start();
-
-    core2.record({
-      type: 'user_prompt',
-
-      role: 'user',
-
-      sourceEventId: 'prompt-concurrent-2',
-
-      data: {
-        content: 'Luôn luôn chạy test trước khi commit.',
-      },
-    });
-
-    const [flushed1, flushed2] = await Promise.all([
-      core1.flush(),
-
-      core2.flush(),
-    ]);
-
-    expect(flushed1.materialization).toBeDefined();
-
-    expect(flushed2.materialization).toBeDefined();
-
-    const store = new MemoryStore(storage);
-
-    const memories = await store.load(p.id);
-
-    expect(memories.length).toBeGreaterThanOrEqual(1);
+    expect(convergentAfter).toHaveLength(1);
   });
 
-  it('never stores raw secrets in journal or MemoryStore', async () => {
+  it('does not rewrite MemoryStore when there are no new candidates', async () => {
+    const p = project('materialize-noop');
+
+    const storage = new MemoryStorage();
+
+    const core = startCore(p, storage, 'mat-noop-1');
+
+    recordPrompt(core, 'prompt-noop', RULE);
+
+    await core.flush();
+
+    const writesAfterFirst = storage.memoryWriteCount(p.id);
+
+    const operationsAfterFirst = storage.operationKeys(p.id).length;
+
+    const second = await core.flush();
+
+    expect(second.materialization?.status).toBe('noop');
+
+    expect(second.materialization?.added).toBe(0);
+
+    expect(storage.memoryWriteCount(p.id)).toBe(writesAfterFirst);
+
+    expect(storage.operationKeys(p.id).length).toBe(operationsAfterFirst);
+  });
+
+  it('derives a stable operation id from immutable journal input', async () => {
+    const p = project('materialize-operation-id');
+
+    const storage = new MemoryStorage();
+
+    const core = startCore(p, storage, 'mat-opid-1');
+
+    recordPrompt(core, 'prompt-opid', RULE);
+
+    const flushed = await core.flush();
+
+    const first = flushed.materialization?.operationId;
+
+    expect(first).toBeTruthy();
+
+    const retry = await new SessionMemoryMaterializer(storage).materialize(p, core.identity);
+
+    expect(retry.operationId).toBe(first);
+
+    const growth = startCore(p, storage, 'mat-opid-2');
+
+    recordPrompt(growth, 'prompt-opid-2', TEST_RULE);
+
+    const flushedGrowth = await growth.flush();
+
+    expect(flushedGrowth.materialization?.operationId).not.toBe(first);
+  });
+
+  it('keeps concurrent same-candidate materializations idempotent', async () => {
+    const p = project('materialize-concurrent');
+
+    const storage = new SlowMemoryReadStorage();
+
+    const core = startCore(p, storage, 'mat-concurrent-shared');
+
+    recordPrompt(core, 'prompt-concurrent', RULE);
+
+    const learner = new SessionMemoryLearner({
+      project: p,
+
+      storage,
+
+      identity: core.identity,
+
+      wal: core.wal,
+    });
+
+    await learner.learnNew();
+
+    const [first, second] = await Promise.all([
+      new SessionMemoryMaterializer(storage).materialize(p, core.identity),
+
+      new SessionMemoryMaterializer(storage).materialize(p, core.identity),
+    ]);
+
+    expect([first.status, second.status]).not.toContain('failed');
+
+    const convergent = await new ConvergentMemoryStore(storage).load(p.id);
+
+    expect(convergent).toHaveLength(1);
+  });
+
+  it('keeps concurrent distinct-candidate materializations convergent', async () => {
+    const p = project('materialize-concurrent-distinct');
+
+    const storage = new SlowMemoryReadStorage();
+
+    const core1 = startCore(p, storage, 'mat-concurrent-a');
+
+    recordPrompt(core1, 'prompt-concurrent-a', RULE);
+
+    const core2 = startCore(p, storage, 'mat-concurrent-b');
+
+    recordPrompt(core2, 'prompt-concurrent-b', TEST_RULE);
+
+    await Promise.all([core1.flush(), core2.flush()]);
+
+    const convergent = await new ConvergentMemoryStore(storage).load(p.id);
+
+    expect(convergent.length).toBeGreaterThanOrEqual(1);
+
+    const fingerprints = convergent.map((memory) => memory.metadata?.learningFingerprint);
+
+    expect(new Set(fingerprints).size).toBe(fingerprints.length);
+  });
+
+  it('never stores raw secrets in the WAL, learned journal or MemoryStore', async () => {
     const p = project('materialize-secret');
 
     const storage = new MemoryStorage();
 
-    const core = new SessionCore({
-      project: p,
+    const core = startCore(p, storage, 'mat-secret-1');
 
-      storage,
+    const secret = 'sk-1234567890abcdefABCDEF1234567890abcdef';
 
-      agent: 'opencode',
-
-      nativeSessionId: 'mat-secret-1',
-    });
-
-    core.start();
-
-    core.record({
-      type: 'user_prompt',
-
-      role: 'user',
-
-      sourceEventId: 'prompt-secret',
-
-      data: {
-        content: 'API key is sk-1234567890abcdefABCDEF1234567890abcdef. Use it carefully.',
-      },
-    });
+    recordPrompt(core, 'prompt-secret', `API key is ${secret}. Use it carefully.`);
 
     await core.flush();
 
-    const store = new MemoryStore(storage);
+    const walText = readFileSync(core.wal.eventsFile, 'utf8');
 
-    const memories = await store.load(p.id);
+    expect(walText).not.toContain(secret);
 
-    const allText = memories.map((m) => m.content).join('\n');
+    const memories = await new MemoryStore(storage).load(p.id);
 
-    expect(allText).not.toContain('sk-1234567890abcdefABCDEF1234567890abcdef');
+    const memoryText = memories.map((memory) => memory.content).join('\n');
 
-    const journalValues = Array.from(storage.objects.values()).map((buf) =>
-      Buffer.from(buf).toString('utf8')
-    );
+    expect(memoryText).not.toContain(secret);
 
-    const allJournalText = journalValues.join('\n');
-
-    expect(allJournalText).not.toContain('sk-1234567890abcdefABCDEF1234567890abcdef');
+    expect(storage.textValues()).not.toContain(secret);
   });
 
-  it('does not mutate TaskStore during auto-materialization', async () => {
+  it('does not mutate TaskStore during materialization', async () => {
     const p = project('materialize-taskstore');
 
     const storage = new MemoryStorage();
@@ -437,78 +466,58 @@ describe('SessionMemoryMaterializer', () => {
       priority: 'high',
     });
 
-    const core = new SessionCore({
-      project: p,
+    const before = JSON.stringify(await taskStore.listTasks());
 
-      storage,
+    const core = startCore(p, storage, 'mat-task-1');
 
-      agent: 'opencode',
-
-      nativeSessionId: 'mat-task-1',
-    });
-
-    core.start();
-
-    core.record({
-      type: 'user_prompt',
-
-      role: 'user',
-
-      sourceEventId: 'prompt-task',
-
-      data: {
-        content: 'Complete the existing task.',
-      },
-    });
+    recordPrompt(core, 'prompt-task', RULE);
 
     await core.flush();
 
-    const tasks = await taskStore.listTasks();
+    const after = JSON.stringify(await taskStore.listTasks());
 
-    expect(tasks).toHaveLength(1);
+    expect(after).toBe(before);
 
-    expect(tasks[0].id).toBe('task-1');
+    expect(await taskStore.listTasks()).toHaveLength(1);
   });
 
-  it('materializes without daemon', async () => {
+  it('materializes without a daemon', async () => {
     const p = project('materialize-no-daemon');
 
     const storage = new MemoryStorage();
 
-    const core = new SessionCore({
-      project: p,
+    const core = startCore(p, storage, 'mat-nodaemon-1');
 
-      storage,
-
-      agent: 'opencode',
-
-      nativeSessionId: 'mat-nodaemon-1',
-    });
-
-    core.start();
-
-    core.record({
-      type: 'user_prompt',
-
-      role: 'user',
-
-      sourceEventId: 'prompt-nodaemon',
-
-      data: {
-        content: 'Từ giờ luôn chỉ edit source, không được edit production trực tiếp.',
-      },
-    });
+    recordPrompt(core, 'prompt-nodaemon', RULE);
 
     const flushed = await core.flush();
 
-    expect(flushed.materialization).toBeDefined();
+    expect(flushed.materialization?.status).toBe('ok');
 
     expect(flushed.materialization?.added).toBeGreaterThanOrEqual(1);
 
-    const store = new MemoryStore(storage);
+    expect(await new MemoryStore(storage).load(p.id)).toHaveLength(1);
+  });
 
-    const memories = await store.load(p.id);
+  it('treats startup and manual reconciliation as a no-op once current', async () => {
+    const p = project('materialize-reconcile');
 
-    expect(memories).toHaveLength(1);
+    const storage = new MemoryStorage();
+
+    const core = startCore(p, storage, 'mat-reconcile-1');
+
+    recordPrompt(core, 'prompt-reconcile', RULE);
+
+    await core.flush();
+
+    const startup = await reconcileSessionMemoryJournal(p, storage);
+
+    expect(startup.added).toBe(0);
+
+    const manual = await reconcileSessionMemoryJournal(p, storage);
+
+    expect(manual.added).toBe(0);
+
+    expect(await new MemoryStore(storage).load(p.id)).toHaveLength(1);
   });
 });
