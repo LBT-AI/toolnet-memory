@@ -120,4 +120,6 @@ export interface MemoryReconcileResult {
   duplicates: number;
 
   memories: number;
+
+  evidenceUpdated: number;
 }

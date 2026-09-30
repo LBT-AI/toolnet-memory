@@ -148,19 +148,14 @@ describe('Session Memory Learner', () => {
     expect(hierarchyKeys).toHaveLength(1);
 
     /*
-     * Learner journal must not blindly modify current snapshot.
+     * After 86B2, flush() immediately materializes the journal into
+     * canonical MemoryStore. The store is no longer empty here.
      */
     const store = new MemoryStore(storage);
 
-    expect(await store.load(p.id)).toHaveLength(0);
-
-    const result = await reconcileSessionMemoryJournal(p, storage);
-
-    expect(result.added).toBe(1);
+    expect(await store.load(p.id)).toHaveLength(1);
 
     const memories = await store.load(p.id);
-
-    expect(memories).toHaveLength(1);
 
     expect(memories[0].type).toBe('rule');
 
@@ -207,12 +202,6 @@ describe('Session Memory Learner', () => {
 
       await core.flush();
     }
-
-    const result = await reconcileSessionMemoryJournal(p, storage);
-
-    expect(result.added).toBe(1);
-
-    expect(result.duplicates).toBe(1);
 
     const memories = await new MemoryStore(storage).load(p.id);
 

@@ -262,16 +262,32 @@ export interface PendingSessionEvents {
   startOffset: number;
   endOffset: number;
 }
-
 export interface SessionFlushResult {
   uploadedEvents: number;
 
   lastRemoteSequence: number;
 
   eventCount: number;
+
   chunkCount: number;
 
   status: SessionStatus;
+
+  materialization?: {
+    batchesScanned: number;
+
+    candidates: number;
+
+    added: number;
+
+    duplicates: number;
+
+    memories: number;
+
+    operationId: string;
+
+    durationMs: number;
+  };
 }
 
 export interface SessionCoreOptions {

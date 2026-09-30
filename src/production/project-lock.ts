@@ -71,6 +71,14 @@ export class ProjectLock {
           const data = JSON.parse(readFileSync(this.path, 'utf8'));
 
           if (Number.isInteger(data.pid) && processAlive(data.pid)) {
+            if (data.pid === process.pid) {
+              this.acquired = true;
+
+              process.once('exit', this.exitHandler);
+
+              return;
+            }
+
             stale = false;
           }
         } catch {

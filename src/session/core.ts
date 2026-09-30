@@ -16,6 +16,8 @@ import { SessionWal } from './wal.js';
 
 import { SessionMemoryLearner } from './learner/learner.js';
 
+import { SessionMemoryMaterializer, type MaterializationResult } from './learner/materializer.js';
+
 import { WorkContinuityLearner } from '../work-continuity/learner.js';
 
 import { SemanticWorkLearner } from '../work-continuity/semantic-learner.js';
@@ -49,6 +51,8 @@ export class SessionCore {
   private readonly sanitizer = new Sanitizer();
 
   private readonly learner: SessionMemoryLearner;
+
+  private readonly materializer: SessionMemoryMaterializer;
 
   private readonly continuity: WorkContinuityLearner;
 
@@ -100,6 +104,8 @@ export class SessionCore {
 
       wal: this.wal,
     });
+
+    this.materializer = new SessionMemoryMaterializer(options.storage);
 
     this.continuity = new WorkContinuityLearner({
       project: options.project,
@@ -324,6 +330,24 @@ export class SessionCore {
     }
 
     /*
+     * Materialize learned journal into canonical MemoryStore.
+     *
+     * This is downstream of durable session persistence and learner
+     * success. A materialization failure preserves WAL + journal;
+     * cursor is not advanced, so next flush retries.
+     */
+    let materialization: MaterializationResult | undefined;
+
+    if (process.env.TOOLNET_SESSION_MATERIALIZATION !== '0') {
+      try {
+        materialization = await this.materializer.materialize(this.project, this.identity);
+      } catch {
+        // Materialization is best-effort downstream of durable capture.
+        // WAL + journal remain intact for retry.
+      }
+    }
+
+    /*
      * Work continuity is a separate projection from
      * long-term memory.
      *
@@ -381,7 +405,27 @@ export class SessionCore {
       }
     }
 
-    return result;
+    return {
+      ...result,
+
+      materialization: materialization
+        ? {
+            batchesScanned: materialization.batchesScanned,
+
+            candidates: materialization.candidates,
+
+            added: materialization.added,
+
+            duplicates: materialization.duplicates,
+
+            memories: materialization.memories,
+
+            operationId: materialization.operationId,
+
+            durationMs: materialization.durationMs,
+          }
+        : undefined,
+    };
   }
 
   async idle(data: Record<string, unknown> = {}): Promise<SessionFlushResult> {

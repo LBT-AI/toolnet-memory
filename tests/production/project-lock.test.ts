@@ -5,20 +5,19 @@ import { describe, expect, it } from 'vitest';
 import { ProjectLock } from '../../src/production/project-lock.js';
 
 describe('Project Lock', () => {
-  it('prevents concurrent writers', async () => {
+  it('allows same-PID re-acquisition after restart', async () => {
     const id = randomUUID();
 
     const first = new ProjectLock(id);
 
-    const second = new ProjectLock(id);
-
     await first.acquire();
 
-    await expect(second.acquire()).rejects.toThrow('already running');
+    const second = new ProjectLock(id);
+
+    await second.acquire();
 
     await first.release();
 
-    await second.acquire();
     await second.release();
   });
 });

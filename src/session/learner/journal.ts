@@ -228,13 +228,13 @@ async function loadBatches(
   return batches;
 }
 
-export async function reconcileSessionMemoryJournal(
+export async function reconcileJournalBatches(
   project: ProjectManifest,
 
-  storage: StorageProvider
-): Promise<MemoryReconcileResult> {
-  const batches = await loadBatches(project, storage);
+  storage: StorageProvider,
 
+  batches: LearnedMemoryBatch[]
+): Promise<MemoryReconcileResult> {
   const store = new ConvergentMemoryStore(storage);
 
   const existing = await store.load(project.id);
@@ -292,6 +292,10 @@ export async function reconcileSessionMemoryJournal(
 
         const evidenceChanged = memory ? mergeConfirmationEvidence(memory, candidate) : false;
         const phase53Changed = memory ? normalizeMemoryScopeMetadata(memory) : false;
+
+        if ((evidenceChanged || phase53Changed) && memory) {
+          engine.importRecords([memory]);
+        }
 
         evidenceUpdated += evidenceChanged || phase53Changed ? 1 : 0;
 
@@ -377,5 +381,17 @@ export async function reconcileSessionMemoryJournal(
     duplicates,
 
     memories: engine.exportProject(project.id).length,
+
+    evidenceUpdated,
   };
+}
+
+export async function reconcileSessionMemoryJournal(
+  project: ProjectManifest,
+
+  storage: StorageProvider
+): Promise<MemoryReconcileResult> {
+  const batches = await loadBatches(project, storage);
+
+  return reconcileJournalBatches(project, storage, batches);
 }
