@@ -19,6 +19,7 @@ import { SessionCore } from '../core.js';
 import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 import { extractSessionMemory } from '../session-extractor.js';
 import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
+import { syncMaterialization, type SyncMaterialization } from '../sync-materialization.js';
 
 interface OpenCodeRow {
   [key: string]: unknown;
@@ -84,6 +85,9 @@ export interface OpenCodeSyncResult {
   status: string;
 
   durability: 'local' | 'remote';
+
+  /** Canonical MemoryStore outcome once the flush boundary completed. */
+  materialization?: SyncMaterialization;
 }
 
 export interface OpenCodeRecoveryOptions {
@@ -718,6 +722,7 @@ export async function syncOpenCodeSession(
         eventCount: flushed.eventCount,
         chunkCount: flushed.chunkCount,
         status: flushed.status,
+        materialization: syncMaterialization(flushed),
         durability: options.localOnly ? 'local' : 'remote',
       };
     }
@@ -972,6 +977,8 @@ export async function syncOpenCodeSession(
       chunkCount: flushed.chunkCount,
 
       status: flushed.status,
+
+      materialization: syncMaterialization(flushed),
 
       durability: 'remote',
     };

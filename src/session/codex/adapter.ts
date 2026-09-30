@@ -11,6 +11,28 @@ import { readCodexRollout } from './rollout.js';
 import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 import { extractSessionMemory } from '../session-extractor.js';
 import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
+import { syncMaterialization, type SyncMaterialization } from '../sync-materialization.js';
+
+export interface CodexSyncResult {
+  threadId: string;
+
+  imported: number;
+
+  rolloutEvents: number;
+
+  eventCount: number;
+
+  chunkCount: number;
+
+  status: string;
+
+  rolloutOffset: number;
+
+  reset: boolean;
+
+  /** Canonical MemoryStore outcome once the flush boundary completed. */
+  materialization?: SyncMaterialization;
+}
 
 export interface CodexSyncOptions {
   project: ProjectManifest;
@@ -30,7 +52,7 @@ export interface CodexSyncOptions {
   idle?: boolean;
 }
 
-export async function syncCodexSession(options: CodexSyncOptions) {
+export async function syncCodexSession(options: CodexSyncOptions): Promise<CodexSyncResult> {
   const threadId = options.threadId.trim();
 
   if (!threadId) {
@@ -237,6 +259,8 @@ export async function syncCodexSession(options: CodexSyncOptions) {
     chunkCount: flushed.chunkCount,
 
     status: flushed.status,
+
+    materialization: syncMaterialization(flushed),
 
     rolloutOffset: rollout.nextOffset,
 

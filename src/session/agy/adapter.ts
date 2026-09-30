@@ -15,6 +15,7 @@ import { readAgyTranscript } from './transcript.js';
 import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 import { extractSessionMemory } from '../session-extractor.js';
 import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
+import { syncMaterialization, type SyncMaterialization } from '../sync-materialization.js';
 
 export interface AgySyncOptions {
   project: ProjectManifest;
@@ -54,6 +55,9 @@ export interface AgySyncResult {
   transcriptOffset: number;
 
   reset: boolean;
+
+  /** Canonical MemoryStore outcome once the flush boundary completed. */
+  materialization?: SyncMaterialization;
 }
 
 function expandHome(value: string): string {
@@ -271,6 +275,8 @@ export async function syncAgySession(options: AgySyncOptions): Promise<AgySyncRe
     transcriptOffset: transcript.nextOffset,
 
     reset: transcript.reset,
+
+    materialization: syncMaterialization(flushed),
   };
 }
 

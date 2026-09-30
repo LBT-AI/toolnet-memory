@@ -204,6 +204,11 @@ async function main() {
 
     console.log(JSON.stringify(result, null, 2));
 
+    /* Canonical MemoryStore must be durable before reporting sync success. */
+    if (result.materialization?.status === 'failed') {
+      process.exitCode = 1;
+    }
+
     return;
   }
 

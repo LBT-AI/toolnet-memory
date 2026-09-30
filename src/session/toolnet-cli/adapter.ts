@@ -8,7 +8,9 @@ import type { ProjectManifest } from '../../core/types.js';
 
 import type { StorageProvider } from '../../storage/types.js';
 
-import type { SessionEventInput } from '../types.js';
+import type { SessionEventInput, SessionFlushResult } from '../types.js';
+
+import { syncMaterialization, type SyncMaterialization } from '../sync-materialization.js';
 
 import { SessionCore } from '../core.js';
 
@@ -73,6 +75,9 @@ export interface ToolNetCliSyncResult {
   eventCount: number;
 
   durability: 'local' | 'remote';
+
+  /** Canonical MemoryStore outcome once the flush boundary completed. */
+  materialization?: SyncMaterialization;
 }
 
 export function defaultToolNetCliSessionsDir(): string {
@@ -392,14 +397,16 @@ export async function syncToolNetCliSession(
     };
   }
 
+  let flushed: SessionFlushResult;
+
   if (options.idle) {
-    await core.idle({
+    flushed = await core.idle({
       nativeSource: 'toolnet-cli-session-json',
 
       sourceFile,
     });
   } else {
-    await core.flush();
+    flushed = await core.flush();
   }
 
   const state = core.status();
@@ -416,5 +423,7 @@ export async function syncToolNetCliSession(
     eventCount: state.lastSequence,
 
     durability: 'remote',
+
+    materialization: syncMaterialization(flushed),
   };
 }
