@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 
 import { join } from 'node:path';
 
@@ -61,12 +61,21 @@ function readJson<T>(file: string): T | null {
   }
 }
 
-function scanSessionStates(root: string, project: ProjectManifest): LocalSessionState[] {
+/** One durable per-source state entry and its WAL footprint. */
+export interface SessionSourceEntry {
+  state: LocalSessionState;
+
+  directory: string;
+
+  eventsFileSize: number;
+}
+
+function scanSessionStates(root: string, project: ProjectManifest): SessionSourceEntry[] {
   if (!existsSync(root)) {
     return [];
   }
 
-  const output: LocalSessionState[] = [];
+  const output: SessionSourceEntry[] = [];
 
   for (const agentEntry of readdirSync(root, { withFileTypes: true })) {
     if (!agentEntry.isDirectory()) {
@@ -80,7 +89,9 @@ function scanSessionStates(root: string, project: ProjectManifest): LocalSession
         continue;
       }
 
-      const state = readJson<LocalSessionState>(join(agentRoot, sessionEntry.name, 'state.json'));
+      const directory = join(agentRoot, sessionEntry.name);
+
+      const state = readJson<LocalSessionState>(join(directory, 'state.json'));
 
       if (!state) {
         continue;
@@ -94,14 +105,36 @@ function scanSessionStates(root: string, project: ProjectManifest): LocalSession
         continue;
       }
 
-      output.push(state);
+      output.push({ state, directory, eventsFileSize: eventsFileSize(directory) });
     }
   }
 
   return output;
 }
 
-function sessionStates(project: ProjectManifest): LocalSessionState[] {
+function eventsFileSize(directory: string): number {
+  const file = join(directory, 'events.jsonl');
+
+  if (!existsSync(file)) {
+    return 0;
+  }
+
+  try {
+    return statSync(file).size;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Read-only view of durable session sources. Never acquires the WAL lock and
+ * never repairs state: status inspection must not mutate anything.
+ */
+export function readSessionSourceStates(project: ProjectManifest): SessionSourceEntry[] {
+  return sessionStates(project);
+}
+
+function sessionStates(project: ProjectManifest): SessionSourceEntry[] {
   /*
    * Current runtime source metadata.
    *
@@ -128,14 +161,14 @@ function sessionStates(project: ProjectManifest): LocalSessionState[] {
    * Prefer current runtime state when the same native
    * agent/session exists in both layouts.
    */
-  const merged = new Map<string, LocalSessionState>();
+  const merged = new Map<string, SessionSourceEntry>();
 
-  for (const state of legacy) {
-    merged.set(`${state.agent}:${state.nativeSessionId}`, state);
+  for (const entry of legacy) {
+    merged.set(`${entry.state.agent}:${entry.state.nativeSessionId}`, entry);
   }
 
-  for (const state of current) {
-    merged.set(`${state.agent}:${state.nativeSessionId}`, state);
+  for (const entry of current) {
+    merged.set(`${entry.state.agent}:${entry.state.nativeSessionId}`, entry);
   }
 
   return Array.from(merged.values());
@@ -165,18 +198,20 @@ function readOpenCodeStatus(project: ProjectManifest): OpenCodeStatus | null {
 }
 
 export function inspectSessionCaptureHealth(project: ProjectManifest): SessionCaptureHealth {
-  const states = sessionStates(project);
+  const entries = sessionStates(project);
 
-  const ordered = [...states].sort((a, b) =>
-    (a.lastLocalEventAt ?? a.updatedAt).localeCompare(b.lastLocalEventAt ?? b.updatedAt)
+  const ordered = [...entries].sort((a, b) =>
+    (a.state.lastLocalEventAt ?? a.state.updatedAt).localeCompare(
+      b.state.lastLocalEventAt ?? b.state.updatedAt
+    )
   );
 
-  const latest = ordered.at(-1);
+  const latest = ordered.at(-1)?.state;
 
-  const agents = Array.from(new Set(states.map((state) => state.agent))).sort();
+  const agents = Array.from(new Set(entries.map((entry) => entry.state.agent))).sort();
 
-  const pendingWal = states.reduce(
-    (sum, state) => sum + Math.max(0, state.lastSequence - state.lastRemoteSequence),
+  const pendingWal = entries.reduce(
+    (sum, entry) => sum + Math.max(0, entry.state.lastSequence - entry.state.lastRemoteSequence),
     0
   );
 
@@ -192,7 +227,7 @@ export function inspectSessionCaptureHealth(project: ProjectManifest): SessionCa
     syncHealth = 'degraded';
   } else if (pendingWal > 0 || remoteFailed) {
     syncHealth = 'pending';
-  } else if (states.length > 0) {
+  } else if (entries.length > 0) {
     syncHealth = 'healthy';
   } else {
     syncHealth = 'unknown';
@@ -205,17 +240,17 @@ export function inspectSessionCaptureHealth(project: ProjectManifest): SessionCa
 
     agents,
 
-    sessions: states.length,
+    sessions: entries.length,
 
     latestAgent: latest?.agent,
 
     latestSessionId: latest?.nativeSessionId,
 
     lastCaptureAt: latestTimestamp(
-      states.map((state) => state.lastLocalEventAt ?? state.updatedAt)
+      entries.map((entry) => entry.state.lastLocalEventAt ?? entry.state.updatedAt)
     ),
 
-    lastFlushAt: latestTimestamp(states.map((state) => state.lastRemoteAt)),
+    lastFlushAt: latestTimestamp(entries.map((entry) => entry.state.lastRemoteAt)),
 
     pendingWal,
 

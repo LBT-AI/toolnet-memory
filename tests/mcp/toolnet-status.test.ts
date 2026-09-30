@@ -20,7 +20,7 @@ import { toolnetStatus } from '../../src/mcp/tools/toolnet-status.js';
 import type { MCPContext } from '../../src/mcp/context.js';
 
 describe('toolnet_status', () => {
-  it('returns compact MCP runtime health', () => {
+  it('returns compact MCP runtime health', async () => {
     const memory = new MemoryEngine();
 
     const graph = new CodeGraphStore();
@@ -58,7 +58,7 @@ describe('toolnet_status', () => {
       runtime,
     };
 
-    const status = toolnetStatus(ctx);
+    const status = await toolnetStatus(ctx);
 
     expect(status.project.name).toBe('demo');
 
@@ -69,5 +69,8 @@ describe('toolnet_status', () => {
     expect(status.data.memories).toBe(0);
 
     expect(status.data.graphSymbols).toBe(0);
+
+    /* Backward-compatible shape: memory is present but null without storage. */
+    expect(status.memory).toBeNull();
   });
 });

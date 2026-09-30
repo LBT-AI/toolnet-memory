@@ -12,6 +12,7 @@ import {
 } from '../storage/index.js';
 import { inspectSessionCaptureHealth } from './session-capture-health.js';
 import { detectAgentIntegrations } from './integration-detection.js';
+import { inspectMemoryPipeline } from './memory-pipeline-status.js';
 import { inspectKiroIntegrationStatus } from '../session/kiro/status.js';
 import { TaskReplicationService } from '../tasks/replication/service.js';
 import { ConvergentMemoryStore } from '../multi-host/memory-projection.js';
@@ -184,17 +185,89 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
       console.log('');
     }
 
+    // Memory pipeline health (read-only; configuration is not runtime proof).
+    const pipeline = await inspectMemoryPipeline({ project, storage });
+    console.log(renderSectionTitle('MEMORY PIPELINE', uiOpts));
+    console.log(renderKeyValue('Overall', pipeline.overall, 16, uiOpts));
+    console.log(renderKeyValue('Integration', pipeline.configuration, 16, uiOpts));
+    console.log(
+      renderKeyValue(
+        'Capture',
+        `${pipeline.capture.status} (${pipeline.capture.sessions} session(s))`,
+        16,
+        uiOpts
+      )
+    );
+    console.log(
+      renderKeyValue(
+        'WAL',
+        `${pipeline.wal.state} — ${pipeline.wal.pendingLearnerBytes}B learner / ${pipeline.wal.pendingRemoteEvents} remote`,
+        16,
+        uiOpts
+      )
+    );
+    console.log(
+      renderKeyValue(
+        'Journal',
+        `${pipeline.journal.state} (${pipeline.journal.batches} batch(es))`,
+        16,
+        uiOpts
+      )
+    );
+    console.log(
+      renderKeyValue(
+        'MemoryStore',
+        `${pipeline.memoryStore.state} (${pipeline.memoryStore.count})`,
+        16,
+        uiOpts
+      )
+    );
+    console.log(
+      renderKeyValue(
+        'Materialization',
+        pipeline.materialization.pending > 0
+          ? `${pipeline.materialization.state} (${pipeline.materialization.pending} pending)`
+          : pipeline.materialization.state,
+        16,
+        uiOpts
+      )
+    );
+    console.log(renderKeyValue('Last capture', pipeline.lastCaptureAt ?? 'never', 16, uiOpts));
+    console.log(
+      renderKeyValue('Last materialize', pipeline.lastMaterializationAt ?? 'never', 16, uiOpts)
+    );
+    console.log('');
+
+    console.log(renderSectionTitle('AGENT INTEGRATIONS', uiOpts));
+    for (const integration of pipeline.integrations) {
+      console.log(
+        renderKeyValue(
+          integration.label,
+          `${integration.captureMode} · capture ${integration.captureStatus} · materialization ${integration.materializationStatus}`,
+          18,
+          uiOpts
+        )
+      );
+    }
+    console.log('');
+
     // Service status (optional)
     const capture = inspectSessionCaptureHealth(project);
     if (capture.agents.length > 0) {
       console.log(renderSectionTitle('SERVICE', uiOpts));
-      const serviceStatus =
-        capture.syncHealth === 'healthy'
-          ? 'running'
-          : capture.syncHealth === 'degraded'
-            ? 'degraded'
-            : 'stopped';
-      console.log(renderKeyValue('Daemon', serviceStatus, 8, uiOpts));
+      console.log(
+        renderKeyValue(
+          'Capture sync',
+          capture.syncHealth === 'healthy'
+            ? 'healthy'
+            : capture.syncHealth === 'degraded'
+              ? 'degraded'
+              : 'pending',
+          16,
+          uiOpts
+        )
+      );
+      console.log(renderKeyValue('Daemon required', 'no', 16, uiOpts));
       console.log('');
     }
   } catch (error) {

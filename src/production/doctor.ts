@@ -30,6 +30,12 @@ import {
   type SessionCaptureHealth,
 } from './session-capture-health.js';
 
+import {
+  inspectMemoryPipeline,
+  memoryPipelineWarnings,
+  type MemoryPipelineStatus,
+} from './memory-pipeline-status.js';
+
 import { inspectProductionTaskHealth, type ProductionTaskHealth } from './task-health.js';
 
 type DoctorResult = {
@@ -49,6 +55,7 @@ type DoctorResult = {
   codeVectors?: number;
   snapshots?: number;
   capture?: SessionCaptureHealth;
+  pipeline?: MemoryPipelineStatus;
   tasks?: ProductionTaskHealth;
   memoryQuality?: MemoryQualityReport;
   artifactPaths?: ArtifactPathHealth;
@@ -188,6 +195,37 @@ function printHuman(result: DoctorResult): void {
     console.log(`${branch} ${dim('Sync health')}   ${sync}`);
   }
 
+  if (result.pipeline) {
+    const { pipeline } = result;
+    console.log(pipe);
+    console.log(`${cyan('◇')} ${white('Memory Pipeline')}`);
+
+    const overallColor =
+      pipeline.overall === 'error' ? red : pipeline.overall === 'warning' ? amber : green;
+
+    console.log(`${branch} ${dim('Overall')}          ${overallColor(pipeline.overall)}`);
+    console.log(`${branch} ${dim('Integration')}      ${white(pipeline.configuration)}`);
+    console.log(
+      `${branch} ${dim('Capture')}          ${white(`${pipeline.capture.status} (${pipeline.capture.sessions} session(s))`)}`
+    );
+    console.log(
+      `${branch} ${dim('WAL')}              ${white(`${pipeline.wal.state} — ${pipeline.wal.pendingLearnerBytes}B learner / ${pipeline.wal.pendingRemoteEvents} remote`)}`
+    );
+    console.log(
+      `${branch} ${dim('Journal')}          ${white(`${pipeline.journal.state} (${pipeline.journal.batches} batch(es))`)}`
+    );
+    console.log(
+      `${branch} ${dim('MemoryStore')}      ${white(`${pipeline.memoryStore.state} (${pipeline.memoryStore.count})`)}`
+    );
+    console.log(
+      `${branch} ${dim('Materialize')}      ${white(`${pipeline.materialization.state}${pipeline.materialization.pending > 0 ? ` — ${pipeline.materialization.pending} pending` : ''}`)}`
+    );
+    console.log(`${branch} ${dim('Last capture')}     ${white(pipeline.lastCaptureAt ?? 'never')}`);
+    console.log(
+      `${branch} ${dim('Last materialize')} ${white(pipeline.lastMaterializationAt ?? 'never')}`
+    );
+  }
+
   if (result.tasks) {
     console.log(pipe);
     console.log(`${cyan('◇')} ${white('Persistent Tasks')}`);
@@ -291,7 +329,13 @@ function printHuman(result: DoctorResult): void {
   console.log(pipe);
 
   if (result.ok) {
-    console.log(`${green('└ ◆')} ${bold(white('ToolNet Memory is ready'))}`);
+    console.log(
+      `${green('└ ◆')} ${bold(white('ToolNet Memory is configured and its stores are readable'))}`
+    );
+
+    console.log(
+      dim('    Configuration is not proof of runtime capture; verify with `toolnet-memory status`.')
+    );
   } else {
     console.log(`${red('└ ✗')} ${bold(white('ToolNet Memory requires attention'))}`);
 
@@ -368,12 +412,15 @@ async function main(): Promise<void> {
   const snapshots = await new SnapshotManager(storage).list(project.id);
 
   const capture = inspectSessionCaptureHealth(project);
+  const pipeline = await inspectMemoryPipeline({ project, storage });
   const taskHealth = inspectProductionTaskHealth(project);
 
   const captureWarnings =
     capture.syncHealth === 'degraded'
       ? [`Session capture degraded${capture.opencode?.error ? `: ${capture.opencode.error}` : ''}`]
       : [];
+
+  const pipelineWarnings = memoryPipelineWarnings(pipeline);
 
   const taskWarnings = !taskHealth.ok
     ? [
@@ -391,7 +438,13 @@ async function main(): Promise<void> {
         : [];
   const lifecycleWarnings = lifecycle.warnings.map((warning) => `Lifecycle: ${warning}`);
   const result: DoctorResult = {
-    ok: health.ok && capture.ok && taskHealth.ok && artifactPaths.ok && lifecycle.ok,
+    ok:
+      health.ok &&
+      capture.ok &&
+      taskHealth.ok &&
+      artifactPaths.ok &&
+      lifecycle.ok &&
+      pipeline.overall !== 'error',
     project: project.name,
     storage: health.storage,
     memory: memories.length,
@@ -402,6 +455,7 @@ async function main(): Promise<void> {
     codeVectors: codeVectors?.records.length ?? 0,
     snapshots: snapshots.length,
     capture,
+    pipeline,
     tasks: taskHealth,
     memoryQuality,
     artifactPaths,
@@ -409,6 +463,7 @@ async function main(): Promise<void> {
     warnings: [
       ...configCheck.warnings,
       ...captureWarnings,
+      ...pipelineWarnings,
       ...taskWarnings,
       ...artifactWarnings,
       ...lifecycleWarnings,

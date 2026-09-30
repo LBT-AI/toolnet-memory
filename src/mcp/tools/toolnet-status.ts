@@ -1,9 +1,20 @@
 import type { MCPContext } from '../context.js';
 
+import { inspectMemoryPipeline } from '../../production/memory-pipeline-status.js';
+
 export const toolnetStatusSchema = {};
 
-export function toolnetStatus(ctx: MCPContext) {
+export async function toolnetStatus(ctx: MCPContext) {
   const projectId = ctx.project.id;
+
+  /*
+   * Durable memory pipeline health is read-only and separate from MCP runtime
+   * readiness. It is omitted until storage is hydrated so a partially started
+   * runtime never reports a false pipeline state.
+   */
+  const memory = ctx.storage
+    ? await inspectMemoryPipeline({ project: ctx.project, storage: ctx.storage })
+    : undefined;
 
   return {
     project: {
@@ -54,5 +65,34 @@ export function toolnetStatus(ctx: MCPContext) {
 
       semanticAvailable: ctx.codeSemantic !== undefined,
     },
+
+    /* Structured capture/materialization health for another agent to reason on. */
+    memory: memory
+      ? {
+          configuration: memory.configuration,
+
+          overall: memory.overall,
+
+          capture: memory.capture,
+
+          wal: memory.wal,
+
+          journal: memory.journal,
+
+          memoryStore: memory.memoryStore,
+
+          materialization: memory.materialization,
+
+          lastCaptureAt: memory.lastCaptureAt,
+
+          lastMaterializationAt: memory.lastMaterializationAt,
+
+          pendingMaterialization: memory.pendingMaterialization,
+
+          requiresDaemon: memory.requiresDaemon,
+
+          integrations: memory.integrations,
+        }
+      : null,
   };
 }

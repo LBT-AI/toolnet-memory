@@ -1004,12 +1004,16 @@ export function createMCPServer(ctx: MCPContext) {
   server.tool(
     'toolnet_status',
     [
-      'Inspect ToolNet MCP runtime health.',
+      'Inspect ToolNet MCP runtime health plus durable memory pipeline health.',
       'Returns dependency readiness, degraded state, retry counts,',
       'startup timing, hydration timing, storage source and project data counts.',
+      'The memory section separates integration configuration from runtime capture:',
+      'capture/wal/journal/memoryStore/materialization states, pending materialization,',
+      'last capture and last materialization, and per-agent capture modes.',
+      'Only metadata, counts and coded reasons are returned — never session content or secrets.',
     ].join(' '),
     toolnetStatusSchema,
-    async () => jsonText(toolnetStatus(ctx))
+    async () => jsonText(await toolnetStatus(ctx))
   );
 
   server.tool(

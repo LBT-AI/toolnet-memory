@@ -701,6 +701,39 @@ function printDetections(detections: AgentDetection[]): void {
   console.log('');
 }
 
+const HOOK_CAPTURE_AGENTS: readonly AgentIntegrationId[] = [
+  'claude',
+  'cursor',
+  'copilot',
+  'grok',
+  'kiro',
+];
+
+const MANUAL_SYNC_COMMAND: Partial<Record<AgentIntegrationId, string>> = {
+  opencode: 'toolnet-memory session:opencode-sync',
+  codex: 'toolnet-memory session:codex-sync',
+  agy: 'toolnet-memory session:agy-sync',
+  'toolnet-cli': 'toolnet-memory session:toolnet-cli-sync',
+};
+
+/**
+ * Installation success is not runtime proof. State exactly what was written
+ * and, for manual-sync agents, the command that actually starts capture.
+ */
+function integrationInstallMessage(agent: AgentIntegrationId): string {
+  if (HOOK_CAPTURE_AGENTS.includes(agent)) {
+    return 'ToolNet integration configured; hooks installed successfully';
+  }
+
+  const command = MANUAL_SYNC_COMMAND[agent];
+
+  if (command) {
+    return `ToolNet integration configured; run ${command} to capture session history`;
+  }
+
+  return 'ToolNet integration configured; capture begins when a supported hook or sync runs';
+}
+
 function printResults(results: AutoIntegrationResult[]): void {
   console.log('');
   console.log('ToolNet Memory AI Integrations');
@@ -719,7 +752,7 @@ function printResults(results: AutoIntegrationResult[]): void {
     if (result.installed) {
       const scope = result.scope ? ` [scope=${result.scope}]` : '';
 
-      console.log(`✓ ${name}: automatic memory enabled${scope}`);
+      console.log(`✓ ${name}: ${integrationInstallMessage(result.agent)}${scope}`);
 
       if (result.projectRoot) {
         console.log(`  project: ${result.projectRoot}`);
