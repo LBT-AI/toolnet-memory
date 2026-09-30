@@ -18,6 +18,8 @@ import { refreshFastHandoffFromCurrent } from '../../work-continuity/handoff-ref
 
 import { SessionCore } from '../core.js';
 
+import type { SessionFlushResult } from '../types.js';
+
 import { createSessionIdentity } from '../identity.js';
 
 import { checkpointLocalSession } from '../local-checkpoint.js';
@@ -37,13 +39,43 @@ export interface KiroRuntimeResult {
 
   captured: number;
 
+  /** True when the canonical flush boundary completed (remote + learner). */
   flushed: boolean;
+
+  /** True when canonical MemoryStore is current. Undefined when unknown. */
+  materialized?: boolean;
+
+  materializationStatus?: 'ok' | 'noop' | 'failed';
+
+  materializationErrorCode?: string;
 
   error?: string;
 }
 
 export interface KiroRuntimeDependencies {
-  flushSession?: (project: ProjectManifest, sessionId: string, cwd: string) => Promise<void>;
+  flushSession?: (
+    project: ProjectManifest,
+    sessionId: string,
+    cwd: string
+  ) => Promise<SessionFlushResult | void>;
+}
+
+function materializationOutcome(
+  result: SessionFlushResult | void
+): Pick<KiroRuntimeResult, 'materialized' | 'materializationStatus' | 'materializationErrorCode'> {
+  const materialization = result?.materialization;
+
+  if (!materialization) {
+    return {};
+  }
+
+  return {
+    materialized: materialization.status !== 'failed',
+
+    materializationStatus: materialization.status,
+
+    ...(materialization.errorCode ? { materializationErrorCode: materialization.errorCode } : {}),
+  };
 }
 
 function text(value: unknown): string | undefined {
@@ -126,7 +158,7 @@ export async function flushKiroSession(
   project: ProjectManifest,
   sessionId: string,
   cwd: string
-): Promise<void> {
+): Promise<SessionFlushResult> {
   const config = loadConfig();
 
   const raw = withStorageRetry(
@@ -169,7 +201,7 @@ export async function flushKiroSession(
     },
   });
 
-  await core.flush();
+  return core.flush();
 }
 
 export async function handleKiroHookInput(
@@ -262,7 +294,7 @@ export async function handleKiroHookInput(
      * Pending events from SessionStart/UserPromptSubmit/PostToolUse plus
      * the final assistant response/session_idle are flushed together.
      */
-    await flush(project, sessionId, cwd);
+    const flushResult = await flush(project, sessionId, cwd);
 
     return {
       active: true,
@@ -274,6 +306,8 @@ export async function handleKiroHookInput(
       captured,
 
       flushed: true,
+
+      ...materializationOutcome(flushResult),
     };
   } catch (error) {
     /*

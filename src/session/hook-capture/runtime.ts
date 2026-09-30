@@ -41,7 +41,15 @@ export interface HookCaptureRuntimeResult {
 
   captured: number;
 
+  /** True when the canonical flush boundary completed (remote + learner). */
   flushed: boolean;
+
+  /** True when canonical MemoryStore is current. Undefined when unknown. */
+  materialized?: boolean;
+
+  materializationStatus?: 'ok' | 'noop' | 'failed';
+
+  materializationErrorCode?: string;
 
   error?: string;
 }
@@ -52,7 +60,28 @@ export interface HookCaptureRuntimeDependencies {
     agent: HookCaptureAgent,
     sessionId: string,
     cwd: string
-  ) => Promise<void>;
+  ) => Promise<SessionFlushResult | void>;
+}
+
+function materializationOutcome(
+  result: SessionFlushResult | void
+): Pick<
+  HookCaptureRuntimeResult,
+  'materialized' | 'materializationStatus' | 'materializationErrorCode'
+> {
+  const materialization = result?.materialization;
+
+  if (!materialization) {
+    return {};
+  }
+
+  return {
+    materialized: materialization.status !== 'failed',
+
+    materializationStatus: materialization.status,
+
+    ...(materialization.errorCode ? { materializationErrorCode: materialization.errorCode } : {}),
+  };
 }
 
 function findProject(cwd: string): ProjectManifest | null {
@@ -202,18 +231,23 @@ export async function handleNormalizedHookInput(
       flushed: false,
     };
   }
-
   const flush = dependencies.flushSession ?? flushHookCaptureSession;
 
   try {
-    await flush(project, input.agent, input.sessionId, input.cwd);
+    const flushResult = await flush(project, input.agent, input.sessionId, input.cwd);
 
     return {
       active: true,
+
       projectRoot: project.rootPath,
+
       sessionId: input.sessionId,
+
       captured,
+
       flushed: true,
+
+      ...materializationOutcome(flushResult),
     };
   } catch (error) {
     /*
