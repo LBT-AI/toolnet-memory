@@ -123,7 +123,7 @@ export class SessionMemoryMaterializer {
 
   private async loadPendingBatches(
     project: ProjectManifest,
-    identity: SessionIdentity | undefined
+    _identity: SessionIdentity | undefined
   ): Promise<import('./types.js').LearnedMemoryBatch[]> {
     const prefix = `projects/${project.id}/memory/learned/`;
 
@@ -144,10 +144,6 @@ export class SessionMemoryMaterializer {
         const parsed = JSON.parse(text) as import('./types.js').LearnedMemoryBatch;
 
         if (parsed.version !== 1 || !Array.isArray(parsed.candidates)) {
-          continue;
-        }
-
-        if (identity && (parsed.projectId !== identity.projectId || parsed.nativeSessionId !== identity.nativeSessionId)) {
           continue;
         }
 
