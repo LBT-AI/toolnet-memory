@@ -644,6 +644,226 @@ case "$COMMAND" in
     exec "$TSX" "$ROOT/src/session/codex/cli.ts" install-notify "$@"
     ;;
 
+  session:goose-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/goose-hook.js" ]; then
+      exec node "$ROOT/bundle/goose-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/goose/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/goose/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
+  session:qwen-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/qwen-hook.js" ]; then
+      exec node "$ROOT/bundle/qwen-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/qwen/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/qwen/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
+  session:kimi-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/kimi-hook.js" ]; then
+      exec node "$ROOT/bundle/kimi-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/kimi/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/kimi/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
+  session:hermes-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/hermes-hook.js" ]; then
+      exec node "$ROOT/bundle/hermes-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/hermes/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/hermes/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
+  session:qoder-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/qoder-hook.js" ]; then
+      exec node "$ROOT/bundle/qoder-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/qoder/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/qoder/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
+  integrate:goose)
+    shift
+
+    if [ -f "$ROOT/bundle/goose.js" ]; then
+      exec node "$ROOT/bundle/goose.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/goose/cli.ts" install-hooks "$@"
+    ;;
+
+  integrate:qwen)
+    shift
+
+    if [ -f "$ROOT/bundle/qwen.js" ]; then
+      exec node "$ROOT/bundle/qwen.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/qwen/cli.ts" install-hooks "$@"
+    ;;
+
+  integrate:kimi)
+    shift
+
+    if [ -f "$ROOT/bundle/kimi.js" ]; then
+      exec node "$ROOT/bundle/kimi.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/kimi/cli.ts" install-hooks "$@"
+    ;;
+
+  integrate:hermes)
+    shift
+
+    if [ -f "$ROOT/bundle/hermes.js" ]; then
+      exec node "$ROOT/bundle/hermes.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/hermes/cli.ts" install-hooks "$@"
+    ;;
+
+  integrate:qoder)
+    shift
+
+    if [ -f "$ROOT/bundle/qoder.js" ]; then
+      exec node "$ROOT/bundle/qoder.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/qoder/cli.ts" install-hooks "$@"
+    ;;
+
+  session:goose-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/goose.js" ]; then
+      exec node "$ROOT/bundle/goose.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/goose/cli.ts" sync "$@"
+    ;;
+
+  session:qwen-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/qwen.js" ]; then
+      exec node "$ROOT/bundle/qwen.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/qwen/cli.ts" sync "$@"
+    ;;
+
+  session:kimi-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/kimi.js" ]; then
+      exec node "$ROOT/bundle/kimi.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/kimi/cli.ts" sync "$@"
+    ;;
+
+  session:hermes-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/hermes.js" ]; then
+      exec node "$ROOT/bundle/hermes.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/hermes/cli.ts" sync "$@"
+    ;;
+
+  session:qoder-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/qoder.js" ]; then
+      exec node "$ROOT/bundle/qoder.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/qoder/cli.ts" sync "$@"
+    ;;
+
+  session:goose-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/goose.js" ]; then
+      exec node "$ROOT/bundle/goose.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/goose/cli.ts" recover "$@"
+    ;;
+
+  session:qwen-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/qwen.js" ]; then
+      exec node "$ROOT/bundle/qwen.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/qwen/cli.ts" recover "$@"
+    ;;
+
+  session:kimi-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/kimi.js" ]; then
+      exec node "$ROOT/bundle/kimi.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/kimi/cli.ts" recover "$@"
+    ;;
+
+  session:hermes-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/hermes.js" ]; then
+      exec node "$ROOT/bundle/hermes.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/hermes/cli.ts" recover "$@"
+    ;;
+
+  session:qoder-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/qoder.js" ]; then
+      exec node "$ROOT/bundle/qoder.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/qoder/cli.ts" recover "$@"
+    ;;
+
   memory:reconcile)
     shift
 

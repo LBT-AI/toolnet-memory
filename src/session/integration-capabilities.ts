@@ -13,7 +13,12 @@ export type SupportedIntegrationAgent =
   | 'copilot'
   | 'grok'
   | 'toolnet-cli'
-  | 'kilo';
+  | 'kilo'
+  | 'goose'
+  | 'qwen'
+  | 'kimi'
+  | 'hermes'
+  | 'qoder';
 
 export interface IntegrationCapabilities {
   mcp: boolean;
@@ -67,6 +72,11 @@ export const REQUIRED_HOOK_EVENTS: Readonly<Record<SupportedIntegrationAgent, re
     agy: ['Stop'],
     'toolnet-cli': [],
     kilo: [],
+    goose: ['SessionEnd', 'Stop'],
+    qwen: ['SessionEnd', 'Stop'],
+    kimi: ['SessionEnd', 'Stop'],
+    hermes: ['on_session_end'],
+    qoder: ['SessionEnd', 'Stop'],
   };
 
 const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptureMode>> = {
@@ -80,6 +90,11 @@ const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptu
   agy: 'hook',
   'toolnet-cli': 'manual-sync',
   kilo: 'mcp-only',
+  goose: 'hook',
+  qwen: 'hook',
+  kimi: 'hook',
+  hermes: 'hook',
+  qoder: 'hook',
 };
 
 export const MCP_ONLY_CAPABILITIES: IntegrationCapabilities = {
@@ -159,6 +174,11 @@ export const AGENT_INTEGRATION_CAPABILITIES: Readonly<
   grok: profile('grok', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
   'toolnet-cli': profile('toolnet-cli', NATIVE_SESSION_IMPORT_CAPABILITIES, 'native-session'),
   kilo: profile('kilo', MCP_ONLY_CAPABILITIES, 'mcp-only'),
+  goose: profile('goose', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  qwen: profile('qwen', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  kimi: profile('kimi', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  hermes: profile('hermes', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  qoder: profile('qoder', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
 };
 
 export function isSupportedIntegrationAgent(agent: string): agent is SupportedIntegrationAgent {
@@ -186,6 +206,11 @@ export const SUPPORTED_INTEGRATION_AGENTS: readonly SupportedIntegrationAgent[] 
   'agy',
   'toolnet-cli',
   'kilo',
+  'goose',
+  'qwen',
+  'kimi',
+  'hermes',
+  'qoder',
 ] as const;
 
 export function integrationCapabilityLabel(agent: string): string {

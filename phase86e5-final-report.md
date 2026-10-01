@@ -74,6 +74,7 @@ CAPABILITY_VERIFIED=true (BLOCKED_PENDING_CLI_PATCH)
 OPENCODE_ZERO_TOUCH=true
 
 The OpenCode plugin (`src/session/opencode/plugin-installer.ts`) already auto-captures on `session.idle` by calling `toolnet-memory session:opencode-sync` via `Bun.spawn`. This implementation was verified to:
+
 1. Listen for `session.idle` event
 2. Call `queueCapture` → `syncNow` with `localOnly: true`
 3. Queue remote sync independently
@@ -81,6 +82,7 @@ The OpenCode plugin (`src/session/opencode/plugin-installer.ts`) already auto-ca
 5. Use delta-only source cursor (`opencode.message`, `opencode.part`)
 
 Changes made:
+
 - Updated `integration-capabilities.ts`: `opencode` capture mode `manual-sync` → `hook`
 - Updated `memory-pipeline-status.ts`: `opencode` capture mode `manual-sync` → `hook`
 - Updated `REQUIRED_HOOK_EVENTS`: added `['session.idle']` for opencode
@@ -93,10 +95,12 @@ CODEX_ZERO_TOUCH=true
 Implemented official Codex `Stop` and `SessionEnd` hooks.
 
 New files:
+
 - `src/session/codex/stop-hook.ts` — reads JSON from stdin, calls `syncCodexSession`
 - `src/session/codex/stop-hook-installer.ts` — installs `Stop` and `SessionEnd` hooks in `.codex/hooks.json`
 
 Changes made:
+
 - Updated `src/session/codex/cli.ts` — added `stop-hook` and `session-end` commands
 - Updated `src/production/auto-integrate.ts` — installs `Stop`/`SessionEnd` hooks during `integrate:codex`
 - Updated `integration-capabilities.ts`: `codex` capture mode `manual-sync` → `hook`
@@ -113,6 +117,7 @@ AGY_ZERO_TOUCH=true (SUPPORTED_WITH_LIMITATIONS)
 The Agy plugin already had `Stop` hook installed calling `toolnet-memory session:agy-hook stop`. Verified the hook calls `syncAgySession` with `phase='stop'`.
 
 Changes made:
+
 - Updated `integration-capabilities.ts`: `agy` capture mode `manual-sync` → `hook`
 - Updated `memory-pipeline-status.ts`: `agy` capture mode `manual-sync` → `hook`
 - Updated `REQUIRED_HOOK_EVENTS`: added `['Stop']` for agy
@@ -125,15 +130,18 @@ TOOLNET_CLI_ZERO_TOUCH=BLOCKED_PENDING_CLI_PATCH
 No local worktree exists. Implemented the ToolNet Memory receiver side.
 
 New files:
+
 - `toolnet-cli-zero-touch-patch-requirement.md` — exact patch requirement for ToolNet CLI
 
 Changes made:
+
 - Updated `src/session/toolnet-cli/cli.ts` — added `auto` command (`session:toolnet-cli-auto`)
 - Updated `bin/toolnet-memory` — added `session:toolnet-cli-auto`
 - Updated `packages/cli/help.ts` — added help entry
 - Updated `src/standalone/cli.ts` — added command routing
 
 The `auto` command:
+
 1. Reads `TOOLNET_CLI_NATIVE_SESSION_ID` or `TOOLNET_HOOK_SESSION_ID` env var
 2. Falls back to recovering the most recent bound session
 3. Calls `syncToolNetCliSession` with `idle: true`
@@ -219,24 +227,24 @@ ZERO_TOUCH_VISIBILITY=true (auto-captured sessions immediately retrievable via m
 
 ## Final 9-Agent Matrix
 
-| Agent | Previous Mode | Native Trigger | New Normal Mode | Delta Only | Manual Sync Fallback | Production E2E | Limitations |
-|---|---|---|---|---|---|---|---|
-| OpenCode | manual-sync | `session.idle` plugin event | auto | yes | yes | yes | Requires Bun runtime (OpenCode is Bun-based) |
-| Codex | manual-sync | `Stop` + `SessionEnd` hooks | auto | yes | yes | yes | None for supported versions |
-| Agy | manual-sync | `Stop` hook | auto | yes | yes | yes | Older versions < 2.6.0 / CLI < 1.1.11 have timeout risks |
-| ToolNet CLI | manual-sync | `agent.end` hook (pending CLI patch) | BLOCKED | yes | yes | receiver ready | No local worktree to patch |
+| Agent       | Previous Mode | Native Trigger                       | New Normal Mode | Delta Only | Manual Sync Fallback | Production E2E | Limitations                                              |
+| ----------- | ------------- | ------------------------------------ | --------------- | ---------- | -------------------- | -------------- | -------------------------------------------------------- |
+| OpenCode    | manual-sync   | `session.idle` plugin event          | auto            | yes        | yes                  | yes            | Requires Bun runtime (OpenCode is Bun-based)             |
+| Codex       | manual-sync   | `Stop` + `SessionEnd` hooks          | auto            | yes        | yes                  | yes            | None for supported versions                              |
+| Agy         | manual-sync   | `Stop` hook                          | auto            | yes        | yes                  | yes            | Older versions < 2.6.0 / CLI < 1.1.11 have timeout risks |
+| ToolNet CLI | manual-sync   | `agent.end` hook (pending CLI patch) | BLOCKED         | yes        | yes                  | receiver ready | No local worktree to patch                               |
 
-| Agent | Final Capture Mode | Normal Manual Command Required | Recovery Sync |
-|---|---|---|---|
-| Claude | auto | no | yes |
-| Cursor | auto | no | yes |
-| Copilot | auto | no | yes |
-| Grok | auto | no | yes |
-| Kiro | auto | no | yes |
-| OpenCode | auto | no | yes |
-| Codex | auto | no | yes |
-| Agy | auto (supported-with-limitations) | no when supported | yes |
-| ToolNet CLI | manual-sync (BLOCKED pending CLI patch) | yes | yes |
+| Agent       | Final Capture Mode                      | Normal Manual Command Required | Recovery Sync |
+| ----------- | --------------------------------------- | ------------------------------ | ------------- |
+| Claude      | auto                                    | no                             | yes           |
+| Cursor      | auto                                    | no                             | yes           |
+| Copilot     | auto                                    | no                             | yes           |
+| Grok        | auto                                    | no                             | yes           |
+| Kiro        | auto                                    | no                             | yes           |
+| OpenCode    | auto                                    | no                             | yes           |
+| Codex       | auto                                    | no                             | yes           |
+| Agy         | auto (supported-with-limitations)       | no when supported              | yes           |
+| ToolNet CLI | manual-sync (BLOCKED pending CLI patch) | yes                            | yes           |
 
 ---
 
@@ -259,10 +267,11 @@ PHASE86E=false
 CRITICAL=0
 HIGH=0
 MEDIUM=2
-  - Codex stop-hook installer test uses loose typing for hooks JSON (acceptable for test)
-  - ToolNet CLI blocked status requires manual CLI patch before GA
-LOW=1
-  - OpenCode plugin uses Bun.spawn which requires Bun runtime (already the case)
+
+- Codex stop-hook installer test uses loose typing for hooks JSON (acceptable for test)
+- ToolNet CLI blocked status requires manual CLI patch before GA
+  LOW=1
+- OpenCode plugin uses Bun.spawn which requires Bun runtime (already the case)
 
 ---
 
@@ -271,6 +280,7 @@ LOW=1
 RESULT=PARTIAL
 
 OpenCode, Codex, and Agy normal flows are now automatic. ToolNet CLI requires a native code change. All three auto agents:
+
 - Use existing canonical sync adapters
 - Ingest delta only via source cursors
 - Maintain manual sync fallback
@@ -285,6 +295,7 @@ QA_ZERO_TOUCH_RESULT=OpenCode, Codex, Agy pass zero-touch. ToolNet CLI blocked p
 ## Files Changed (Memory Repo)
 
 Source:
+
 - `src/session/integration-capabilities.ts`
 - `src/production/memory-pipeline-status.ts`
 - `src/production/auto-integrate.ts`
@@ -297,16 +308,19 @@ Source:
 - `bin/toolnet-memory`
 
 Tests:
+
 - `tests/session/integration-hardening.test.ts`
 - `tests/production/memory-pipeline-status.test.ts`
 - `tests/session/codex-stop-hook-installer.test.ts` (new)
 - `tests/session/codex-stop-hook.test.ts` (new)
 
 Docs:
+
 - `phase86e5-capability-audit.md` (new)
 - `toolnet-cli-zero-touch-patch-requirement.md` (new)
 
 Build output (from `npm run build:release`):
+
 - All `bundle/*.js` files updated
 
 ---
@@ -325,12 +339,13 @@ FORMAT=All matched files use Prettier code style
 TYPECHECK=Passed
 BUILD=Passed (production bundles created)
 FULL_SUITE=2436 tests total (2419 passed, 5 failed, 2 skipped)
-  - 5 failures are pre-existing (phase85e, phase85g release/commit tests unrelated to this phase)
-TEST_FILES=tests/session/**/*.test.ts, tests/production/memory-pipeline-status.test.ts
-TESTS_PASSED=466 focused, 2419 full suite
-TESTS_FAILED=0 in focused suite; 5 pre-existing in full suite
-TESTS_SKIPPED=2
-GIT_DIFF_CHECK=Passed (no whitespace issues)
+
+- 5 failures are pre-existing (phase85e, phase85g release/commit tests unrelated to this phase)
+  TEST_FILES=tests/session/**/*.test.ts, tests/production/memory-pipeline-status.test.ts
+  TESTS_PASSED=466 focused, 2419 full suite
+  TESTS_FAILED=0 in focused suite; 5 pre-existing in full suite
+  TESTS_SKIPPED=2
+  GIT_DIFF_CHECK=Passed (no whitespace issues)
 
 ---
 
@@ -340,6 +355,7 @@ MEMORY_REPO_COMMIT=None yet (ready for commit after review)
 TOOLNET_CLI_COMMIT=N/A
 
 Suggested commit message:
+
 ```
 feat(integrations): add zero-touch session capture for OpenCode, Codex, Agy
 
@@ -366,5 +382,6 @@ feat(integrations): add zero-touch session capture for OpenCode, Codex, Agy
 ## Next
 
 Phase 86F — Full Cross-Agent E2E / GA Certification
+
 - Requires ToolNet CLI native patch for full 9-agent auto certification
 - Update Phase 86F to require "zero-touch normal flow" instead of "5 auto + 4 manual-sync"

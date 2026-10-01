@@ -354,14 +354,65 @@ async function main(): Promise<void> {
     case 'session:codex-session-end':
       await runModule(['session-end', ...args], () => import('../session/codex/cli.js'));
       return;
-    case 'session:codex-sync':
-      await runModule(['sync', ...args], () => import('../session/codex/cli.js'));
+    case 'session:goose-hook':
+      await runModule(args, () => import('../session/goose/hook.js'));
       return;
-    case 'session:codex-recover':
-      await runModule(['recover', ...args], () => import('../session/codex/cli.js'));
+    case 'session:qwen-hook':
+      await runModule(args, () => import('../session/qwen/hook.js'));
       return;
-    case 'integrate:codex':
-      await runModule(['install-notify', ...args], () => import('../session/codex/cli.js'));
+    case 'session:kimi-hook':
+      await runModule(args, () => import('../session/kimi/hook.js'));
+      return;
+    case 'session:hermes-hook':
+      await runModule(args, () => import('../session/hermes/hook.js'));
+      return;
+    case 'session:qoder-hook':
+      await runModule(args, () => import('../session/qoder/hook.js'));
+      return;
+    case 'integrate:goose':
+      await runModule(['install-hooks', ...args], () => import('../session/goose/cli.js'));
+      return;
+    case 'integrate:qwen':
+      await runModule(['install-hooks', ...args], () => import('../session/qwen/cli.js'));
+      return;
+    case 'integrate:kimi':
+      await runModule(['install-hooks', ...args], () => import('../session/kimi/cli.js'));
+      return;
+    case 'integrate:hermes':
+      await runModule(['install-hooks', ...args], () => import('../session/hermes/cli.js'));
+      return;
+    case 'integrate:qoder':
+      await runModule(['install-hooks', ...args], () => import('../session/qoder/cli.js'));
+      return;
+    case 'session:goose-sync':
+      await runModule(['sync', ...args], () => import('../session/goose/cli.js'));
+      return;
+    case 'session:qwen-sync':
+      await runModule(['sync', ...args], () => import('../session/qwen/cli.js'));
+      return;
+    case 'session:kimi-sync':
+      await runModule(['sync', ...args], () => import('../session/kimi/cli.js'));
+      return;
+    case 'session:hermes-sync':
+      await runModule(['sync', ...args], () => import('../session/hermes/cli.js'));
+      return;
+    case 'session:qoder-sync':
+      await runModule(['sync', ...args], () => import('../session/qoder/cli.js'));
+      return;
+    case 'session:goose-recover':
+      await runModule(['recover', ...args], () => import('../session/goose/cli.js'));
+      return;
+    case 'session:qwen-recover':
+      await runModule(['recover', ...args], () => import('../session/qwen/cli.js'));
+      return;
+    case 'session:kimi-recover':
+      await runModule(['recover', ...args], () => import('../session/kimi/cli.js'));
+      return;
+    case 'session:hermes-recover':
+      await runModule(['recover', ...args], () => import('../session/hermes/cli.js'));
+      return;
+    case 'session:qoder-recover':
+      await runModule(['recover', ...args], () => import('../session/qoder/cli.js'));
       return;
     case 'memory:reconcile':
       await runModule(['reconcile', ...args], () => import('../session/learner/cli.js'));

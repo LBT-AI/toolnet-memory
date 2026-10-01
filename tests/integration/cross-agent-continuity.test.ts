@@ -3,12 +3,12 @@ import { describe, expect, test } from 'vitest';
 import { certifyCrossAgentContinuity } from '../../src/production/continuity-certify.js';
 
 describe('X1 cross-agent continuity E2E', () => {
-  test('recovers canonical work across the ten-agent continuity ring', async () => {
+  test('recovers canonical work across the 15-agent continuity ring', async () => {
     const result = await certifyCrossAgentContinuity();
 
-    expect(result.total).toBe(10);
+    expect(result.total).toBe(15);
 
-    expect(result.passedCount).toBe(10);
+    expect(result.passedCount).toBe(15);
 
     expect(result.passed).toBe(true);
 
@@ -31,7 +31,17 @@ describe('X1 cross-agent continuity E2E', () => {
 
       ['toolnet-cli', 'kilo'],
 
-      ['kilo', 'agy'],
+      ['kilo', 'goose'],
+
+      ['goose', 'qwen'],
+
+      ['qwen', 'kimi'],
+
+      ['kimi', 'hermes'],
+
+      ['hermes', 'qoder'],
+
+      ['qoder', 'agy'],
     ]);
 
     for (const item of result.cases) {

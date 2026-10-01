@@ -170,6 +170,11 @@ describe('integration registry', () => {
       'agy',
       'toolnet-cli',
       'kilo',
+      'goose',
+      'qwen',
+      'kimi',
+      'hermes',
+      'qoder',
     ]);
 
     for (const spec of PIPELINE_AGENTS) {
@@ -186,7 +191,16 @@ describe('integration registry', () => {
       expect(requiredHookEventsFor(agent), agent).toEqual([]);
     }
 
-    for (const agent of ['opencode', 'codex', 'agy'] as const) {
+    for (const agent of [
+      'opencode',
+      'codex',
+      'agy',
+      'goose',
+      'qwen',
+      'kimi',
+      'hermes',
+      'qoder',
+    ] as const) {
       expect(requiredHookEventsFor(agent).length, agent).toBeGreaterThan(0);
     }
 

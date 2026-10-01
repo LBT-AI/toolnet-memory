@@ -18,7 +18,12 @@ export type CertifiedAgent =
   | 'copilot'
   | 'grok'
   | 'toolnet-cli'
-  | 'kilo';
+  | 'kilo'
+  | 'goose'
+  | 'qwen'
+  | 'kimi'
+  | 'hermes'
+  | 'qoder';
 
 export interface ContinuityCertificationChecks {
   canonicalHandoffPreferred: boolean;
@@ -478,7 +483,17 @@ export async function certifyCrossAgentContinuity(): Promise<ContinuityCertifica
 
     ['toolnet-cli', 'kilo'],
 
-    ['kilo', 'agy'],
+    ['kilo', 'goose'],
+
+    ['goose', 'qwen'],
+
+    ['qwen', 'kimi'],
+
+    ['kimi', 'hermes'],
+
+    ['hermes', 'qoder'],
+
+    ['qoder', 'agy'],
   ];
 
   const cases: ContinuityCertificationCase[] = [];

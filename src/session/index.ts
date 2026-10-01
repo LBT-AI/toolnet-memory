@@ -18,3 +18,8 @@ export * from './native-plan/mutate.js';
 export * from './native-plan/runtime.js';
 export * from '../tasks/session-resume.js';
 export * from './task-self-healing.js';
+export * from './goose/index.js';
+export * from './qwen/index.js';
+export * from './kimi/index.js';
+export * from './hermes/index.js';
+export * from './qoder/index.js';

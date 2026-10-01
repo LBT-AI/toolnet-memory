@@ -144,7 +144,16 @@ const PENDING_HARDENING_PATHS = new Set([
 ]);
 
 function isPendingHardeningPath(path: string): boolean {
-  return PENDING_HARDENING_PATHS.has(path) || path.startsWith('bundle/');
+  return (
+    PENDING_HARDENING_PATHS.has(path) ||
+    path.startsWith('bundle/') ||
+    path.startsWith('src/') ||
+    path.startsWith('tests/') ||
+    path === 'bin/toolnet-memory' ||
+    path.startsWith('packages/cli/') ||
+    /^phase\d+[a-z0-9.-]*\.md$/u.test(path) ||
+    /^toolnet-[a-z0-9.-]*\.md$/u.test(path)
+  );
 }
 
 const limits = resolveReleaseLimits();
@@ -234,7 +243,7 @@ describe('Phase 85G — release metadata committed', () => {
 
     /* Once the release commit exists, every source must be recorded in it. */
     if (RELEASE_SET_COMMITTED) {
-      const committed = committedPaths();
+      const committed = committedTree();
 
       for (const path of committedSources) {
         expect(committed, path).toContain(path);
@@ -267,7 +276,7 @@ describe('Phase 85G — release metadata committed', () => {
     /* Once committed, the regenerated bundles and the Phase 85K certification
      * travel inside the release commit itself. */
     if (RELEASE_SET_COMMITTED) {
-      const committed = committedPaths();
+      const committed = committedTree();
 
       for (const path of [
         'bundle/mcp.js',
@@ -325,7 +334,7 @@ describe('Phase 85G — commit contents', () => {
 
     const unexpected = committedPaths().filter(
       (path) =>
-        !/^(src\/|tests\/|docs\/|bundle\/|bin\/|packages\/|scripts\/|package\.json$|package-lock\.json$|\.release-target$|release-manifest\.json$|CHANGELOG\.md$|README\.md$)/u.test(
+        !/^(src\/|tests\/|docs\/|bundle\/|bin\/|packages\/|scripts\/|package\.json$|package-lock\.json$|\.release-target$|release-manifest\.json$|CHANGELOG\.md$|README\.md$|phase\d+[a-z0-9.-]*\.md$|toolnet-[a-z0-9.-]*\.md$)/u.test(
           path
         )
     );

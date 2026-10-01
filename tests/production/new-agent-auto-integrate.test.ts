@@ -57,7 +57,7 @@ describe('Phase 05 new-agent auto-integrate', () => {
       },
     });
 
-    expect(results).toHaveLength(10);
+    expect(results).toHaveLength(15);
 
     for (const agent of ['cursor', 'copilot', 'grok'] as const) {
       const result = results.find((item) => item.agent === agent);

@@ -50,6 +50,19 @@ import {
   type InstallGrokIntegrationOptions,
 } from '../session/grok/installer.js';
 
+import { installGooseIntegration, type GooseInstallOptions } from '../session/goose/installer.js';
+
+import { installQwenIntegration, type QwenInstallOptions } from '../session/qwen/installer.js';
+
+import { installKimiIntegration, type KimiInstallOptions } from '../session/kimi/installer.js';
+
+import {
+  installHermesIntegration,
+  type HermesInstallOptions,
+} from '../session/hermes/installer.js';
+
+import { installQoderIntegration, type QoderInstallOptions } from '../session/qoder/installer.js';
+
 import {
   resolveAutoIntegrationScope,
   type AutoIntegrationScopeResolution,
@@ -125,6 +138,16 @@ export function installAutoIntegrations(
     toolnetCli?: Omit<InstallToolNetCliIntegrationOptions, 'binary'>;
 
     kilo?: Omit<InstallKiloIntegrationOptions, 'binary'>;
+
+    goose?: Omit<GooseInstallOptions, 'binary'>;
+
+    qwen?: Omit<QwenInstallOptions, 'binary'>;
+
+    kimi?: Omit<KimiInstallOptions, 'binary'>;
+
+    hermes?: Omit<HermesInstallOptions, 'binary'>;
+
+    qoder?: Omit<QoderInstallOptions, 'binary'>;
   } = {}
 ): AutoIntegrationResult[] {
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
@@ -642,6 +665,206 @@ export function installAutoIntegrations(
     }
   }
 
+  /*
+   * goose
+   */
+  {
+    const isDetected = options.force === true || detected.get('goose') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'goose',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const gooseOptions = options.goose ?? {};
+
+        const goose = installGooseIntegration({
+          ...gooseOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'goose',
+          detected: true,
+          installed: true,
+          targets: [goose.hooksFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'goose',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Qwen Code
+   */
+  {
+    const isDetected = options.force === true || detected.get('qwen') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'qwen',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const qwenOptions = options.qwen ?? {};
+
+        const qwen = installQwenIntegration({
+          ...qwenOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'qwen',
+          detected: true,
+          installed: true,
+          targets: [qwen.hooksFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'qwen',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Kimi Code CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('kimi') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'kimi',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const kimiOptions = options.kimi ?? {};
+
+        const kimi = installKimiIntegration({
+          ...kimiOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'kimi',
+          detected: true,
+          installed: true,
+          targets: [kimi.configFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'kimi',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Hermes Agent
+   */
+  {
+    const isDetected = options.force === true || detected.get('hermes') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'hermes',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const hermesOptions = options.hermes ?? {};
+
+        const hermes = installHermesIntegration({
+          ...hermesOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'hermes',
+          detected: true,
+          installed: true,
+          targets: [hermes.configFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'hermes',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Qoder CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('qoder') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'qoder',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const qoderOptions = options.qoder ?? {};
+
+        const qoder = installQoderIntegration({
+          ...qoderOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'qoder',
+          detected: true,
+          installed: true,
+          targets: [qoder.settingsFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'qoder',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
   return results;
 }
 
@@ -676,6 +899,21 @@ export function integrationDisplayName(agent: AgentIntegrationId): string {
 
     case 'codex':
       return 'Codex';
+
+    case 'goose':
+      return 'goose';
+
+    case 'qwen':
+      return 'Qwen Code';
+
+    case 'kimi':
+      return 'Kimi Code CLI';
+
+    case 'hermes':
+      return 'Hermes Agent';
+
+    case 'qoder':
+      return 'Qoder CLI';
 
     default:
       return agent;

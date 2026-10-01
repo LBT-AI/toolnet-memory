@@ -6,13 +6,13 @@ import { certifyCrossAgentContinuity } from '../../src/production/continuity-cer
 
 import { PRODUCTION_PACK_REQUIRED_FILES } from '../../src/production/production-certify.js';
 
-describe('10-agent release contract', () => {
-  it('certifies the complete 10-agent continuity ring', async () => {
+describe('15-agent release contract', () => {
+  it('certifies the complete 15-agent continuity ring', async () => {
     const result = await certifyCrossAgentContinuity();
 
     expect(result.passed).toBe(true);
-    expect(result.total).toBe(10);
-    expect(result.passedCount).toBe(10);
+    expect(result.total).toBe(15);
+    expect(result.passedCount).toBe(15);
 
     expect(result.cases.map((item) => [item.from, item.to])).toEqual([
       ['agy', 'codex'],
@@ -24,7 +24,12 @@ describe('10-agent release contract', () => {
       ['copilot', 'grok'],
       ['grok', 'toolnet-cli'],
       ['toolnet-cli', 'kilo'],
-      ['kilo', 'agy'],
+      ['kilo', 'goose'],
+      ['goose', 'qwen'],
+      ['qwen', 'kimi'],
+      ['kimi', 'hermes'],
+      ['hermes', 'qoder'],
+      ['qoder', 'agy'],
     ]);
   });
 
@@ -44,7 +49,7 @@ describe('10-agent release contract', () => {
     );
   });
 
-  it('keeps production routes for all 10 integration entrypoints', () => {
+  it('keeps production routes for all 15 integration entrypoints', () => {
     const source = readFileSync('bin/toolnet-memory', 'utf8');
 
     for (const route of [
@@ -58,6 +63,11 @@ describe('10-agent release contract', () => {
       'integrate:grok)',
       'integrate:toolnet-cli)',
       'integrate:kilo)',
+      'integrate:goose)',
+      'integrate:qwen)',
+      'integrate:kimi)',
+      'integrate:hermes)',
+      'integrate:qoder)',
     ]) {
       expect(source).toContain(route);
     }
@@ -71,12 +81,17 @@ describe('10-agent release contract', () => {
       'session:cursor-hook)',
       'session:copilot-hook)',
       'session:grok-hook)',
+      'session:goose-hook)',
+      'session:qwen-hook)',
+      'session:kimi-hook)',
+      'session:hermes-hook)',
+      'session:qoder-hook)',
     ]) {
       expect(source).toContain(route);
     }
   });
 
-  it('documents all 10 integrations in CLI help metadata', () => {
+  it('documents all 15 integrations in CLI help metadata', () => {
     const source = readFileSync('packages/cli/help.ts', 'utf8');
 
     for (const command of [
@@ -90,6 +105,11 @@ describe('10-agent release contract', () => {
       "name: 'integrate:grok'",
       "name: 'integrate:toolnet-cli'",
       "name: 'integrate:kilo'",
+      "name: 'integrate:goose'",
+      "name: 'integrate:qwen'",
+      "name: 'integrate:kimi'",
+      "name: 'integrate:hermes'",
+      "name: 'integrate:qoder'",
     ]) {
       expect(source).toContain(command);
     }

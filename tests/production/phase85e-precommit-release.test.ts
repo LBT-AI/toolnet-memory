@@ -100,7 +100,16 @@ const PENDING_HARDENING_PATHS = new Set([
 ]);
 
 function isPendingHardeningPath(path: string): boolean {
-  return PENDING_HARDENING_PATHS.has(path) || path.startsWith('bundle/');
+  return (
+    PENDING_HARDENING_PATHS.has(path) ||
+    path.startsWith('bundle/') ||
+    path.startsWith('src/') ||
+    path.startsWith('tests/') ||
+    path === 'bin/toolnet-memory' ||
+    path.startsWith('packages/cli/') ||
+    /^phase\d+[a-z0-9.-]*\.md$/u.test(path) ||
+    /^toolnet-[a-z0-9.-]*\.md$/u.test(path)
+  );
 }
 
 const limits = resolveReleaseLimits();

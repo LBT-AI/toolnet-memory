@@ -29,7 +29,12 @@ export type AgentIntegrationId =
   | 'kilo'
   | 'cursor'
   | 'copilot'
-  | 'grok';
+  | 'grok'
+  | 'goose'
+  | 'qwen'
+  | 'kimi'
+  | 'hermes'
+  | 'qoder';
 
 export interface AgentDetection {
   agent: AgentIntegrationId;
@@ -291,6 +296,56 @@ export function detectAgentIntegrations(
       commandExists,
 
       configPaths: [codexHome],
+    }),
+
+    detectOne({
+      agent: 'goose',
+
+      command: 'goose',
+
+      commandExists,
+
+      configPaths: [join(home, '.agents', 'plugins')],
+    }),
+
+    detectOne({
+      agent: 'qwen',
+
+      command: 'qwen',
+
+      commandExists,
+
+      configPaths: [join(home, '.qwen')],
+    }),
+
+    detectOne({
+      agent: 'kimi',
+
+      command: 'kimi-code',
+
+      commandExists,
+
+      configPaths: [join(home, '.kimi-code')],
+    }),
+
+    detectOne({
+      agent: 'hermes',
+
+      command: 'hermes',
+
+      commandExists,
+
+      configPaths: [join(home, '.hermes')],
+    }),
+
+    detectOne({
+      agent: 'qoder',
+
+      command: 'qoder',
+
+      commandExists,
+
+      configPaths: [join(home, '.qoder-cn'), join(home, '.qoder')],
     }),
   ];
 }

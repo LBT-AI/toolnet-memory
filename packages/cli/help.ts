@@ -358,6 +358,31 @@ export const COMMANDS: CommandMetadata[] = [
     category: 'integration',
   },
   {
+    name: 'integrate:goose',
+    description: 'Install Goose integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:qwen',
+    description: 'Install Qwen Code integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:kimi',
+    description: 'Install Kimi Code CLI integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:hermes',
+    description: 'Install Hermes Agent integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:qoder',
+    description: 'Install Qoder CLI integration',
+    category: 'integration',
+  },
+  {
     name: 'integrate:opencode',
     description: 'Install OpenCode plugin',
     category: 'integration',
@@ -493,6 +518,36 @@ export const COMMANDS: CommandMetadata[] = [
   {
     name: 'session:codex-session-end',
     description: 'Codex SessionEnd hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:goose-hook',
+    description: 'Goose lifecycle hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:qwen-hook',
+    description: 'Qwen Code lifecycle hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:kimi-hook',
+    description: 'Kimi Code CLI lifecycle hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:hermes-hook',
+    description: 'Hermes Agent lifecycle hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:qoder-hook',
+    description: 'Qoder CLI lifecycle hook',
     category: 'session',
     hidden: true,
   },
