@@ -1130,6 +1130,19 @@ toolnet-memory memory:review
 toolnet-memory memory:reconcile
 ```
 
+Recover ToolNet-owned session memory after an upgrade, crash or interrupted
+materialization:
+
+```bash
+toolnet-memory memory:backfill --dry-run   # read-only: report state and pending work
+toolnet-memory memory:backfill             # WAL -> learned journal -> canonical MemoryStore
+```
+
+`memory:backfill` reads only ToolNet-owned durable state (the local session WAL,
+the immutable learned journal and the canonical MemoryStore). It never imports
+another agent's native memory, never mutates Tasks, Wiki, Fleet or integration
+config, and is idempotent: a second run is a no-op.
+
 Structured continuity can include:
 
 ```text

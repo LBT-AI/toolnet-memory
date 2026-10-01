@@ -619,6 +619,21 @@ case "$COMMAND" in
     exit 1
     ;;
 
+  memory:backfill)
+    shift
+
+    if [ -f "$ROOT/bundle/learner.js" ]; then
+      exec node "$ROOT/bundle/learner.js" backfill "$@"
+    fi
+
+    if [ -x "${TSX:-}" ]; then
+      exec "$TSX" "$ROOT/src/session/learner/cli.ts" backfill "$@"
+    fi
+
+    echo "Memory learner not found."
+    exit 1
+    ;;
+
   memory:review)
     shift
     run bundle/memory-review.js src/session/memory-review-cli.ts "$@"

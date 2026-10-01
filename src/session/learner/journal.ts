@@ -210,6 +210,92 @@ function mergeConfirmationEvidence(
   return true;
 }
 
+/** Result of a strict journal read: batches plus any unreadable batch keys. */
+export interface SessionMemoryBatchRead {
+  batches: LearnedMemoryBatch[];
+
+  malformedKeys: string[];
+}
+
+async function listSessionMemoryBatchKeys(
+  project: ProjectManifest,
+  storage: StorageProvider
+): Promise<string[]> {
+  let objects: Awaited<ReturnType<StorageProvider['list']>>;
+
+  try {
+    objects = await storage.list(`projects/${project.id}/memory/learned/`);
+  } catch (error) {
+    throw new MaterializationError('journal-read-failed', failureMessage(error));
+  }
+
+  return objects
+    .filter((item) => item.key.includes('/batches/') && item.key.endsWith('.json'))
+    .map((item) => item.key)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+async function readSessionMemoryBatch(
+  storage: StorageProvider,
+  key: string
+): Promise<LearnedMemoryBatch | null> {
+  let text: string | null;
+
+  try {
+    text = await storage.getText(key);
+  } catch (error) {
+    throw new MaterializationError('journal-read-failed', failureMessage(error));
+  }
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(text) as LearnedMemoryBatch;
+
+    if (parsed.version !== 1 || !Array.isArray(parsed.candidates)) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Strict journal reader used by recovery.
+ *
+ * Unlike `loadSessionMemoryBatches`, a malformed batch is reported instead of
+ * silently skipped, so recovery can refuse to advance past corrupt state.
+ */
+export async function readSessionMemoryBatchesStrict(
+  project: ProjectManifest,
+
+  storage: StorageProvider
+): Promise<SessionMemoryBatchRead> {
+  const keys = await listSessionMemoryBatchKeys(project, storage);
+
+  const batches: LearnedMemoryBatch[] = [];
+
+  const malformedKeys: string[] = [];
+
+  for (const key of keys) {
+    const batch = await readSessionMemoryBatch(storage, key);
+
+    if (batch) {
+      batches.push(batch);
+
+      continue;
+    }
+
+    malformedKeys.push(key);
+  }
+
+  return { batches, malformedKeys };
+}
+
 /**
  * Single reader for learned journal batches.
  *
@@ -221,43 +307,15 @@ export async function loadSessionMemoryBatches(
 
   storage: StorageProvider
 ): Promise<LearnedMemoryBatch[]> {
-  const prefix = `projects/${project.id}/memory/learned/`;
-
-  let objects: Awaited<ReturnType<StorageProvider['list']>>;
-
-  try {
-    objects = await storage.list(prefix);
-  } catch (error) {
-    throw new MaterializationError('journal-read-failed', failureMessage(error));
-  }
+  const keys = await listSessionMemoryBatchKeys(project, storage);
 
   const batches: LearnedMemoryBatch[] = [];
 
-  for (const object of objects
-    .filter((item) => item.key.includes('/batches/') && item.key.endsWith('.json'))
-    .sort((left, right) => left.key.localeCompare(right.key))) {
-    let text: string | null;
+  for (const key of keys) {
+    const batch = await readSessionMemoryBatch(storage, key);
 
-    try {
-      text = await storage.getText(object.key);
-    } catch (error) {
-      throw new MaterializationError('journal-read-failed', failureMessage(error));
-    }
-
-    if (!text) {
-      continue;
-    }
-
-    try {
-      const parsed = JSON.parse(text) as LearnedMemoryBatch;
-
-      if (parsed.version !== 1 || !Array.isArray(parsed.candidates)) {
-        continue;
-      }
-
-      batches.push(parsed);
-    } catch {
-      // Ignore incomplete/corrupt optional learning batch.
+    if (batch) {
+      batches.push(batch);
     }
   }
 

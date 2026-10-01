@@ -117,7 +117,19 @@ export class SessionMemoryLearner {
     this.hierarchyJournal = new SessionMemoryHierarchyJournal(options.storage);
   }
 
-  async learnNew(): Promise<SessionLearningResult> {
+  /**
+   * Learn newly durable WAL events into the immutable learned journal.
+   *
+   * `includeDerivedProjections` defaults to true so normal session flush
+   * keeps Skill Memory, context offload and Wiki automation. Recovery passes
+   * false: it must only advance ToolNet learner progress and the learned
+   * journal, never mutate Wiki/Fleet or unrelated projections.
+   */
+  async learnNew(
+    options: { includeDerivedProjections?: boolean } = {}
+  ): Promise<SessionLearningResult> {
+    const includeDerivedProjections = options.includeDerivedProjections !== false;
+
     const state = this.options.wal.loadState();
 
     const rawOffset = Number(state.sourceCursors['memory.learner.offset'] ?? 0);
@@ -184,10 +196,6 @@ export class SessionMemoryLearner {
      * if a skill asset should be written and persistence fails,
      * the learner throws before memory.learner.offset advances.
      */
-    const skillAssets = buildSkillMemoryAssets(this.options.identity, read.events, pipeline.state);
-
-    const skillPersist = persistSkillMemoryAssets(this.options.project, skillAssets);
-
     /*
      * Advance only after immutable learning journal succeeds.
      * If journal write throws, next flush retries same range.
@@ -239,79 +247,91 @@ export class SessionMemoryLearner {
       hierarchyJournalWritten ? 1 : 0
     );
 
-    this.options.wal.setSourceCursor('memory.skill.assets', skillAssets.length);
-
-    this.options.wal.setSourceCursor('memory.skill.written', skillPersist.written);
-
-    this.options.wal.setSourceCursor('memory.skill.deduped', skillPersist.deduped);
-
-    /*
-     * T2 Context Offload is best-effort.
-     * Canonical WAL remains authoritative if local offload storage fails.
-     */
-    try {
-      const offload = offloadSessionEvents(this.options.project.rootPath, read.events);
-
-      this.options.wal.setSourceCursor('memory.context_offload.eligible', offload.eligible);
-
-      this.options.wal.setSourceCursor('memory.context_offload.written', offload.written);
-
-      this.options.wal.setSourceCursor('memory.context_offload.deduped', offload.deduped);
-
-      this.options.wal.setSourceCursor('memory.context_offload.graph_nodes', offload.graphNodes);
-
-      this.options.wal.setSourceCursor('memory.context_offload.failed', 0);
-    } catch {
-      this.options.wal.setSourceCursor('memory.context_offload.failed', 1);
-    }
-
-    /*
-     * Knowledge Automation is a derived projection.
-     *
-     * Canonical hierarchy / Skill Memory / WAL remain authoritative.
-     * Wiki promotion is best-effort and must not block memory learning.
-     * The learner offset advances only after this attempt completes.
-     */
-    try {
-      const wikiAutomation = await promoteKnowledgeToWiki({
-        project: this.options.project,
-        storage: this.options.storage,
-        hierarchy: pipeline.hierarchy,
-      });
-
-      this.options.wal.setSourceCursor('memory.wiki_automation.scanned', wikiAutomation.scanned);
-
-      this.options.wal.setSourceCursor('memory.wiki_automation.eligible', wikiAutomation.eligible);
-
-      this.options.wal.setSourceCursor('memory.wiki_automation.created', wikiAutomation.created);
-
-      this.options.wal.setSourceCursor('memory.wiki_automation.updated', wikiAutomation.updated);
-
-      this.options.wal.setSourceCursor(
-        'memory.wiki_automation.unchanged',
-        wikiAutomation.unchanged
+    if (includeDerivedProjections) {
+      const skillAssets = buildSkillMemoryAssets(
+        this.options.identity,
+        read.events,
+        pipeline.state
       );
 
-      this.options.wal.setSourceCursor('memory.wiki_automation.skipped', wikiAutomation.skipped);
+      const skillPersist = persistSkillMemoryAssets(this.options.project, skillAssets);
 
-      this.options.wal.setSourceCursor('memory.wiki_automation.failed', wikiAutomation.failed);
+      this.options.wal.setSourceCursor('memory.skill.assets', skillAssets.length);
 
-      this.options.wal.setSourceCursor(
-        'memory.wiki_automation.review_pending',
-        wikiAutomation.reviewPending
-      );
+      this.options.wal.setSourceCursor('memory.skill.written', skillPersist.written);
 
-      this.options.wal.setSourceCursor(
-        'memory.wiki_automation.auto_approved',
-        wikiAutomation.autoApproved
-      );
+      this.options.wal.setSourceCursor('memory.skill.deduped', skillPersist.deduped);
 
-      this.options.wal.setSourceCursor(
-        'memory.wiki_automation.review_approved',
-        wikiAutomation.reviewApproved
-      );
-    } catch {
-      this.options.wal.setSourceCursor('memory.wiki_automation.failed', 1);
+      /*
+       * T2 Context Offload is best-effort.
+       * Canonical WAL remains authoritative if local offload storage fails.
+       */
+      try {
+        const offload = offloadSessionEvents(this.options.project.rootPath, read.events);
+
+        this.options.wal.setSourceCursor('memory.context_offload.eligible', offload.eligible);
+
+        this.options.wal.setSourceCursor('memory.context_offload.written', offload.written);
+
+        this.options.wal.setSourceCursor('memory.context_offload.deduped', offload.deduped);
+
+        this.options.wal.setSourceCursor('memory.context_offload.graph_nodes', offload.graphNodes);
+
+        this.options.wal.setSourceCursor('memory.context_offload.failed', 0);
+      } catch {
+        this.options.wal.setSourceCursor('memory.context_offload.failed', 1);
+      }
+
+      /*
+       * Knowledge Automation is a derived projection.
+       *
+       * Canonical hierarchy / Skill Memory / WAL remain authoritative.
+       * Wiki promotion is best-effort and must not block memory learning.
+       */
+      try {
+        const wikiAutomation = await promoteKnowledgeToWiki({
+          project: this.options.project,
+          storage: this.options.storage,
+          hierarchy: pipeline.hierarchy,
+        });
+
+        this.options.wal.setSourceCursor('memory.wiki_automation.scanned', wikiAutomation.scanned);
+
+        this.options.wal.setSourceCursor(
+          'memory.wiki_automation.eligible',
+          wikiAutomation.eligible
+        );
+
+        this.options.wal.setSourceCursor('memory.wiki_automation.created', wikiAutomation.created);
+
+        this.options.wal.setSourceCursor('memory.wiki_automation.updated', wikiAutomation.updated);
+
+        this.options.wal.setSourceCursor(
+          'memory.wiki_automation.unchanged',
+          wikiAutomation.unchanged
+        );
+
+        this.options.wal.setSourceCursor('memory.wiki_automation.skipped', wikiAutomation.skipped);
+
+        this.options.wal.setSourceCursor('memory.wiki_automation.failed', wikiAutomation.failed);
+
+        this.options.wal.setSourceCursor(
+          'memory.wiki_automation.review_pending',
+          wikiAutomation.reviewPending
+        );
+
+        this.options.wal.setSourceCursor(
+          'memory.wiki_automation.auto_approved',
+          wikiAutomation.autoApproved
+        );
+
+        this.options.wal.setSourceCursor(
+          'memory.wiki_automation.review_approved',
+          wikiAutomation.reviewApproved
+        );
+      } catch {
+        this.options.wal.setSourceCursor('memory.wiki_automation.failed', 1);
+      }
     }
 
     this.options.wal.setSourceCursor('memory.learner.offset', read.nextOffset);
