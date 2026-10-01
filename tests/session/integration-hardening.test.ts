@@ -175,6 +175,9 @@ describe('integration registry', () => {
       'kimi',
       'hermes',
       'qoder',
+      'aider',
+      'plandex',
+      'openrouter',
     ]);
 
     for (const spec of PIPELINE_AGENTS) {
@@ -187,8 +190,8 @@ describe('integration registry', () => {
       expect(requiredHookEventsFor(agent).length, agent).toBeGreaterThan(0);
     }
 
-    for (const agent of ['toolnet-cli'] as const) {
-      expect(requiredHookEventsFor(agent), agent).toEqual([]);
+    for (const agent of ['toolnet-cli', 'aider', 'plandex', 'openrouter'] as const) {
+      expect(requiredHookEventsFor(agent).length, agent).toEqual(0);
     }
 
     for (const agent of [

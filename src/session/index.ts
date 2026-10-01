@@ -23,3 +23,6 @@ export * from './qwen/index.js';
 export * from './kimi/index.js';
 export * from './hermes/index.js';
 export * from './qoder/index.js';
+export * from './aider/index.js';
+export * from './plandex/index.js';
+export * from './openrouter/index.js';

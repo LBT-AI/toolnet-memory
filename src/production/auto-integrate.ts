@@ -63,6 +63,18 @@ import {
 
 import { installQoderIntegration, type QoderInstallOptions } from '../session/qoder/installer.js';
 
+import { installAiderIntegration, type AiderInstallOptions } from '../session/aider/installer.js';
+
+import {
+  installPlandexIntegration,
+  type PlandexInstallOptions,
+} from '../session/plandex/installer.js';
+
+import {
+  installOpenRouterIntegration,
+  type OpenRouterInstallOptions,
+} from '../session/openrouter/installer.js';
+
 import {
   resolveAutoIntegrationScope,
   type AutoIntegrationScopeResolution,
@@ -148,6 +160,12 @@ export function installAutoIntegrations(
     hermes?: Omit<HermesInstallOptions, 'binary'>;
 
     qoder?: Omit<QoderInstallOptions, 'binary'>;
+
+    aider?: Omit<AiderInstallOptions, 'binary'>;
+
+    plandex?: Omit<PlandexInstallOptions, 'binary'>;
+
+    openrouter?: Omit<OpenRouterInstallOptions, 'binary'>;
   } = {}
 ): AutoIntegrationResult[] {
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
@@ -865,6 +883,126 @@ export function installAutoIntegrations(
     }
   }
 
+  /*
+   * Aider
+   */
+  {
+    const isDetected = options.force === true || detected.get('aider') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'aider',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const aiderOptions = options.aider ?? {};
+
+        const aider = installAiderIntegration({
+          ...aiderOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'aider',
+          detected: true,
+          installed: true,
+          targets: [aider.launcherPath],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'aider',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Plandex
+   */
+  {
+    const isDetected = options.force === true || detected.get('plandex') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'plandex',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const plandexOptions = options.plandex ?? {};
+
+        const plandex = installPlandexIntegration({
+          ...plandexOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'plandex',
+          detected: true,
+          installed: true,
+          targets: [plandex.configPath],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'plandex',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * OpenRouter CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('openrouter') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'openrouter',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const openrouterOptions = options.openrouter ?? {};
+
+        const openrouter = installOpenRouterIntegration({
+          ...openrouterOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'openrouter',
+          detected: true,
+          installed: true,
+          targets: [openrouter.configPath],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'openrouter',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
   return results;
 }
 
@@ -914,6 +1052,15 @@ export function integrationDisplayName(agent: AgentIntegrationId): string {
 
     case 'qoder':
       return 'Qoder CLI';
+
+    case 'aider':
+      return 'Aider';
+
+    case 'plandex':
+      return 'Plandex';
+
+    case 'openrouter':
+      return 'OpenRouter CLI';
 
     default:
       return agent;

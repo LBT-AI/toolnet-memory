@@ -764,6 +764,36 @@ case "$COMMAND" in
     exec "$TSX" "$ROOT/src/session/qoder/cli.ts" install-hooks "$@"
     ;;
 
+  integrate:aider)
+    shift
+
+    if [ -f "$ROOT/bundle/aider.js" ]; then
+      exec node "$ROOT/bundle/aider.js" install-wrapper "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/aider/cli.ts" install-wrapper "$@"
+    ;;
+
+  integrate:plandex)
+    shift
+
+    if [ -f "$ROOT/bundle/plandex.js" ]; then
+      exec node "$ROOT/bundle/plandex.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/plandex/cli.ts" install-hooks "$@"
+    ;;
+
+  integrate:openrouter)
+    shift
+
+    if [ -f "$ROOT/bundle/openrouter.js" ]; then
+      exec node "$ROOT/bundle/openrouter.js" status "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/openrouter/cli.ts" status "$@"
+    ;;
+
   session:goose-sync)
     shift
 
@@ -862,6 +892,46 @@ case "$COMMAND" in
     fi
 
     exec "$TSX" "$ROOT/src/session/qoder/cli.ts" recover "$@"
+    ;;
+
+  session:aider-wrapper)
+    shift
+
+    if [ -f "$ROOT/bundle/aider.js" ]; then
+      exec node "$ROOT/bundle/aider.js" wrapper "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/aider/cli.ts" wrapper "$@"
+    ;;
+
+  session:aider-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/aider.js" ]; then
+      exec node "$ROOT/bundle/aider.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/aider/cli.ts" recover "$@"
+    ;;
+
+  session:plandex-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/plandex.js" ]; then
+      exec node "$ROOT/bundle/plandex.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/plandex/cli.ts" recover "$@"
+    ;;
+
+  session:openrouter-status)
+    shift
+
+    if [ -f "$ROOT/bundle/openrouter.js" ]; then
+      exec node "$ROOT/bundle/openrouter.js" status "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/openrouter/cli.ts" status "$@"
     ;;
 
   memory:reconcile)

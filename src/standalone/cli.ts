@@ -384,6 +384,15 @@ async function main(): Promise<void> {
     case 'integrate:qoder':
       await runModule(['install-hooks', ...args], () => import('../session/qoder/cli.js'));
       return;
+    case 'integrate:aider':
+      await runModule(['install-wrapper', ...args], () => import('../session/aider/cli.js'));
+      return;
+    case 'integrate:plandex':
+      await runModule(['install-hooks', ...args], () => import('../session/plandex/cli.js'));
+      return;
+    case 'integrate:openrouter':
+      await runModule(['status', ...args], () => import('../session/openrouter/cli.js'));
+      return;
     case 'session:goose-sync':
       await runModule(['sync', ...args], () => import('../session/goose/cli.js'));
       return;
@@ -413,6 +422,18 @@ async function main(): Promise<void> {
       return;
     case 'session:qoder-recover':
       await runModule(['recover', ...args], () => import('../session/qoder/cli.js'));
+      return;
+    case 'session:aider-wrapper':
+      await runModule(['wrapper', ...args], () => import('../session/aider/cli.js'));
+      return;
+    case 'session:aider-recover':
+      await runModule(['recover', ...args], () => import('../session/aider/cli.js'));
+      return;
+    case 'session:plandex-recover':
+      await runModule(['recover', ...args], () => import('../session/plandex/cli.js'));
+      return;
+    case 'session:openrouter-status':
+      await runModule(['status', ...args], () => import('../session/openrouter/cli.js'));
       return;
     case 'memory:reconcile':
       await runModule(['reconcile', ...args], () => import('../session/learner/cli.js'));

@@ -34,7 +34,10 @@ export type AgentIntegrationId =
   | 'qwen'
   | 'kimi'
   | 'hermes'
-  | 'qoder';
+  | 'qoder'
+  | 'aider'
+  | 'plandex'
+  | 'openrouter';
 
 export interface AgentDetection {
   agent: AgentIntegrationId;
@@ -346,6 +349,36 @@ export function detectAgentIntegrations(
       commandExists,
 
       configPaths: [join(home, '.qoder-cn'), join(home, '.qoder')],
+    }),
+
+    detectOne({
+      agent: 'aider',
+
+      command: 'aider',
+
+      commandExists,
+
+      configPaths: [join(home, '.aider')],
+    }),
+
+    detectOne({
+      agent: 'plandex',
+
+      command: 'plandex',
+
+      commandExists,
+
+      configPaths: [join(home, '.plandex'), join(home, 'plandex-server')],
+    }),
+
+    detectOne({
+      agent: 'openrouter',
+
+      command: 'openrouter',
+
+      commandExists,
+
+      configPaths: [join(home, '.openrouter')],
     }),
   ];
 }

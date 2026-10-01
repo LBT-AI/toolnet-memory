@@ -1,7 +1,7 @@
 export type IntegrationMemoryLevel = 'mcp-only' | 'native-capture';
 
 export type IntegrationRefreshMode =
-  'native-lifecycle' | 'persistent-plugin' | 'native-session' | 'mcp-only';
+  'native-lifecycle' | 'persistent-plugin' | 'native-session' | 'mcp-only' | 'managed-wrapper';
 
 export type SupportedIntegrationAgent =
   | 'agy'
@@ -18,7 +18,10 @@ export type SupportedIntegrationAgent =
   | 'qwen'
   | 'kimi'
   | 'hermes'
-  | 'qoder';
+  | 'qoder'
+  | 'aider'
+  | 'plandex'
+  | 'openrouter';
 
 export interface IntegrationCapabilities {
   mcp: boolean;
@@ -29,7 +32,13 @@ export interface IntegrationCapabilities {
   level: IntegrationMemoryLevel;
 }
 
-export type IntegrationCaptureMode = 'hook' | 'manual-sync' | 'mcp-only';
+export type IntegrationCaptureMode =
+  | 'hook'
+  | 'managed-wrapper-session-end'
+  | 'native-auto-with-source-resolution'
+  | 'manual-sync'
+  | 'mcp-only'
+  | 'blocked-product-identity';
 
 export interface AgentIntegrationCapabilities extends IntegrationCapabilities {
   agent: SupportedIntegrationAgent;
@@ -77,6 +86,9 @@ export const REQUIRED_HOOK_EVENTS: Readonly<Record<SupportedIntegrationAgent, re
     kimi: ['SessionEnd', 'Stop'],
     hermes: ['on_session_end'],
     qoder: ['SessionEnd', 'Stop'],
+    aider: [],
+    plandex: [],
+    openrouter: [],
   };
 
 const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptureMode>> = {
@@ -95,6 +107,9 @@ const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptu
   kimi: 'hook',
   hermes: 'hook',
   qoder: 'hook',
+  aider: 'managed-wrapper-session-end',
+  plandex: 'manual-sync',
+  openrouter: 'blocked-product-identity',
 };
 
 export const MCP_ONLY_CAPABILITIES: IntegrationCapabilities = {
@@ -140,6 +155,15 @@ const PERSISTENT_PLUGIN_CAPABILITIES: IntegrationCapabilities = {
   level: 'native-capture',
 };
 
+const MANAGED_WRAPPER_CAPABILITIES: IntegrationCapabilities = {
+  mcp: true,
+  continuityRead: true,
+  nativeCapture: true,
+  lifecycleHooks: false,
+  sharedJournalWrite: true,
+  level: 'native-capture',
+};
+
 function profile(
   agent: SupportedIntegrationAgent,
   capabilities: IntegrationCapabilities,
@@ -179,6 +203,9 @@ export const AGENT_INTEGRATION_CAPABILITIES: Readonly<
   kimi: profile('kimi', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
   hermes: profile('hermes', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
   qoder: profile('qoder', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  aider: profile('aider', MANAGED_WRAPPER_CAPABILITIES, 'managed-wrapper'),
+  plandex: profile('plandex', NATIVE_SESSION_IMPORT_CAPABILITIES, 'native-session'),
+  openrouter: profile('openrouter', MCP_ONLY_CAPABILITIES, 'mcp-only'),
 };
 
 export function isSupportedIntegrationAgent(agent: string): agent is SupportedIntegrationAgent {
@@ -211,6 +238,9 @@ export const SUPPORTED_INTEGRATION_AGENTS: readonly SupportedIntegrationAgent[] 
   'kimi',
   'hermes',
   'qoder',
+  'aider',
+  'plandex',
+  'openrouter',
 ] as const;
 
 export function integrationCapabilityLabel(agent: string): string {
@@ -227,5 +257,9 @@ export function integrationCapabilityLabel(agent: string): string {
       return 'native session capture';
     case 'mcp-only':
       return 'MCP only';
+    case 'managed-wrapper':
+      return 'managed wrapper';
+    default:
+      return capabilities.refreshMode;
   }
 }

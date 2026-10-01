@@ -383,6 +383,21 @@ export const COMMANDS: CommandMetadata[] = [
     category: 'integration',
   },
   {
+    name: 'integrate:aider',
+    description: 'Install Aider wrapper integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:plandex',
+    description: 'Install Plandex integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:openrouter',
+    description: 'OpenRouter CLI product identity check',
+    category: 'integration',
+  },
+  {
     name: 'integrate:opencode',
     description: 'Install OpenCode plugin',
     category: 'integration',
@@ -548,6 +563,30 @@ export const COMMANDS: CommandMetadata[] = [
   {
     name: 'session:qoder-hook',
     description: 'Qoder CLI lifecycle hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:aider-wrapper',
+    description: 'Aider managed wrapper launcher',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:aider-recover',
+    description: 'Recover Aider session from history',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:plandex-recover',
+    description: 'Recover Plandex plan conversation',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:openrouter-status',
+    description: 'OpenRouter CLI product identity status',
     category: 'session',
     hidden: true,
   },
