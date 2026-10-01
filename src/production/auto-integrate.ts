@@ -14,6 +14,8 @@ import { installCodexNotify } from '../session/codex/notify-installer.js';
 
 import { installCodexContextHook } from '../session/codex/context-hook-installer.js';
 
+import { installCodexStopHook } from '../session/codex/stop-hook-installer.js';
+
 import { installCodexMcp } from '../session/codex/mcp-installer.js';
 
 import { installClaudeIntegration } from '../session/claude/installer.js';
@@ -597,6 +599,10 @@ export function installAutoIntegrations(
           binary,
         });
 
+        const stopHook = installCodexStopHook({
+          binary,
+        });
+
         const mcp = installCodexMcp({
           binary,
         });
@@ -605,7 +611,7 @@ export function installAutoIntegrations(
           throw new Error(mcp.error ?? 'Codex MCP registration failed');
         }
 
-        const targets = [notify.configFile, context, `mcp:${mcp.serverName}`];
+        const targets = [notify.configFile, context, stopHook.hooksFile, `mcp:${mcp.serverName}`];
 
         if (notify.preservedPrevious) {
           targets.push(notify.previousFile);
@@ -707,6 +713,9 @@ const HOOK_CAPTURE_AGENTS: readonly AgentIntegrationId[] = [
   'copilot',
   'grok',
   'kiro',
+  'opencode',
+  'codex',
+  'agy',
 ];
 
 const MANUAL_SYNC_COMMAND: Partial<Record<AgentIntegrationId, string>> = {

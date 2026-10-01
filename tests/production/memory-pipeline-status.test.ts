@@ -487,7 +487,7 @@ describe('memory pipeline status', () => {
 
     expect(opencode.configured).toBe(true);
 
-    expect(opencode.captureMode).toBe('manual-sync');
+    expect(opencode.captureMode).toBe('hook');
 
     expect(opencode.captureStatus).toBe('idle');
 

@@ -497,6 +497,12 @@ export const COMMANDS: CommandMetadata[] = [
     hidden: true,
   },
   {
+    name: 'session:toolnet-cli-auto',
+    description: 'ToolNet CLI automatic capture receiver',
+    category: 'session',
+    hidden: true,
+  },
+  {
     name: 'session:opencode-sync',
     description: 'Sync OpenCode session',
     category: 'session',

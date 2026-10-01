@@ -333,6 +333,9 @@ async function main(): Promise<void> {
     case 'integrate:toolnet-cli':
       await runModule(args, () => import('../session/toolnet-cli/cli.js'));
       return;
+    case 'session:toolnet-cli-auto':
+      await runModule(['auto', ...args], () => import('../session/toolnet-cli/cli.js'));
+      return;
     case 'integrate:kilo':
       await runModule(args, () => import('../session/kilo/cli.js'));
       return;
@@ -344,6 +347,12 @@ async function main(): Promise<void> {
       return;
     case 'session:codex-notify':
       await runModule(['notify', ...args], () => import('../session/codex/cli.js'));
+      return;
+    case 'session:codex-stop-hook':
+      await runModule(['stop-hook', ...args], () => import('../session/codex/cli.js'));
+      return;
+    case 'session:codex-session-end':
+      await runModule(['session-end', ...args], () => import('../session/codex/cli.js'));
       return;
     case 'session:codex-sync':
       await runModule(['sync', ...args], () => import('../session/codex/cli.js'));

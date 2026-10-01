@@ -560,6 +560,11 @@ case "$COMMAND" in
     run bundle/toolnet-cli.js src/session/toolnet-cli/cli.ts "$@"
     ;;
 
+  session:toolnet-cli-auto)
+    shift
+    run bundle/toolnet-cli.js src/session/toolnet-cli/cli.ts auto "$@"
+    ;;
+
   integrate:kilo)
     shift
     run bundle/kilo.js src/session/kilo/cli.ts "$@"

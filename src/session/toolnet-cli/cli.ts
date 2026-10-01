@@ -258,6 +258,77 @@ async function main(): Promise<void> {
     return;
   }
 
+  /*
+   * Automatic capture receiver for native ToolNet CLI lifecycle hook.
+   *
+   * This command is invoked by the ToolNet CLI agent.end hook.
+   * It expects TOOLNET_CLI_NATIVE_SESSION_ID or TOOLNET_HOOK_SESSION_ID
+   * to identify the active session.
+   *
+   * Falls back to recovering the most recent bound session for the project.
+   */
+  if (command === 'auto') {
+    const projectPath = after(args, '--project') ?? process.cwd();
+
+    const project = new ProjectManager().detect(projectPath);
+
+    const storage = storageFor(project);
+
+    const nativeSessionId =
+      process.env.TOOLNET_CLI_NATIVE_SESSION_ID ?? process.env.TOOLNET_HOOK_SESSION_ID ?? '';
+
+    if (!nativeSessionId) {
+      const recovered = await recoverBoundToolNetCliSessions({
+        project,
+
+        storage,
+
+        sessionsDir: after(args, '--sessions-dir'),
+
+        localOnly: args.includes('--local-only'),
+
+        idle: true,
+      });
+
+      if (recovered.failed > 0 || recovered.importedMessages === 0) {
+        console.log(JSON.stringify({ captured: false, reason: 'no-active-session' }));
+
+        return;
+      }
+
+      console.log(JSON.stringify({ captured: true, sessions: recovered.sessions }));
+
+      return;
+    }
+
+    try {
+      const result = await syncToolNetCliSession({
+        project,
+
+        storage,
+
+        nativeSessionId,
+
+        sessionsDir: after(args, '--sessions-dir'),
+
+        localOnly: args.includes('--local-only'),
+
+        idle: true,
+      });
+
+      console.log(JSON.stringify({ captured: true, ...result }));
+
+      if (result.materialization?.status === 'failed') {
+        process.exitCode = 1;
+      }
+    } catch {
+      // Auto-capture failure must not break ToolNet CLI.
+      console.log(JSON.stringify({ captured: false, reason: 'sync-failed' }));
+    }
+
+    return;
+  }
+
   const wantsStatus = args.includes('--status') || args[0] === 'status';
 
   if (wantsStatus) {

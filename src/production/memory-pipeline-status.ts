@@ -231,9 +231,9 @@ export const PIPELINE_AGENTS: readonly AgentSpec[] = [
   { agent: 'copilot', label: 'Copilot', captureMode: 'hook' },
   { agent: 'grok', label: 'Grok', captureMode: 'hook' },
   { agent: 'kiro', label: 'Kiro', captureMode: 'hook' },
-  { agent: 'opencode', label: 'OpenCode', captureMode: 'manual-sync' },
-  { agent: 'codex', label: 'Codex', captureMode: 'manual-sync' },
-  { agent: 'agy', label: 'Agy', captureMode: 'manual-sync' },
+  { agent: 'opencode', label: 'OpenCode', captureMode: 'hook' },
+  { agent: 'codex', label: 'Codex', captureMode: 'hook' },
+  { agent: 'agy', label: 'Agy', captureMode: 'hook' },
   { agent: 'toolnet-cli', label: 'ToolNet CLI', captureMode: 'manual-sync' },
 ] as const;
 
@@ -579,10 +579,8 @@ export async function inspectMemoryPipeline(
 
       captureStatus: captureHealthFor({
         configured,
-
         sessions: agentSources.length,
-
-        degraded: spec.agent === 'opencode' && capture.syncHealth === 'degraded',
+        degraded: capture.syncHealth === 'degraded',
       }),
 
       lastCaptureAt: latestTimestamp(

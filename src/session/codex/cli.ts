@@ -26,6 +26,8 @@ import { installCodexNotify } from './notify-installer.js';
 
 import { installCodexContextHook } from './context-hook-installer.js';
 
+import { installCodexStopHook } from './stop-hook-installer.js';
+
 import { refreshStartupBriefCache } from '../../work-continuity/brief-cache.js';
 
 import { refreshFastHandoffFromCurrent } from '../../work-continuity/handoff-refresh.js';
@@ -202,6 +204,10 @@ async function main() {
       binary,
     });
 
+    const stopHook = installCodexStopHook({
+      binary,
+    });
+
     console.log(`✅ Codex notify installed: ${result.configFile}`);
 
     if (result.preservedPrevious) {
@@ -209,6 +215,8 @@ async function main() {
     }
 
     console.log(`✅ Codex SessionStart context hook: ${contextHooks}`);
+
+    console.log(`✅ Codex Stop/SessionEnd hooks installed: ${stopHook.hooksFile}`);
 
     return;
   }
@@ -221,6 +229,24 @@ async function main() {
     } finally {
       runPreviousNotify(raw);
     }
+
+    return;
+  }
+
+  if (command === 'stop-hook') {
+    const { main: stopHookMain } = await import('./stop-hook.js');
+
+    await stopHookMain();
+
+    return;
+  }
+
+  if (command === 'session-end') {
+    const { main: stopHookMain } = await import('./stop-hook.js');
+
+    process.env.TOOLNET_CODEX_HOOK_EVENT = 'SessionEnd';
+
+    await stopHookMain();
 
     return;
   }

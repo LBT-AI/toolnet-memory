@@ -182,8 +182,12 @@ describe('integration registry', () => {
       expect(requiredHookEventsFor(agent).length, agent).toBeGreaterThan(0);
     }
 
-    for (const agent of ['opencode', 'codex', 'agy', 'toolnet-cli'] as const) {
+    for (const agent of ['toolnet-cli'] as const) {
       expect(requiredHookEventsFor(agent), agent).toEqual([]);
+    }
+
+    for (const agent of ['opencode', 'codex', 'agy'] as const) {
+      expect(requiredHookEventsFor(agent).length, agent).toBeGreaterThan(0);
     }
 
     expect(AGENT_INTEGRATION_CAPABILITIES.claude.captureMode).toBe('hook');
