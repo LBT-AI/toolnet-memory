@@ -31,15 +31,20 @@ function metadataRecord(value: unknown): Record<string, unknown> {
 export function inferMemoryScope(kind?: string, type?: MemoryType): MemoryScope {
   switch (kind) {
     case 'rule':
+    case 'requirement':
       return 'rule';
     case 'decision':
     case 'architecture':
       return 'decision';
     case 'fix':
     case 'context':
+    case 'root_cause':
+    case 'deploy':
       return 'fact';
     case 'todo':
     case 'next_action':
+    case 'blocker':
+    case 'handoff':
       return 'observation';
   }
 
@@ -60,11 +65,24 @@ export function inferMemoryScope(kind?: string, type?: MemoryType): MemoryScope 
 }
 
 export function inferMemoryLifetimeClass(kind?: string, type?: MemoryType): MemoryLifetimeClass {
-  if (kind === 'rule') {
+  /*
+   * Rules and requirements are timeless: they express how the project must
+   * behave, so age alone never makes them stale. Deployment facts are the
+   * opposite — only the current version is trustworthy.
+   */
+  if (kind === 'rule' || kind === 'requirement') {
     return 'permanent';
   }
 
-  if (kind === 'decision' || kind === 'todo' || kind === 'next_action' || kind === 'fix') {
+  if (
+    kind === 'decision' ||
+    kind === 'todo' ||
+    kind === 'next_action' ||
+    kind === 'fix' ||
+    kind === 'blocker' ||
+    kind === 'deploy' ||
+    kind === 'root_cause'
+  ) {
     return 'task';
   }
 
@@ -72,7 +90,7 @@ export function inferMemoryLifetimeClass(kind?: string, type?: MemoryType): Memo
     return 'session';
   }
 
-  if (kind === 'context') {
+  if (kind === 'context' || kind === 'handoff') {
     return 'session';
   }
 

@@ -3,7 +3,18 @@ import type { ImportanceLevel, MemoryScope, MemoryType } from '../../core/types.
 import type { SessionAgent } from '../types.js';
 
 export type LearnedMemoryKind =
-  'rule' | 'decision' | 'todo' | 'next_action' | 'fix' | 'architecture' | 'context';
+  | 'rule'
+  | 'requirement'
+  | 'decision'
+  | 'todo'
+  | 'next_action'
+  | 'fix'
+  | 'architecture'
+  | 'context'
+  | 'root_cause'
+  | 'blocker'
+  | 'deploy'
+  | 'handoff';
 
 export interface LearnedMemoryEvidence {
   userExplicit: boolean;
@@ -48,6 +59,22 @@ export interface LearnedMemoryCandidate {
   sourceRef?: string;
 
   knowledgeClass?: 'permanent' | 'task' | 'session' | 'transient';
+
+  /** Phase 86D durable knowledge taxonomy (kept loose to avoid a type cycle). */
+  knowledgeType?: string;
+
+  /** Phase 86D deterministic policy reason code. */
+  policyReason?: string;
+
+  policyVersion?: number;
+
+  /**
+   * Structured contradiction identity for keyed operational facts
+   * (`subject = value` / `subject: value`). Normalized, deterministic.
+   */
+  subject?: string;
+
+  subjectValue?: string;
 
   confidence: number;
 

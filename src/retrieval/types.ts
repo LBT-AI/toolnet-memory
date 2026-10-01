@@ -4,6 +4,16 @@ export interface RetrievalOptions {
   topK?: number;
   minScore?: number;
   types?: MemoryType[];
+
+  /**
+   * Historical retrieval. Superseded/resolved memories are excluded by default
+   * (current truth only); setting this exposes them, still ranked below
+   * current memories.
+   */
+  includeSuperseded?: boolean;
+
+  /** Optional durable knowledge-class filter (`permanent`/`task`/...). */
+  knowledgeClasses?: string[];
 }
 
 export interface RetrievalResult {

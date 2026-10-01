@@ -1,6 +1,18 @@
 import type { MemoryRecord } from '../core/types.js';
 export type MemoryConflictKind =
-  'rule' | 'decision' | 'todo' | 'next_action' | 'fix' | 'context' | 'architecture' | 'other';
+  | 'rule'
+  | 'requirement'
+  | 'decision'
+  | 'todo'
+  | 'next_action'
+  | 'fix'
+  | 'context'
+  | 'architecture'
+  | 'root_cause'
+  | 'blocker'
+  | 'deploy'
+  | 'handoff'
+  | 'other';
 export type MemoryLifecycleState =
   'active' | 'conflicting' | 'superseded' | 'resolved' | 'completed' | 'stale';
 interface MemoryEvidence {
@@ -35,6 +47,15 @@ const GENERIC_TAGS = new Set([
   'context',
   'next_action',
   'next-action',
+  'requirement',
+  'root_cause',
+  'root-cause',
+  'blocker',
+  'blockers',
+  'deploy',
+  'deployment',
+  'release',
+  'handoff',
   'opencode',
   'agy',
   'codex',
@@ -109,13 +130,33 @@ const LIFECYCLE_WORDS = new Set([
 ]);
 const CONFLICT_KINDS = new Set<MemoryConflictKind>([
   'rule',
+  'requirement',
   'decision',
   'todo',
   'next_action',
   'fix',
   'context',
   'architecture',
+  'root_cause',
+  'blocker',
+  'deploy',
+  'handoff',
 ]);
+
+/*
+ * Derived metadata tag prefixes are structural, never topics. Sharing one of
+ * them (e.g. `scope:fact`, `class:task`) must not make two unrelated memories
+ * look related — otherwise the policy would silently supersede unrelated facts.
+ */
+const STRUCTURAL_TAG_PREFIXES = [
+  'class:',
+  'kind:',
+  'level:',
+  'scope:',
+  'knowledge:',
+  'verified:',
+  'policy:',
+];
 function normalizedText(value: string): string {
   return value.normalize('NFKC').trim().toLowerCase();
 }
@@ -264,7 +305,7 @@ function meaningfulTags(memory: MemoryRecord): Set<string> {
       if (GENERIC_TAGS.has(tag)) {
         return false;
       }
-      if (tag.startsWith('class:') || tag.startsWith('kind:') || tag.startsWith('level:')) {
+      if (STRUCTURAL_TAG_PREFIXES.some((prefix) => tag.startsWith(prefix))) {
         return false;
       }
       return true;
@@ -289,6 +330,17 @@ function entityOf(memory: MemoryRecord): string | undefined {
     metadataString(memory, ['entity', 'entityKey', 'subject', 'taskId', 'taskKey']) ??
     prefixedTag(memory, ['entity:', 'subject:', 'task:'])
   );
+}
+
+/**
+ * Structured identity for keyed operational facts.
+ *
+ * `subject` answers "which slot is this fact about" (class + subject), so a
+ * changed value is deterministic supersession while a different subject stays
+ * a separate fact. `next/subjects` are normalized lowercase.
+ */
+export function memorySubjectOf(memory: MemoryRecord): string | undefined {
+  return metadataString(memory, ['subject', 'subjectKey']) ?? prefixedTag(memory, ['subject:']);
 }
 function provenancePaths(memory: MemoryRecord): Set<string> {
   const raw = memory.metadata?.provenance;
@@ -397,7 +449,7 @@ function compatibleKinds(left: MemoryConflictKind, right: MemoryConflictKind): b
   if (left === right) {
     return true;
   }
-  const taskKinds = new Set<MemoryConflictKind>(['todo', 'next_action']);
+  const taskKinds = new Set<MemoryConflictKind>(['todo', 'next_action', 'blocker']);
   if (taskKinds.has(left) && taskKinds.has(right)) {
     return true;
   }
@@ -413,6 +465,15 @@ function compatibleKinds(left: MemoryConflictKind, right: MemoryConflictKind): b
   if ((left === 'fix' && right === 'context') || (right === 'fix' && left === 'context')) {
     return true;
   }
+  /*
+   * `requirement` is intentionally only compatible with itself. A lasting
+   * requirement stays true while the current implementation is broken, so a
+   * bug observation or a fix must never supersede or resolve it — the two
+   * facts coexist.
+   */
+  if (left === 'requirement' || right === 'requirement') {
+    return false;
+  }
   return false;
 }
 function relationThreshold(left: MemoryConflictKind, right: MemoryConflictKind): number {
@@ -423,7 +484,7 @@ function relationThreshold(left: MemoryConflictKind, right: MemoryConflictKind):
   if (taskKinds.has(left) && taskKinds.has(right)) {
     return 0.38;
   }
-  if (left === 'rule' || left === 'decision') {
+  if (left === 'rule' || left === 'decision' || left === 'requirement') {
     return 0.6;
   }
   return 0.5;
@@ -542,6 +603,20 @@ export class ConflictDetector {
         continue;
       }
       /*
+       * FIX -> BLOCKER
+       *
+       * A verified fix clears the blocker it was about. Assistant prose alone
+       * is not enough, exactly like the fix -> task rule.
+       */
+      if (nextKind === 'fix' && oldKind === 'blocker') {
+        if (completionEvidence(next) && nextAuthority >= oldAuthority) {
+          result.resolved.push(old);
+          continue;
+        }
+        result.conflicts.push(old);
+        continue;
+      }
+      /*
        * TODO/NEXT_ACTION after FIX:
        * treat sufficiently authoritative task as a reopen.
        */
@@ -568,6 +643,21 @@ export class ConflictDetector {
         continue;
       }
       /*
+       * Structured identity: same class + same subject with a different value
+       * is an update (latest observation wins), not two competing truths.
+       * Different subjects stay separate facts.
+       */
+      const nextSubject = memorySubjectOf(next);
+      const oldSubject = memorySubjectOf(old);
+      if (nextSubject && oldSubject && nextSubject === oldSubject) {
+        if (newerOrEqual(next, old)) {
+          result.superseded.push(old);
+          continue;
+        }
+        result.conflicts.push(old);
+        continue;
+      }
+      /*
        * General deterministic authority resolution.
        */
       if (nextAuthority > oldAuthority) {
@@ -587,7 +677,17 @@ export class ConflictDetector {
        * newer observation is an update, not two active states.
        */
       if (
-        ['context', 'fix', 'architecture', 'decision'].includes(nextKind) &&
+        [
+          'context',
+          'fix',
+          'architecture',
+          'decision',
+          'requirement',
+          'deploy',
+          'handoff',
+          'root_cause',
+          'blocker',
+        ].includes(nextKind) &&
         newerOrEqual(next, old)
       ) {
         result.superseded.push(old);

@@ -536,6 +536,58 @@ src/memory/scope-freshness.ts
 src/memory/quality.ts
 ```
 
+### Durable Memory Policy
+
+```text
+src/memory/promotion-policy.ts    # canonical policy owner
+src/session/learner/extractor.ts  # durable knowledge kinds
+src/memory/conflict-detector.ts   # contradiction and supersession
+src/memory/decay.ts
+src/memory/lifecycle.ts
+```
+
+Exactly one policy decides what ToolNet remembers. Every automatic capture and
+every explicit `memory_save` call passes through `evaluateMemoryPolicy`, which
+returns a deterministic decision plus a reason code:
+
+- accepted: `accepted_project_rule`, `accepted_requirement`,
+  `accepted_architecture_decision`, `accepted_decision`, `accepted_root_cause`,
+  `accepted_verified_fix`, `accepted_deployment`, `accepted_blocker`,
+  `accepted_handoff`, ...
+- rejected: `rejected_empty`, `rejected_too_large`, `rejected_secret`,
+  `rejected_speculative`, `rejected_transient`, `rejected_low_confidence`,
+  `rejected_scope`
+
+Policy behaviour:
+
+- Automatic capture is always project scope. A single session can never promote
+  global memory; a global request is refused rather than silently downgraded.
+- Secrets are rejected before anything reaches the learned journal, and an
+  explicit save never bypasses that gate.
+- Hedged conclusions (`probably`, `maybe`, `I think`) are never durable. A root
+  cause additionally requires user, source or test verification.
+- Contradiction is structured, not fuzzy: same class plus the same `subject`
+  means the newer value supersedes the older, while a different subject stays a
+  separate fact.
+- A lasting requirement is never superseded by the bug that currently violates
+  it, and deployment facts keep only the current version.
+- Superseded memory is hidden from default search and returned only through
+  explicit historical retrieval (`includeSuperseded`).
+- Stale temporal facts are flagged, never deleted.
+
+The authoritative per-type table is produced by `memoryKnowledgeClassMatrix()`
+and certified by `certifyMemoryQualityGA()`. It is derived from the policy, never
+hand-maintained. Timeless knowledge (project rules, adopted requirements and
+architecture decisions) never goes stale by age; task-scoped knowledge
+(decisions, fixes, deployments, blockers, root causes, handoffs) goes stale
+after 30 days, and session-scoped knowledge (facts, preferences, operational
+references) after 14.
+
+Durable memory quality (`src/memory/quality.ts`) is inspected separately from
+capture and materialization health
+(`src/production/memory-pipeline-status.ts`). A healthy pipeline can hold no
+durable knowledge, and a broken pipeline says nothing about memory quality.
+
 ### MCP / CLI
 
 ```text

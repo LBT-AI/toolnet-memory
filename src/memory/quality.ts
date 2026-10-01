@@ -1,5 +1,6 @@
 import type { MemoryFreshnessState, MemoryRecord, MemoryScope } from '../core/types.js';
 import { deriveMemoryFreshness, inferMemoryScope } from './scope-freshness.js';
+import { hasSecretContent, MEMORY_POLICY_VERSION } from './promotion-policy.js';
 
 export type MemoryConfidenceBand = 'high' | 'medium' | 'low';
 
@@ -214,6 +215,141 @@ export function filterMemoryQualityItems(
       return true;
     })
     .slice(0, limit);
+}
+
+/**
+ * Durable-memory policy compliance inspection.
+ *
+ * This is a Memory QUALITY surface. It is intentionally separate from
+ * `inspectMemoryPipeline` (src/production/memory-pipeline-status.ts), which
+ * reports CAPTURE/PIPELINE health (WAL, journal, materialization). A project
+ * can have a perfectly healthy pipeline and no durable knowledge, and vice
+ * versa — the two must never be conflated.
+ *
+ * Read-only: nothing here mutates a Memory record.
+ */
+export interface MemoryPolicyComplianceReport {
+  total: number;
+
+  /** Records that are neither superseded nor in a terminal lifecycle state. */
+  current: number;
+
+  /** Terminal records: superseded, resolved or completed. */
+  superseded: number;
+
+  /** Records carrying an accepted policy reason code. */
+  accepted: number;
+
+  /** Rejected candidates must never reach the store. Anything here is a bug. */
+  rejectedArtifacts: number;
+
+  /** Records whose content contains a detected secret. Must always be 0. */
+  secretLeaks: number;
+
+  /** Records with no policy version — legacy rows written before 86D. */
+  unknownPolicy: number;
+
+  policyVersion: number;
+
+  knowledgeTypes: Record<string, number>;
+
+  knowledgeClasses: Record<string, number>;
+}
+
+function lifecycleState(memory: MemoryRecord): string {
+  const metadata = record(memory.metadata);
+  return typeof metadata.lifecycleState === 'string' ? metadata.lifecycleState : 'active';
+}
+
+export function inspectDurableMemoryPolicy(memories: MemoryRecord[]): MemoryPolicyComplianceReport {
+  const knowledgeTypes: Record<string, number> = {};
+
+  const knowledgeClasses: Record<string, number> = {};
+
+  let current = 0;
+
+  let superseded = 0;
+
+  let accepted = 0;
+
+  let rejectedArtifacts = 0;
+
+  let secretLeaks = 0;
+
+  let unknownPolicy = 0;
+
+  for (const memory of memories) {
+    const metadata = record(memory.metadata);
+
+    const state = lifecycleState(memory);
+
+    if (state === 'superseded' || state === 'resolved' || state === 'completed') {
+      superseded += 1;
+    } else {
+      current += 1;
+    }
+
+    const reason = typeof metadata.policyReason === 'string' ? metadata.policyReason : undefined;
+
+    if (reason?.startsWith('accepted_')) {
+      accepted += 1;
+    }
+
+    if (reason?.startsWith('rejected_')) {
+      rejectedArtifacts += 1;
+    }
+
+    if (typeof metadata.policyVersion !== 'number') {
+      unknownPolicy += 1;
+    }
+
+    if (hasSecretContent(memory.content)) {
+      secretLeaks += 1;
+    }
+
+    if (typeof metadata.knowledgeType === 'string') {
+      knowledgeTypes[metadata.knowledgeType] = (knowledgeTypes[metadata.knowledgeType] ?? 0) + 1;
+    }
+
+    if (typeof metadata.knowledgeClass === 'string') {
+      knowledgeClasses[metadata.knowledgeClass] =
+        (knowledgeClasses[metadata.knowledgeClass] ?? 0) + 1;
+    }
+  }
+
+  return {
+    total: memories.length,
+    current,
+    superseded,
+    accepted,
+    rejectedArtifacts,
+    secretLeaks,
+    unknownPolicy,
+    policyVersion: MEMORY_POLICY_VERSION,
+    knowledgeTypes,
+    knowledgeClasses,
+  };
+}
+
+/** Content-free policy findings, safe for doctor/status output. */
+export function durableMemoryPolicyFindings(report: MemoryPolicyComplianceReport): string[] {
+  const findings: string[] = [];
+
+  if (report.secretLeaks > 0) {
+    findings.push(`memory-policy: ${report.secretLeaks} memory record(s) contain a secret`);
+  }
+
+  if (report.rejectedArtifacts > 0) {
+    findings.push(
+      `memory-policy: ${report.rejectedArtifacts} rejected candidate(s) were persisted`
+    );
+  }
+
+  if (report.total > 0 && report.accepted === 0) {
+    findings.push('memory-policy: no memory record carries a policy reason code');
+  }
+
+  return findings;
 }
 
 export function memoryAgeLabel(iso: string, now = Date.now()): string {

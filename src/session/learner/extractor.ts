@@ -8,6 +8,8 @@ import type { LearnedMemoryCandidate, LearnedMemoryKind } from './types.js';
 
 import { sha256 } from '../utils.js';
 
+import { hasSecretContent } from '../../memory/promotion-policy.js';
+
 const RULE_CRITICAL = [
   /không được/iu,
   /tuyệt đối/iu,
@@ -121,6 +123,7 @@ const CONTEXT = [
   /\bport\b/iu,
   /\bendpoint\b/iu,
   /\bdomain\b/iu,
+  /\bprovider\b/iu,
   /\bbucket\b/iu,
   /\brepository\b/iu,
   /\brepo\b/iu,
@@ -138,6 +141,111 @@ const CONTEXT_ASSIGNMENT = [
   /located/iu,
   /runs on/iu,
 ];
+
+/*
+ * Phase 86D durable knowledge kinds.
+ *
+ * A lasting requirement is a positive, durable expectation ("the API must
+ * support X"). It is deliberately distinct from a rule/constraint ("never do
+ * Y") because a requirement stays valid even while the implementation is
+ * broken, so a bug observation must never supersede it.
+ */
+const REQUIREMENT = [
+  /\byêu cầu\b/iu,
+  /\bphải (?:hỗ trợ|đảm bảo|có|duy trì|giữ)\b/iu,
+  /\bcần (?:hỗ trợ|đảm bảo)\b/iu,
+  /\brequirements?\b/iu,
+  /\bmust (?:support|remain|keep|stay|preserve|continue)\b/iu,
+  /\bshould (?:support|remain|keep|stay)\b/iu,
+  /\bneed(?:s)? to (?:support|remain|keep|stay)\b/iu,
+];
+
+const ROOT_CAUSE = [
+  /nguyên nhân/iu,
+  /\broot cause\b/iu,
+  /\bcaused by\b/iu,
+  /\bbecause of\b/iu,
+  /\bthe reason (?:is|was)\b/iu,
+  /\blỗi do\b/iu,
+  /\bdo\b[^.]{1,48}\bgây ra\b/iu,
+];
+
+const BLOCKER = [
+  /\bblockers?\b/iu,
+  /\bblocked\b/iu,
+  /\bblocking\b/iu,
+  /\bwaiting (?:on|for)\b/iu,
+  /\bđang bị chặn\b/iu,
+  /\bbị chặn\b/iu,
+  /\bkhông thể tiếp tục\b/iu,
+];
+
+const DEPLOY = [
+  /\bdeploy(?:ed|ing|ment)?\b/iu,
+  /\btriển khai\b/iu,
+  /\breleased?\b/iu,
+  /\brelease\b/iu,
+  /\bproduction\b/iu,
+  /\bprod\b/iu,
+];
+
+const DEPLOY_VERSION = /\bv?(\d+\.\d+\.\d+)\b/u;
+
+const HANDOFF = [
+  /\bhandoff\b/iu,
+  /\bbàn giao\b/iu,
+  /\bnext session\b/iu,
+  /\bsession summary\b/iu,
+  /\bcontinue in (?:a )?(?:new|next) session\b/iu,
+];
+
+/*
+ * Ephemeral chat noise. This is a deterministic pre-filter: greetings,
+ * acknowledgements, self-narration and raw command output never carry durable
+ * knowledge, so they must not even become candidates.
+ */
+const GREETING =
+  /^(?:hi|hello|hey|yo|chào|xin chào|good morning|good afternoon|good evening)\b[\s!.,]*$/iu;
+
+const ACKNOWLEDGEMENT =
+  /^(?:ok(?:ay)?|oke|k|thanks|thank you|thanks!|cảm ơn|got it|sure|yes|yeah|no|nope|yep|được|vâng|dạ|cool|nice|great)\b[\s!.,]*$/iu;
+
+const PROGRESS_NARRATION =
+  /^(?:i(?:'m| am) (?:now |currently )?(?:editing|updating|reading|writing|running|checking|looking|searching)|let me (?:now )?(?:update|edit|read|run|check|search)|đang (?:sửa|đọc|chạy|kiểm tra|cập nhật))/iu;
+
+const COMMAND_OUTPUT =
+  /(?:^|\n)\s*\$\s|\bnpm (?:notice|warn|error|ERR!)\b|\badded \d+ packages\b|\bpackages in \d+(?:\.\d+)?s\b|\bfound \d+ vulnerabilities?\b|\bnode_modules\b/iu;
+
+/*
+ * Deterministic structured identity for keyed operational facts.
+ *
+ * `subject = value` (or `subject: value` for keyed identifiers) gives the
+ * conflict detector a class-independent identity, so a changed value is an
+ * update (supersession) while a different subject stays a separate fact.
+ */
+const SUBJECT_EQUALS = /\b([A-Za-z][A-Za-z0-9_.-]{2,39})\s*=\s*([^\s,;=]{1,80})/u;
+
+const SUBJECT_KEYED = /\b([A-Za-z][A-Za-z0-9]*(?:[_.-][A-Za-z0-9]+)+)\s*[:=]\s*([^\s,;=]{1,80})/u;
+
+const SUBJECT_BLOCKLIST = new Set([
+  'blocker',
+  'blockers',
+  'rule',
+  'rules',
+  'decision',
+  'decisions',
+  'todo',
+  'requirement',
+  'requirements',
+  'root_cause',
+  'note',
+  'notes',
+  'fix',
+  'fixes',
+  'handoff',
+  'step',
+  'steps',
+]);
 
 const TEXT_KEYS = new Set([
   'content',
@@ -185,6 +293,22 @@ function fingerprintText(value: string): string {
     .trim();
 }
 
+function isNoise(value: string): boolean {
+  if (GREETING.test(value) || ACKNOWLEDGEMENT.test(value)) {
+    return true;
+  }
+
+  if (COMMAND_OUTPUT.test(value)) {
+    return true;
+  }
+
+  if (value.length <= 160 && PROGRESS_NARRATION.test(value)) {
+    return true;
+  }
+
+  return false;
+}
+
 function useful(value: string): boolean {
   if (value.length < 12 || value.length > 1000) {
     return false;
@@ -200,7 +324,71 @@ function useful(value: string): boolean {
     return false;
   }
 
+  if (isNoise(value)) {
+    return false;
+  }
+
   return true;
+}
+
+function normalizeSubject(value: string): string | undefined {
+  const normalized = value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[.\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (!/^[a-z][a-z0-9_]{2,39}$/u.test(normalized)) {
+    return undefined;
+  }
+
+  if (SUBJECT_BLOCKLIST.has(normalized)) {
+    return undefined;
+  }
+
+  return normalized;
+}
+
+function subjectOf(
+  kind: LearnedMemoryKind,
+  text: string
+): { subject: string; value: string } | undefined {
+  const equals = SUBJECT_EQUALS.exec(text);
+
+  if (equals) {
+    const subject = normalizeSubject(equals[1]);
+
+    if (subject) {
+      return { subject, value: equals[2].trim() };
+    }
+  }
+
+  const keyed = SUBJECT_KEYED.exec(text);
+
+  if (keyed) {
+    const subject = normalizeSubject(keyed[1]);
+
+    if (subject) {
+      return { subject, value: keyed[2].trim() };
+    }
+  }
+
+  /*
+   * A deployment fact is keyed by the version it shipped. Two deploy facts
+   * therefore share the `version` subject and the newer one supersedes the
+   * older, which is exactly the currentness rule we want.
+   */
+  if (kind === 'deploy') {
+    const version = DEPLOY_VERSION.exec(text);
+
+    if (version) {
+      return { subject: 'version', value: version[1] };
+    }
+  }
+
+  return undefined;
 }
 
 function collectText(value: unknown, key: string | undefined, output: string[], depth = 0): void {
@@ -328,6 +516,34 @@ function classify(
     };
   }
 
+  if (matches(text, BLOCKER)) {
+    return {
+      kind: 'blocker',
+      confidence: 0.9,
+    };
+  }
+
+  if (matches(text, ROOT_CAUSE)) {
+    return {
+      kind: 'root_cause',
+      confidence: 0.85,
+    };
+  }
+
+  if (matches(text, REQUIREMENT)) {
+    return {
+      kind: 'requirement',
+      confidence: isUser ? 0.9 : 0.82,
+    };
+  }
+
+  if (matches(text, HANDOFF)) {
+    return {
+      kind: 'handoff',
+      confidence: 0.85,
+    };
+  }
+
   if (isUser && matches(text, NEXT_ACTION)) {
     return {
       kind: 'next_action',
@@ -338,6 +554,13 @@ function classify(
     return {
       kind: 'todo',
       confidence: 0.87,
+    };
+  }
+
+  if (matches(text, DEPLOY) && DEPLOY_VERSION.test(text)) {
+    return {
+      kind: 'deploy',
+      confidence: 0.86,
     };
   }
 
@@ -379,10 +602,15 @@ function evidenceFor(
 
   const sourceVerified =
     Boolean(event.provenance.sourcePath) &&
-    (kind === 'architecture' || kind === 'context' || kind === 'fix');
+    (kind === 'architecture' ||
+      kind === 'context' ||
+      kind === 'fix' ||
+      kind === 'root_cause' ||
+      kind === 'deploy');
 
   const testVerified =
-    kind === 'fix' && /(?:test|tests|pass|passed|passing)/iu.test(JSON.stringify(event.data));
+    (kind === 'fix' || kind === 'root_cause' || kind === 'deploy') &&
+    /(?:test|tests|pass|passed|passing|verified|confirmed)/iu.test(JSON.stringify(event.data));
 
   return {
     userExplicit: isUser,
@@ -400,19 +628,26 @@ function evidenceFor(
 function memoryType(kind: LearnedMemoryKind): MemoryType {
   switch (kind) {
     case 'rule':
+    case 'requirement':
       return 'rule';
 
     case 'decision':
     case 'architecture':
+    case 'deploy':
       return 'decision';
 
     case 'todo':
     case 'next_action':
+    case 'blocker':
       return 'todo';
 
     case 'fix':
     case 'context':
+    case 'root_cause':
       return 'code';
+
+    case 'handoff':
+      return 'summary';
   }
 }
 
@@ -421,11 +656,18 @@ function importance(kind: LearnedMemoryKind, type: MemoryType, content: string):
     return 'critical';
   }
 
-  if (kind === 'architecture' || kind === 'decision' || kind === 'rule') {
+  if (
+    kind === 'architecture' ||
+    kind === 'decision' ||
+    kind === 'rule' ||
+    kind === 'requirement' ||
+    kind === 'blocker' ||
+    kind === 'deploy'
+  ) {
     return 'high';
   }
 
-  if (kind === 'fix' || kind === 'context') {
+  if (kind === 'fix' || kind === 'context' || kind === 'root_cause' || kind === 'handoff') {
     return 'normal';
   }
 
@@ -468,6 +710,16 @@ export function extractLearnedMemories(
         continue;
       }
 
+      /*
+       * Secret safety. A candidate is written to the immutable learned
+       * journal on disk, so a secret must never even become a candidate —
+       * the policy gate would reject it later, but by then it would already
+       * have been persisted raw.
+       */
+      if (hasSecretContent(text)) {
+        continue;
+      }
+
       const type = memoryType(classified.kind);
 
       const normalized = fingerprintText(text);
@@ -483,6 +735,14 @@ export function extractLearnedMemories(
       const sourcePaths = event.provenance.sourcePath ? [event.provenance.sourcePath] : [];
 
       const sourceEventIds = event.sourceEventId ? [event.sourceEventId] : [];
+
+      const subject = subjectOf(classified.kind, text);
+
+      const tags: string[] = [type];
+
+      if (subject) {
+        tags.push(`subject:${subject.subject}`);
+      }
 
       output.push({
         version: 1,
@@ -509,11 +769,15 @@ export function extractLearnedMemories(
 
         evidence: evidenceFor(classified.kind, role, event),
 
+        subject: subject?.subject,
+
+        subjectValue: subject?.value,
+
         /*
-         * Keep decision/rule tags generic.
-         * ConflictDetector uses non-generic tags as topic hints.
+         * Keep decision/rule tags generic. ConflictDetector uses non-generic
+         * tags as topic hints, and the `subject:` tag as structured identity.
          */
-        tags: [type],
+        tags,
 
         provenance: {
           agent: identity.agent,

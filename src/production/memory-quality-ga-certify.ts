@@ -9,9 +9,22 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MemoryRecord, ProjectManifest } from '../core/types.js';
+import { MemoryEngine } from '../core/memory-engine.js';
+import { runMemoryPipelineV2 } from '../memory/pipeline-v2.js';
+import {
+  evaluateMemoryPolicy,
+  MEMORY_POLICY_VERSION,
+  memoryKnowledgeClassMatrix,
+} from '../memory/promotion-policy.js';
+import { inspectDurableMemoryPolicy } from '../memory/quality.js';
 import { deriveMemoryFreshness } from '../memory/scope-freshness.js';
 import { ConvergentMemoryStore } from '../multi-host/memory-projection.js';
-import { reconcileSessionMemoryJournal } from '../session/learner/journal.js';
+import {
+  reconcileJournalBatches,
+  reconcileSessionMemoryJournal,
+} from '../session/learner/journal.js';
+import type { LearnedMemoryBatch, LearnedMemoryEvidence } from '../session/learner/types.js';
+import type { NormalizedSessionEvent, SessionIdentity } from '../session/types.js';
 import { MemoryStore } from '../storage/memory-store.js';
 import type { StorageObject, StorageProvider } from '../storage/types.js';
 import { currentTaskArtifactLines } from '../tasks/artifact-evidence.js';
@@ -576,6 +589,294 @@ async function certifyMemoryConvergence(): Promise<boolean> {
   );
 }
 
+function candidateBatch(input: {
+  agent: string;
+  sessionId: string;
+  projectId: string;
+  text: string;
+}): LearnedMemoryBatch {
+  const identity: SessionIdentity = {
+    projectId: input.projectId,
+    projectName: 'phase86d-policy',
+    projectRoot: '/tmp/phase86d-policy',
+    agent: input.agent,
+    nativeSessionId: input.sessionId,
+    sessionKey: `${input.agent}:${input.sessionId}`,
+    remotePrefix: `projects/phase86d-policy/sessions/${input.agent}/${input.sessionId}`,
+    localDirectory: '/tmp/phase86d-policy/.session',
+  };
+  const events: NormalizedSessionEvent[] = [
+    {
+      version: 1,
+      id: `event-${input.sessionId}`,
+      sequence: 1,
+      projectId: input.projectId,
+      agent: input.agent,
+      nativeSessionId: input.sessionId,
+      type: 'message',
+      timestamp: '2026-10-01T00:00:00.000Z',
+      role: 'user',
+      data: { text: input.text },
+      provenance: { source: input.agent },
+    },
+  ];
+  const pipeline = runMemoryPipelineV2(identity, events);
+  return {
+    version: 1,
+    projectId: input.projectId,
+    agent: input.agent,
+    nativeSessionId: input.sessionId,
+    sessionKey: identity.sessionKey,
+    createdAt: '2026-10-01T00:00:00.000Z',
+    firstSequence: 1,
+    lastSequence: 1,
+    candidateCount: pipeline.candidates.length,
+    candidates: pipeline.candidates,
+  };
+}
+
+function verifiedEvidence(): LearnedMemoryEvidence {
+  return {
+    userExplicit: false,
+    sourceVerified: true,
+    testVerified: false,
+    crossSessionConfirmations: 1,
+    assistantDerived: false,
+  };
+}
+
+/**
+ * Phase 86D: durable memory quality policy certification.
+ *
+ * Proves that exactly one policy decides what ToolNet remembers, that noise and
+ * secrets never become durable memory, and that contradiction, staleness and
+ * cross-agent dedupe behave deterministically.
+ */
+async function certifyDurableMemoryPolicy(): Promise<boolean> {
+  const sharedCandidate = {
+    kind: 'rule' as const,
+    importance: 'high' as const,
+    confidence: 0.95,
+    content: 'Rule: always run the full test suite before committing.',
+    evidence: { ...verifiedEvidence(), userExplicit: true },
+  };
+  /*
+   * One canonical owner: auto and explicit paths reach the same verdict, and a
+   * single session can never promote global memory.
+   */
+  const automatic = evaluateMemoryPolicy(sharedCandidate);
+  const explicit = evaluateMemoryPolicy(sharedCandidate, undefined, { explicit: true });
+  if (automatic.reasonCode !== 'accepted_project_rule' || !automatic.persist) {
+    return false;
+  }
+  if (explicit.reasonCode !== automatic.reasonCode) {
+    return false;
+  }
+  if (evaluateMemoryPolicy(sharedCandidate, undefined, { requestedScope: 'global' }).persist) {
+    return false;
+  }
+  /*
+   * Explicit save bypasses the auto threshold but never secret safety.
+   */
+  const secret = evaluateMemoryPolicy(
+    { ...sharedCandidate, content: 'api_key=sk-1234567890abcdefABCDEF1234567890abcdef' },
+    undefined,
+    { explicit: true }
+  );
+  if (secret.persist || secret.reasonCode !== 'rejected_secret') {
+    return false;
+  }
+  /*
+   * Knowledge-class matrix is derived, never hand-held.
+   */
+  const matrix = memoryKnowledgeClassMatrix();
+  if (matrix.length !== 13) {
+    return false;
+  }
+  if (!matrix.every((entry) => entry.timeless === (entry.knowledgeClass === 'permanent'))) {
+    return false;
+  }
+  const projectRule = matrix.find((entry) => entry.knowledgeType === 'project_rule');
+  const deployment = matrix.find((entry) => entry.knowledgeType === 'deployment');
+  const requirement = matrix.find((entry) => entry.knowledgeType === 'requirement');
+  if (projectRule?.knowledgeClass !== 'permanent' || deployment?.knowledgeClass !== 'task') {
+    return false;
+  }
+  if (requirement?.knowledgeClass !== 'permanent' || !requirement.timeless) {
+    return false;
+  }
+  if (deployment.timeless) {
+    return false;
+  }
+  /*
+   * Structured contradiction: the latest value wins, unrelated subjects stay.
+   */
+  const engine = new MemoryEngine();
+  const projectId = 'phase86d-certify-policy';
+  const evidence = verifiedEvidence();
+  const older = engine.remember({
+    projectId,
+    type: 'decision',
+    importance: 'high',
+    content: 'Database provider is DATABASE_PROVIDER=Aiven.',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    tags: ['subject:database_provider'],
+    metadata: { conflictKind: 'context', subject: 'database_provider', confidence: 0.95, evidence },
+  });
+  const newer = engine.remember({
+    projectId,
+    type: 'decision',
+    importance: 'high',
+    content: 'Database provider is DATABASE_PROVIDER=Oracle MySQL.',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    tags: ['subject:database_provider'],
+    metadata: { conflictKind: 'context', subject: 'database_provider', confidence: 0.95, evidence },
+  });
+  if (engine.get(older.id)?.metadata?.supersededBy !== newer.id) {
+    return false;
+  }
+  if (engine.list(projectId).length !== 1) {
+    return false;
+  }
+  const port = engine.remember({
+    projectId,
+    type: 'decision',
+    importance: 'high',
+    content: 'Service port is PORT=9090.',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    tags: ['subject:port'],
+    metadata: { conflictKind: 'context', subject: 'port', confidence: 0.95, evidence },
+  });
+  const service = engine.remember({
+    projectId,
+    type: 'decision',
+    importance: 'high',
+    content: 'Service name is SERVICE_NAME=auth-service.',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    tags: ['subject:service_name'],
+    metadata: { conflictKind: 'context', subject: 'service_name', confidence: 0.95, evidence },
+  });
+  if (port.metadata?.supersededBy || service.metadata?.supersededBy) {
+    return false;
+  }
+  if (engine.list(projectId).length !== 3) {
+    return false;
+  }
+  /*
+   * A lasting requirement coexists with the bug that currently violates it.
+   */
+  const lasting = engine.remember({
+    projectId,
+    type: 'rule',
+    importance: 'high',
+    content: 'The CLI has a requirement to support offline operation.',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    metadata: {
+      conflictKind: 'requirement',
+      topic: 'offline-mode',
+      confidence: 0.95,
+      evidence: { ...evidence, userExplicit: true },
+      knowledgeClass: 'permanent',
+    },
+  });
+  engine.remember({
+    projectId,
+    type: 'code',
+    importance: 'normal',
+    content: 'Offline operation is broken: the CLI fails without network access.',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    metadata: { conflictKind: 'root_cause', topic: 'offline-mode', confidence: 0.9, evidence },
+  });
+  if (engine.get(lasting.id)?.metadata?.supersededBy) {
+    return false;
+  }
+  /*
+   * Timeless rules never go stale; temporal deployment facts do but survive.
+   */
+  const timeless = engine.remember({
+    projectId,
+    type: 'rule',
+    importance: 'critical',
+    content: 'Never commit directly to the main branch.',
+    createdAt: '2019-01-01T00:00:00.000Z',
+    metadata: {
+      conflictKind: 'rule',
+      confidence: 0.98,
+      evidence: { ...evidence, userExplicit: true },
+      knowledgeClass: 'permanent',
+    },
+  });
+  if (timeless.staleAfter !== undefined) {
+    return false;
+  }
+  if (deriveMemoryFreshness(timeless, Date.parse('2026-10-01T00:00:00.000Z')) !== 'fresh') {
+    return false;
+  }
+  const deploymentFact = engine.remember({
+    projectId,
+    type: 'decision',
+    importance: 'high',
+    content: 'Released v0.6.0 to production.',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    metadata: {
+      conflictKind: 'deploy',
+      confidence: 0.95,
+      evidence,
+      knowledgeClass: 'task',
+      staleAfter: '2026-02-01T00:00:00.000Z',
+    },
+  });
+  if (deriveMemoryFreshness(deploymentFact, Date.parse('2026-03-01T00:00:00.000Z')) !== 'stale') {
+    return false;
+  }
+  if (!engine.get(deploymentFact.id)) {
+    return false;
+  }
+  /*
+   * Cross-agent duplicate produces one memory with three confirmations, and the
+   * stored projection contains no secret and no rejected candidate.
+   */
+  const root = mkdtempSync(join(tmpdir(), 'toolnet-phase86d-policy-'));
+  try {
+    const manifest = project(root, 'phase86d-certify-dedupe');
+    const storage = new MemoryStorage();
+    const text = 'Rule: always run the full test suite before committing.';
+    const sessions: Array<[string, string]> = [
+      ['codex', 'sess-a'],
+      ['opencode', 'sess-b'],
+      ['agy', 'sess-c'],
+    ];
+    const batches = sessions.map(([agent, sessionId]) =>
+      candidateBatch({ agent, sessionId, projectId: manifest.id, text })
+    );
+    const result = await reconcileJournalBatches(manifest, storage, batches);
+    if (result.added !== 1 || result.duplicates !== 2 || result.memories !== 1) {
+      return false;
+    }
+    const memories = await new ConvergentMemoryStore(storage).load(manifest.id);
+    if (memories.length !== 1) {
+      return false;
+    }
+    const confirming = memories[0].metadata?.confirmingSessionKeys;
+    if (!Array.isArray(confirming) || confirming.length !== 3) {
+      return false;
+    }
+    const compliance = inspectDurableMemoryPolicy(memories);
+    if (compliance.secretLeaks !== 0 || compliance.rejectedArtifacts !== 0) {
+      return false;
+    }
+    if (compliance.policyVersion !== MEMORY_POLICY_VERSION) {
+      return false;
+    }
+    if (compliance.accepted !== 1) {
+      return false;
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+  return true;
+}
+
 export async function certifyMemoryQualityGA(): Promise<MemoryQualityGACertification> {
   const checks: MemoryQualityGACheck[] = [];
   checks.push(
@@ -625,6 +926,13 @@ export async function certifyMemoryQualityGA(): Promise<MemoryQualityGACertifica
       'memory-cross-host-convergence',
       'canonical Memory converges across hosts',
       certifyMemoryConvergence
+    )
+  );
+  checks.push(
+    await check(
+      'durable-memory-policy',
+      'one durable memory policy governs capture, contradiction, staleness and dedupe',
+      certifyDurableMemoryPolicy
     )
   );
   const passedCount = checks.filter((item) => item.passed).length;

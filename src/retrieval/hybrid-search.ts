@@ -8,6 +8,8 @@ import { memoryImportanceScore } from './importance.js';
 
 import { typePriority } from './type-priority.js';
 
+import { isSuperseded } from '../memory/decay.js';
+
 import { QueryAnalyzer } from './query-analyzer.js';
 
 import type { RetrievalOptions, RetrievalResult } from './types.js';
@@ -35,6 +37,17 @@ export class HybridSearch {
         continue;
       }
 
+      if (options.knowledgeClasses?.length) {
+        const knowledgeClass = memory.metadata?.knowledgeClass;
+
+        if (
+          typeof knowledgeClass !== 'string' ||
+          !options.knowledgeClasses.includes(knowledgeClass)
+        ) {
+          continue;
+        }
+      }
+
       const keyword = this.bm25.score(query, memory);
 
       const recency = recencyScore(memory);
@@ -58,6 +71,13 @@ export class HybridSearch {
       const score = keyword * 0.55 + importance * 0.2 + recency * 0.15 + type * 0.1;
 
       /*
+       * Historical retrieval must never let a superseded fact outrank the
+       * current one. The penalty only matters when the caller explicitly
+       * asked for superseded memories — default search excludes them.
+       */
+      const historical = isSuperseded(memory) ? 0.5 : 1;
+
+      /*
        * Không cho memory hoàn toàn
        * không liên quan lọt vào chỉ
        * vì recency/importance cao.
@@ -69,13 +89,13 @@ export class HybridSearch {
         continue;
       }
 
-      if (score < minScore) {
+      if (score * historical < minScore) {
         continue;
       }
 
       results.push({
         memory,
-        score,
+        score: score * historical,
         scores: {
           keyword,
           recency,

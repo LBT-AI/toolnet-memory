@@ -1,4 +1,4 @@
-import { evaluateMemoryPromotion, type MemoryKnowledgeClass } from './promotion-policy.js';
+import { evaluateMemoryPolicy, type MemoryKnowledgeClass } from './promotion-policy.js';
 import {
   candidateVerifiedAt,
   defaultMemoryStaleAfter,
@@ -29,6 +29,9 @@ export interface MemoryPipelineCandidate extends LearnedMemoryCandidate {
   importanceScore: number;
 
   retrievalTerms: string[];
+
+  /** Deterministic policy outcome recorded for observability and tests. */
+  verifiedState: 'accepted' | 'rejected';
 }
 
 export interface MemoryPipelineState {
@@ -48,13 +51,16 @@ export interface MemoryPipelineState {
 
   architecture: string[];
 }
-
 export interface MemoryRetrievalIndexEntry {
   fingerprint: string;
 
   kind: LearnedMemoryCandidate['kind'];
 
   knowledgeClass: MemoryKnowledgeClass;
+
+  knowledgeType?: string;
+
+  verifiedState: 'accepted' | 'rejected';
 
   scope: MemoryScope;
 
@@ -172,7 +178,7 @@ function retrievalTerms(text: string): string[] {
 }
 
 function enrichCandidate(candidate: LearnedMemoryCandidate): MemoryPipelineCandidate {
-  const evaluation = evaluateMemoryPromotion(candidate);
+  const evaluation = evaluateMemoryPolicy(candidate);
 
   const scope = inferMemoryScope(candidate.kind, candidate.type);
 
@@ -198,6 +204,12 @@ function enrichCandidate(candidate: LearnedMemoryCandidate): MemoryPipelineCandi
 
     knowledgeClass: evaluation.knowledgeClass,
 
+    knowledgeType: evaluation.knowledgeType,
+
+    policyReason: evaluation.reasonCode,
+
+    policyVersion: evaluation.policyVersion,
+
     scope,
 
     observedAt,
@@ -212,12 +224,15 @@ function enrichCandidate(candidate: LearnedMemoryCandidate): MemoryPipelineCandi
 
     retrievalTerms: retrievalTerms(candidate.content),
 
+    verifiedState: evaluation.decision === 'accepted' ? 'accepted' : 'rejected',
+
     tags: uniqueStrings([
       ...candidate.tags,
       'level:fact',
       `class:${evaluation.knowledgeClass}`,
       `scope:${scope}`,
       `kind:${candidate.kind}`,
+      `knowledge:${evaluation.knowledgeType}`,
     ]),
   };
 }
@@ -329,7 +344,7 @@ export function runMemoryPipelineV2(
    * from durable persistence and retrieval.
    */
   const candidates = extracted
-    .filter((candidate) => evaluateMemoryPromotion(candidate).persist)
+    .filter((candidate) => evaluateMemoryPolicy(candidate).persist)
     .sort((left, right) => right.importanceScore - left.importanceScore);
 
   /*
@@ -351,13 +366,16 @@ export function runMemoryPipelineV2(
    * Candidate content is still persisted through the
    * existing immutable SessionMemoryJournal and later
    * reconciled into MemoryStore/MemoryEngine.
-   */
-  const retrievalIndex = candidates.map((candidate) => ({
+   */ const retrievalIndex = candidates.map((candidate) => ({
     fingerprint: candidate.fingerprint,
 
     kind: candidate.kind,
 
     knowledgeClass: candidate.knowledgeClass,
+
+    knowledgeType: candidate.knowledgeType,
+
+    verifiedState: candidate.verifiedState,
 
     scope: candidate.scope,
 

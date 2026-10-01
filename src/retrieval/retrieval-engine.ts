@@ -14,7 +14,15 @@ export class RetrievalEngine {
   constructor(private readonly memory: MemoryEngine) {}
 
   search(projectId: string, query: string, options: RetrievalOptions = {}): RetrievalResult[] {
-    return this.searcher.search(query, this.memory.list(projectId), options);
+    /*
+     * Default search is "current truth": only active memories. Requesting
+     * superseded memories is an explicit historical-retrieval operation.
+     */
+    const memories = options.includeSuperseded
+      ? this.memory.listAll(projectId)
+      : this.memory.list(projectId);
+
+    return this.searcher.search(query, memories, options);
   }
 
   context(projectId: string, query: string, options: RetrievalOptions = {}): string {
