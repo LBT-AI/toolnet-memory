@@ -21,6 +21,10 @@ import {
 } from '../work-continuity/lifecycle-drift.js';
 import { inspectActiveTaskArtifactPaths, type ArtifactPathHealth } from './artifact-path-health.js';
 
+import { inspectFleetState, type FleetDataInspection } from '../mcp/fleet.js';
+
+import { inspectWikiState, type WikiInspectionReport } from './wiki-state.js';
+
 import { checkProductionConfig } from './config-check.js';
 
 import { ProductionHealth } from './health.js';
@@ -58,6 +62,8 @@ type DoctorResult = {
   pipeline?: MemoryPipelineStatus;
   tasks?: ProductionTaskHealth;
   memoryQuality?: MemoryQualityReport;
+  wiki?: WikiInspectionReport;
+  fleet?: FleetDataInspection;
   artifactPaths?: ArtifactPathHealth;
   lifecycle?: LifecycleDriftReport;
   config?: {
@@ -284,6 +290,34 @@ function printHuman(result: DoctorResult): void {
     );
   }
 
+  if (result.wiki || result.fleet) {
+    console.log(pipe);
+    console.log(`${cyan('◇')} ${white('Knowledge (Wiki / Fleet)')}`);
+
+    if (result.wiki) {
+      const wikiState =
+        result.wiki.status === 'corrupt' || result.wiki.status === 'project_mismatch'
+          ? red(result.wiki.status)
+          : result.wiki.status === 'unused' || result.wiki.status === 'current'
+            ? green(result.wiki.status)
+            : amber(result.wiki.status);
+      console.log(`${branch} ${dim('Wiki')}          ${wikiState}`);
+    }
+
+    if (result.fleet) {
+      const fleetState =
+        result.fleet.status === 'registry_corrupt' || result.fleet.status === 'snapshot_corrupt'
+          ? red(result.fleet.status)
+          : result.fleet.status === 'current'
+            ? green(result.fleet.status)
+            : amber(result.fleet.status);
+      console.log(`${branch} ${dim('Fleet')}         ${fleetState}`);
+      console.log(
+        `${branch} ${dim('Fleet projects')} ${white(String(result.fleet.registeredProjects))}${result.fleet.buildRequired ? amber(' / build required') : ''}`
+      );
+    }
+  }
+
   if (result.artifactPaths) {
     console.log(pipe);
     console.log(`${cyan('◇')} ${white('Active Artifact Paths')}`);
@@ -415,6 +449,10 @@ async function main(): Promise<void> {
   const pipeline = await inspectMemoryPipeline({ project, storage });
   const taskHealth = inspectProductionTaskHealth(project);
 
+  /* Wiki + Fleet live in the shared root namespace; inspect them read-only. */
+  const wiki = await inspectWikiState(rawStorage, project);
+  const fleet = await inspectFleetState(rawStorage);
+
   const captureWarnings =
     capture.syncHealth === 'degraded'
       ? [`Session capture degraded${capture.opencode?.error ? `: ${capture.opencode.error}` : ''}`]
@@ -437,6 +475,26 @@ async function main(): Promise<void> {
         ? [`Artifact path health: ${artifactPaths.error}`]
         : [];
   const lifecycleWarnings = lifecycle.warnings.map((warning) => `Lifecycle: ${warning}`);
+
+  const wikiWarnings =
+    wiki.status === 'corrupt' ||
+    wiki.status === 'project_mismatch' ||
+    wiki.status === 'schema_unsupported' ||
+    wiki.status === 'revision_integrity_failed'
+      ? [`Wiki state: ${wiki.status}`]
+      : [];
+
+  const fleetWarnings =
+    fleet.status === 'registry_corrupt' ||
+    fleet.status === 'snapshot_corrupt' ||
+    fleet.status === 'registry_unsupported' ||
+    fleet.status === 'snapshot_unsupported'
+      ? [`Fleet state: ${fleet.status}`]
+      : [];
+
+  const wikiHealthy = wiki.status !== 'corrupt' && wiki.status !== 'project_mismatch';
+  const fleetHealthy = fleet.status !== 'registry_corrupt' && fleet.status !== 'snapshot_corrupt';
+
   const result: DoctorResult = {
     ok:
       health.ok &&
@@ -444,7 +502,9 @@ async function main(): Promise<void> {
       taskHealth.ok &&
       artifactPaths.ok &&
       lifecycle.ok &&
-      pipeline.overall !== 'error',
+      pipeline.overall !== 'error' &&
+      wikiHealthy &&
+      fleetHealthy,
     project: project.name,
     storage: health.storage,
     memory: memories.length,
@@ -458,6 +518,8 @@ async function main(): Promise<void> {
     pipeline,
     tasks: taskHealth,
     memoryQuality,
+    wiki,
+    fleet,
     artifactPaths,
     lifecycle,
     warnings: [
@@ -467,6 +529,8 @@ async function main(): Promise<void> {
       ...taskWarnings,
       ...artifactWarnings,
       ...lifecycleWarnings,
+      ...wikiWarnings,
+      ...fleetWarnings,
     ],
   };
 

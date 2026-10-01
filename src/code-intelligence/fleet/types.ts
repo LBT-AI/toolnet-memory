@@ -127,6 +127,15 @@ export interface FleetCoverageReasons {
   projects: string[];
   missingProjects: string[];
   staleProjects: string[];
+
+  /**
+   * Snapshot generation this coverage belongs to.
+   *
+   * Phase 86E: coverage is published for exactly one snapshot generation, so
+   * coverage from snapshot A can never be read as current for snapshot B.
+   * Optional so snapshots written before 86E stay readable.
+   */
+  generation?: string;
 }
 
 export type FleetCoverageReason =

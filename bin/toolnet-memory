@@ -302,6 +302,21 @@ case "$COMMAND" in
     run bundle/impact.js src/code-intelligence/test-impact.ts "$@"
     ;;
 
+  fleet:build)
+    shift
+    run bundle/fleet-cli.js src/production/fleet-cli.ts "$@"
+    ;;
+
+  wiki:inspect)
+    shift
+    run bundle/wiki-cli.js src/production/wiki-cli.ts inspect "$@"
+    ;;
+
+  wiki:repair)
+    shift
+    run bundle/wiki-cli.js src/production/wiki-cli.ts repair "$@"
+    ;;
+
   snapshot:list)
     run bundle/snapshot.js src/production/snapshot-cli.ts list
     ;;
@@ -572,6 +587,26 @@ case "$COMMAND" in
     fi
 
     exit 0
+    ;;
+
+  session:codex-stop-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/codex.js" ]; then
+      exec node "$ROOT/bundle/codex.js" stop-hook "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/codex/cli.ts" stop-hook "$@"
+    ;;
+
+  session:codex-session-end)
+    shift
+
+    if [ -f "$ROOT/bundle/codex.js" ]; then
+      exec node "$ROOT/bundle/codex.js" session-end "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/codex/cli.ts" session-end "$@"
     ;;
 
   session:codex-sync)

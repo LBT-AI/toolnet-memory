@@ -485,6 +485,18 @@ export const COMMANDS: CommandMetadata[] = [
     hidden: true,
   },
   {
+    name: 'session:codex-stop-hook',
+    description: 'Codex Stop/SessionEnd hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:codex-session-end',
+    description: 'Codex SessionEnd hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
     name: 'session:opencode-sync',
     description: 'Sync OpenCode session',
     category: 'session',
@@ -542,6 +554,20 @@ export const COMMANDS: CommandMetadata[] = [
     description: 'Reconcile memory state',
     category: 'session',
   },
+  {
+    name: 'wiki:inspect',
+    description: 'Inspect Wiki / knowledge state (read-only)',
+    usage: 'toolnet-memory wiki:inspect [--json]',
+    category: 'memory',
+    examples: ['toolnet-memory wiki:inspect', 'toolnet-memory wiki:inspect --json'],
+  },
+  {
+    name: 'wiki:repair',
+    description: 'Repair Wiki / knowledge state without deleting data',
+    usage: 'toolnet-memory wiki:repair [--dry-run]',
+    category: 'memory',
+    examples: ['toolnet-memory wiki:repair --dry-run', 'toolnet-memory wiki:repair'],
+  },
 
   // Guard
   {
@@ -579,6 +605,17 @@ export const COMMANDS: CommandMetadata[] = [
   },
 
   // Snapshots & Recovery
+  {
+    name: 'fleet:build',
+    description: 'Rebuild and publish the cross-repo Fleet snapshot',
+    usage: 'toolnet-memory fleet:build [--dry-run] [--require-complete]',
+    category: 'code',
+    examples: [
+      'toolnet-memory fleet:build --dry-run',
+      'toolnet-memory fleet:build',
+      'toolnet-memory fleet:build --require-complete',
+    ],
+  },
   {
     name: 'snapshot:list',
     description: 'List snapshots',

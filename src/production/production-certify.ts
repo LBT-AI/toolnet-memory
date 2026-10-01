@@ -19,6 +19,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parsePackManifestEntries } from '../code-intelligence/release/package-audit.js';
 import { certifyMemoryQualityGA } from './memory-quality-ga-certify.js';
+import { certifyWikiFleetState } from './wiki-fleet-certify.js';
 import { certifyRetrievalProduction } from './retrieval-production-certify.js';
 import { certifyAdaptiveRetrieval } from './retrieval-adaptive-certify.js';
 import { certifyRetrievalGa } from './retrieval-ga-certify.js';
@@ -653,6 +654,22 @@ export async function certifyProductionReadiness(
    *   1. hardened deterministic benchmark
    *   2. actual packaged ask CLI through bundle/memory-query.js
    */
+  const wikiFleet = await certifyWikiFleetState();
+
+  checks.push(
+    check(
+      'phase86e-wiki-fleet-state',
+      'Phase 86E Wiki/Fleet state recovery certification passes',
+      wikiFleet.passed,
+      wikiFleet.passed
+        ? undefined
+        : wikiFleet.checks
+            .filter((item) => !item.passed)
+            .map((item) => `${item.id}: ${item.detail ?? 'failed'}`)
+            .join('\n')
+    )
+  );
+
   const retrieval = certifyRetrievalProduction(packageRoot);
   checks.push(
     check(

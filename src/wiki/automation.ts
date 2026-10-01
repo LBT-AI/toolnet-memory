@@ -10,6 +10,8 @@ import { WikiError, WikiService, wikiSlug } from './service.js';
 
 import { WikiStore, type WikiStorage } from './store.js';
 
+import { WikiStateError } from './state.js';
+
 import { KnowledgeGovernanceService, KnowledgeGovernanceStore } from './governance.js';
 
 import type { WikiPageV1 } from './types.js';
@@ -446,32 +448,110 @@ function initialLedger(projectId: string): WikiAutomationLedgerV1 {
   };
 }
 
+/**
+ * Phase 86E ledger classification.
+ *
+ * The automation ledger is a global knowledge state file too. Returning an
+ * empty ledger for another project's file used to be harmless on read but
+ * destructive on write, because promotion always saves the ledger at the end.
+ * A mismatch, a future schema, or corruption is now classified explicitly so
+ * automation fails safely rather than overwriting another project's ledger.
+ */
+export type WikiAutomationLedgerClassification =
+  | { status: 'missing' }
+  | { status: 'current'; ledger: WikiAutomationLedgerV1 }
+  | { status: 'project_mismatch'; projectId: string; expectedProjectId: string }
+  | { status: 'unsupported_schema'; version?: number }
+  | { status: 'corrupt'; reason: string };
+
+export function classifyWikiLedger(
+  text: string | null,
+  projectId: string
+): WikiAutomationLedgerClassification {
+  if (!text) {
+    return { status: 'missing' };
+  }
+
+  let parsed: Partial<WikiAutomationLedgerV1>;
+
+  try {
+    parsed = JSON.parse(text) as Partial<WikiAutomationLedgerV1>;
+  } catch {
+    return { status: 'corrupt', reason: 'json-unparseable' };
+  }
+
+  const version = typeof parsed.version === 'number' ? parsed.version : undefined;
+
+  if (parsed.schema !== LEDGER_SCHEMA || version !== 1) {
+    if (version !== undefined && version > 1) {
+      return { status: 'unsupported_schema', version };
+    }
+
+    return { status: 'corrupt', reason: 'schema-mismatch' };
+  }
+
+  const stateProjectId = typeof parsed.projectId === 'string' ? parsed.projectId : '';
+
+  if (!stateProjectId) {
+    return { status: 'corrupt', reason: 'missing-project-id' };
+  }
+
+  if (stateProjectId !== projectId) {
+    return { status: 'project_mismatch', projectId: stateProjectId, expectedProjectId: projectId };
+  }
+
+  if (!Array.isArray(parsed.entries)) {
+    return { status: 'corrupt', reason: 'invalid-entries' };
+  }
+
+  return { status: 'current', ledger: parsed as WikiAutomationLedgerV1 };
+}
+
+function ledgerError(classification: WikiAutomationLedgerClassification): WikiStateError | null {
+  switch (classification.status) {
+    case 'project_mismatch':
+      return new WikiStateError(
+        'WIKI_PROJECT_MISMATCH',
+        [
+          'Wiki automation ledger belongs to a different ToolNet project.',
+          `state projectId: ${classification.projectId}`,
+          `current projectId: ${classification.expectedProjectId}`,
+          'ToolNet never adopts or rewrites another project\u2019s ledger.',
+        ].join(' '),
+        { statusCode: 409, expectedProjectId: classification.expectedProjectId }
+      );
+    case 'unsupported_schema':
+      return new WikiStateError(
+        'WIKI_SCHEMA_UNSUPPORTED',
+        `Wiki automation ledger version ${String(classification.version)} is newer than this ToolNet build. The original file is preserved.`,
+        { statusCode: 409 }
+      );
+    case 'corrupt':
+      return new WikiStateError(
+        'WIKI_STATE_CORRUPT',
+        `Wiki automation ledger is corrupt (${classification.reason}). The original file is preserved.`,
+        { statusCode: 422 }
+      );
+    default:
+      return null;
+  }
+}
+
 async function loadLedger(
   storage: WikiStorage,
   projectId: string
 ): Promise<WikiAutomationLedgerV1> {
-  const text = await storage.getText(LEDGER_KEY);
+  const classification = classifyWikiLedger(await storage.getText(LEDGER_KEY), projectId);
 
-  if (!text) {
+  if (classification.status === 'missing') {
     return initialLedger(projectId);
   }
 
-  try {
-    const parsed = JSON.parse(text) as Partial<WikiAutomationLedgerV1>;
-
-    if (
-      parsed.schema !== LEDGER_SCHEMA ||
-      parsed.version !== 1 ||
-      parsed.projectId !== projectId ||
-      !Array.isArray(parsed.entries)
-    ) {
-      return initialLedger(projectId);
-    }
-
-    return parsed as WikiAutomationLedgerV1;
-  } catch {
-    return initialLedger(projectId);
+  if (classification.status === 'current') {
+    return classification.ledger;
   }
+
+  throw ledgerError(classification) ?? new Error('Unreachable ledger classification');
 }
 
 async function saveLedger(storage: WikiStorage, ledger: WikiAutomationLedgerV1): Promise<void> {

@@ -7,7 +7,7 @@ import {
 
 import type { FleetSnapshot } from '../../code-intelligence/fleet/types.js';
 
-import { loadFleetSnapshot } from '../fleet.js';
+import { inspectContextFleetState, loadFleetSnapshot, type FleetDataInspection } from '../fleet.js';
 
 import type { MCPContext } from '../context.js';
 
@@ -22,6 +22,26 @@ export const fleetStatusSchema = {
 
 export interface FleetStatusResult {
   scope: 'fleet';
+
+  /** Precise persisted Fleet state (registry vs snapshot vs coverage). */
+  state: FleetDataInspection['status'];
+
+  /** True when an explicit Fleet build is required. */
+  buildRequired: boolean;
+
+  /** Registry/snapshot/coverage classification detail. */
+  fleetState?: Pick<
+    FleetDataInspection,
+    | 'registeredProjects'
+    | 'unregisteredProjects'
+    | 'coverageGenerationMatches'
+    | 'incompleteCoverage'
+    | 'reasons'
+    | 'registryState'
+    | 'snapshotState'
+    | 'coverageState'
+  >;
+
   generation: string;
   fingerprint: string;
   registeredProjects: number;
@@ -31,9 +51,26 @@ export interface FleetStatusResult {
   crossProjectEdges: number;
   crossProjectEdgesByType: Record<string, number>;
   unresolved: number;
-  coverage: FleetSnapshot['coverage'] | null;
+  /* `reasons` is widened to string[] so the precise Fleet state reasons can be
+   * surfaced for a not-yet-built Fleet too. */
+  coverage: (Omit<FleetSnapshot['coverage'], 'reasons'> & { reasons: string[] }) | null;
   diagnostics?: ReturnType<typeof summarizeFleetDiagnostics>;
   architecture?: ReturnType<typeof summarizeFleetArchitecture>;
+}
+
+function inspectionSummary(
+  inspection: FleetDataInspection
+): NonNullable<FleetStatusResult['fleetState']> {
+  return {
+    registeredProjects: inspection.registeredProjects,
+    unregisteredProjects: inspection.unregisteredProjects,
+    coverageGenerationMatches: inspection.coverageGenerationMatches,
+    incompleteCoverage: inspection.incompleteCoverage,
+    reasons: inspection.reasons,
+    registryState: inspection.registryState,
+    snapshotState: inspection.snapshotState,
+    coverageState: inspection.coverageState,
+  };
 }
 
 export async function fleetStatus(
@@ -44,14 +81,20 @@ export async function fleetStatus(
     includeArchitecture?: boolean;
   } = {}
 ): Promise<FleetStatusResult> {
+  /* Read-only: no implicit rebuild publication, no state mutation. */
   const snapshot = await loadFleetSnapshot(ctx, {
     cached: input.cached ?? false,
-    persist: true,
+    persist: false,
   });
+
+  const inspection = await inspectContextFleetState(ctx);
 
   if (!snapshot) {
     return {
       scope: 'fleet',
+      state: inspection?.status ?? 'not_configured',
+      buildRequired: inspection?.buildRequired ?? false,
+      ...(inspection ? { fleetState: inspectionSummary(inspection) } : {}),
       generation: '',
       fingerprint: '',
       registeredProjects: 0,
@@ -64,7 +107,7 @@ export async function fleetStatus(
       coverage: {
         status: 'unavailable',
         negativeClaimSafe: false,
-        reasons: ['FLEET_EMPTY'],
+        reasons: inspection?.reasons.length ? inspection.reasons : ['FLEET_EMPTY'],
         projects: [],
         missingProjects: [],
         staleProjects: [],
@@ -74,6 +117,9 @@ export async function fleetStatus(
 
   const result: FleetStatusResult = {
     scope: 'fleet',
+    state: inspection?.status ?? 'current',
+    buildRequired: inspection?.buildRequired ?? false,
+    ...(inspection ? { fleetState: inspectionSummary(inspection) } : {}),
     generation: snapshot.generation,
     fingerprint: snapshot.fingerprint,
     registeredProjects: snapshot.stats.registeredProjects,

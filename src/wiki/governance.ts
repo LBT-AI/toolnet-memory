@@ -8,11 +8,15 @@ import type { WikiPageV1 } from './types.js';
 
 import { WikiError, WikiService } from './service.js';
 
+import { WikiStateError } from './state.js';
+
 const STATE_KEY = 'wiki/governance.v1.json';
 
 const STATE_SCHEMA = 'toolnet.knowledge-governance.v1' as const;
 
 const MAX_AUDIT_EVENTS = 500;
+
+const MAX_REVIEWS = 5_000;
 
 export type KnowledgeGovernanceSourceType = 'memory' | 'scene' | 'skill';
 
@@ -221,6 +225,11 @@ const DEFAULT_POLICY: KnowledgeGovernancePolicy = {
   staleAfterDays: 90,
 };
 
+/** Canonical default governance policy (used by status surfaces too). */
+export function defaultGovernancePolicy(): KnowledgeGovernancePolicy {
+  return { ...DEFAULT_POLICY };
+}
+
 function clamp(value: number, min = 0, max = 1): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -336,50 +345,178 @@ function validPolicy(value: Partial<KnowledgeGovernancePolicy>): KnowledgeGovern
   };
 }
 
+/**
+ * Phase 86E governance state classification.
+ *
+ * Kept separate from the Wiki classification because the payload shape
+ * differs, but it follows the same contract: missing is valid, a mismatch is
+ * never adopted, corruption is never overwritten.
+ */
+export type KnowledgeGovernanceClassification =
+  | { status: 'missing' }
+  | { status: 'current'; state: KnowledgeGovernanceStateV1 }
+  | { status: 'project_mismatch'; projectId: string; expectedProjectId: string }
+  | { status: 'unsupported_schema'; version?: number }
+  | { status: 'corrupt'; reason: string };
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function classifyGovernanceState(
+  text: string | null,
+  projectId: string
+): KnowledgeGovernanceClassification {
+  if (!text) {
+    return { status: 'missing' };
+  }
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { status: 'corrupt', reason: 'json-unparseable' };
+  }
+
+  const value = asRecord(parsed);
+
+  if (!value) {
+    return { status: 'corrupt', reason: 'not-an-object' };
+  }
+
+  const version = typeof value.version === 'number' ? value.version : undefined;
+
+  if (value.schema !== STATE_SCHEMA || version !== 1) {
+    if (version !== undefined && version > 1) {
+      return { status: 'unsupported_schema', version };
+    }
+
+    return { status: 'corrupt', reason: 'schema-mismatch' };
+  }
+
+  const stateProjectId = typeof value.projectId === 'string' ? value.projectId : '';
+
+  if (!stateProjectId) {
+    return { status: 'corrupt', reason: 'missing-project-id' };
+  }
+
+  if (stateProjectId !== projectId) {
+    return { status: 'project_mismatch', projectId: stateProjectId, expectedProjectId: projectId };
+  }
+
+  if (!Array.isArray(value.reviews) || !Array.isArray(value.audit)) {
+    return { status: 'corrupt', reason: 'invalid-collections' };
+  }
+
+  if (value.reviews.length > MAX_REVIEWS || value.audit.length > MAX_AUDIT_EVENTS) {
+    return { status: 'corrupt', reason: 'state-too-large' };
+  }
+
+  try {
+    return {
+      status: 'current',
+      state: {
+        ...(value as unknown as KnowledgeGovernanceStateV1),
+        policy: validPolicy((value.policy ?? {}) as Partial<KnowledgeGovernancePolicy>),
+      },
+    };
+  } catch {
+    return { status: 'corrupt', reason: 'invalid-policy' };
+  }
+}
+
+function governanceStateError(
+  classification: KnowledgeGovernanceClassification
+): WikiStateError | null {
+  switch (classification.status) {
+    case 'project_mismatch':
+      return new WikiStateError(
+        'WIKI_PROJECT_MISMATCH',
+        [
+          'Knowledge governance state belongs to a different ToolNet project.',
+          `state projectId: ${classification.projectId}`,
+          `current projectId: ${classification.expectedProjectId}`,
+          'ToolNet never adopts or rewrites another project\u2019s governance state.',
+        ].join(' '),
+        {
+          statusCode: 409,
+          projectId: classification.projectId,
+          expectedProjectId: classification.expectedProjectId,
+        }
+      );
+    case 'unsupported_schema':
+      return new WikiStateError(
+        'WIKI_SCHEMA_UNSUPPORTED',
+        [
+          'Knowledge governance state was written by a newer ToolNet version.',
+          `state version: ${String(classification.version)}`,
+          'Upgrade ToolNet; the existing state is left untouched.',
+        ].join(' '),
+        { statusCode: 409 }
+      );
+    case 'corrupt':
+      return new WikiStateError(
+        'WIKI_STATE_CORRUPT',
+        `Knowledge governance state is corrupt (${classification.reason}). The original file is preserved.`,
+        { statusCode: 422 }
+      );
+    default:
+      return null;
+  }
+}
+
+/**
+ * Phase 86E KnowledgeGovernanceStore.
+ *
+ * `readState()` / `load()` are pure. The previous implementation reset an
+ * unreadable or foreign state to an empty one for the caller's project — which
+ * destroyed another project's reviews and audit log. That behaviour is gone:
+ * only a genuinely missing state initialises, and only when a real mutation
+ * persists.
+ */
 export class KnowledgeGovernanceStore {
   constructor(
     private readonly storage: WikiStorage,
     private readonly project: ProjectManifest
   ) {}
 
+  get key(): string {
+    return STATE_KEY;
+  }
+
+  async readState(): Promise<KnowledgeGovernanceClassification> {
+    return classifyGovernanceState(await this.storage.getText(STATE_KEY), this.project.id);
+  }
+
   async load(): Promise<KnowledgeGovernanceStateV1> {
-    const text = await this.storage.getText(STATE_KEY);
+    const classification = await this.readState();
 
-    if (!text) {
-      const state = initialState(this.project.id);
-
-      await this.save(state);
-
-      return state;
+    if (classification.status === 'missing') {
+      return initialState(this.project.id);
     }
 
-    try {
-      const parsed = JSON.parse(text) as Partial<KnowledgeGovernanceStateV1>;
-
-      if (
-        parsed.schema !== STATE_SCHEMA ||
-        parsed.version !== 1 ||
-        parsed.projectId !== this.project.id ||
-        !Array.isArray(parsed.reviews) ||
-        !Array.isArray(parsed.audit)
-      ) {
-        throw new Error('invalid');
-      }
-
-      return {
-        ...(parsed as KnowledgeGovernanceStateV1),
-        policy: validPolicy(parsed.policy ?? DEFAULT_POLICY),
-      };
-    } catch {
-      const state = initialState(this.project.id);
-
-      await this.save(state);
-
-      return state;
+    if (classification.status === 'current') {
+      return classification.state;
     }
+
+    throw (
+      governanceStateError(classification) ??
+      new Error('Unreachable governance state classification')
+    );
   }
 
   async save(state: KnowledgeGovernanceStateV1): Promise<void> {
+    if (state.schema !== STATE_SCHEMA || state.version !== 1) {
+      throw new Error('Refusing to persist an unsupported governance schema');
+    }
+
+    if (state.projectId !== this.project.id) {
+      throw new Error('Refusing to persist governance state for a different project');
+    }
+
     await this.storage.put(STATE_KEY, JSON.stringify(state, null, 2), 'application/json');
   }
 }

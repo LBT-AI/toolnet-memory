@@ -2582,6 +2582,35 @@ complete, and the coverage always names the `projects` in scope plus the
 partial fleet. Fleet scope is the set of ToolNet projects this install knows
 about — never the whole organisation.
 
+### Wiki and Fleet state recovery
+
+Wiki and Fleet state are shared knowledge namespaces (`wiki/*.v1.json`,
+`fleet/*`), not project-scoped data. Their recovery contract is deterministic
+and non-destructive:
+
+- **Wiki.** `wiki/state.v1.json`, `wiki/governance.v1.json` and
+  `wiki/automation.v1.json` each carry the owning `projectId`. A missing file
+  is a valid _unused_ subsystem, never corruption; reading never writes and
+  the first real mutation initializes state lazily. A file owned by another
+  project (`project_mismatch`), a future schema (`schema_unsupported`),
+  broken revision references (`revision_integrity_failed`) or a corrupt
+  payload (`corrupt`) is reported with a typed error and left byte-for-byte
+  untouched — ToolNet never adopts or rewrites it. `wiki:inspect` is read-only
+  and `wiki:repair` only applies a supported migration (identity at schema
+  version 1), never deleting state. Status and doctor report the exact state;
+  `unused` is healthy.
+- **Fleet.** Registry, snapshot and coverage are three distinct states.
+  `fleet_projects`/`fleet_status` are read-only and report
+  `not_configured`, `registry_empty`, `snapshot_missing`, `snapshot_stale`,
+  `snapshot_corrupt`, `registry_unsupported`, `snapshot_unsupported` or
+  `current` — never a generic "unavailable". Registered-without-snapshot is
+  `snapshot_missing` with `buildRequired: true`. Publishing is an explicit
+  lifecycle action (`fleet:build`), which rebuilds the derived snapshot from
+  the registered projects' export views and stamps coverage with the
+  snapshot generation, so coverage for one generation can never be read as
+  current for another. A partial fleet is published with explicit coverage
+  and `negativeClaimSafe: false`, never silently trimmed.
+
 ### Impact
 
 Cross-repo impact is opt-in (`analyze_impact` with `includeCrossRepo: true`)

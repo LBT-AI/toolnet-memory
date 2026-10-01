@@ -17,6 +17,8 @@ import { inspectKiroIntegrationStatus } from '../session/kiro/status.js';
 import { TaskReplicationService } from '../tasks/replication/service.js';
 import { ConvergentMemoryStore } from '../multi-host/memory-projection.js';
 import { inspectMemoryQuality } from '../memory/quality.js';
+import { inspectFleetState } from '../mcp/fleet.js';
+import { inspectWikiState } from './wiki-state.js';
 import { summarizeRetrievalTelemetry } from '../work-continuity/retrieval-telemetry.js';
 import { summarizeRetrievalFeedback } from '../work-continuity/retrieval-feedback.js';
 import {
@@ -236,6 +238,41 @@ async function showStatus(options: StatusCliOptions): Promise<void> {
     console.log(
       renderKeyValue('Last materialize', pipeline.lastMaterializationAt ?? 'never', 16, uiOpts)
     );
+    console.log('');
+
+    /* Knowledge subsystems (read-only). A never-used Wiki or an unbuilt Fleet
+     * is a valid state, not an error. */
+    console.log(renderSectionTitle('KNOWLEDGE (WIKI / FLEET)', uiOpts));
+    try {
+      const wiki = await inspectWikiState(rawStorage, project);
+      console.log(renderKeyValue('Wiki', wiki.status, 16, uiOpts));
+      if (wiki.state.wiki.pages !== undefined) {
+        console.log(
+          renderKeyValue(
+            'Wiki pages',
+            `${wiki.state.wiki.pages} page(s) / ${wiki.state.wiki.revisions ?? 0} revision(s)`,
+            16,
+            uiOpts
+          )
+        );
+      }
+    } catch {
+      console.log(renderKeyValue('Wiki', 'unavailable', 16, uiOpts));
+    }
+    try {
+      const fleet = await inspectFleetState(rawStorage);
+      console.log(renderKeyValue('Fleet', fleet.status, 16, uiOpts));
+      console.log(
+        renderKeyValue(
+          'Fleet projects',
+          `${fleet.registeredProjects} registered${fleet.buildRequired ? ' / build required' : ''}`,
+          16,
+          uiOpts
+        )
+      );
+    } catch {
+      console.log(renderKeyValue('Fleet', 'unavailable', 16, uiOpts));
+    }
     console.log('');
 
     console.log(renderSectionTitle('AGENT INTEGRATIONS', uiOpts));

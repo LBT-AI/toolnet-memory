@@ -101,6 +101,13 @@ export class FleetProjectRegistry {
   /**
    * Registered projects, enriched from the registry record and the persisted
    * per-project exports.
+   *
+   * Phase 86E registry authority: when the registry has at least one entry, it
+   * is the ONLY source of Fleet membership. Physical project folders that were
+   * never registered are not silently promoted into the user's Fleet. When the
+   * registry is empty (never configured), discovery falls back to the physical
+   * folders so a fresh single-project setup still works — the state inspector
+   * reports that fallback explicitly as `registry_empty`.
    */
   async discover(): Promise<FleetProjectInput[]> {
     const [registry, folders] = await Promise.all([
@@ -108,46 +115,66 @@ export class FleetProjectRegistry {
       this.listRegisteredFolders(),
     ]);
 
-    const byId = new Map<string, FleetRegistryEntry>();
-    for (const entry of registry.projects) {
-      byId.set(entry.projectId, entry);
+    const foldersById = new Map<string, { folder: string; name: string; remote: string }>();
+
+    for (const { folder, manifest } of folders) {
+      foldersById.set(manifest.id, { folder, name: manifest.name, remote: manifest.remote });
+    }
+
+    if (registry.projects.length === 0) {
+      const legacy: FleetProjectInput[] = [];
+
+      for (const { folder, manifest } of folders) {
+        legacy.push({
+          projectId: manifest.id,
+          name: manifest.name,
+          remote: manifest.remote,
+          export: await this.loadExport(folder),
+        });
+      }
+
+      return legacy.sort((left, right) => left.projectId.localeCompare(right.projectId));
     }
 
     const inputs: FleetProjectInput[] = [];
-    const seen = new Set<string>();
 
-    for (const { folder, manifest } of folders) {
-      const entry = byId.get(manifest.id);
-      const exportView = await this.loadExport(folder);
-
-      inputs.push({
-        projectId: manifest.id,
-        name: entry?.name ?? manifest.name,
-        remote: manifest.remote,
-        ...(entry?.rootPath && existsSync(entry.rootPath) ? { rootPath: entry.rootPath } : {}),
-        ...(entry?.pinnedGeneration ? { pinnedGeneration: entry.pinnedGeneration } : {}),
-        export: exportView,
-      });
-
-      seen.add(manifest.id);
-    }
-
-    /* Registry entries without a physical manifest stay unavailable. */
     for (const entry of registry.projects) {
-      if (seen.has(entry.projectId)) {
-        continue;
-      }
+      const located = foldersById.get(entry.projectId);
+
       inputs.push({
         projectId: entry.projectId,
-        name: entry.name,
-        ...(entry.remote ? { remote: entry.remote } : {}),
+        name: entry.name ?? located?.name ?? entry.projectId,
+        ...((entry.remote ?? located?.remote) ? { remote: entry.remote ?? located?.remote } : {}),
         ...(entry.rootPath && existsSync(entry.rootPath) ? { rootPath: entry.rootPath } : {}),
         ...(entry.pinnedGeneration ? { pinnedGeneration: entry.pinnedGeneration } : {}),
-        export: null,
+        /* A registered project without a physical manifest stays unavailable. */
+        export: located ? await this.loadExport(located.folder) : null,
       });
     }
 
     return inputs.sort((left, right) => left.projectId.localeCompare(right.projectId));
+  }
+
+  /**
+   * Physical project folders that are not part of the registered Fleet.
+   * Reported (counted) by status surfaces, never silently promoted.
+   */
+  async unregisteredFolders(): Promise<string[]> {
+    const [registry, folders] = await Promise.all([
+      this.store.loadRegistry(),
+      this.listRegisteredFolders(),
+    ]);
+
+    if (registry.projects.length === 0) {
+      return [];
+    }
+
+    const registered = new Set(registry.projects.map((entry) => entry.projectId));
+
+    return folders
+      .filter(({ manifest }) => !registered.has(manifest.id))
+      .map(({ manifest }) => manifest.id)
+      .sort((left, right) => left.localeCompare(right));
   }
 
   async register(entry: {

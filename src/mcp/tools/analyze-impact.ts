@@ -257,7 +257,8 @@ async function buildCrossRepoImpact(
   ctx: MCPContext,
   resourceId: string
 ): Promise<CrossRepoImpactOutput | undefined> {
-  const snapshot = await loadFleetSnapshot(ctx, { persist: true });
+  /* Read-only: impact analysis never publishes Fleet state as a side effect. */
+  const snapshot = await loadFleetSnapshot(ctx, { persist: false });
 
   if (!snapshot) {
     return undefined;

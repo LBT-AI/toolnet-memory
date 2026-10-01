@@ -38,6 +38,8 @@ const entries = {
   impact: 'src/code-intelligence/test-impact.ts',
 
   'full-index': 'src/production/full-index.ts',
+  'fleet-cli': 'src/production/fleet-cli.ts',
+  'wiki-cli': 'src/production/wiki-cli.ts',
   doctor: 'src/production/doctor.ts',
   'auto-integrate': 'src/production/auto-integrate.ts',
   mcp: 'src/mcp/bootstrap.ts',
