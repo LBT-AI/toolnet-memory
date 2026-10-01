@@ -24,10 +24,63 @@ export interface IntegrationCapabilities {
   level: IntegrationMemoryLevel;
 }
 
+export type IntegrationCaptureMode = 'hook' | 'manual-sync' | 'mcp-only';
+
 export interface AgentIntegrationCapabilities extends IntegrationCapabilities {
   agent: SupportedIntegrationAgent;
   refreshMode: IntegrationRefreshMode;
+
+  /**
+   * How session events actually reach ToolNet. Distinct from refreshMode:
+   * a native-lifecycle host may still require an explicit sync command.
+   */
+  captureMode: IntegrationCaptureMode;
 }
+
+/**
+ * Native lifecycle events a hook integration must register. Empty for
+ * manual-sync and mcp-only integrations.
+ */
+export const REQUIRED_HOOK_EVENTS: Readonly<Record<SupportedIntegrationAgent, readonly string[]>> =
+  {
+    claude: ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop'],
+    cursor: [
+      'sessionStart',
+      'beforeSubmitPrompt',
+      'preToolUse',
+      'postToolUse',
+      'afterAgentResponse',
+      'stop',
+    ],
+    copilot: [
+      'sessionStart',
+      'userPromptSubmitted',
+      'userPromptTransformed',
+      'preToolUse',
+      'postToolUse',
+      'agentStop',
+    ],
+    grok: ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'],
+    kiro: ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop'],
+    opencode: [],
+    codex: [],
+    agy: [],
+    'toolnet-cli': [],
+    kilo: [],
+  };
+
+const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptureMode>> = {
+  claude: 'hook',
+  cursor: 'hook',
+  copilot: 'hook',
+  grok: 'hook',
+  kiro: 'hook',
+  opencode: 'manual-sync',
+  codex: 'manual-sync',
+  agy: 'manual-sync',
+  'toolnet-cli': 'manual-sync',
+  kilo: 'mcp-only',
+};
 
 export const MCP_ONLY_CAPABILITIES: IntegrationCapabilities = {
   mcp: true,
@@ -81,7 +134,16 @@ function profile(
     agent,
     ...capabilities,
     refreshMode,
+    captureMode: CAPTURE_MODES[agent],
   };
+}
+
+export function integrationCaptureModeFor(agent: string): IntegrationCaptureMode | undefined {
+  return isSupportedIntegrationAgent(agent) ? CAPTURE_MODES[agent] : undefined;
+}
+
+export function requiredHookEventsFor(agent: string): readonly string[] {
+  return isSupportedIntegrationAgent(agent) ? REQUIRED_HOOK_EVENTS[agent] : [];
 }
 
 export const AGENT_INTEGRATION_CAPABILITIES: Readonly<
@@ -111,6 +173,20 @@ export function integrationCapabilitiesForAgent(
   }
   return AGENT_INTEGRATION_CAPABILITIES[agent];
 }
+
+/** All supported integration agents in stable order. */
+export const SUPPORTED_INTEGRATION_AGENTS: readonly SupportedIntegrationAgent[] = [
+  'claude',
+  'cursor',
+  'copilot',
+  'grok',
+  'kiro',
+  'opencode',
+  'codex',
+  'agy',
+  'toolnet-cli',
+  'kilo',
+] as const;
 
 export function integrationCapabilityLabel(agent: string): string {
   const capabilities = integrationCapabilitiesForAgent(agent);

@@ -10,12 +10,17 @@ export interface InstallClaudeHooksOptions {
   settingsFile?: string;
 
   binary?: string;
+
+  /** Plan the change without writing anything (read-only repair preview). */
+  dryRun?: boolean;
 }
 
 export interface InstallClaudeHooksResult {
   settingsFile: string;
 
   changed: boolean;
+
+  dryRun?: boolean;
 }
 
 function isObject(value: unknown): value is JsonObject {
@@ -217,6 +222,16 @@ export function installClaudeHooks(
       settingsFile,
 
       changed: false,
+    };
+  }
+
+  if (options.dryRun === true) {
+    return {
+      settingsFile,
+
+      changed: true,
+
+      dryRun: true,
     };
   }
 

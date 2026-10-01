@@ -12,6 +12,9 @@ export interface InstallClaudeMcpOptions {
   binary?: string;
 
   serverName?: string;
+
+  /** Plan the change without writing anything (read-only repair preview). */
+  dryRun?: boolean;
 }
 
 export interface InstallClaudeMcpResult {
@@ -26,6 +29,8 @@ export interface InstallClaudeMcpResult {
   command: string[];
 
   repaired: boolean;
+
+  dryRun?: boolean;
 }
 
 function isObject(value: unknown): value is JsonObject {
@@ -146,6 +151,24 @@ export function installClaudeMcp(options: InstallClaudeMcpOptions = {}): Install
 
     args: ['mcp'],
   };
+
+  if (options.dryRun === true) {
+    return {
+      installed: true,
+
+      changed: true,
+
+      configFile,
+
+      serverName,
+
+      command: [binary, 'mcp'],
+
+      repaired,
+
+      dryRun: true,
+    };
+  }
 
   atomicWrite(configFile, {
     ...root,

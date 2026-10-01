@@ -8,6 +8,9 @@ export interface InstallClaudeIntegrationOptions {
   settingsFile?: string;
 
   stateFile?: string;
+
+  /** Read-only repair preview: report intended changes without writing. */
+  dryRun?: boolean;
 }
 
 export function installClaudeIntegration(options: InstallClaudeIntegrationOptions = {}) {
@@ -17,12 +20,16 @@ export function installClaudeIntegration(options: InstallClaudeIntegrationOption
     binary,
 
     settingsFile: options.settingsFile,
+
+    ...(options.dryRun !== undefined ? { dryRun: options.dryRun } : {}),
   });
 
   const mcp = installClaudeMcp({
     binary,
 
     stateFile: options.stateFile,
+
+    ...(options.dryRun !== undefined ? { dryRun: options.dryRun } : {}),
   });
 
   return {
