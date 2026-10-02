@@ -91,6 +91,28 @@ const entries = {
   context: 'src/work-continuity/context-cli.ts',
   'context-runtime': 'src/work-continuity/context-runtime-cli.ts',
 
+  goose: 'src/session/goose/cli.ts',
+  'goose-hook': 'src/session/goose/hook.ts',
+  qwen: 'src/session/qwen/cli.ts',
+  'qwen-hook': 'src/session/qwen/hook.ts',
+  kimi: 'src/session/kimi/cli.ts',
+  'kimi-hook': 'src/session/kimi/hook.ts',
+  hermes: 'src/session/hermes/cli.ts',
+  'hermes-hook': 'src/session/hermes/hook.ts',
+  qoder: 'src/session/qoder/cli.ts',
+  'qoder-hook': 'src/session/qoder/hook.ts',
+
+  aider: 'src/session/aider/cli.ts',
+  plandex: 'src/session/plandex/cli.ts',
+  openrouter: 'src/session/openrouter/cli.ts',
+  bob: 'src/session/bob/cli.ts',
+  'bob-hook': 'src/session/bob/hook.ts',
+  cline: 'src/session/cline/cli.ts',
+  'cline-hook': 'src/session/cline/hook.ts',
+  rovo: 'src/session/rovo/cli.ts',
+  'rovo-hook': 'src/session/rovo/hook.ts',
+  warp: 'src/session/warp/cli.ts',
+
   // Shimmer progress worker (must be separate entry for Worker thread)
   'shimmer-worker': 'src/production/ui/shimmer-worker.ts',
 };

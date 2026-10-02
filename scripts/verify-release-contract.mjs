@@ -75,6 +75,90 @@ const EXPECTED_AGENTS = {
     bundle: 'kilo.js',
     command: 'integrate:kilo',
   },
+
+  goose: {
+    displayName: 'goose',
+    refreshMode: 'native-lifecycle',
+    bundle: 'goose.js',
+    command: 'integrate:goose',
+  },
+
+  qwen: {
+    displayName: 'Qwen Code',
+    refreshMode: 'native-lifecycle',
+    bundle: 'qwen.js',
+    command: 'integrate:qwen',
+  },
+
+  kimi: {
+    displayName: 'Kimi Code CLI',
+    refreshMode: 'native-lifecycle',
+    bundle: 'kimi.js',
+    command: 'integrate:kimi',
+  },
+
+  hermes: {
+    displayName: 'Hermes Agent',
+    refreshMode: 'native-lifecycle',
+    bundle: 'hermes.js',
+    command: 'integrate:hermes',
+  },
+
+  qoder: {
+    displayName: 'Qoder CLI',
+    refreshMode: 'native-lifecycle',
+    bundle: 'qoder.js',
+    command: 'integrate:qoder',
+  },
+
+  aider: {
+    displayName: 'Aider',
+    refreshMode: 'managed-wrapper',
+    bundle: 'aider.js',
+    command: 'integrate:aider',
+  },
+
+  plandex: {
+    displayName: 'Plandex',
+    refreshMode: 'native-session',
+    bundle: 'plandex.js',
+    command: 'integrate:plandex',
+  },
+
+  openrouter: {
+    displayName: 'OpenRouter CLI',
+    refreshMode: 'blocked',
+    bundle: 'openrouter.js',
+    command: 'integrate:openrouter',
+  },
+
+  bob: {
+    displayName: 'IBM Bob Shell',
+    refreshMode: 'native-lifecycle',
+    bundle: 'bob.js',
+    command: 'integrate:bob',
+  },
+
+  cline: {
+    displayName: 'Cline CLI',
+    refreshMode: 'native-lifecycle',
+    bundle: 'cline.js',
+    command: 'integrate:cline',
+  },
+
+  rovo: {
+    displayName: 'Rovo Dev CLI',
+    refreshMode: 'native-lifecycle',
+    bundle: 'rovo.js',
+    command: 'integrate:rovo',
+  },
+
+  warp: {
+    displayName: 'Warp Agent CLI',
+    refreshMode: 'blocked',
+    bundle: 'warp.js',
+    command: 'integrate:warp',
+  },
 };
 
 let failures = 0;
@@ -321,7 +405,7 @@ absent('stale MEMORY_AUTO_SUMMARIZE removed', envExample, 'MEMORY_AUTO_SUMMARIZE
 console.log('');
 console.log('=== README CONTRACT ===');
 
-contains('README 10-agent wording', readme, '10-agent continuity ring');
+  contains('README 22-agent wording', readme, '22-agent continuity ring');
 
 for (const { displayName } of Object.values(EXPECTED_AGENTS)) {
   contains(`README agent ${displayName}`, readme, displayName);

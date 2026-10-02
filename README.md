@@ -183,15 +183,15 @@ Warp Agent CLI
 
 Integration capability depends on what the host application actually exposes:
 
-| Capability                 | Agents                                                                                      |
-| -------------------------- | ------------------------------------------------------------------------------------------- |
+| Capability                 | Agents                                                                                                                              |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build, IBM Bob Shell, Cline CLI, Rovo Dev CLI |
-| Persistent plugin refresh  | OpenCode                                                                                    |
-| Managed wrapper            | Aider                                                                                       |
-| Native session capture     | ToolNet CLI                                                                                 |
-| Manual recovery            | Plandex                                                                                     |
-| MCP continuity             | Kilo                                                                                        |
-| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no native hook system)         |
+| Persistent plugin refresh  | OpenCode                                                                                                                            |
+| Managed wrapper            | Aider                                                                                                                               |
+| Native session capture     | ToolNet CLI                                                                                                                         |
+| Manual recovery            | Plandex                                                                                                                             |
+| MCP continuity             | Kilo                                                                                                                                |
+| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no native hook system)                                                |
 
 ToolNet does not report lifecycle support unless the host exposes a genuine lifecycle integration.
 

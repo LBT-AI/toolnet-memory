@@ -64,6 +64,54 @@
     "kilo": {
       "displayName": "Kilo",
       "refreshMode": "mcp-only"
+    },
+    "goose": {
+      "displayName": "goose",
+      "refreshMode": "native-lifecycle"
+    },
+    "qwen": {
+      "displayName": "Qwen Code",
+      "refreshMode": "native-lifecycle"
+    },
+    "kimi": {
+      "displayName": "Kimi Code CLI",
+      "refreshMode": "native-lifecycle"
+    },
+    "hermes": {
+      "displayName": "Hermes Agent",
+      "refreshMode": "native-lifecycle"
+    },
+    "qoder": {
+      "displayName": "Qoder CLI",
+      "refreshMode": "native-lifecycle"
+    },
+    "aider": {
+      "displayName": "Aider",
+      "refreshMode": "managed-wrapper"
+    },
+    "plandex": {
+      "displayName": "Plandex",
+      "refreshMode": "native-session"
+    },
+    "openrouter": {
+      "displayName": "OpenRouter CLI",
+      "refreshMode": "blocked"
+    },
+    "bob": {
+      "displayName": "IBM Bob Shell",
+      "refreshMode": "native-lifecycle"
+    },
+    "cline": {
+      "displayName": "Cline CLI",
+      "refreshMode": "native-lifecycle"
+    },
+    "rovo": {
+      "displayName": "Rovo Dev CLI",
+      "refreshMode": "native-lifecycle"
+    },
+    "warp": {
+      "displayName": "Warp Agent CLI",
+      "refreshMode": "blocked"
     }
   },
   "releasePolicy": {
