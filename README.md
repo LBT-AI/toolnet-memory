@@ -154,29 +154,44 @@ v0.5.2 completes the intent-aware retrieval roadmap and promotes the retrieval r
 
 ## Supported Coding Agents
 
-ToolNet Memory currently supports a 10-agent continuity ring:
+ToolNet Memory currently supports a 22-agent continuity ring:
 
 ```text
-Agy / Antigravity
-OpenCode
-Codex
 Claude Code
-Kiro CLI
 Cursor CLI
 GitHub Copilot CLI
 Grok Build
+Kiro CLI
+OpenCode
+Codex
+Agy / Antigravity
 ToolNet CLI
 Kilo
+goose
+Qwen Code
+Kimi Code CLI
+Hermes Agent
+Qoder CLI
+Aider
+Plandex
+OpenRouter CLI
+IBM Bob Shell
+Cline CLI
+Rovo Dev CLI
+Warp Agent CLI
 ```
 
 Integration capability depends on what the host application actually exposes:
 
 | Capability                 | Agents                                                                                      |
 | -------------------------- | ------------------------------------------------------------------------------------------- |
-| Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build |
+| Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build, IBM Bob Shell, Cline CLI, Rovo Dev CLI |
 | Persistent plugin refresh  | OpenCode                                                                                    |
+| Managed wrapper            | Aider                                                                                       |
 | Native session capture     | ToolNet CLI                                                                                 |
+| Manual recovery            | Plandex                                                                                     |
 | MCP continuity             | Kilo                                                                                        |
+| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no native hook system)         |
 
 ToolNet does not report lifecycle support unless the host exposes a genuine lifecycle integration.
 
@@ -362,6 +377,18 @@ toolnet-memory integrate:copilot
 toolnet-memory integrate:grok
 toolnet-memory integrate:toolnet-cli
 toolnet-memory integrate:kilo
+toolnet-memory integrate:goose
+toolnet-memory integrate:qwen
+toolnet-memory integrate:kimi
+toolnet-memory integrate:hermes
+toolnet-memory integrate:qoder
+toolnet-memory integrate:aider
+toolnet-memory integrate:plandex
+toolnet-memory integrate:openrouter
+toolnet-memory integrate:bob
+toolnet-memory integrate:cline
+toolnet-memory integrate:rovo
+toolnet-memory integrate:warp
 ```
 
 ---
@@ -626,6 +653,163 @@ toolnet-memory integrate:kiro --status
 ```
 
 Kiro receives ToolNet continuity through the shared memory core and does not maintain a separate memory database.
+
+---
+
+## goose
+
+goose integrates through native lifecycle hooks (`SessionEnd`, `Stop`):
+
+```bash
+toolnet-memory integrate:goose
+toolnet-memory integrate:goose --status
+```
+
+ToolNet preserves existing goose hooks and writes only ToolNet-owned entries into the goose hooks configuration.
+
+---
+
+## Qwen Code
+
+Qwen Code integrates through native lifecycle hooks (`SessionEnd`, `Stop`):
+
+```bash
+toolnet-memory integrate:qwen
+toolnet-memory integrate:qwen --status
+```
+
+ToolNet preserves existing Qwen hooks and writes only ToolNet-owned entries into the Qwen hooks configuration.
+
+---
+
+## Kimi Code CLI
+
+Kimi Code CLI integrates through native TOML lifecycle hooks (`SessionEnd`, `Stop`):
+
+```bash
+toolnet-memory integrate:kimi
+toolnet-memory integrate:kimi --status
+```
+
+ToolNet preserves existing Kimi hooks and writes only ToolNet-owned entries into `~/.kimi-code/config.toml`.
+
+---
+
+## Hermes Agent
+
+Hermes Agent integrates through native lifecycle hooks (`on_session_end`):
+
+```bash
+toolnet-memory integrate:hermes
+toolnet-memory integrate:hermes --status
+```
+
+ToolNet preserves existing Hermes hooks and writes only ToolNet-owned entries into the Hermes config.
+
+---
+
+## Qoder CLI
+
+Qoder CLI integrates through native lifecycle hooks (`SessionEnd`, `Stop`):
+
+```bash
+toolnet-memory integrate:qoder
+toolnet-memory integrate:qoder --status
+```
+
+ToolNet preserves existing Qoder hooks and writes only ToolNet-owned entries into the Qoder settings.
+
+---
+
+## Aider
+
+Aider integrates through a managed wrapper that captures session data at session end:
+
+```bash
+toolnet-memory integrate:aider
+toolnet-memory integrate:aider --status
+```
+
+The wrapper launches Aider with a unique ToolNet-managed chat history file and captures only new session delta after the session ends.
+
+---
+
+## Plandex
+
+Plandex currently supports manual recovery only:
+
+```bash
+toolnet-memory integrate:plandex
+toolnet-memory integrate:plandex --status
+toolnet-memory session:plandex-recover --project /path/to/project
+```
+
+Automatic capture is not yet available because Plandex plan state and session identity are not exposed through a stable verified native lifecycle hook.
+
+---
+
+## OpenRouter CLI
+
+OpenRouter CLI product identity is currently unresolved. ToolNet does not auto-install an integration for an unidentified product.
+
+```bash
+toolnet-memory integrate:openrouter
+toolnet-memory integrate:openrouter --status
+```
+
+If an official standalone OpenRouter CLI is released, this entry can be upgraded from `blocked-product-identity`.
+
+---
+
+## IBM Bob Shell
+
+IBM Bob Shell integrates through native lifecycle hooks (`Stop`, `SessionStart`):
+
+```bash
+toolnet-memory integrate:bob
+toolnet-memory integrate:bob --status
+```
+
+Bob's `Stop` hook fires after the final turn and sends JSON on stdin containing `event` and `session_id`. ToolNet writes a static hook command into Bob's settings and never mutates Bob's native session history.
+
+---
+
+## Cline CLI
+
+Cline CLI integrates through native file hooks (`TaskStart`, `TaskComplete`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`):
+
+```bash
+toolnet-memory integrate:cline
+toolnet-memory integrate:cline --status
+```
+
+ToolNet creates hook scripts in `.cline/hooks/` or `~/Documents/Cline/Hooks/` and captures only new session delta on task boundaries.
+
+---
+
+## Rovo Dev CLI
+
+Rovo Dev CLI integrates through native event hooks (`on_tool_permission`, session-end-like events):
+
+```bash
+toolnet-memory integrate:rovo
+toolnet-memory integrate:rovo --status
+```
+
+Rovo event hooks are currently a preview/experimental feature. ToolNet preserves existing Rovo config and writes only ToolNet-owned hook entries. Automatic capture is functional but may change when Atlassian stabilizes the hook API.
+
+---
+
+## Warp Agent CLI
+
+Warp Agent CLI is currently `blocked-capability`. Warp tracks external CLI agents via OSC 777, but no official standalone lifecycle hook system for the Warp Agent CLI itself has been found.
+
+```bash
+toolnet-memory integrate:warp
+toolnet-memory integrate:warp --status
+```
+
+Do not rely on automatic capture for Warp until a verified native hook or wrapper contract is available.
 
 ---
 
