@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-const VERSION = '0.3.16';
+const VERSION = '0.6.2';
 let failures = 0;
 function pass(label) {
   console.log(`PASS  ${label}`);
@@ -48,7 +48,7 @@ function absent(label, text, needle) {
   }
   fail(label, `unexpected=${needle}`);
 }
-console.log('=== ToolNet Memory v0.3.16 Feature Contract ===');
+console.log('=== ToolNet Memory v0.6.2 Feature Contract ===');
 const pkg = json('package.json');
 const lock = json('package-lock.json');
 const manifest = json('release-manifest.json');
@@ -134,7 +134,7 @@ exact(
   true
 );
 contains('runtime truth local code search', runtimeTruth, 'Local Code Search — SQLite FTS5/BM25');
-contains('runtime truth Python unsupported', runtimeTruth, '| Python `.py` | unsupported |');
+contains('runtime truth Python supported', runtimeTruth, '| Python `.py`         | supported | supported  | tree-sitter             |');
 contains(
   'runtime truth cross-machine identity',
   runtimeTruth,

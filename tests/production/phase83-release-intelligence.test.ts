@@ -1341,11 +1341,10 @@ describe('Phase 83 — real current worktree release audit', () => {
     const mcp = current.compatibility.comparisons.find((c) => c.surface === 'mcp_tool');
 
     expect(mcp).toBeDefined();
-    expect(mcp?.compatibleChanges.map((c) => c.identity)).toContain('release_readiness');
-    expect(mcp?.compatibleChanges.map((c) => c.identity)).toContain('select_tests');
-    expect(mcp?.compatibleChanges.map((c) => c.identity)).toContain('run_selected_tests');
-    expect(mcp?.compatibleChanges.map((c) => c.identity)).toContain('test_run_status');
     expect(mcp?.breakingChanges).toEqual([]);
+    /* v0.6.2 does not introduce new MCP tool identities; the additive
+     * capability delta lives in the integration matrix, not the MCP surface. */
+    expect(mcp?.compatibleChanges.map((c) => c.identity)).toEqual([]);
   });
 });
 

@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.6.1**
+Current release: **v0.6.2**
 
 </div>
 
@@ -34,7 +34,7 @@ ToolNet Memory is **not a raw transcript dump**. Raw session history is kept sep
 
 Memory promotion, retrieval, conflict handling, and continuity decisions are deterministic and local. ToolNet Memory does not require an LLM or embedding provider for its memory runtime.
 
-### v0.3.15 hardening
+### v0.3.15 Hardening
 
 v0.3.15 strengthens the existing local-first architecture without adding an LLM, embedding provider, vector database, or encryption-key requirement.
 
@@ -46,7 +46,8 @@ v0.3.15 strengthens the existing local-first architecture without adding an LLM,
 - Secret Scanner v2 and one durable-data sanitization contract.
 - Strict existing-project resolution for read/query commands.
 - Repository instruction content is treated as untrusted project data rather than system authority.
-  Garbage collection is non-destructive by default:
+
+Garbage collection is non-destructive by default:
 
 ```bash
 toolnet-memory gc
@@ -78,6 +79,7 @@ v0.4.0 adds a durable project-shared Task execution layer for coding agents.
 ### v0.5.1 Persistent Tasks GA + Memory Quality
 
 v0.5.1 completes the production Persistent Tasks architecture and the Memory Quality roadmap.
+
 Persistent Tasks:
 
 - Provider-native plan/TODO mirroring into one canonical Task system.
@@ -92,7 +94,9 @@ Persistent Tasks:
 - Replication conflict explainability with `task:conflicts --explain`.
 - Crash recovery and Task projection self-healing.
 - Three-host divergence/convergence and restart E2E certification.
-  Memory Quality:
+
+Memory Quality:
+
 - Explicit long-term rule vs observation/history scope.
 - Timestamps, confidence, verification state, and derived freshness.
 - Task-first Current Work Projection v2.
@@ -102,7 +106,9 @@ Persistent Tasks:
 - Read-only `memory:review` quality inspection.
 - Memory Quality and active Artifact Path health in `doctor`.
 - Stale historical work remains searchable but is not automatically injected as current work.
-  Architecture:
+
+Architecture:
+
 - `docs/architecture.md` documents Session WAL → Task Mirror → Persistent Task Core → Replication → Current Work → CLI/MCP.
 - Persistent Tasks remain execution authority.
 - Current Work and Task `state.json` remain rebuildable projections rather than independent sources of truth.
@@ -136,6 +142,15 @@ v0.5.2 completes the intent-aware retrieval roadmap and promotes the retrieval r
 - Remote restore is additive and never deletes newer immutable operations.
 - Production certification now includes the Phase 67 disaster-recovery gate.
 
+### v0.6.2 Extended Agent Integrations
+
+- Adds 22-agent release/package contract with truthful capability modes.
+- Adds native lifecycle integrations for goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, IBM Bob Shell, Cline CLI, and Rovo Dev CLI.
+- Adds managed-wrapper capture for Aider and manual-sync recovery for Plandex.
+- Adds OpenRouter CLI capability entry and Warp Agent CLI blocked-capability entry.
+- Hardens integration setup/repair, Wiki/Fleet state recovery, and session memory materialization.
+- Production certification expanded to the full 22-integration matrix.
+
 ### v0.6.1 Release Repair
 
 - Fixes npm 12 compatibility in the release package audit (`npm pack --json` now returns a name-keyed object), with normalized paths, duplicate detection and fail-closed behavior on malformed output.
@@ -167,7 +182,7 @@ Codex
 Agy / Antigravity
 ToolNet CLI
 Kilo
-goose
+Goose
 Qwen Code
 Kimi Code CLI
 Hermes Agent
@@ -181,7 +196,7 @@ Rovo Dev CLI
 Warp Agent CLI
 ```
 
-Integration capability depends on what the host application actually exposes:
+Integration capability depends on what each host application exposes:
 
 | Capability                 | Agents                                                                                                                              |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -191,9 +206,9 @@ Integration capability depends on what the host application actually exposes:
 | Native session capture     | ToolNet CLI                                                                                                                         |
 | Manual recovery            | Plandex                                                                                                                             |
 | MCP continuity             | Kilo                                                                                                                                |
-| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no native hook system)                                                |
+| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no verified native hook system)                                       |
 
-ToolNet does not report lifecycle support unless the host exposes a genuine lifecycle integration.
+ToolNet reports lifecycle support only when the host exposes a genuine lifecycle integration.
 
 A project can move between agents while keeping the same ToolNet work state and memory.
 
@@ -656,16 +671,16 @@ Kiro receives ToolNet continuity through the shared memory core and does not mai
 
 ---
 
-## goose
+## Goose
 
-goose integrates through native lifecycle hooks (`SessionEnd`, `Stop`):
+Goose integrates through native lifecycle hooks (`SessionEnd`, `Stop`):
 
 ```bash
 toolnet-memory integrate:goose
 toolnet-memory integrate:goose --status
 ```
 
-ToolNet preserves existing goose hooks and writes only ToolNet-owned entries into the goose hooks configuration.
+ToolNet preserves existing Goose hooks and writes only ToolNet-owned entries into the Goose hooks configuration.
 
 ---
 
@@ -736,7 +751,7 @@ The wrapper launches Aider with a unique ToolNet-managed chat history file and c
 
 ## Plandex
 
-Plandex currently supports manual recovery only:
+Plandex supports manual recovery:
 
 ```bash
 toolnet-memory integrate:plandex
@@ -744,13 +759,13 @@ toolnet-memory integrate:plandex --status
 toolnet-memory session:plandex-recover --project /path/to/project
 ```
 
-Automatic capture is not yet available because Plandex plan state and session identity are not exposed through a stable verified native lifecycle hook.
+Automatic capture is not available because Plandex plan state and session identity are not exposed through a stable verified native lifecycle hook.
 
 ---
 
 ## OpenRouter CLI
 
-OpenRouter CLI product identity is currently unresolved. ToolNet does not auto-install an integration for an unidentified product.
+OpenRouter CLI product identity is unresolved. ToolNet does not auto-install an integration for an unidentified product.
 
 ```bash
 toolnet-memory integrate:openrouter
@@ -796,7 +811,7 @@ toolnet-memory integrate:rovo
 toolnet-memory integrate:rovo --status
 ```
 
-Rovo event hooks are currently a preview/experimental feature. ToolNet preserves existing Rovo config and writes only ToolNet-owned hook entries. Automatic capture is functional but may change when Atlassian stabilizes the hook API.
+Rovo event hooks are a preview/experimental feature. ToolNet preserves existing Rovo config and writes only ToolNet-owned hook entries. Automatic capture is functional but may change when Atlassian stabilizes the hook API.
 
 ---
 

@@ -4,6 +4,48 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.6.2] - 2026-10-02
+
+### Added
+
+- Deterministic session-memory materialization on `SessionCore.flush()`.
+- Immediate `MemoryStore` visibility after supported capture.
+- Durable memory quality policy enforcement.
+- Session recovery and backfill.
+- Truthful capture/materialization status and `doctor` semantics.
+- Hardened integration setup/repair lifecycle.
+- Wiki/Fleet state recovery hardening.
+- Zero-touch OpenCode/Codex/Agy capture where supported.
+- Extended agent integrations: goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, Aider, Plandex, OpenRouter capability entry, IBM Bob Shell, Cline CLI, Rovo Dev CLI, Warp capability entry.
+- 22-agent release/package contract.
+
+### Changed
+
+- README integration matrix and capability documentation.
+- Production release certification expanded to 22-integration contract.
+- Bundle/package requirements include expanded integration bundles.
+- Release manifest and metadata for 22-agent release series.
+
+### Limitations
+
+- ToolNet CLI remains manual-sync until verified native lifecycle hook coverage is complete.
+- Plandex remains manual-sync because plan state and session identity are not exposed through a stable verified native lifecycle hook.
+- Kilo is MCP-only; no native session-capture path is provided.
+- Aider is a managed wrapper; capture depends on session-end behavior of the wrapper launcher.
+- OpenRouter CLI product identity remains unresolved; ToolNet does not auto-install an integration for an unidentified product.
+- Warp Agent CLI has no verified native hook system; capability entry documents the gap rather than claiming native automatic capture.
+- Rovo event hooks are a preview/experimental feature; automatic capture is functional but may change when Atlassian stabilizes the hook API.
+
+### Compatibility
+
+- Purely additive from v0.6.1: 0 public breaking changes across MCP tools, CLI commands, the daemon protocol, and the artifact schema.
+- Minor release: new integrations and hardening only, no breaking changes.
+
+### Known limitations
+
+- Native host binaries are optional and may be unavailable on the certification host.
+- The internal MCP server identity remains `0.1.0` and is non-authoritative (not a release version source).
+
 ## [0.6.1]
 
 ### Fixed

@@ -1,10 +1,10 @@
 /*
- * Phase 85D — Release metadata application for v0.6.1.
+ * Phase 85D — Release metadata application for v0.6.2.
  *
- * Verifies that every authoritative version source agrees on 0.6.1, that the
+ * Verifies that every authoritative version source agrees on 0.6.2, that the
  * release manifest declares source phase 84 / certification through Phase85B,
  * that the changelog and README reflect the release, that the packaged build
- * identity carries the 0.6.1 marker, that the MCP internal identity stays out
+ * identity carries the 0.6.2 marker, that the MCP internal identity stays out
  * of release truth, and that no tag or publish happened.
  *
  * Metadata-only: this suite never mutates release state.
@@ -27,7 +27,7 @@ import {
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.6.1';
+const VERSION = '0.6.2';
 
 function readJson(path: string): Record<string, any> {
   return JSON.parse(readFileSync(path, 'utf8')) as Record<string, any>;
@@ -46,7 +46,7 @@ const facts = buildReleaseFacts({
 });
 
 describe('Phase 85D — release metadata', () => {
-  it('synchronizes every authoritative version source to 0.6.1', () => {
+  it('synchronizes every authoritative version source to 0.6.2', () => {
     const pkg = readJson('package.json');
     const lock = readJson('package-lock.json');
     const manifest = readJson('release-manifest.json');
@@ -66,7 +66,7 @@ describe('Phase 85D — release metadata', () => {
 
     expect(engineering?.sourcePhase).toBe(84);
     expect(engineering?.certificationThrough).toBe('Phase85B');
-    expect(engineering?.releaseBaseline).toBe('v0.5.3');
+    expect(engineering?.releaseBaseline).toBe('v0.6.1');
     expect(engineering?.targetVersion).toBe(VERSION);
     expect(engineering?.additiveFromBaseline).toBe(true);
     expect(engineering?.publicBreakingChanges).toBe(0);
@@ -126,16 +126,16 @@ describe('Phase 85D — release metadata', () => {
     expect(report.warnings.map((warning) => warning.code)).not.toContain('RELEASE_MANIFEST_STALE');
   });
 
-  it('reflects v0.6.1 in the changelog and README current release', () => {
+  it('reflects v0.6.2 in the changelog and README current release', () => {
     const changelog = readFileSync('CHANGELOG.md', 'utf8');
     const readme = readFileSync('README.md', 'utf8');
 
-    expect(changelog).toContain('## [0.6.1]');
+    expect(changelog).toContain('## [0.6.2]');
     expect(changelog).toContain('### Compatibility');
     expect(changelog).toContain('### Known limitations');
 
-    expect(readme).toContain('Current release: **v0.6.1**');
-    expect(readme).toContain('### v0.6.1');
+    expect(readme).toContain('Current release: **v0.6.2**');
+    expect(readme).toContain('### v0.6.2');
   });
 
   it('leaves historical release entries untouched', () => {
@@ -155,7 +155,7 @@ describe('Phase 85D — release metadata', () => {
     expect(readme).toContain('### v0.5.3 Disaster Recovery');
   });
 
-  it('packages a build identity whose 0.6.1 marker matches the source digest', () => {
+  it('packages a build identity whose 0.6.2 marker matches the source digest', () => {
     const digest = runtimeSourceDigest(REPO_ROOT);
     const expectedMarker = `${VERSION}+${digest.slice(0, 16)}`;
 
@@ -195,7 +195,7 @@ describe('Phase 85D — release metadata', () => {
 
   it('never creates a release tag or an automatic publish step for the target', () => {
     /*
-     * Read-only. The authorized release tag must target the certified 0.6.1
+     * Read-only. The authorized release tag must target the certified 0.6.2
      * release commit — HEAD before any follow-up hardening commit, an ancestor
      * of HEAD afterwards. Tag creation and publishing always stay outside this
      * certification, and the tag is never automatic.
@@ -238,6 +238,6 @@ describe('Phase 85D — release metadata', () => {
   it('emits the Phase 85D PASS marker', () => {
     console.log('PHASE85D_RELEASE_METADATA=PASS');
 
-    expect(VERSION).toBe('0.6.1');
+    expect(VERSION).toBe('0.6.2');
   });
 });

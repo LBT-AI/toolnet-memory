@@ -1,7 +1,7 @@
 /*
  * Phase 85G — Release Commit certification.
  *
- * Certifies the v0.6.1 release commit itself: HEAD carries 0.6.1, the release
+ * Certifies the v0.6.2 release commit itself: HEAD carries 0.6.2, the release
  * metadata is committed, the release set is recorded with no unexpected paths,
  * the static release contract passes (including the `src/storage frozen` gate
  * that could only clear once the commit existed), source/bundle parity holds,
@@ -28,7 +28,7 @@ import {
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.6.1';
+const VERSION = '0.6.2';
 const PHASE85G_MARKER = 'PHASE85G_RELEASE_COMMIT=PASS';
 
 function git(args: string[]): { status: number; stdout: string } {
@@ -140,7 +140,15 @@ const PENDING_HARDENING_PATHS = new Set([
   'release-manifest.json',
   'README.md',
   'CHANGELOG.md',
+  'docs/runtime-truth.md',
+  'scripts/verify-v0316-contract.mjs',
+  'tests/production/phase83-release-intelligence.test.ts',
+  'tests/production/phase85d-release-metadata.test.ts',
+  'tests/production/phase85e-precommit-release.test.ts',
+  'tests/production/phase85g-release-commit.test.ts',
+  'tests/production/phase85j-final-release-repair.test.ts',
   'tests/production/phase85k-v061-release-recovery.test.ts',
+  'tests/production/phase85k-v062-release-recovery.test.ts',
 ]);
 
 function isPendingHardeningPath(path: string): boolean {
@@ -179,7 +187,7 @@ const report = runReleaseAnalysis({
  * ================================================================== */
 
 describe('Phase 85G — HEAD version truth', () => {
-  it('ships package version 0.6.1 at HEAD or in the pending release set', () => {
+  it('ships package version 0.6.2 at HEAD or in the pending release set', () => {
     expect(releaseSetPackageVersion()).toBe(VERSION);
 
     if (RELEASE_SET_COMMITTED) {
@@ -188,7 +196,7 @@ describe('Phase 85G — HEAD version truth', () => {
     } else {
       /* The release set is still pending: HEAD must still carry the previously
        * published release, never an arbitrary value. */
-      expect(headPackageVersion()).toBe('0.6.0');
+      expect(headPackageVersion()).toBe('0.6.1');
     }
   });
 
@@ -196,7 +204,7 @@ describe('Phase 85G — HEAD version truth', () => {
     if (!RELEASE_SET_COMMITTED) {
       /* The recovery commit does not exist yet, so HEAD is its future parent
        * and must carry the previous published release version. */
-      expect(headPackageVersion()).toBe('0.6.0');
+      expect(headPackageVersion()).toBe('0.6.1');
       return;
     }
 
@@ -208,7 +216,7 @@ describe('Phase 85G — HEAD version truth', () => {
     /* A shallow CI checkout carries no parent commit; when history is present
      * the release commit's parent must carry the previously published release
      * on the certified line — the v0.5.3 baseline for the 0.6.0 cut, or the
-     * preceding 0.6.x release for a recovery patch such as v0.6.1. */
+     * preceding 0.6.x release for a recovery patch such as v0.6.2. */
     if (git(['rev-parse', `${release}^`]).status === 0) {
       const parentPackage = JSON.parse(git(['show', `${release}^:package.json`]).stdout || '{}');
 
@@ -282,7 +290,7 @@ describe('Phase 85G — release metadata committed', () => {
         'bundle/mcp.js',
         'bundle/daemon-cli.js',
         'bundle/identity.js',
-        'tests/production/phase85k-v061-release-recovery.test.ts',
+        'tests/production/phase85k-v062-release-recovery.test.ts',
       ]) {
         expect(committed, path).toContain(path);
       }
@@ -426,7 +434,7 @@ describe('Phase 85G — source / bundle parity', () => {
     const digest = runtimeSourceDigest(REPO_ROOT);
     const expectedMarker = `${VERSION}+${digest.slice(0, 16)}`;
 
-    expect(expectedMarker.startsWith('0.6.1+')).toBe(true);
+    expect(expectedMarker.startsWith('0.6.2')).toBe(true);
     expect(readFileSync(join(REPO_ROOT, 'bundle', 'mcp.js'), 'utf8')).toContain(expectedMarker);
     expect(readFileSync(join(REPO_ROOT, 'bundle', 'identity.js'), 'utf8')).toContain(
       expectedMarker
@@ -449,7 +457,7 @@ describe('Phase 85G — source / bundle parity', () => {
  * ================================================================== */
 
 describe('Phase 85G — no tag, push or publish', () => {
-  it('never creates the v0.6.1 tag; any existing tag targets the release commit', () => {
+  it('never creates the v0.6.2 tag; any existing tag targets the release commit', () => {
     const tag = git(['tag', '--list', `v${VERSION}`]).stdout.trim();
 
     if (!tag) return;
