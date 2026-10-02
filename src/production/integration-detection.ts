@@ -38,7 +38,10 @@ export type AgentIntegrationId =
   | 'aider'
   | 'plandex'
   | 'openrouter'
-  | 'bob';
+  | 'bob'
+  | 'cline'
+  | 'rovo'
+  | 'warp';
 
 export interface AgentDetection {
   agent: AgentIntegrationId;
@@ -390,6 +393,36 @@ export function detectAgentIntegrations(
       commandExists,
 
       configPaths: [join(home, '.bob')],
+    }),
+
+    detectOne({
+      agent: 'cline',
+
+      command: 'cline',
+
+      commandExists,
+
+      configPaths: [join(home, '.cline')],
+    }),
+
+    detectOne({
+      agent: 'rovo',
+
+      command: 'rovo',
+
+      commandExists,
+
+      configPaths: [join(home, '.rovodev'), join(home, '.rovo')],
+    }),
+
+    detectOne({
+      agent: 'warp',
+
+      command: 'warp',
+
+      commandExists,
+
+      configPaths: [join(home, '.warp')],
     }),
   ];
 }

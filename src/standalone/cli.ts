@@ -396,6 +396,15 @@ async function main(): Promise<void> {
     case 'integrate:bob':
       await runModule(['install-hooks', ...args], () => import('../session/bob/cli.js'));
       return;
+    case 'integrate:cline':
+      await runModule(['install-hooks', ...args], () => import('../session/cline/cli.js'));
+      return;
+    case 'integrate:rovo':
+      await runModule(['install-hooks', ...args], () => import('../session/rovo/cli.js'));
+      return;
+    case 'integrate:warp':
+      await runModule(['status', ...args], () => import('../session/warp/cli.js'));
+      return;
     case 'session:goose-sync':
       await runModule(['sync', ...args], () => import('../session/goose/cli.js'));
       return;
@@ -446,6 +455,21 @@ async function main(): Promise<void> {
       return;
     case 'session:bob-recover':
       await runModule(['recover', ...args], () => import('../session/bob/cli.js'));
+      return;
+    case 'session:cline-hook':
+      await runModule(['hook', ...args], () => import('../session/cline/cli.js'));
+      return;
+    case 'session:cline-sync':
+      await runModule(['sync', ...args], () => import('../session/cline/cli.js'));
+      return;
+    case 'session:rovo-hook':
+      await runModule(['hook', ...args], () => import('../session/rovo/cli.js'));
+      return;
+    case 'session:rovo-sync':
+      await runModule(['sync', ...args], () => import('../session/rovo/cli.js'));
+      return;
+    case 'session:warp-status':
+      await runModule(['status', ...args], () => import('../session/warp/cli.js'));
       return;
     case 'memory:reconcile':
       await runModule(['reconcile', ...args], () => import('../session/learner/cli.js'));

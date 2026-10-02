@@ -403,6 +403,21 @@ export const COMMANDS: CommandMetadata[] = [
     category: 'integration',
   },
   {
+    name: 'integrate:cline',
+    description: 'Install Cline CLI integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:rovo',
+    description: 'Install Rovo Dev CLI integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:warp',
+    description: 'Warp Agent CLI product capability check',
+    category: 'integration',
+  },
+  {
     name: 'integrate:opencode',
     description: 'Install OpenCode plugin',
     category: 'integration',
@@ -610,6 +625,36 @@ export const COMMANDS: CommandMetadata[] = [
   {
     name: 'session:bob-recover',
     description: 'Recover IBM Bob Shell session',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:cline-hook',
+    description: 'Cline CLI lifecycle hook receiver',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:cline-sync',
+    description: 'Sync Cline CLI session',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:rovo-hook',
+    description: 'Rovo Dev CLI lifecycle hook receiver',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:rovo-sync',
+    description: 'Sync Rovo Dev CLI session',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:warp-status',
+    description: 'Warp Agent CLI product capability status',
     category: 'session',
     hidden: true,
   },

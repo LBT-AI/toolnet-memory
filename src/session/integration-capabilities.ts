@@ -1,7 +1,12 @@
-export type IntegrationMemoryLevel = 'mcp-only' | 'native-capture';
+export type IntegrationMemoryLevel = 'mcp-only' | 'native-capture' | 'blocked';
 
 export type IntegrationRefreshMode =
-  'native-lifecycle' | 'persistent-plugin' | 'native-session' | 'mcp-only' | 'managed-wrapper';
+  | 'native-lifecycle'
+  | 'persistent-plugin'
+  | 'native-session'
+  | 'mcp-only'
+  | 'managed-wrapper'
+  | 'blocked';
 
 export type SupportedIntegrationAgent =
   | 'agy'
@@ -22,7 +27,10 @@ export type SupportedIntegrationAgent =
   | 'aider'
   | 'plandex'
   | 'openrouter'
-  | 'bob';
+  | 'bob'
+  | 'cline'
+  | 'rovo'
+  | 'warp';
 
 export interface IntegrationCapabilities {
   mcp: boolean;
@@ -39,7 +47,8 @@ export type IntegrationCaptureMode =
   | 'native-auto-with-source-resolution'
   | 'manual-sync'
   | 'mcp-only'
-  | 'blocked-product-identity';
+  | 'blocked-product-identity'
+  | 'blocked-capability';
 
 export interface AgentIntegrationCapabilities extends IntegrationCapabilities {
   agent: SupportedIntegrationAgent;
@@ -91,6 +100,9 @@ export const REQUIRED_HOOK_EVENTS: Readonly<Record<SupportedIntegrationAgent, re
     plandex: [],
     openrouter: [],
     bob: ['Stop', 'SessionStart'],
+    cline: ['TaskComplete', 'TaskStart'],
+    rovo: ['on_tool_permission'],
+    warp: [],
   };
 
 const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptureMode>> = {
@@ -113,6 +125,9 @@ const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptu
   plandex: 'manual-sync',
   openrouter: 'blocked-product-identity',
   bob: 'hook',
+  cline: 'hook',
+  rovo: 'hook',
+  warp: 'blocked-capability',
 };
 
 export const MCP_ONLY_CAPABILITIES: IntegrationCapabilities = {
@@ -122,6 +137,15 @@ export const MCP_ONLY_CAPABILITIES: IntegrationCapabilities = {
   lifecycleHooks: false,
   sharedJournalWrite: false,
   level: 'mcp-only',
+};
+
+export const BLOCKED_CAPABILITIES: IntegrationCapabilities = {
+  mcp: true,
+  continuityRead: true,
+  nativeCapture: false,
+  lifecycleHooks: false,
+  sharedJournalWrite: false,
+  level: 'blocked',
 };
 
 /**
@@ -210,6 +234,9 @@ export const AGENT_INTEGRATION_CAPABILITIES: Readonly<
   plandex: profile('plandex', NATIVE_SESSION_IMPORT_CAPABILITIES, 'native-session'),
   openrouter: profile('openrouter', MCP_ONLY_CAPABILITIES, 'mcp-only'),
   bob: profile('bob', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  cline: profile('cline', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  rovo: profile('rovo', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  warp: profile('warp', BLOCKED_CAPABILITIES, 'blocked'),
 };
 
 export function isSupportedIntegrationAgent(agent: string): agent is SupportedIntegrationAgent {
@@ -246,6 +273,9 @@ export const SUPPORTED_INTEGRATION_AGENTS: readonly SupportedIntegrationAgent[] 
   'plandex',
   'openrouter',
   'bob',
+  'cline',
+  'rovo',
+  'warp',
 ] as const;
 
 export function integrationCapabilityLabel(agent: string): string {

@@ -77,6 +77,12 @@ import {
 
 import { installBobIntegration, type BobInstallOptions } from '../session/bob/installer.js';
 
+import { installClineIntegration, type ClineInstallOptions } from '../session/cline/installer.js';
+
+import { installRovoIntegration, type RovoInstallOptions } from '../session/rovo/installer.js';
+
+import { installWarpIntegration, type WarpInstallOptions } from '../session/warp/installer.js';
+
 import {
   resolveAutoIntegrationScope,
   type AutoIntegrationScopeResolution,
@@ -170,6 +176,12 @@ export function installAutoIntegrations(
     openrouter?: Omit<OpenRouterInstallOptions, 'binary'>;
 
     bob?: Omit<BobInstallOptions, 'binary'>;
+
+    cline?: Omit<ClineInstallOptions, 'binary'>;
+
+    rovo?: Omit<RovoInstallOptions, 'binary'>;
+
+    warp?: Omit<WarpInstallOptions, 'binary'>;
   } = {}
 ): AutoIntegrationResult[] {
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
@@ -1047,6 +1059,126 @@ export function installAutoIntegrations(
     }
   }
 
+  /*
+   * Cline CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('cline') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'cline',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const clineOptions = options.cline ?? {};
+
+        const cline = installClineIntegration({
+          ...clineOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'cline',
+          detected: true,
+          installed: true,
+          targets: [cline.hooksFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'cline',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Rovo Dev CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('rovo') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'rovo',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const rovoOptions = options.rovo ?? {};
+
+        const rovo = installRovoIntegration({
+          ...rovoOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'rovo',
+          detected: true,
+          installed: true,
+          targets: [rovo.configFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'rovo',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Warp Agent CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('warp') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'warp',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const warpOptions = options.warp ?? {};
+
+        const warp = installWarpIntegration({
+          ...warpOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'warp',
+          detected: true,
+          installed: true,
+          targets: [warp.configFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'warp',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
   return results;
 }
 
@@ -1108,6 +1240,15 @@ export function integrationDisplayName(agent: AgentIntegrationId): string {
 
     case 'bob':
       return 'IBM Bob Shell';
+
+    case 'cline':
+      return 'Cline CLI';
+
+    case 'rovo':
+      return 'Rovo Dev CLI';
+
+    case 'warp':
+      return 'Warp Agent CLI';
 
     default:
       return agent;

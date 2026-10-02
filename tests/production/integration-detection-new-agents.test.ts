@@ -261,7 +261,7 @@ describe('Phase 01: Cursor + Copilot + Grok detection', () => {
       commandExists: () => false,
     });
 
-    expect(result).toHaveLength(19);
+    expect(result).toHaveLength(22);
     expect(result.every((item) => !item.detected)).toBe(true);
   });
 });

@@ -27,3 +27,6 @@ export * from './aider/index.js';
 export * from './plandex/index.js';
 export * from './openrouter/index.js';
 export * from './bob/index.js';
+export * from './cline/index.js';
+export * from './rovo/index.js';
+export * from './warp/index.js';

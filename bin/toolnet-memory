@@ -804,6 +804,36 @@ case "$COMMAND" in
     exec "$TSX" "$ROOT/src/session/bob/cli.ts" install-hooks "$@"
     ;;
 
+  integrate:cline)
+    shift
+
+    if [ -f "$ROOT/bundle/cline.js" ]; then
+      exec node "$ROOT/bundle/cline.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/cline/cli.ts" install-hooks "$@"
+    ;;
+
+  integrate:rovo)
+    shift
+
+    if [ -f "$ROOT/bundle/rovo.js" ]; then
+      exec node "$ROOT/bundle/rovo.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/rovo/cli.ts" install-hooks "$@"
+    ;;
+
+  integrate:warp)
+    shift
+
+    if [ -f "$ROOT/bundle/warp.js" ]; then
+      exec node "$ROOT/bundle/warp.js" status "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/warp/cli.ts" status "$@"
+    ;;
+
   session:goose-sync)
     shift
 
@@ -972,6 +1002,56 @@ case "$COMMAND" in
     fi
 
     exec "$TSX" "$ROOT/src/session/bob/cli.ts" recover "$@"
+    ;;
+
+  session:cline-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/cline.js" ]; then
+      exec node "$ROOT/bundle/cline.js" hook "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/cline/cli.ts" hook "$@"
+    ;;
+
+  session:cline-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/cline.js" ]; then
+      exec node "$ROOT/bundle/cline.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/cline/cli.ts" sync "$@"
+    ;;
+
+  session:rovo-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/rovo.js" ]; then
+      exec node "$ROOT/bundle/rovo.js" hook "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/rovo/cli.ts" hook "$@"
+    ;;
+
+  session:rovo-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/rovo.js" ]; then
+      exec node "$ROOT/bundle/rovo.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/rovo/cli.ts" sync "$@"
+    ;;
+
+  session:warp-status)
+    shift
+
+    if [ -f "$ROOT/bundle/warp.js" ]; then
+      exec node "$ROOT/bundle/warp.js" status "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/warp/cli.ts" status "$@"
     ;;
 
   memory:reconcile)
