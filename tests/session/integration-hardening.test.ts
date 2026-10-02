@@ -178,6 +178,7 @@ describe('integration registry', () => {
       'aider',
       'plandex',
       'openrouter',
+      'bob',
     ]);
 
     for (const spec of PIPELINE_AGENTS) {

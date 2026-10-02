@@ -37,7 +37,8 @@ export type AgentIntegrationId =
   | 'qoder'
   | 'aider'
   | 'plandex'
-  | 'openrouter';
+  | 'openrouter'
+  | 'bob';
 
 export interface AgentDetection {
   agent: AgentIntegrationId;
@@ -379,6 +380,16 @@ export function detectAgentIntegrations(
       commandExists,
 
       configPaths: [join(home, '.openrouter')],
+    }),
+
+    detectOne({
+      agent: 'bob',
+
+      command: 'bob',
+
+      commandExists,
+
+      configPaths: [join(home, '.bob')],
     }),
   ];
 }

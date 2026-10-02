@@ -794,6 +794,16 @@ case "$COMMAND" in
     exec "$TSX" "$ROOT/src/session/openrouter/cli.ts" status "$@"
     ;;
 
+  integrate:bob)
+    shift
+
+    if [ -f "$ROOT/bundle/bob.js" ]; then
+      exec node "$ROOT/bundle/bob.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/bob/cli.ts" install-hooks "$@"
+    ;;
+
   session:goose-sync)
     shift
 
@@ -932,6 +942,36 @@ case "$COMMAND" in
     fi
 
     exec "$TSX" "$ROOT/src/session/openrouter/cli.ts" status "$@"
+    ;;
+
+  session:bob-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/bob.js" ]; then
+      exec node "$ROOT/bundle/bob.js" hook "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/bob/cli.ts" hook "$@"
+    ;;
+
+  session:bob-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/bob.js" ]; then
+      exec node "$ROOT/bundle/bob.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/bob/cli.ts" sync "$@"
+    ;;
+
+  session:bob-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/bob.js" ]; then
+      exec node "$ROOT/bundle/bob.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/bob/cli.ts" recover "$@"
     ;;
 
   memory:reconcile)

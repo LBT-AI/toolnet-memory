@@ -21,7 +21,8 @@ export type SupportedIntegrationAgent =
   | 'qoder'
   | 'aider'
   | 'plandex'
-  | 'openrouter';
+  | 'openrouter'
+  | 'bob';
 
 export interface IntegrationCapabilities {
   mcp: boolean;
@@ -89,6 +90,7 @@ export const REQUIRED_HOOK_EVENTS: Readonly<Record<SupportedIntegrationAgent, re
     aider: [],
     plandex: [],
     openrouter: [],
+    bob: ['Stop', 'SessionStart'],
   };
 
 const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptureMode>> = {
@@ -110,6 +112,7 @@ const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptu
   aider: 'managed-wrapper-session-end',
   plandex: 'manual-sync',
   openrouter: 'blocked-product-identity',
+  bob: 'hook',
 };
 
 export const MCP_ONLY_CAPABILITIES: IntegrationCapabilities = {
@@ -206,6 +209,7 @@ export const AGENT_INTEGRATION_CAPABILITIES: Readonly<
   aider: profile('aider', MANAGED_WRAPPER_CAPABILITIES, 'managed-wrapper'),
   plandex: profile('plandex', NATIVE_SESSION_IMPORT_CAPABILITIES, 'native-session'),
   openrouter: profile('openrouter', MCP_ONLY_CAPABILITIES, 'mcp-only'),
+  bob: profile('bob', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
 };
 
 export function isSupportedIntegrationAgent(agent: string): agent is SupportedIntegrationAgent {
@@ -241,6 +245,7 @@ export const SUPPORTED_INTEGRATION_AGENTS: readonly SupportedIntegrationAgent[] 
   'aider',
   'plandex',
   'openrouter',
+  'bob',
 ] as const;
 
 export function integrationCapabilityLabel(agent: string): string {

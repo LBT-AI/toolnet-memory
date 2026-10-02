@@ -63,7 +63,7 @@ describe('Kiro auto integration wiring', () => {
       },
     });
 
-    expect(results).toHaveLength(18);
+    expect(results).toHaveLength(19);
 
     const kiro = results.find((result): result is AutoIntegrationResult => result.agent === 'kiro');
 

@@ -393,6 +393,9 @@ async function main(): Promise<void> {
     case 'integrate:openrouter':
       await runModule(['status', ...args], () => import('../session/openrouter/cli.js'));
       return;
+    case 'integrate:bob':
+      await runModule(['install-hooks', ...args], () => import('../session/bob/cli.js'));
+      return;
     case 'session:goose-sync':
       await runModule(['sync', ...args], () => import('../session/goose/cli.js'));
       return;
@@ -434,6 +437,15 @@ async function main(): Promise<void> {
       return;
     case 'session:openrouter-status':
       await runModule(['status', ...args], () => import('../session/openrouter/cli.js'));
+      return;
+    case 'session:bob-hook':
+      await runModule(['hook', ...args], () => import('../session/bob/cli.js'));
+      return;
+    case 'session:bob-sync':
+      await runModule(['sync', ...args], () => import('../session/bob/cli.js'));
+      return;
+    case 'session:bob-recover':
+      await runModule(['recover', ...args], () => import('../session/bob/cli.js'));
       return;
     case 'memory:reconcile':
       await runModule(['reconcile', ...args], () => import('../session/learner/cli.js'));

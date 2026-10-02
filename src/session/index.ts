@@ -26,3 +26,4 @@ export * from './qoder/index.js';
 export * from './aider/index.js';
 export * from './plandex/index.js';
 export * from './openrouter/index.js';
+export * from './bob/index.js';

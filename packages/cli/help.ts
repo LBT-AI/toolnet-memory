@@ -398,6 +398,11 @@ export const COMMANDS: CommandMetadata[] = [
     category: 'integration',
   },
   {
+    name: 'integrate:bob',
+    description: 'Install IBM Bob Shell integration',
+    category: 'integration',
+  },
+  {
     name: 'integrate:opencode',
     description: 'Install OpenCode plugin',
     category: 'integration',
@@ -587,6 +592,24 @@ export const COMMANDS: CommandMetadata[] = [
   {
     name: 'session:openrouter-status',
     description: 'OpenRouter CLI product identity status',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:bob-hook',
+    description: 'IBM Bob Shell lifecycle hook receiver',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:bob-sync',
+    description: 'Sync IBM Bob Shell session',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:bob-recover',
+    description: 'Recover IBM Bob Shell session',
     category: 'session',
     hidden: true,
   },

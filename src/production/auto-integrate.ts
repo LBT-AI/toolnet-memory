@@ -75,6 +75,8 @@ import {
   type OpenRouterInstallOptions,
 } from '../session/openrouter/installer.js';
 
+import { installBobIntegration, type BobInstallOptions } from '../session/bob/installer.js';
+
 import {
   resolveAutoIntegrationScope,
   type AutoIntegrationScopeResolution,
@@ -166,6 +168,8 @@ export function installAutoIntegrations(
     plandex?: Omit<PlandexInstallOptions, 'binary'>;
 
     openrouter?: Omit<OpenRouterInstallOptions, 'binary'>;
+
+    bob?: Omit<BobInstallOptions, 'binary'>;
   } = {}
 ): AutoIntegrationResult[] {
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
@@ -1003,6 +1007,46 @@ export function installAutoIntegrations(
     }
   }
 
+  /*
+   * IBM Bob Shell
+   */
+  {
+    const isDetected = options.force === true || detected.get('bob') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'bob',
+        detected: false,
+        installed: false,
+        targets: [],
+      });
+    } else {
+      try {
+        const bobOptions = options.bob ?? {};
+
+        const bob = installBobIntegration({
+          ...bobOptions,
+          binary,
+        });
+
+        results.push({
+          agent: 'bob',
+          detected: true,
+          installed: true,
+          targets: [bob.settingsFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'bob',
+          detected: true,
+          installed: false,
+          targets: [],
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
   return results;
 }
 
@@ -1061,6 +1105,9 @@ export function integrationDisplayName(agent: AgentIntegrationId): string {
 
     case 'openrouter':
       return 'OpenRouter CLI';
+
+    case 'bob':
+      return 'IBM Bob Shell';
 
     default:
       return agent;
