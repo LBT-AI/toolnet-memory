@@ -154,8 +154,27 @@
     },
     "codeIntelligence": {
       "parserEngine": "typescript-compiler-api",
-      "treeSitterRuntime": false,
-      "supportedExtensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"],
+      "treeSitterRuntime": true,
+      "supportedExtensions": [
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".mts",
+        ".cts",
+        ".mjs",
+        ".cjs",
+        ".py",
+        ".go",
+        ".rs",
+        ".c",
+        ".h",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".hpp",
+        ".hh"
+      ],
       "tsconfigPaths": true,
       "baseUrlResolution": true,
       "projectReferences": true,
@@ -273,7 +292,7 @@
     "nonTsIntelligence": {
       "localCodeSearch": ["python", "go", "rust", "c", "cpp"],
       "engine": "sqlite-fts5-bm25",
-      "structuralParserSupport": false,
+      "structuralParserSupport": true,
       "lspFoundation": "detection-only",
       "automaticLspDownload": false
     },

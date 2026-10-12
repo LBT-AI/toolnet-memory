@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 
 import { Language, Parser, type Node } from 'web-tree-sitter';
 
@@ -108,12 +109,12 @@ export function createTreeSitterRuntime(config: TreeSitterRuntimeConfig): TreeSi
     };
   }
 
-  cachedRuntime = new TreeSitterRuntimeImpl(true, grammars);
+  cachedRuntime = new TreeSitterRuntimeImpl(Object.keys(grammars).length > 0, grammars);
   return cachedRuntime;
 }
 
 export function treeSitterRuntimeAvailable(): boolean {
-  return cachedRuntime?.available ?? false;
+  return cachedRuntime?.available === true;
 }
 
 export function getTreeSitterRuntime(): TreeSitterRuntime | null {
@@ -121,22 +122,67 @@ export function getTreeSitterRuntime(): TreeSitterRuntime | null {
 }
 
 /**
- * Resolve grammar wasm paths relative to the package root.
- * Uses process.cwd() to find node_modules.
+ * Grammar package + wasm asset per tree-sitter language.
+ *
+ * The wasm files ship inside the grammar npm packages (production
+ * dependencies), so they are installed beside toolnet-memory in every layout:
+ * source checkout, global `npm install -g`, or mirrored packaged runtime.
+ */
+const GRAMMAR_PACKAGES: Readonly<Record<string, { package: string; asset: string }>> = {
+  python: { package: 'tree-sitter-python', asset: 'tree-sitter-python.wasm' },
+  go: { package: 'tree-sitter-go', asset: 'tree-sitter-go.wasm' },
+  rust: { package: 'tree-sitter-rust', asset: 'tree-sitter-rust.wasm' },
+  c: { package: 'tree-sitter-c', asset: 'tree-sitter-c.wasm' },
+  cpp: { package: 'tree-sitter-cpp', asset: 'tree-sitter-cpp.wasm' },
+};
+
+/**
+ * Resolve one grammar wasm path from the installed package tree.
+ *
+ * Resolution is package-relative (via the importing module), never
+ * `process.cwd()`-relative: a globally installed CLI runs with the user's
+ * project as cwd, where no grammar assets exist.
+ */
+function resolveGrammarWasm(language: string): string | null {
+  const spec = GRAMMAR_PACKAGES[language];
+
+  if (!spec) {
+    return null;
+  }
+
+  try {
+    const require = createRequire(import.meta.url);
+    return require.resolve(`${spec.package}/${spec.asset}`);
+  } catch {
+    // fall through to legacy cwd-relative lookup below
+  }
+
+  const legacy = join(process.cwd(), 'node_modules', spec.package, spec.asset);
+  return existsSync(legacy) ? legacy : null;
+}
+
+/**
+ * Resolve grammar wasm paths relative to the installed packages.
  *
  * Grammar assets are package-owned and resolved offline. No grammar is ever
  * downloaded from the network during indexing.
+ *
+ * Languages whose asset cannot be resolved are absent from the map: a
+ * missing grammar must make the language unavailable rather than silently
+ * pretending structural support.
  */
 export function resolveGrammarWasmPaths(): Record<string, string> {
-  const cwd = process.cwd();
-  const nodeModules = join(cwd, 'node_modules');
-  return {
-    python: join(nodeModules, 'tree-sitter-python', 'tree-sitter-python.wasm'),
-    go: join(nodeModules, 'tree-sitter-go', 'tree-sitter-go.wasm'),
-    rust: join(nodeModules, 'tree-sitter-rust', 'tree-sitter-rust.wasm'),
-    c: join(nodeModules, 'tree-sitter-c', 'tree-sitter-c.wasm'),
-    cpp: join(nodeModules, 'tree-sitter-cpp', 'tree-sitter-cpp.wasm'),
-  };
+  const paths: Record<string, string> = {};
+
+  for (const language of Object.keys(GRAMMAR_PACKAGES)) {
+    const resolved = resolveGrammarWasm(language);
+
+    if (resolved) {
+      paths[language] = resolved;
+    }
+  }
+
+  return paths;
 }
 
 /**
@@ -167,12 +213,16 @@ export interface GrammarAssetStatus {
 /**
  * Deterministic grammar asset inventory used by both the runtime and the
  * parser fingerprint. No network access.
+ *
+ * Every known language is always listed: an unresolvable asset is reported
+ * as unavailable rather than hidden, so structural gaps stay visible.
  */
 export function verifyGrammarAssets(): GrammarAssetStatus[] {
-  return Object.entries(resolveGrammarWasmPaths())
-    .map(([language, wasmPath]) => {
-      const sha256 = hashGrammarAsset(wasmPath);
-      return { language, wasmPath, available: sha256 !== null, sha256 };
+  return Object.keys(GRAMMAR_PACKAGES)
+    .map((language) => {
+      const wasmPath = resolveGrammarWasm(language);
+      const sha256 = wasmPath ? hashGrammarAsset(wasmPath) : null;
+      return { language, wasmPath: wasmPath ?? '', available: sha256 !== null, sha256 };
     })
     .sort((left, right) => left.language.localeCompare(right.language));
 }
@@ -199,7 +249,7 @@ export function initializeTreeSitterRuntime(): TreeSitterRuntime | null {
     };
   }
 
-  cachedRuntime = new TreeSitterRuntimeImpl(true, grammars);
+  cachedRuntime = new TreeSitterRuntimeImpl(Object.keys(grammars).length > 0, grammars);
   return cachedRuntime;
 }
 

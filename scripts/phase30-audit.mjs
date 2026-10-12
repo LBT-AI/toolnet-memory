@@ -57,7 +57,7 @@ contains('rust-analyzer detection', lsp, 'rust-analyzer');
 contains('clangd detection', lsp, "'clangd'");
 absent('no language-server download', lsp, 'npm install');
 absent('no network downloader', lsp, 'fetch(');
-contains('docs structural limitation', docs, 'structural graph capability remains');
+contains('docs structural truth', docs, 'fails closed to lexical');
 contains('docs SQLite FTS5 BM25', docs, 'SQLite FTS5 / BM25');
 contains('docs LSP detection only', docs, 'capability detection only');
 

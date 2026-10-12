@@ -405,7 +405,7 @@ absent('stale MEMORY_AUTO_SUMMARIZE removed', envExample, 'MEMORY_AUTO_SUMMARIZE
 console.log('');
 console.log('=== README CONTRACT ===');
 
-  contains('README 22-agent wording', readme, '22-agent continuity ring');
+contains('README 22-agent wording', readme, '22-agent continuity ring');
 
 for (const { displayName } of Object.values(EXPECTED_AGENTS)) {
   contains(`README agent ${displayName}`, readme, displayName);
@@ -438,8 +438,79 @@ if (!envFiles.length) {
 }
 
 console.log('');
-console.log('=== FINAL CERTIFIER CONTRACT ===');
+console.log('=== PARSER TRUTH CONTRACT (Phase 86E.7A) ===');
 
+const parserCapabilities = read('src/code-intelligence/parsers/capabilities.ts');
+const treeSitterRuntime = read('src/code-intelligence/parsers/tree-sitter/runtime.ts');
+const upgradePorts = read('src/production/upgrade/ports.ts');
+
+exact(
+  'manifest treeSitterRuntime matches packaged runtime',
+  manifest?.hardening?.codeIntelligence?.treeSitterRuntime,
+  true
+);
+
+exact(
+  'manifest nonTs structuralParserSupport matches packaged runtime',
+  manifest?.hardening?.nonTsIntelligence?.structuralParserSupport,
+  true
+);
+
+const manifestExtensions = Array.isArray(manifest?.hardening?.codeIntelligence?.supportedExtensions)
+  ? manifest.hardening.codeIntelligence.supportedExtensions
+  : [];
+
+for (const extension of [
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mts',
+  '.cts',
+  '.mjs',
+  '.cjs',
+  '.py',
+  '.go',
+  '.rs',
+  '.c',
+  '.h',
+  '.cc',
+  '.cpp',
+  '.cxx',
+  '.hpp',
+  '.hh',
+]) {
+  if (manifestExtensions.includes(extension)) {
+    pass(`manifest supportedExtensions includes ${extension}`);
+  } else {
+    fail(`manifest supportedExtensions includes ${extension}`);
+  }
+}
+
+for (const dependency of [
+  'web-tree-sitter',
+  'tree-sitter-python',
+  'tree-sitter-go',
+  'tree-sitter-rust',
+  'tree-sitter-c',
+  'tree-sitter-cpp',
+]) {
+  if (pkg?.dependencies?.[dependency]) {
+    pass(`grammar runtime dependency: ${dependency}`);
+  } else {
+    fail(`grammar runtime dependency: ${dependency}`);
+  }
+}
+
+contains('canonical parser authority declares tree-sitter', parserCapabilities, "'tree-sitter'");
+contains('canonical parser authority declares python', parserCapabilities, "'python'");
+contains('canonical parser authority declares cpp', parserCapabilities, "'cpp'");
+contains('grammar resolution is package-relative', treeSitterRuntime, 'createRequire');
+contains('daemon restart timeout owner', upgradePorts, 'DEFAULT_DAEMON_RESTART_TIMEOUT_MS');
+contains('daemon restart timeout code', upgradePorts, 'UPGRADE_DAEMON_RESTART_TIMEOUT');
+
+console.log('');
+console.log('=== FINAL CERTIFIER CONTRACT ===');
 for (const gate of [
   'V0316_FEATURE_CONTRACT',
   'PROJECT_IDENTITY_AUDIT',

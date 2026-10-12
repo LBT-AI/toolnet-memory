@@ -16,6 +16,8 @@ import { tmpdir } from 'node:os';
 
 import { basename, dirname, join, resolve } from 'node:path';
 
+import { createRequire } from 'node:module';
+
 import { fileURLToPath } from 'node:url';
 import { parsePackManifestEntries } from '../code-intelligence/release/package-audit.js';
 import { certifyMemoryQualityGA } from './memory-quality-ga-certify.js';
@@ -336,6 +338,111 @@ function readManifestId(file: string): string | undefined {
   }
 }
 
+export interface PackagedParserGate {
+  passed: boolean;
+  detail?: string;
+}
+
+/**
+ * Phase 86E.7A — packaged parser release gate.
+ *
+ * A release fails certification when the manifest claims structural support
+ * but the packaged runtime cannot actually load the grammars. Resolution is
+ * anchored at the package (never `process.cwd()`), so this gate holds for
+ * global installs running from any project directory.
+ */
+export function certifyPackagedParserRuntime(
+  packageRoot = currentPackageRoot()
+): PackagedParserGate {
+  const fail = (detail: string): PackagedParserGate => ({ passed: false, detail });
+
+  let packageJson: { dependencies?: Record<string, string> };
+  let manifest: {
+    hardening?: {
+      codeIntelligence?: { treeSitterRuntime?: unknown; supportedExtensions?: unknown };
+      nonTsIntelligence?: { structuralParserSupport?: unknown };
+    };
+  };
+
+  try {
+    packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+    };
+  } catch {
+    return fail('package.json is unreadable.');
+  }
+
+  try {
+    manifest = JSON.parse(readFileSync(join(packageRoot, 'release-manifest.json'), 'utf8'));
+  } catch {
+    return fail('release-manifest.json is unreadable.');
+  }
+
+  if (manifest?.hardening?.codeIntelligence?.treeSitterRuntime !== true) {
+    return fail('release-manifest does not claim treeSitterRuntime=true.');
+  }
+
+  if (manifest?.hardening?.nonTsIntelligence?.structuralParserSupport !== true) {
+    return fail('release-manifest does not claim nonTs structuralParserSupport=true.');
+  }
+
+  const manifestExtensions = manifest?.hardening?.codeIntelligence?.supportedExtensions;
+  const requiredExtensions = [
+    '.py',
+    '.go',
+    '.rs',
+    '.c',
+    '.h',
+    '.cc',
+    '.cpp',
+    '.cxx',
+    '.hpp',
+    '.hh',
+  ];
+  const missingExtensions = Array.isArray(manifestExtensions)
+    ? requiredExtensions.filter((extension) => !manifestExtensions.includes(extension))
+    : requiredExtensions;
+  if (missingExtensions.length > 0) {
+    return fail(`release-manifest omits structural extensions: ${missingExtensions.join(', ')}.`);
+  }
+
+  const requiredDeps: Array<{ package: string; asset: string }> = [
+    { package: 'web-tree-sitter', asset: '' },
+    { package: 'tree-sitter-python', asset: 'tree-sitter-python.wasm' },
+    { package: 'tree-sitter-go', asset: 'tree-sitter-go.wasm' },
+    { package: 'tree-sitter-rust', asset: 'tree-sitter-rust.wasm' },
+    { package: 'tree-sitter-c', asset: 'tree-sitter-c.wasm' },
+    { package: 'tree-sitter-cpp', asset: 'tree-sitter-cpp.wasm' },
+  ];
+
+  const missingDeps = requiredDeps.filter(({ package: name }) => !packageJson.dependencies?.[name]);
+  if (missingDeps.length > 0) {
+    return fail(
+      `grammar runtime missing from dependencies: ${missingDeps.map((item) => item.package).join(', ')}.`
+    );
+  }
+
+  const packageRequire = createRequire(join(packageRoot, 'package.json'));
+  const missingAssets: string[] = [];
+  for (const { package: name, asset } of requiredDeps) {
+    if (!asset) {
+      continue;
+    }
+    try {
+      packageRequire.resolve(`${name}/${asset}`);
+    } catch {
+      missingAssets.push(`${name}/${asset}`);
+    }
+  }
+  if (missingAssets.length > 0) {
+    return fail(
+      `grammar assets do not resolve from the packaged tree: ${missingAssets.join(', ')}.`
+    );
+  }
+
+  return { passed: true };
+}
+
 function runPackagedRuntimeInit(packageRoot: string): RuntimeMirrorResult {
   const base = mkdtempSync(join(tmpdir(), 'toolnet-x3-runtime-'));
 
@@ -489,6 +596,8 @@ export async function certifyProductionReadiness(
 
   const packedValidation = validatePackedRuntimeFiles(packed.files);
 
+  const packagedParser = certifyPackagedParserRuntime(packageRoot);
+
   checks.push(
     check(
       'npm-package',
@@ -505,6 +614,15 @@ export async function certifyProductionReadiness(
         ]
           .filter(Boolean)
           .join('\n')
+    )
+  );
+
+  checks.push(
+    check(
+      'packaged-parser-runtime',
+      'packaged parser grammars resolve and manifest claims structural truth',
+      packagedParser.passed,
+      packagedParser.detail
     )
   );
 

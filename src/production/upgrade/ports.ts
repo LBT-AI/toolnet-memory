@@ -43,6 +43,14 @@ export interface RealUpgradePortsOptions {
   recoveryRoot?: string;
   /** Replace the daemon restart (tests inject a fake; production spawns the CLI). */
   restartDaemon?: () => Promise<void>;
+  /**
+   * Bound for the daemon restart child process.
+   *
+   * The upgrade orchestrator owns this timeout: it is the only layer that
+   * waits on the external daemon CLI child, so it is the only layer that may
+   * stop waiting. Unit tests inject a tiny value; production uses the default.
+   */
+  restartTimeoutMs?: number;
   /** Replace the derived rebuild (tests inject a fake). */
   rebuildDerived?: (kinds: readonly string[]) => Promise<void>;
   /**
@@ -58,19 +66,118 @@ export interface RealUpgradePortsOptions {
   verifyMigration?: (migrationId: string) => Promise<boolean>;
 }
 
-function runNode(entry: string, args: readonly string[]): Promise<void> {
+/**
+ * Run a daemon CLI command with a hard bound.
+ *
+ * TIMEOUT OWNER for the daemon restart wait: this is the only layer that
+ * waits on the external child, so it is the only layer that may stop
+ * waiting. Exported for focused regression tests; production callers go
+ * through `restartDaemonViaCli`.
+ */
+export function runDaemonCommand(
+  entry: string,
+  args: readonly string[],
+  timeoutMs: number
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [entry, ...args], { stdio: 'ignore' });
 
-    child.once('error', reject);
+    let settled = false;
+    let killTimer: NodeJS.Timeout | undefined;
 
-    child.once('close', (code) => {
-      if (code === 0) {
-        resolve();
+    const clearKillTimer = (): void => {
+      if (killTimer !== undefined) {
+        clearTimeout(killTimer);
+        killTimer = undefined;
+      }
+    };
+
+    const settleResolve = (): void => {
+      if (settled) {
         return;
       }
 
-      reject(new Error(`daemon command exited with code ${code ?? 'unknown'}`));
+      settled = true;
+      clearTimeout(timer);
+      clearKillTimer();
+      resolve();
+    };
+
+    const settleReject = (error: Error): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timer);
+      clearKillTimer();
+      reject(error);
+    };
+
+    /*
+     * Bounded wait: the daemon CLI restart can remain pending indefinitely
+     * (live sessions, wedged socket, hung child). Without this timer the
+     * `toolnet-memory update` UI would sit at 99% forever after the package
+     * already installed successfully.
+     *
+     * Cleanup kills only this direct child (no detached process group, no PID
+     * scan), so unrelated daemon processes are never at risk.
+     */
+    const timer = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+
+      try {
+        child.kill('SIGTERM');
+      } catch {
+        // best-effort: the child may already be gone
+      }
+
+      const SIGKILL_GRACE_MS = 2000;
+
+      killTimer = setTimeout(() => {
+        killTimer = undefined;
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // best-effort escalation only
+        }
+      }, SIGKILL_GRACE_MS);
+
+      killTimer.unref?.();
+
+      const timeout = new Error(
+        `daemon restart timed out after ${timeoutMs}ms; ` +
+          `the installed package was left as-is (no rollback) — retry with: toolnet-memory daemon:restart`
+      ) as Error & { code: 'UPGRADE_DAEMON_RESTART_TIMEOUT'; timeoutMs: number };
+
+      timeout.code = 'UPGRADE_DAEMON_RESTART_TIMEOUT';
+      timeout.timeoutMs = timeoutMs;
+
+      reject(timeout);
+    }, timeoutMs);
+
+    timer.unref?.();
+
+    child.once('error', (error) => {
+      // Unconditional: after a timeout the settled flag is already set, but
+      // a late exit must still cancel the SIGKILL escalation so a recycled
+      // PID can never receive it.
+      clearKillTimer();
+      settleReject(error instanceof Error ? error : new Error(String(error)));
+    });
+
+    child.once('close', (code) => {
+      clearKillTimer();
+      if (code === 0) {
+        settleResolve();
+        return;
+      }
+
+      settleReject(new Error(`daemon command exited with code ${code ?? 'unknown'}`));
     });
   });
 }
@@ -94,14 +201,23 @@ function daemonCliEntry(): string | null {
   return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
 
-async function restartDaemonViaCli(): Promise<void> {
+/**
+ * Default bound for the daemon restart child process.
+ *
+ * The daemon restart path already budgets 750ms connect + 5000ms shutdown +
+ * 250ms settle + 1000ms start internally (~7s nominal), so 30s leaves ample
+ * headroom for a slow host while guaranteeing `update` always terminates.
+ */
+export const DEFAULT_DAEMON_RESTART_TIMEOUT_MS = 30_000;
+
+async function restartDaemonViaCli(timeoutMs = DEFAULT_DAEMON_RESTART_TIMEOUT_MS): Promise<void> {
   const entry = daemonCliEntry();
 
   if (!entry) {
     throw new Error('daemon CLI entry not found; cannot enforce the build barrier');
   }
 
-  await runNode(entry, ['restart']);
+  await runDaemonCommand(entry, ['restart'], timeoutMs);
 }
 
 /**
@@ -197,7 +313,7 @@ function clearEphemeralFor(
  * anything else fails loudly rather than silently skipping authority work.
  */
 export function createDaemonOnlyUpgradePorts(
-  options: { restartDaemon?: () => Promise<void> } = {}
+  options: { restartDaemon?: () => Promise<void>; restartTimeoutMs?: number } = {}
 ): UpgradePorts {
   const noProject = (): never => {
     throw new Error('UPGRADE_PROJECT_CONTEXT_REQUIRED');
@@ -225,7 +341,7 @@ export function createDaemonOnlyUpgradePorts(
         return;
       }
 
-      await restartDaemonViaCli();
+      await restartDaemonViaCli(options.restartTimeoutMs);
     },
     /* Nothing local to re-read: the daemon restart is the whole post-condition. */
     async verifyUpgrade() {},
@@ -290,7 +406,7 @@ export function createRealUpgradePorts(options: RealUpgradePortsOptions): Upgrad
         return;
       }
 
-      await restartDaemonViaCli();
+      await restartDaemonViaCli(options.restartTimeoutMs);
     },
 
     async verifyUpgrade() {
