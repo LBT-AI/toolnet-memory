@@ -159,6 +159,12 @@ interface CommandResult {
   stdout: string;
 
   stderr: string;
+
+  /** True when the subprocess was killed for exceeding its time budget. */
+  timedOut: boolean;
+
+  /** Wall-clock time spent waiting on the subprocess. */
+  elapsedMs: number;
 }
 
 interface RuntimeMirrorResult {
@@ -212,12 +218,66 @@ function currentPackageRoot(): string {
   return process.cwd();
 }
 
-function run(
+export interface RunCommandBudget {
+  /**
+   * Hard bound for one subprocess invocation.
+   *
+   * Short interactive checks keep the 30s default. Packaging/build probes
+   * (npm pack runs the prepack build first) use PACKAGING_PROBE_TIMEOUT_MS.
+   */
+  timeoutMs?: number;
+  /** Human label for timeout diagnostics (command + purpose). */
+  label?: string;
+}
+
+/** Default bound for short certification subprocesses (init, CLI, bundles). */
+export const SHORT_CHECK_TIMEOUT_MS = 30_000;
+
+/**
+ * Bound for packaging/build probes.
+ *
+ * `npm pack` runs the prepack build first; build:prod measured 64s on a
+ * constrained host, so 300s leaves ample headroom for slow CI/VPS runners
+ * while still failing closed on a genuinely hung build.
+ */
+export const PACKAGING_PROBE_TIMEOUT_MS = 300_000;
+
+function isTimeoutError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === 'ETIMEDOUT' || /timed out/i.test(error.message);
+}
+
+function describeTimeout(
+  command: string,
+  args: string[],
+  timeoutMs: number,
+  elapsedMs: number
+): string {
+  return (
+    `CERTIFY_SUBPROCESS_TIMEOUT command=${command} ` +
+    `args=${JSON.stringify(args)} budgetMs=${timeoutMs} elapsedMs=${elapsedMs}`
+  );
+}
+
+/**
+ * Run one certification subprocess with a hard bound.
+ *
+ * Exported for timeout fault-injection tests. Production callers use the
+ * short-check default; packaging/build probes pass PACKAGING_PROBE_TIMEOUT_MS.
+ */
+export function run(
   command: string,
   args: string[],
   cwd: string,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  budget: RunCommandBudget = {}
 ): CommandResult {
+  const timeoutMs = budget.timeoutMs ?? SHORT_CHECK_TIMEOUT_MS;
+  const startedAt = Date.now();
+
   const result = spawnSync(command, args, {
     cwd,
 
@@ -225,10 +285,27 @@ function run(
 
     encoding: 'utf8',
 
-    timeout: 30_000,
+    timeout: timeoutMs,
 
     maxBuffer: 10 * 1024 * 1024,
   });
+
+  const elapsedMs = Date.now() - startedAt;
+  const timedOut = isTimeoutError(result.error);
+
+  if (timedOut) {
+    return {
+      status: result.status,
+
+      stdout: '',
+
+      stderr: describeTimeout(command, args, timeoutMs, elapsedMs),
+
+      timedOut: true,
+
+      elapsedMs,
+    };
+  }
 
   return {
     status: result.status,
@@ -236,6 +313,10 @@ function run(
     stdout: result.stdout ?? '',
 
     stderr: result.stderr ?? '',
+
+    timedOut: false,
+
+    elapsedMs,
   };
 }
 
@@ -302,7 +383,24 @@ function npmPackedFiles(packageRoot: string): {
 
   error?: string;
 } {
-  const result = run('npm', ['pack', '--dry-run', '--json'], packageRoot);
+  /*
+   * `npm pack` runs the prepack build first (measured 64s for build:prod on
+   * a constrained host), so this probe gets the packaging budget rather
+   * than the 30s short-check default. A hung build still fails closed via
+   * CERTIFY_SUBPROCESS_TIMEOUT.
+   */
+  const result = run('npm', ['pack', '--dry-run', '--json'], packageRoot, process.env, {
+    timeoutMs: PACKAGING_PROBE_TIMEOUT_MS,
+    label: 'npm-pack-manifest',
+  });
+
+  if (result.timedOut) {
+    return {
+      files: [],
+
+      error: compactError(result),
+    };
+  }
 
   if (result.status !== 0) {
     return {
@@ -644,6 +742,10 @@ export async function certifyProductionReadiness(
         stdout: '',
 
         stderr: 'CLI file does not exist.',
+
+        timedOut: false,
+
+        elapsedMs: 0,
       };
 
   checks.push(

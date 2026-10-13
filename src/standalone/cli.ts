@@ -240,6 +240,24 @@ async function main(): Promise<void> {
       }
       await runModule(['status', ...args], () => import('../service/cli.js'));
       return;
+    case 'daemon':
+      await runModule(args, () => import('../daemon/cli.js'));
+      return;
+    case 'daemon:status':
+      await runModule(['status', ...args], () => import('../daemon/cli.js'));
+      return;
+    case 'daemon:start':
+      await runModule(['start', ...args], () => import('../daemon/cli.js'));
+      return;
+    case 'daemon:stop':
+      await runModule(['stop', ...args], () => import('../daemon/cli.js'));
+      return;
+    case 'daemon:restart':
+      await runModule(['restart', ...args], () => import('../daemon/cli.js'));
+      return;
+    case 'identity':
+      await runModule(args, () => import('../production/identity-cli.js'));
+      return;
     case 'production:certify':
       await runModule([], () => import('../production/production-certify-cli.js'));
       return;
@@ -257,6 +275,15 @@ async function main(): Promise<void> {
       return;
     case 'impact':
       await runModule(args, () => import('../code-intelligence/test-impact.js'));
+      return;
+    case 'fleet:build':
+      await runModule(args, () => import('../production/fleet-cli.js'));
+      return;
+    case 'wiki:inspect':
+      await runModule(['inspect', ...args], () => import('../production/wiki-cli.js'));
+      return;
+    case 'wiki:repair':
+      await runModule(['repair', ...args], () => import('../production/wiki-cli.js'));
       return;
     case 'snapshot:list':
       await runModule(['list'], () => import('../production/snapshot-cli.js'));
@@ -318,6 +345,9 @@ async function main(): Promise<void> {
     case 'integrate:claude':
       await runModule(['install', ...args], () => import('../session/claude/cli.js'));
       return;
+    case 'integrate:codex':
+      await runModule(['install-notify', ...args], () => import('../session/codex/cli.js'));
+      return;
     case 'integrate:kiro':
       await runModule(['install', ...args], () => import('../session/kiro/cli.js'));
       return;
@@ -353,6 +383,12 @@ async function main(): Promise<void> {
       return;
     case 'session:codex-session-end':
       await runModule(['session-end', ...args], () => import('../session/codex/cli.js'));
+      return;
+    case 'session:codex-sync':
+      await runModule(['sync', ...args], () => import('../session/codex/cli.js'));
+      return;
+    case 'session:codex-recover':
+      await runModule(['recover', ...args], () => import('../session/codex/cli.js'));
       return;
     case 'session:goose-hook':
       await runModule(args, () => import('../session/goose/hook.js'));
@@ -473,6 +509,9 @@ async function main(): Promise<void> {
       return;
     case 'memory:reconcile':
       await runModule(['reconcile', ...args], () => import('../session/learner/cli.js'));
+      return;
+    case 'memory:backfill':
+      await runModule(['backfill', ...args], () => import('../session/learner/cli.js'));
       return;
     case 'memory:review':
       await runModule(args, () => import('../session/memory-review-cli.js'));

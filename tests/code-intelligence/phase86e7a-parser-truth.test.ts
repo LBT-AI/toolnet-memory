@@ -295,4 +295,46 @@ describe('Phase 86E.7A — parser capability truth', () => {
       expect(existsSync(asset.wasmPath)).toBe(true);
     }
   });
+
+  it('P17: grammar asset hashes are memoized for the admission hot path', async () => {
+    /*
+     * Phase 77 regression guard: every daemon admission handshake recomputes
+     * the build fingerprint, which hashes the grammar wasm assets. Without
+     * memoization each handshake synchronously re-reads ~6MB, starving the
+     * event loop until concurrent startups miss their connect budgets.
+     * This test proves repeat lookups are served from the memo without
+     * touching the filesystem again: a file created after the first (miss)
+     * lookup stays invisible until resetTreeSitterRuntime clears the cache.
+     */
+    const { hashGrammarAsset } =
+      await import('../../src/code-intelligence/parsers/tree-sitter/runtime.js');
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+
+    const dir = mkdtempSync(join(tmpdir(), 'toolnet-hash-memo-'));
+
+    try {
+      const probe = join(dir, 'late.wasm');
+
+      expect(hashGrammarAsset(probe)).toBe(null);
+
+      writeFileSync(probe, 'grammar-bytes');
+
+      // Memoized miss: no filesystem re-read on repeat lookups.
+      expect(hashGrammarAsset(probe)).toBe(null);
+
+      resetTreeSitterRuntime();
+
+      const digest = hashGrammarAsset(probe);
+      expect(digest).toMatch(/^[0-9a-f]{64}$/u);
+
+      // Memoized hit: stable across repeat lookups.
+      expect(hashGrammarAsset(probe)).toBe(digest);
+    } finally {
+      resetTreeSitterRuntime();
+      const { rmSync } = await import('node:fs');
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

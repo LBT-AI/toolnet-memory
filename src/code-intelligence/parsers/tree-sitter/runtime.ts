@@ -191,16 +191,37 @@ export function resolveGrammarWasmPaths(): Record<string, string> {
  * Returns the SHA-256 of the asset when it is present and readable, or
  * null when it is missing/corrupt. A missing grammar must make the parser
  * unavailable rather than silently pretending structural support.
+ *
+ * Results are memoized per path for the life of the process. Grammar assets
+ * are immutable package files (a package upgrade is always a new process),
+ * and without this cache every daemon admission handshake synchronously
+ * re-reads and re-hashes ~6MB of wasm — enough to starve the event loop and
+ * stall concurrent startups. The cache holds hashes only, never file
+ * contents, and is cleared alongside the runtime by resetTreeSitterRuntime.
  */
+const grammarHashCache = new Map<string, string | null>();
+
 export function hashGrammarAsset(wasmPath: string): string | null {
+  const cached = grammarHashCache.get(wasmPath);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  let digest: string | null;
+
   try {
     if (!existsSync(wasmPath)) {
-      return null;
+      digest = null;
+    } else {
+      digest = createHash('sha256').update(readFileSync(wasmPath)).digest('hex');
     }
-    return createHash('sha256').update(readFileSync(wasmPath)).digest('hex');
   } catch {
-    return null;
+    digest = null;
   }
+
+  grammarHashCache.set(wasmPath, digest);
+  return digest;
 }
 
 export interface GrammarAssetStatus {
@@ -262,6 +283,7 @@ export function resetTreeSitterRuntime(): void {
     cachedRuntime.dispose();
     cachedRuntime = null;
   }
+  grammarHashCache.clear();
 }
 
 /**
