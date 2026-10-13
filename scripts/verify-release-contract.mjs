@@ -9,6 +9,7 @@ const EXPECTED_AGENTS = {
   agy: {
     displayName: 'Agy / Antigravity',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'agy.js',
     command: 'integrate:agy',
   },
@@ -16,6 +17,7 @@ const EXPECTED_AGENTS = {
   opencode: {
     displayName: 'OpenCode',
     refreshMode: 'persistent-plugin',
+    captureMode: 'hook',
     bundle: 'opencode.js',
     command: 'integrate:opencode',
   },
@@ -23,6 +25,7 @@ const EXPECTED_AGENTS = {
   codex: {
     displayName: 'Codex',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'codex.js',
     command: 'integrate:codex',
   },
@@ -30,6 +33,7 @@ const EXPECTED_AGENTS = {
   claude: {
     displayName: 'Claude Code',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'claude.js',
     command: 'integrate:claude',
   },
@@ -37,6 +41,7 @@ const EXPECTED_AGENTS = {
   kiro: {
     displayName: 'Kiro CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'kiro.js',
     command: 'integrate:kiro',
   },
@@ -44,6 +49,7 @@ const EXPECTED_AGENTS = {
   cursor: {
     displayName: 'Cursor CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'cursor.js',
     command: 'integrate:cursor',
   },
@@ -51,6 +57,7 @@ const EXPECTED_AGENTS = {
   copilot: {
     displayName: 'GitHub Copilot CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'copilot.js',
     command: 'integrate:copilot',
   },
@@ -58,6 +65,7 @@ const EXPECTED_AGENTS = {
   grok: {
     displayName: 'Grok Build',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'grok.js',
     command: 'integrate:grok',
   },
@@ -65,6 +73,7 @@ const EXPECTED_AGENTS = {
   'toolnet-cli': {
     displayName: 'ToolNet CLI',
     refreshMode: 'native-session',
+    captureMode: 'manual-sync',
     bundle: 'toolnet-cli.js',
     command: 'integrate:toolnet-cli',
   },
@@ -72,6 +81,7 @@ const EXPECTED_AGENTS = {
   kilo: {
     displayName: 'Kilo',
     refreshMode: 'mcp-only',
+    captureMode: 'mcp-only',
     bundle: 'kilo.js',
     command: 'integrate:kilo',
   },
@@ -79,6 +89,7 @@ const EXPECTED_AGENTS = {
   goose: {
     displayName: 'goose',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'goose.js',
     command: 'integrate:goose',
   },
@@ -86,6 +97,7 @@ const EXPECTED_AGENTS = {
   qwen: {
     displayName: 'Qwen Code',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'qwen.js',
     command: 'integrate:qwen',
   },
@@ -93,6 +105,7 @@ const EXPECTED_AGENTS = {
   kimi: {
     displayName: 'Kimi Code CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'kimi.js',
     command: 'integrate:kimi',
   },
@@ -100,6 +113,7 @@ const EXPECTED_AGENTS = {
   hermes: {
     displayName: 'Hermes Agent',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'hermes.js',
     command: 'integrate:hermes',
   },
@@ -107,6 +121,7 @@ const EXPECTED_AGENTS = {
   qoder: {
     displayName: 'Qoder CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'qoder.js',
     command: 'integrate:qoder',
   },
@@ -114,6 +129,7 @@ const EXPECTED_AGENTS = {
   aider: {
     displayName: 'Aider',
     refreshMode: 'managed-wrapper',
+    captureMode: 'managed-wrapper-session-end',
     bundle: 'aider.js',
     command: 'integrate:aider',
   },
@@ -121,13 +137,15 @@ const EXPECTED_AGENTS = {
   plandex: {
     displayName: 'Plandex',
     refreshMode: 'native-session',
+    captureMode: 'manual-sync',
     bundle: 'plandex.js',
     command: 'integrate:plandex',
   },
 
   openrouter: {
     displayName: 'OpenRouter CLI',
-    refreshMode: 'blocked',
+    refreshMode: 'mcp-only',
+    captureMode: 'blocked-product-identity',
     bundle: 'openrouter.js',
     command: 'integrate:openrouter',
   },
@@ -135,6 +153,7 @@ const EXPECTED_AGENTS = {
   bob: {
     displayName: 'IBM Bob Shell',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'bob.js',
     command: 'integrate:bob',
   },
@@ -142,6 +161,7 @@ const EXPECTED_AGENTS = {
   cline: {
     displayName: 'Cline CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'cline.js',
     command: 'integrate:cline',
   },
@@ -149,6 +169,7 @@ const EXPECTED_AGENTS = {
   rovo: {
     displayName: 'Rovo Dev CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'rovo.js',
     command: 'integrate:rovo',
   },
@@ -156,6 +177,7 @@ const EXPECTED_AGENTS = {
   warp: {
     displayName: 'Warp Agent CLI',
     refreshMode: 'blocked',
+    captureMode: 'blocked-capability',
     bundle: 'warp.js',
     command: 'integrate:warp',
   },
@@ -325,6 +347,8 @@ for (const [agent, expected] of Object.entries(EXPECTED_AGENTS)) {
   exact(`${agent} display name`, actual.displayName, expected.displayName);
 
   exact(`${agent} refresh mode`, actual.refreshMode, expected.refreshMode);
+
+  exact(`${agent} capture mode`, actual.captureMode, expected.captureMode);
 
   contains(`${agent} capability registry`, capabilities, `'${agent}'`);
 

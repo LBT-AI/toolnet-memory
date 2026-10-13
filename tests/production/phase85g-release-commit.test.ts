@@ -149,6 +149,9 @@ const PENDING_HARDENING_PATHS = new Set([
   'tests/production/phase85j-final-release-repair.test.ts',
   'tests/production/phase85k-v061-release-recovery.test.ts',
   'tests/production/phase85k-v062-release-recovery.test.ts',
+  /* CI workflow and verification script tracked in this repo. */
+  '.github/workflows/ci.yml',
+  'scripts/verify-release-contract.mjs',
 ]);
 
 function isPendingHardeningPath(path: string): boolean {

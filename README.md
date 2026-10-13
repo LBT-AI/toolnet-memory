@@ -182,7 +182,7 @@ Codex
 Agy / Antigravity
 ToolNet CLI
 Kilo
-Goose
+goose
 Qwen Code
 Kimi Code CLI
 Hermes Agent
@@ -198,15 +198,15 @@ Warp Agent CLI
 
 Integration capability depends on what each host application exposes:
 
-| Capability                 | Agents                                                                                                                              |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build, IBM Bob Shell, Cline CLI, Rovo Dev CLI |
-| Persistent plugin refresh  | OpenCode                                                                                                                            |
-| Managed wrapper            | Aider                                                                                                                               |
-| Native session capture     | ToolNet CLI                                                                                                                         |
-| Manual recovery            | Plandex                                                                                                                             |
-| MCP continuity             | Kilo                                                                                                                                |
-| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no verified native hook system)                                       |
+| Capability                 | Agents                                                                                                                                                                                        |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build, goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, IBM Bob Shell, Cline CLI, Rovo Dev CLI |
+| Persistent plugin refresh  | OpenCode                                                                                                                                                                                      |
+| Managed wrapper            | Aider                                                                                                                                                                                         |
+| Native session capture     | ToolNet CLI                                                                                                                                                                                   |
+| Manual recovery            | Plandex                                                                                                                                                                                       |
+| MCP continuity             | Kilo                                                                                                                                                                                          |
+| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no verified native hook system)                                                                                                 |
 
 ToolNet reports lifecycle support only when the host exposes a genuine lifecycle integration.
 
