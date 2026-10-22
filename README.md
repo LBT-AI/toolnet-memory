@@ -144,12 +144,12 @@ v0.5.2 completes the intent-aware retrieval roadmap and promotes the retrieval r
 
 ### v0.6.2 Extended Agent Integrations
 
-- Adds 22-agent release/package contract with truthful capability modes.
+- Adds 27-agent release/package contract with truthful capability modes.
 - Adds native lifecycle integrations for goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, IBM Bob Shell, Cline CLI, and Rovo Dev CLI.
 - Adds managed-wrapper capture for Aider and manual-sync recovery for Plandex.
 - Adds OpenRouter CLI capability entry and Warp Agent CLI blocked-capability entry.
 - Hardens integration setup/repair, Wiki/Fleet state recovery, and session memory materialization.
-- Production certification expanded to the full 22-integration matrix.
+- Production certification expanded to the full 27-integration matrix.
 
 ### v0.6.1 Release Repair
 
@@ -169,7 +169,7 @@ v0.5.2 completes the intent-aware retrieval roadmap and promotes the retrieval r
 
 ## Supported Coding Agents
 
-ToolNet Memory currently supports a 22-agent continuity ring:
+ToolNet Memory currently supports a 27-agent continuity ring:
 
 ```text
 Claude Code
@@ -194,19 +194,24 @@ IBM Bob Shell
 Cline CLI
 Rovo Dev CLI
 Warp Agent CLI
+Gemini CLI
+Junie
+Codebuff
+Freebuff
+Continue
 ```
 
 Integration capability depends on what each host application exposes:
 
-| Capability                 | Agents                                                                                                                                                                                        |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build, goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, IBM Bob Shell, Cline CLI, Rovo Dev CLI |
-| Persistent plugin refresh  | OpenCode                                                                                                                                                                                      |
-| Managed wrapper            | Aider                                                                                                                                                                                         |
-| Native session capture     | ToolNet CLI                                                                                                                                                                                   |
-| Manual recovery            | Plandex                                                                                                                                                                                       |
-| MCP continuity             | Kilo                                                                                                                                                                                          |
-| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no verified native hook system)                                                                                                 |
+| Capability                 | Agents                                                                                                                                                                                                           |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build, goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, IBM Bob Shell, Cline CLI, Rovo Dev CLI, Gemini CLI, Junie |
+| Persistent plugin refresh  | OpenCode                                                                                                                                                                                                         |
+| Managed wrapper            | Aider                                                                                                                                                                                                            |
+| Native session capture     | ToolNet CLI                                                                                                                                                                                                      |
+| Manual recovery            | Plandex, Continue                                                                                                                                                                                                |
+| MCP continuity             | Kilo, Codebuff, Freebuff                                                                                                                                                                                         |
+| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no verified native hook system)                                                                                                                    |
 
 ToolNet reports lifecycle support only when the host exposes a genuine lifecycle integration.
 

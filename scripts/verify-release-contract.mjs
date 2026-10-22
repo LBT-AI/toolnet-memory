@@ -181,6 +181,46 @@ const EXPECTED_AGENTS = {
     bundle: 'warp.js',
     command: 'integrate:warp',
   },
+
+  gemini: {
+    displayName: 'Gemini CLI',
+    refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
+    bundle: 'gemini.js',
+    command: 'integrate:gemini',
+  },
+
+  junie: {
+    displayName: 'Junie',
+    refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
+    bundle: 'junie.js',
+    command: 'integrate:junie',
+  },
+
+  codebuff: {
+    displayName: 'Codebuff',
+    refreshMode: 'mcp-only',
+    captureMode: 'mcp-only',
+    bundle: 'codebuff.js',
+    command: 'integrate:codebuff',
+  },
+
+  freebuff: {
+    displayName: 'Freebuff',
+    refreshMode: 'mcp-only',
+    captureMode: 'mcp-only',
+    bundle: 'freebuff.js',
+    command: 'integrate:freebuff',
+  },
+
+  continue: {
+    displayName: 'Continue',
+    refreshMode: 'native-session',
+    captureMode: 'manual-sync',
+    bundle: 'continue.js',
+    command: 'integrate:continue',
+  },
 };
 
 let failures = 0;
@@ -407,6 +447,11 @@ for (const expected of [
   "kilo: 'src/session/kilo/cli.ts'",
   "'background-refresh': 'src/multi-host/background-refresh-cli.ts'",
   "'integration-status': 'src/session/new-agents/scoped-status-cli.ts'",
+  "gemini: 'src/session/gemini/cli.ts'",
+  "junie: 'src/session/junie/cli.ts'",
+  "codebuff: 'src/session/codebuff/cli.ts'",
+  "freebuff: 'src/session/freebuff/cli.ts'",
+  "continue: 'src/session/continue/cli.ts'",
 ]) {
   contains(`bundle entry ${expected.split(':')[0]}`, buildBundle, expected);
 }
@@ -429,7 +474,7 @@ absent('stale MEMORY_AUTO_SUMMARIZE removed', envExample, 'MEMORY_AUTO_SUMMARIZE
 console.log('');
 console.log('=== README CONTRACT ===');
 
-contains('README 22-agent wording', readme, '22-agent continuity ring');
+contains('README 27-agent wording', readme, '27-agent continuity ring');
 
 for (const { displayName } of Object.values(EXPECTED_AGENTS)) {
   contains(`README agent ${displayName}`, readme, displayName);

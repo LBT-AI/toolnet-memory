@@ -50,6 +50,16 @@ import {
   type InstallGrokIntegrationOptions,
 } from '../session/grok/installer.js';
 
+import { installGeminiHooks } from '../session/gemini/hook-installer.js';
+
+import { installJunieHooks } from '../session/junie/hook-installer.js';
+
+import { installCodebuffIntegration } from '../session/codebuff/installer.js';
+
+import { installFreebuffIntegration } from '../session/freebuff/installer.js';
+
+import { continueSessionsDirectory } from '../session/continue/config-paths.js';
+
 import { installGooseIntegration, type GooseInstallOptions } from '../session/goose/installer.js';
 
 import { installQwenIntegration, type QwenInstallOptions } from '../session/qwen/installer.js';
@@ -182,6 +192,14 @@ export function installAutoIntegrations(
     rovo?: Omit<RovoInstallOptions, 'binary'>;
 
     warp?: Omit<WarpInstallOptions, 'binary'>;
+
+    gemini?: { settingsFile?: string };
+
+    junie?: { configFile?: string; projectRoot?: string };
+
+    codebuff?: { configFile?: string; cwd?: string; force?: boolean };
+
+    freebuff?: { configFile?: string; cwd?: string; force?: boolean };
   } = {}
 ): AutoIntegrationResult[] {
   const binary = options.binary ?? process.env.TOOLNET_MEMORY_BIN ?? 'toolnet-memory';
@@ -232,6 +250,113 @@ export function installAutoIntegrations(
       } catch (error) {
         results.push({
           agent: 'agy',
+
+          detected: true,
+
+          installed: false,
+
+          targets: [],
+
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Gemini CLI
+   */
+  {
+    const isDetected = options.force === true || detected.get('gemini') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'gemini',
+
+        detected: false,
+
+        installed: false,
+
+        targets: [],
+      });
+    } else {
+      try {
+        const hooks = installGeminiHooks({
+          ...options.gemini,
+
+          binary,
+        });
+
+        results.push({
+          agent: 'gemini',
+
+          detected: true,
+
+          installed: true,
+
+          targets: [hooks.settingsFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'gemini',
+
+          detected: true,
+
+          installed: false,
+
+          targets: [],
+
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Junie
+   */
+  {
+    const isDetected = options.force === true || detected.get('junie') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'junie',
+
+        detected: false,
+
+        installed: false,
+
+        targets: [],
+      });
+    } else {
+      try {
+        const projectRoot =
+          options.junie?.projectRoot ??
+          scopedPolicy.project?.root ??
+          options.projectRoot ??
+          options.cwd ??
+          process.cwd();
+
+        const hooks = installJunieHooks({
+          ...options.junie,
+
+          binary,
+
+          projectRoot,
+        });
+
+        results.push({
+          agent: 'junie',
+
+          detected: true,
+
+          installed: true,
+
+          targets: [hooks.configFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'junie',
 
           detected: true,
 
@@ -628,6 +753,132 @@ export function installAutoIntegrations(
         });
       }
     }
+  }
+
+  /*
+   * Codebuff
+   */
+  {
+    const isDetected = options.force === true || detected.get('codebuff') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'codebuff',
+
+        detected: false,
+
+        installed: false,
+
+        targets: [],
+      });
+    } else {
+      try {
+        const codebuff = installCodebuffIntegration({
+          ...options.codebuff,
+
+          binary,
+
+          ...(options.codebuff?.cwd || options.cwd
+            ? { cwd: options.codebuff?.cwd ?? options.cwd }
+            : {}),
+        });
+
+        results.push({
+          agent: 'codebuff',
+
+          detected: true,
+
+          installed: true,
+
+          targets: [codebuff.mcp.configFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'codebuff',
+
+          detected: true,
+
+          installed: false,
+
+          targets: [],
+
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Freebuff
+   */
+  {
+    const isDetected = options.force === true || detected.get('freebuff') === true;
+
+    if (!isDetected) {
+      results.push({
+        agent: 'freebuff',
+
+        detected: false,
+
+        installed: false,
+
+        targets: [],
+      });
+    } else {
+      try {
+        const freebuff = installFreebuffIntegration({
+          ...options.freebuff,
+
+          binary,
+
+          ...(options.freebuff?.cwd || options.cwd
+            ? { cwd: options.freebuff?.cwd ?? options.cwd }
+            : {}),
+        });
+
+        results.push({
+          agent: 'freebuff',
+
+          detected: true,
+
+          installed: true,
+
+          targets: [freebuff.mcp.configFile],
+        });
+      } catch (error) {
+        results.push({
+          agent: 'freebuff',
+
+          detected: true,
+
+          installed: false,
+
+          targets: [],
+
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /*
+   * Continue
+   *
+   * Continue has no lifecycle hooks and no installer; sessions are imported
+   * on demand from ~/.continue/sessions.
+   */
+  {
+    const isDetected = options.force === true || detected.get('continue') === true;
+
+    results.push({
+      agent: 'continue',
+
+      detected: isDetected,
+
+      installed: isDetected,
+
+      targets: isDetected ? [continueSessionsDirectory()] : [],
+    });
   }
 
   /*
@@ -1249,6 +1500,21 @@ export function integrationDisplayName(agent: AgentIntegrationId): string {
 
     case 'warp':
       return 'Warp Agent CLI';
+
+    case 'gemini':
+      return 'Gemini CLI';
+
+    case 'junie':
+      return 'Junie';
+
+    case 'codebuff':
+      return 'Codebuff';
+
+    case 'freebuff':
+      return 'Freebuff';
+
+    case 'continue':
+      return 'Continue';
 
     default:
       return agent;

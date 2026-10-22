@@ -134,6 +134,31 @@
       "displayName": "Warp Agent CLI",
       "refreshMode": "blocked",
       "captureMode": "blocked-capability"
+    },
+    "gemini": {
+      "displayName": "Gemini CLI",
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
+    },
+    "junie": {
+      "displayName": "Junie",
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
+    },
+    "codebuff": {
+      "displayName": "Codebuff",
+      "refreshMode": "mcp-only",
+      "captureMode": "mcp-only"
+    },
+    "freebuff": {
+      "displayName": "Freebuff",
+      "refreshMode": "mcp-only",
+      "captureMode": "mcp-only"
+    },
+    "continue": {
+      "displayName": "Continue",
+      "refreshMode": "native-session",
+      "captureMode": "manual-sync"
     }
   },
   "releasePolicy": {
@@ -232,7 +257,7 @@
       "storagePlaceholdersFrozen": true
     },
     "codeSearch": {
-      "displayName": "Local Code Search — SQLite FTS5/BM25",
+      "displayName": "Local Code Search \u2014 SQLite FTS5/BM25",
       "engine": "sqlite-fts5-bm25",
       "mode": "lexical",
       "embeddings": false,

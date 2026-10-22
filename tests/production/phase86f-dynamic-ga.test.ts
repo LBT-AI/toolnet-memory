@@ -64,6 +64,17 @@ const V062_SNAPSHOT = {
   blocked: 2,
 } as const;
 
+/** Phase 86G source snapshot: five additional integrations on the same 0.6.2 source. */
+const PHASE86G_SNAPSHOT = {
+  canonical: 27,
+  autoNative: 17,
+  autoPersistentPlugin: 1,
+  autoManagedWrapper: 1,
+  manualRecovery: 3,
+  mcpOnly: 3,
+  blocked: 2,
+} as const;
+
 const REPO_ROOT = process.cwd();
 
 function agentDir(agent: string): string {
@@ -96,16 +107,23 @@ describe('Phase 86F — dynamic integration matrix', () => {
     }
   });
 
-  it('pins the v0.6.2 release snapshot as history, not as the GA rule', () => {
+  it('pins the current source snapshot derived from the live registry', () => {
     const counts = countIntegrationMatrix(buildIntegrationMatrix());
 
-    expect(counts.canonical).toBe(V062_SNAPSHOT.canonical);
-    expect(counts.autoNative).toBe(V062_SNAPSHOT.autoNative);
-    expect(counts.autoPersistentPlugin).toBe(V062_SNAPSHOT.autoPersistentPlugin);
-    expect(counts.autoManagedWrapper).toBe(V062_SNAPSHOT.autoManagedWrapper);
-    expect(counts.manualRecovery).toBe(V062_SNAPSHOT.manualRecovery);
-    expect(counts.mcpOnly).toBe(V062_SNAPSHOT.mcpOnly);
-    expect(counts.blocked).toBe(V062_SNAPSHOT.blocked);
+    expect(counts).toEqual(PHASE86G_SNAPSHOT);
+  });
+
+  it('keeps the v0.6.2 release snapshot as history, not as the GA rule', () => {
+    expect(V062_SNAPSHOT.canonical).toBe(22);
+    expect(
+      V062_SNAPSHOT.autoNative +
+        V062_SNAPSHOT.autoPersistentPlugin +
+        V062_SNAPSHOT.autoManagedWrapper +
+        V062_SNAPSHOT.manualRecovery +
+        V062_SNAPSHOT.mcpOnly +
+        V062_SNAPSHOT.blocked
+    ).toBe(V062_SNAPSHOT.canonical);
+    expect(PHASE86G_SNAPSHOT.canonical).toBeGreaterThan(V062_SNAPSHOT.canonical);
   });
 
   it('declares no alias model: every product identity is its own canonical adapter', () => {
@@ -266,7 +284,7 @@ describe('Phase 86F — manual / MCP-only / blocked truth', () => {
   it('manual-recovery agents expose recovery without claiming AUTO', () => {
     const rows = buildIntegrationMatrix().filter((row) => row.gaClass === 'MANUAL_RECOVERY');
 
-    expect(rows.map((row) => row.agent).sort()).toEqual(['plandex', 'toolnet-cli']);
+    expect(rows.map((row) => row.agent).sort()).toEqual(['continue', 'plandex', 'toolnet-cli']);
     expect(rows.every((row) => !row.auto)).toBe(true);
 
     for (const row of rows) {
@@ -278,13 +296,15 @@ describe('Phase 86F — manual / MCP-only / blocked truth', () => {
   it('MCP-only agents claim no native capture and install no hooks', () => {
     const rows = buildIntegrationMatrix().filter((row) => row.gaClass === 'MCP_ONLY');
 
-    expect(rows.map((row) => row.agent)).toEqual(['kilo']);
+    expect(rows.map((row) => row.agent)).toEqual(['kilo', 'codebuff', 'freebuff']);
 
-    const capabilities = AGENT_INTEGRATION_CAPABILITIES['kilo'];
-    expect(capabilities.nativeCapture).toBe(false);
-    expect(capabilities.lifecycleHooks).toBe(false);
-    expect(capabilities.level).toBe('mcp-only');
-    expect(buildIntegrationMatrix().find((row) => row.agent === 'kilo')!.hookEvents).toEqual([]);
+    for (const agent of ['kilo', 'codebuff', 'freebuff'] as const) {
+      const capabilities = AGENT_INTEGRATION_CAPABILITIES[agent];
+      expect(capabilities.nativeCapture).toBe(false);
+      expect(capabilities.lifecycleHooks).toBe(false);
+      expect(capabilities.level).toBe('mcp-only');
+      expect(buildIntegrationMatrix().find((row) => row.agent === agent)!.hookEvents).toEqual([]);
+    }
   });
 
   it('blocked agents carry explicit reasons and install no fake hooks', () => {

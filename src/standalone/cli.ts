@@ -324,6 +324,42 @@ async function main(): Promise<void> {
     case 'integrate:agy':
       await runModule(['install-hooks', ...args], () => import('../session/agy/cli.js'));
       return;
+    case 'session:gemini-hook':
+      await runModule(args, () => import('../session/gemini/hook.js'));
+      return;
+    case 'session:gemini-sync':
+      await runModule(['sync', ...args], () => import('../session/gemini/cli.js'));
+      return;
+    case 'session:gemini-recover':
+      await runModule(['recover', ...args], () => import('../session/gemini/cli.js'));
+      return;
+    case 'integrate:gemini':
+      await runModule(['install-hooks', ...args], () => import('../session/gemini/cli.js'));
+      return;
+    case 'session:junie-hook':
+      await runModule(args, () => import('../session/junie/hook.js'));
+      return;
+    case 'session:junie-recover':
+      await runModule(['recover', ...args], () => import('../session/junie/cli.js'));
+      return;
+    case 'integrate:junie':
+      await runModule(['install-hooks', ...args], () => import('../session/junie/cli.js'));
+      return;
+    case 'integrate:codebuff':
+      await runModule(['install', ...args], () => import('../session/codebuff/cli.js'));
+      return;
+    case 'integrate:freebuff':
+      await runModule(['install', ...args], () => import('../session/freebuff/cli.js'));
+      return;
+    case 'integrate:continue':
+      await runModule(['status', ...args], () => import('../session/continue/cli.js'));
+      return;
+    case 'session:continue-sync':
+      await runModule(['sync', ...args], () => import('../session/continue/cli.js'));
+      return;
+    case 'session:continue-recover':
+      await runModule(['recover', ...args], () => import('../session/continue/cli.js'));
+      return;
     case 'certify:continuity':
       await runModule(args, () => import('../production/continuity-certify-cli.js'));
       return;
