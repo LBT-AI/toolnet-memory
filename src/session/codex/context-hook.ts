@@ -6,6 +6,14 @@ import { findCodexToolNetProject } from './project-resolver.js';
 
 import { renderTaskSessionBootstrap } from '../../tasks/session-resume.js';
 
+import {
+  createCloudAuthorityFromEnv,
+  hasCloudAuthorityConfig,
+  resolveDurabilityMode,
+} from '../../v0.7/index.js';
+
+import { resumeFromCloud } from '../../v0.7/resume.js';
+
 const MAX_CONTEXT_CHARS = 3200;
 
 async function readInput(): Promise<Record<string, unknown>> {
@@ -90,13 +98,45 @@ async function main(): Promise<void> {
   triggerProjectBackgroundRefresh(project.rootPath);
 
   try {
-    const context = mergeTaskBootstrap(
+    let cloudResumeText = '';
+
+    /*
+     * v0.7 cloud-backed resume: when a cloud authority is configured, prefer
+     * the acknowledged resume packet over the local fast context. In strict
+     * cloud-only mode we never fall back to local memory if the cloud is
+     * unavailable — we simply omit the cloud packet and keep the read-only
+     * local projection (which contains no durable memory writes).
+     */
+    try {
+      const mode = resolveDurabilityMode(process.env.TOOLNET_DURABILITY_MODE);
+      const strict = mode === 'strict-cloud-only';
+
+      if (hasCloudAuthorityConfig() || !strict) {
+        const authority = createCloudAuthorityFromEnv();
+        const result = await resumeFromCloud({
+          authority,
+          projectId: project.id,
+          mode: 'standard',
+          budgetTokens: 1_500,
+        });
+
+        if (result.available) {
+          cloudResumeText = result.text;
+        }
+      }
+    } catch {
+      cloudResumeText = '';
+    }
+
+    const baseContext = mergeTaskBootstrap(
       buildFastProjectContext({ projectPath: cwd }) ?? '',
       renderTaskSessionBootstrap(project, {
         agentId: 'codex',
         maxChars: 4_000,
       })
     );
+
+    const context = cloudResumeText ? `${cloudResumeText}\n\n${baseContext}` : baseContext;
 
     if (!context.trim()) {
       writeEmpty();
