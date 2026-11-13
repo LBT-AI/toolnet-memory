@@ -17,7 +17,12 @@ function fixture(): ResumePacketSource {
         { id: 'flow-admin', description: 'Admin -> API -> DB', critical: false },
       ],
       rules: [
-        { id: 'no-token-logs', text: 'Never log raw access tokens.', mandatory: true, verified: true },
+        {
+          id: 'no-token-logs',
+          text: 'Never log raw access tokens.',
+          mandatory: true,
+          verified: true,
+        },
         {
           id: 'keep-public-api',
           text: 'Preserve public API contracts.',
