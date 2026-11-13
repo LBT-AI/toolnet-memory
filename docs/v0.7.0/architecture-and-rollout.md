@@ -1,6 +1,6 @@
 # ToolNet Memory v0.7.0: Cross-Agent Continuity
 
-Status: **Design approved as backlog; implementation in progress.** No production deployment or authority migration has occurred. Track all work in [Epic #2](https://github.com/LBT-AI/toolnet-memory/issues/2).
+Status: **Design approved as backlog; foundation implemented.** No production deployment or authority migration has occurred. Implemented modules and their measured evidence are listed in [implementation-status.md](./implementation-status.md). Track all work in [Epic #2](https://github.com/LBT-AI/toolnet-memory/issues/2).
 
 ## User story
 
@@ -74,6 +74,7 @@ A cloud-backed resolver and verified token-counting adapter are prerequisites fo
 ## Token and correctness measurements
 
 Measure total **prompt/tool** consumption, not only result strings:
+
 - MCP tool definitions, server instructions, startup injection
 - retrieval requests, result payloads and follow-up context
 - recovery paths when task data is stale, conflicting or incomplete
@@ -82,13 +83,13 @@ Compare to v0.6.2 on fixed bilingual scenarios. Saving 30–50% is a target to t
 
 ## Phases and issue references
 
-| Phase | Issues | Gate |
-|---|---|---|
-| 0. Baseline + contract | [#3](https://github.com/LBT-AI/toolnet-memory/issues/3) | Storage-write inventory, task fixtures, measured baseline |
-| 1. No-disk + cloud authority | [#4](https://github.com/LBT-AI/toolnet-memory/issues/4), [#5](https://github.com/LBT-AI/toolnet-memory/issues/5) | Fail closed, authenticated durable writes, concurrency |
-| 2. Continuity core | [#6](https://github.com/LBT-AI/toolnet-memory/issues/6), [#7](https://github.com/LBT-AI/toolnet-memory/issues/7), [#8](https://github.com/LBT-AI/toolnet-memory/issues/8), [#9](https://github.com/LBT-AI/toolnet-memory/issues/9) | Accurate resumable T8 context; no lost rules |
-| 3. Agent + efficiency | [#10](https://github.com/LBT-AI/toolnet-memory/issues/10), [#11](https://github.com/LBT-AI/toolnet-memory/issues/11), [#12](https://github.com/LBT-AI/toolnet-memory/issues/12) | Automatic startup resume and measured tokens |
-| 4. Integrity + release | [#13](https://github.com/LBT-AI/toolnet-memory/issues/13), [#14](https://github.com/LBT-AI/toolnet-memory/issues/14), [#15](https://github.com/LBT-AI/toolnet-memory/issues/15) | Cross-host patch safety, upgrade/rollback, certified E2E |
+| Phase                        | Issues                                                                                                                                                                                                                             | Gate                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 0. Baseline + contract       | [#3](https://github.com/LBT-AI/toolnet-memory/issues/3)                                                                                                                                                                            | Storage-write inventory, task fixtures, measured baseline |
+| 1. No-disk + cloud authority | [#4](https://github.com/LBT-AI/toolnet-memory/issues/4), [#5](https://github.com/LBT-AI/toolnet-memory/issues/5)                                                                                                                   | Fail closed, authenticated durable writes, concurrency    |
+| 2. Continuity core           | [#6](https://github.com/LBT-AI/toolnet-memory/issues/6), [#7](https://github.com/LBT-AI/toolnet-memory/issues/7), [#8](https://github.com/LBT-AI/toolnet-memory/issues/8), [#9](https://github.com/LBT-AI/toolnet-memory/issues/9) | Accurate resumable T8 context; no lost rules              |
+| 3. Agent + efficiency        | [#10](https://github.com/LBT-AI/toolnet-memory/issues/10), [#11](https://github.com/LBT-AI/toolnet-memory/issues/11), [#12](https://github.com/LBT-AI/toolnet-memory/issues/12)                                                    | Automatic startup resume and measured tokens              |
+| 4. Integrity + release       | [#13](https://github.com/LBT-AI/toolnet-memory/issues/13), [#14](https://github.com/LBT-AI/toolnet-memory/issues/14), [#15](https://github.com/LBT-AI/toolnet-memory/issues/15)                                                    | Cross-host patch safety, upgrade/rollback, certified E2E  |
 
 ## Release gates
 
