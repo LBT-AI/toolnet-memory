@@ -53,6 +53,7 @@ import {
 import { installGeminiHooks } from '../session/gemini/hook-installer.js';
 
 import { installJunieHooks } from '../session/junie/hook-installer.js';
+import { resolveJunieCapability, type JunieCapabilityResult } from '../session/junie/capability.js';
 
 import { installCodebuffIntegration } from '../session/codebuff/installer.js';
 
@@ -195,7 +196,11 @@ export function installAutoIntegrations(
 
     gemini?: { settingsFile?: string };
 
-    junie?: { configFile?: string; projectRoot?: string };
+    junie?: {
+      configFile?: string;
+      projectRoot?: string;
+      capability?: JunieCapabilityResult;
+    };
 
     codebuff?: { configFile?: string; cwd?: string; force?: boolean };
 
@@ -329,32 +334,9 @@ export function installAutoIntegrations(
         targets: [],
       });
     } else {
-      try {
-        const projectRoot =
-          options.junie?.projectRoot ??
-          scopedPolicy.project?.root ??
-          options.projectRoot ??
-          options.cwd ??
-          process.cwd();
+      const capability = options.junie?.capability ?? resolveJunieCapability();
 
-        const hooks = installJunieHooks({
-          ...options.junie,
-
-          binary,
-
-          projectRoot,
-        });
-
-        results.push({
-          agent: 'junie',
-
-          detected: true,
-
-          installed: true,
-
-          targets: [hooks.configFile],
-        });
-      } catch (error) {
+      if (!capability.hooksAvailable || !capability.automaticCaptureSupported) {
         results.push({
           agent: 'junie',
 
@@ -364,8 +346,48 @@ export function installAutoIntegrations(
 
           targets: [],
 
-          error: error instanceof Error ? error.message : String(error),
+          error: `Junie capture blocked: ${capability.capabilityReason}. Capture mode: ${capability.captureMode}`,
         });
+      } else {
+        try {
+          const projectRoot =
+            options.junie?.projectRoot ??
+            scopedPolicy.project?.root ??
+            options.projectRoot ??
+            options.cwd ??
+            process.cwd();
+
+          const hooks = installJunieHooks({
+            ...(options.junie?.configFile ? { configFile: options.junie.configFile } : {}),
+            capability,
+            binary,
+            projectRoot,
+          });
+
+          results.push({
+            agent: 'junie',
+
+            detected: true,
+
+            installed: hooks.installed,
+
+            targets: hooks.installed ? [hooks.configFile] : [],
+
+            ...(hooks.installed ? {} : { error: hooks.reason }),
+          });
+        } catch (error) {
+          results.push({
+            agent: 'junie',
+
+            detected: true,
+
+            installed: false,
+
+            targets: [],
+
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }
   }

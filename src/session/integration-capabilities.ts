@@ -55,9 +55,28 @@ export type IntegrationCaptureMode =
   | 'blocked-product-identity'
   | 'blocked-capability';
 
+export interface ConditionalIntegrationCapture {
+  runtimeResolutionRequired: true;
+
+  hookChannel: 'eap';
+
+  stableFallback: 'blocked-capability';
+
+  manualRecoveryAvailable: false;
+
+  reason: string;
+}
+
 export interface AgentIntegrationCapabilities extends IntegrationCapabilities {
   agent: SupportedIntegrationAgent;
   refreshMode: IntegrationRefreshMode;
+
+  /**
+   * Present when product-level lifecycle support is conditional on a runtime
+   * capability check. The static capture mode describes the capable path; the
+   * runtime resolver must downgrade unsupported builds.
+   */
+  conditionalCapture?: ConditionalIntegrationCapture;
 
   /**
    * How session events actually reach ToolNet. Distinct from refreshMode:
@@ -179,7 +198,7 @@ export const NATIVE_SESSION_IMPORT_CAPABILITIES: IntegrationCapabilities = {
   level: 'native-capture',
 };
 
-const NATIVE_LIFECYCLE_CAPABILITIES: IntegrationCapabilities = {
+export const NATIVE_LIFECYCLE_CAPABILITIES: IntegrationCapabilities = {
   mcp: true,
   continuityRead: true,
   nativeCapture: true,
@@ -253,7 +272,16 @@ export const AGENT_INTEGRATION_CAPABILITIES: Readonly<
   rovo: profile('rovo', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
   warp: profile('warp', BLOCKED_CAPABILITIES, 'blocked'),
   gemini: profile('gemini', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
-  junie: profile('junie', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  junie: {
+    ...profile('junie', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+    conditionalCapture: {
+      runtimeResolutionRequired: true,
+      hookChannel: 'eap',
+      stableFallback: 'blocked-capability',
+      manualRecoveryAvailable: false,
+      reason: 'lifecycle hooks require verified EAP capability; unverified builds fail closed',
+    },
+  },
   codebuff: profile('codebuff', MCP_ONLY_CAPABILITIES, 'mcp-only'),
   freebuff: profile('freebuff', MCP_ONLY_CAPABILITIES, 'mcp-only'),
   continue: profile('continue', NATIVE_SESSION_IMPORT_CAPABILITIES, 'native-session'),

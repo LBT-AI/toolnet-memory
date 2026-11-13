@@ -42,6 +42,8 @@ import {
 
 import { inspectProductionTaskHealth, type ProductionTaskHealth } from './task-health.js';
 
+import { inspectJunieStatus, type JunieIntegrationStatus } from '../session/junie/status.js';
+
 type DoctorResult = {
   ok: boolean;
   project?: string;
@@ -66,6 +68,7 @@ type DoctorResult = {
   fleet?: FleetDataInspection;
   artifactPaths?: ArtifactPathHealth;
   lifecycle?: LifecycleDriftReport;
+  junie?: JunieIntegrationStatus;
   config?: {
     ok: boolean;
     errors?: string[];
@@ -265,6 +268,22 @@ function printHuman(result: DoctorResult): void {
       `${branch} ${dim('Verified')}        ${white(String(result.memoryQuality.verified))}`
     );
   }
+  if (result.junie?.binaryDetected) {
+    console.log(pipe);
+    console.log(`${cyan('◇')} ${white('Junie CLI')}`);
+    console.log(
+      `${branch} ${dim('Version')}         ${white(result.junie.version ?? 'unparseable')}`
+    );
+
+    const hooksState = result.junie.hooksAvailable
+      ? green('available (verified EAP)')
+      : amber('unavailable on this build');
+
+    console.log(`${branch} ${dim('Lifecycle hooks')} ${hooksState}`);
+    console.log(`${branch} ${dim('Capture mode')}    ${white(result.junie.captureMode)}`);
+    console.log(`${branch} ${dim('Reason')}          ${white(result.junie.capabilityReason)}`);
+  }
+
   if (result.lifecycle) {
     console.log(pipe);
     console.log(`${cyan('◇')} ${white('Lifecycle & Drift')}`);
@@ -446,6 +465,7 @@ async function main(): Promise<void> {
   const snapshots = await new SnapshotManager(storage).list(project.id);
 
   const capture = inspectSessionCaptureHealth(project);
+  const junieStatus = inspectJunieStatus();
   const pipeline = await inspectMemoryPipeline({ project, storage });
   const taskHealth = inspectProductionTaskHealth(project);
 
@@ -522,6 +542,7 @@ async function main(): Promise<void> {
     fleet,
     artifactPaths,
     lifecycle,
+    ...(junieStatus.binaryDetected ? { junie: junieStatus } : {}),
     warnings: [
       ...configCheck.warnings,
       ...captureWarnings,

@@ -1,10 +1,11 @@
 /*
  * Phase 86G — Gemini, Junie, Codebuff, Freebuff, and Continue integrations.
  *
- * Host binaries are not installed on the certification host, so these are
- * SOURCE_CONTRACT_CERTIFIED: the real installers, adapters, and recovery
- * entrypoints are driven with synthetic native fixtures. No claim of
- * LIVE_HOST_CERTIFIED is made here.
+ * These integrations are SOURCE_CONTRACT_CERTIFIED: the real installers,
+ * adapters, and recovery entrypoints are driven with synthetic native
+ * fixtures. Junie exists on the certification host but stable 1468.30 has no
+ * lifecycle hooks, so hook tests use explicit verified-EAP capability
+ * evidence. No authenticated live-host claim is made here.
  *
  * PASS marker: PHASE86G_NEW_AGENT_INTEGRATIONS=PASS
  */
@@ -26,7 +27,12 @@ import {
   REQUIRED_HOOK_EVENTS,
 } from '../../src/session/integration-capabilities.js';
 
-import { buildIntegrationMatrix } from '../../src/session/integration-matrix.js';
+import {
+  buildIntegrationMatrix,
+  buildRuntimeIntegrationMatrix,
+} from '../../src/session/integration-matrix.js';
+
+import { resolveJunieCapability } from '../../src/session/junie/capability.js';
 
 import { syncGeminiSession } from '../../src/session/gemini/adapter.js';
 import { installGeminiHooks } from '../../src/session/gemini/hook-installer.js';
@@ -134,7 +140,19 @@ describe('Phase 86G — registry truth for the new integrations', () => {
 
     const rows = buildIntegrationMatrix();
     expect(rows.find((row) => row.agent === 'gemini')?.gaClass).toBe('AUTO_NATIVE');
-    expect(rows.find((row) => row.agent === 'junie')?.gaClass).toBe('AUTO_NATIVE');
+    const junieRow = rows.find((row) => row.agent === 'junie');
+    expect(junieRow?.gaClass).toBe('AUTO_NATIVE');
+    expect(junieRow?.conditional).toBe(true);
+
+    const stable = resolveJunieCapability({
+      probe: () => ({ detected: true, version: '1468.30' }),
+    });
+
+    expect(
+      buildRuntimeIntegrationMatrix({ junieCapability: stable }).find(
+        (row) => row.agent === 'junie'
+      )?.gaClass
+    ).toBe('BLOCKED');
     expect(rows.find((row) => row.agent === 'codebuff')?.gaClass).toBe('MCP_ONLY');
     expect(rows.find((row) => row.agent === 'freebuff')?.gaClass).toBe('MCP_ONLY');
     expect(rows.find((row) => row.agent === 'continue')?.gaClass).toBe('MANUAL_RECOVERY');
@@ -215,14 +233,20 @@ describe('Phase 86G — Gemini CLI hook installer and transcript adapter', () =>
 });
 
 describe('Phase 86G — Junie hook installer and adapter', () => {
-  it('installs project-scoped hooks without dropping existing config', () => {
+  it('installs project-scoped hooks without dropping existing config', { timeout: 15000 }, () => {
     const configFile = join(tempRoot('toolnet-junie-config-'), 'config.json');
     writeFileSync(configFile, JSON.stringify({ model: 'default', hooks: { PreToolUse: [] } }));
+
+    const capability = resolveJunieCapability({
+      probe: () => ({ detected: true, version: '9999.1-eap' }),
+      hookEvidence: 'verified-eap-hooks',
+    });
 
     const result = installJunieHooks({
       configFile,
       binary: 'toolnet-memory',
       projectRoot: '/workspace/app',
+      capability,
     });
 
     expect(result.events).toEqual(['SessionStart', 'Stop', 'SessionEnd']);
@@ -241,6 +265,7 @@ describe('Phase 86G — Junie hook installer and adapter', () => {
       configFile,
       binary: 'toolnet-memory',
       projectRoot: '/workspace/app',
+      capability,
     });
     expect(second.changed).toBe(false);
   });

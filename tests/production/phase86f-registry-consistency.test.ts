@@ -57,11 +57,16 @@ describe('Phase 86F — README matches the canonical registry', () => {
     };
 
     const nativeRow = rowFor('Native lifecycle / refresh');
-    for (const row of rows.filter((item) => item.refreshMode === 'native-lifecycle')) {
+    for (const row of rows.filter(
+      (item) => item.refreshMode === 'native-lifecycle' && item.agent !== 'junie'
+    )) {
       expect(nativeRow, integrationDisplayName(row.agent as never)).toContain(
         integrationDisplayName(row.agent as never)
       );
     }
+
+    const eapRow = rowFor('Native lifecycle (EAP)');
+    expect(eapRow).toContain('Junie');
 
     expect(rowFor('Persistent plugin refresh')).toContain('OpenCode');
     expect(rowFor('Managed wrapper')).toContain('Aider');

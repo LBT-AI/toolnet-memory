@@ -1,3 +1,4 @@
+export * from './capability.js';
 export * from './config-paths.js';
 export * from './hook-installer.js';
 export * from './project-resolver.js';

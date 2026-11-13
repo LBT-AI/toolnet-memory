@@ -6,6 +6,8 @@ import {
   withStorageRetry,
 } from '../../storage/index.js';
 
+import { resolveJunieCapability } from './capability.js';
+
 import { installJunieHooks } from './hook-installer.js';
 
 import { recoverJunieProject } from './recovery.js';
@@ -50,8 +52,14 @@ async function main() {
       projectRoot,
     });
 
-    console.log(`Junie hooks installed: ${result.configFile}`);
-    console.log(`Events: ${result.events.join(', ')}`);
+    if (result.installed) {
+      console.log(`Junie hooks installed: ${result.configFile}`);
+      console.log(`Events: ${result.events.join(', ')}`);
+    } else {
+      console.log(`Junie hooks not installed: ${result.reason}`);
+      console.log(`Config file: ${result.configFile} (unchanged)`);
+      process.exitCode = 1;
+    }
     console.log(`Project: ${projectRoot}`);
 
     return;
@@ -62,10 +70,19 @@ async function main() {
 
     console.log('Junie CLI Integration Status');
     console.log('============================');
-    console.log(`Binary detected : ${status.binaryDetected ? 'yes' : 'no'}`);
-    console.log(`Config ready    : ${status.configReady ? 'yes' : 'no'}`);
-    console.log(`Hooks configured: ${status.hooksConfigured ? 'yes' : 'no'}`);
-    console.log(`Config file     : ${status.configFile}`);
+    console.log(`Binary detected        : ${status.binaryDetected ? 'yes' : 'no'}`);
+    if (status.version) {
+      console.log(`Version                : ${status.version}`);
+    }
+    console.log(`Config ready           : ${status.configReady ? 'yes' : 'no'}`);
+    console.log(`Hooks configured       : ${status.hooksConfigured ? 'yes' : 'no'}`);
+    console.log(`Config file            : ${status.configFile}`);
+    console.log(`Lifecycle hooks avail. : ${status.hooksAvailable ? 'yes' : 'no'}`);
+    console.log(`Auto capture supported : ${status.automaticCaptureSupported ? 'yes' : 'no'}`);
+    console.log(`Capture mode           : ${status.captureMode}`);
+    console.log(`GA class               : ${status.gaClass}`);
+    console.log(`Refresh mode           : ${status.refreshMode}`);
+    console.log(`Capability reason      : ${status.capabilityReason}`);
 
     return;
   }
@@ -79,11 +96,38 @@ Commands:
     --config PATH                    Junie config.json
     --bin PATH                       ToolNet binary
 
+    Installs only when the detected build exposes verified lifecycle hooks.
+    Stable builds fail closed and leave config.json untouched.
+
   status
 
   recover
     --project PATH                   Project root
+
+    Available only for hook-capable builds with an active hook marker.
+    Blocked-capability builds refuse recovery instead of guessing.
 `);
+    return;
+  }
+
+  const capability = resolveJunieCapability();
+
+  if (capability.captureMode === 'blocked-capability') {
+    console.log(
+      JSON.stringify(
+        {
+          recovered: false,
+          captureMode: capability.captureMode,
+          version: capability.version,
+          reason: capability.capabilityReason,
+        },
+        null,
+        2
+      )
+    );
+
+    process.exitCode = 1;
+
     return;
   }
 

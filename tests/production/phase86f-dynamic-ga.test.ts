@@ -35,9 +35,12 @@ import {
 } from '../../src/session/integration-capabilities.js';
 import {
   buildIntegrationMatrix,
+  buildRuntimeIntegrationMatrix,
   countIntegrationMatrix,
   type GaCertificationClass,
 } from '../../src/session/integration-matrix.js';
+
+import { resolveJunieCapability } from '../../src/session/junie/capability.js';
 
 import { spawnAiderSession } from '../../src/session/aider/wrapper.js';
 
@@ -436,6 +439,45 @@ describe('Phase 86F — platform matrix honesty', () => {
     expect(doc).toContain('Linux: CERTIFIED (this suite executes on Linux)');
     expect(doc).toContain('NOT_TESTED');
     expect(doc).not.toMatch(/macOS: CERTIFIED|Windows: CERTIFIED/);
+  });
+});
+
+describe('Phase 86F — conditional Junie capability', () => {
+  /**
+   * Junie lifecycle capture is EAP-only. The static contract may declare
+   * native lifecycle, but runtime truth must downgrade a stable build
+   * without hook support instead of leaving a false AUTO claim.
+   */
+  it('keeps Junie AUTO only when the installed build proves hook support', () => {
+    const staticRow = buildIntegrationMatrix().find((row) => row.agent === 'junie')!;
+
+    expect(staticRow.gaClass).toBe('AUTO_NATIVE');
+    expect(staticRow.conditional).toBe(true);
+
+    const stableRows = buildRuntimeIntegrationMatrix({
+      junieCapability: resolveJunieCapability({
+        probe: () => ({ detected: true, version: '1468.30' }),
+      }),
+    });
+    const stableRow = stableRows.find((row) => row.agent === 'junie')!;
+
+    expect(stableRow.auto).toBe(false);
+    expect(stableRow.gaClass).toBe('BLOCKED');
+    expect(stableRow.hookEvents).toEqual([]);
+
+    // The documented EAP hook contract still yields AUTO when evidence exists.
+    const eapRow = buildRuntimeIntegrationMatrix({
+      junieCapability: resolveJunieCapability({
+        probe: () => ({ detected: true, version: '9999.1-eap' }),
+        hookEvidence: 'verified-eap-hooks',
+      }),
+    }).find((row) => row.agent === 'junie')!;
+
+    expect(eapRow.auto).toBe(true);
+    expect(eapRow.gaClass).toBe('AUTO_NATIVE');
+    expect(eapRow.hookEvents).toEqual(['SessionStart', 'Stop', 'SessionEnd']);
+
+    expect(stableRows.filter((row) => row.auto && row.agent === 'junie')).toHaveLength(0);
   });
 });
 

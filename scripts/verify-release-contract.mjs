@@ -399,6 +399,41 @@ for (const [agent, expected] of Object.entries(EXPECTED_AGENTS)) {
   contains(`${agent} production package`, productionCert, `'bundle/${expected.bundle}'`);
 }
 
+exact(
+  'junie capability is conditional',
+  manifestAgents.junie?.conditionalCapability?.runtimeResolutionRequired,
+  true
+);
+exact('junie hook channel is EAP', manifestAgents.junie?.conditionalCapability?.hookChannel, 'eap');
+exact(
+  'junie stable fallback is blocked',
+  manifestAgents.junie?.conditionalCapability?.stableFallback,
+  'blocked-capability'
+);
+exact(
+  'junie manual recovery is not offered',
+  manifestAgents.junie?.conditionalCapability?.manualRecoveryAvailable,
+  false
+);
+exact(
+  'junie stable example has no hooks',
+  manifestAgents.junie?.conditionalCapability?.stableHasHooks,
+  false
+);
+
+const junieReadme = read('README.md') ?? '';
+contains('README documents verified EAP requirement', junieReadme, 'verified hook-capable EAP');
+contains(
+  'README documents blocked stable fallback',
+  readme,
+  'stable builds report blocked capability'
+);
+contains(
+  'README rejects manual recovery claim',
+  readme,
+  'Manual recovery is not offered for stable Junie'
+);
+
 console.log('');
 console.log('=== RELEASE POLICY ===');
 

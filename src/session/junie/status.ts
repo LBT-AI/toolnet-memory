@@ -1,16 +1,22 @@
 import { existsSync, readFileSync } from 'node:fs';
 
-import { spawnSync } from 'node:child_process';
-
 import { junieConfigFile } from './config-paths.js';
 
 import {
-  AGENT_INTEGRATION_CAPABILITIES,
-  type IntegrationCapabilities,
-} from '../integration-capabilities.js';
+  getJunieCaptureMode,
+  getJunieCapabilities,
+  getJunieGaClass,
+  getJunieRefreshMode,
+  resolveJunieCapability,
+  type JunieCapabilityResult,
+} from './capability.js';
+
+import type { IntegrationCapabilities } from '../integration-capabilities.js';
 
 export interface JunieIntegrationStatus {
   binaryDetected: boolean;
+
+  version: string | null;
 
   configReady: boolean;
 
@@ -19,15 +25,32 @@ export interface JunieIntegrationStatus {
   configFile: string;
 
   capabilities: IntegrationCapabilities;
+
+  hooksAvailable: boolean;
+
+  automaticCaptureSupported: boolean;
+
+  captureMode: 'hook' | 'blocked-capability';
+
+  capabilityReason: string;
+
+  gaClass: 'AUTO_NATIVE' | 'MANUAL_RECOVERY' | 'BLOCKED';
+
+  refreshMode: 'native-lifecycle' | 'native-session' | 'blocked';
 }
 
-export function inspectJunieStatus(): JunieIntegrationStatus {
-  const binaryDetected =
-    spawnSync('sh', ['-lc', 'command -v junie >/dev/null 2>&1'], {
-      stdio: 'ignore',
-    }).status === 0;
+export interface InspectJunieStatusOptions {
+  capability?: JunieCapabilityResult;
 
-  const configFile = junieConfigFile();
+  configFile?: string;
+}
+
+export function inspectJunieStatus(
+  options: InspectJunieStatusOptions = {}
+): JunieIntegrationStatus {
+  const capability = options.capability ?? resolveJunieCapability();
+
+  const configFile = options.configFile ?? junieConfigFile();
   const configReady = existsSync(configFile);
 
   let hooksConfigured = false;
@@ -41,12 +64,17 @@ export function inspectJunieStatus(): JunieIntegrationStatus {
   }
 
   return {
-    binaryDetected,
+    binaryDetected: capability.detected,
+    version: capability.version,
     configReady,
     hooksConfigured,
     configFile,
-    capabilities: {
-      ...AGENT_INTEGRATION_CAPABILITIES.junie,
-    },
+    capabilities: getJunieCapabilities(capability),
+    hooksAvailable: capability.hooksAvailable,
+    automaticCaptureSupported: capability.automaticCaptureSupported,
+    captureMode: getJunieCaptureMode(capability),
+    capabilityReason: capability.capabilityReason,
+    gaClass: getJunieGaClass(capability),
+    refreshMode: getJunieRefreshMode(capability),
   };
 }

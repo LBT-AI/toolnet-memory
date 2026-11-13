@@ -7,6 +7,14 @@ import {
   type SupportedIntegrationAgent,
 } from './integration-capabilities.js';
 
+import {
+  getJunieCaptureMode,
+  getJunieGaClass,
+  getJunieRefreshMode,
+  resolveJunieCapability,
+  type JunieCapabilityResult,
+} from './junie/capability.js';
+
 /**
  * Phase 86F — canonical integration matrix.
  *
@@ -72,6 +80,14 @@ export interface IntegrationMatrixRow {
   gaClass: GaCertificationClass;
   auto: boolean;
   hookEvents: readonly string[];
+
+  /** Static contract depends on a runtime capability check (Junie). */
+  conditional?: boolean;
+
+  /** Row was resolved against the current host/build capability. */
+  runtimeResolved?: boolean;
+
+  capabilityReason?: string;
 }
 
 export function buildIntegrationMatrix(): IntegrationMatrixRow[] {
@@ -89,6 +105,42 @@ export function buildIntegrationMatrix(): IntegrationMatrixRow[] {
         gaClass === 'AUTO_PERSISTENT_PLUGIN' ||
         gaClass === 'AUTO_MANAGED_WRAPPER',
       hookEvents: [...REQUIRED_HOOK_EVENTS[agent]],
+      ...(capabilities.conditionalCapture ? { conditional: true } : {}),
+    };
+  });
+}
+
+export interface RuntimeMatrixOptions {
+  /** Injectable Junie capability so tests do not depend on the host binary. */
+  junieCapability?: JunieCapabilityResult;
+}
+
+/**
+ * Resolve product-level conditional capture against the current build.
+ * Static rows describe the capable contract; runtime rows must never keep an
+ * unconditional AUTO claim when the installed build cannot satisfy it.
+ */
+export function buildRuntimeIntegrationMatrix(
+  options: RuntimeMatrixOptions = {}
+): IntegrationMatrixRow[] {
+  const junieCapability = options.junieCapability ?? resolveJunieCapability();
+  const junieGaClass = getJunieGaClass(junieCapability);
+
+  return buildIntegrationMatrix().map((row) => {
+    if (row.agent !== 'junie') {
+      return row;
+    }
+
+    return {
+      ...row,
+      refreshMode: getJunieRefreshMode(junieCapability),
+      captureMode: getJunieCaptureMode(junieCapability),
+      gaClass: junieGaClass,
+      auto: junieGaClass === 'AUTO_NATIVE',
+      hookEvents: junieCapability.hooksAvailable ? [...REQUIRED_HOOK_EVENTS.junie] : [],
+      conditional: true,
+      runtimeResolved: true,
+      capabilityReason: junieCapability.capabilityReason,
     };
   });
 }

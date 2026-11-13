@@ -203,15 +203,16 @@ Continue
 
 Integration capability depends on what each host application exposes:
 
-| Capability                 | Agents                                                                                                                                                                                                           |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build, goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, IBM Bob Shell, Cline CLI, Rovo Dev CLI, Gemini CLI, Junie |
-| Persistent plugin refresh  | OpenCode                                                                                                                                                                                                         |
-| Managed wrapper            | Aider                                                                                                                                                                                                            |
-| Native session capture     | ToolNet CLI                                                                                                                                                                                                      |
-| Manual recovery            | Plandex, Continue                                                                                                                                                                                                |
-| MCP continuity             | Kilo, Codebuff, Freebuff                                                                                                                                                                                         |
-| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no verified native hook system)                                                                                                                    |
+| Capability                 | Agents                                                                                                                                                                                                    |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native lifecycle / refresh | Codex, Agy / Antigravity, Kiro CLI, Claude Code, Cursor CLI, GitHub Copilot CLI, Grok Build, goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, IBM Bob Shell, Cline CLI, Rovo Dev CLI, Gemini CLI |
+| Native lifecycle (EAP)     | Junie (verified hook-capable EAP builds only; stable builds report blocked capability)                                                                                                                    |
+| Persistent plugin refresh  | OpenCode                                                                                                                                                                                                  |
+| Managed wrapper            | Aider                                                                                                                                                                                                     |
+| Native session capture     | ToolNet CLI                                                                                                                                                                                               |
+| Manual recovery            | Plandex, Continue                                                                                                                                                                                         |
+| MCP continuity             | Kilo, Codebuff, Freebuff                                                                                                                                                                                  |
+| Blocked / unresolved       | OpenRouter CLI (product identity unresolved), Warp Agent CLI (no verified native hook system)                                                                                                             |
 
 ToolNet reports lifecycle support only when the host exposes a genuine lifecycle integration.
 
@@ -830,6 +831,29 @@ toolnet-memory integrate:warp --status
 ```
 
 Do not rely on automatic capture for Warp until a verified native hook or wrapper contract is available.
+
+---
+
+## Junie
+
+Junie CLI supports native lifecycle hooks (`SessionStart`, `Stop`, `SessionEnd`) only on **verified hook-capable EAP/preview builds**.
+
+```bash
+toolnet-memory integrate:junie
+toolnet-memory integrate:junie --status
+toolnet-memory session:junie-recover --project /path/to/project
+```
+
+**Stable Junie 1468.30 does not expose the lifecycle-hook contract.** Hooks are an EAP/preview capability. ToolNet has no verified machine-checkable hook-capability signal for EAP builds, so it fails closed.
+
+On a stable build without verified hooks:
+
+- Automatic capture is **not available** (`captureMode=blocked-capability`)
+- The hook installer refuses to write hook config and leaves `~/.junie/config.json` untouched
+- Status and doctor report `hooksAvailable: false` with the exact capability reason
+- `session:junie-recover` refuses instead of guessing
+
+Manual recovery is not offered for stable Junie: ToolNet has not verified a deterministic local session schema that can be imported safely. A hook-capable build becomes `AUTO_NATIVE` only when verified hook capability evidence is available; unknown versions also fail closed.
 
 ---
 

@@ -4,12 +4,17 @@ import { dirname } from 'node:path';
 
 import { junieConfigFile } from './config-paths.js';
 
+import { resolveJunieCapability, type JunieCapabilityResult } from './capability.js';
+
 export interface JunieHookInstallOptions {
   configFile?: string;
 
   binary?: string;
 
   projectRoot?: string;
+
+  /** Injectable capability for deterministic tests and future verified probes. */
+  capability?: JunieCapabilityResult;
 }
 
 export interface JunieHookInstallResult {
@@ -18,6 +23,12 @@ export interface JunieHookInstallResult {
   changed: boolean;
 
   events: string[];
+
+  installed: boolean;
+
+  fallbackAvailable: boolean;
+
+  reason?: string;
 }
 
 type JsonObject = Record<string, unknown>;
@@ -76,13 +87,26 @@ function atomicWriteJson(file: string, value: unknown): void {
 /**
  * Install ToolNet Memory lifecycle hooks into Junie's user config.
  *
- * Junie fires SessionStart with session metadata and SessionEnd/Stop without
- * a session id (Stop carries the last assistant message), so the hook command
- * carries the project root and the runtime keeps a project-scoped marker.
- * Timeouts are seconds, as required by Junie.
+ * Hooks are a verified-EAP capability. Stable builds (including 1468.30) do
+ * not expose the hook config schema, so this installer fails closed and does
+ * not read or rewrite the user config. Timeouts are seconds, as required by
+ * the documented Junie hook contract.
  */
 export function installJunieHooks(options: JunieHookInstallOptions = {}): JunieHookInstallResult {
   const configFile = options.configFile ?? junieConfigFile();
+
+  const capability = options.capability ?? resolveJunieCapability();
+
+  if (!capability.hooksAvailable || !capability.automaticCaptureSupported) {
+    return {
+      configFile,
+      changed: false,
+      events: [],
+      installed: false,
+      fallbackAvailable: false,
+      reason: capability.capabilityReason,
+    };
+  }
 
   const root = readConfig(configFile);
 
@@ -152,5 +176,7 @@ export function installJunieHooks(options: JunieHookInstallOptions = {}): JunieH
     configFile,
     changed,
     events: events.map((event) => event.name),
+    installed: true,
+    fallbackAvailable: false,
   };
 }

@@ -143,7 +143,17 @@
     "junie": {
       "displayName": "Junie",
       "refreshMode": "native-lifecycle",
-      "captureMode": "hook"
+      "captureMode": "hook",
+      "conditionalCapability": {
+        "runtimeResolutionRequired": true,
+        "hookChannel": "eap",
+        "hooksRequireVerifiedCapability": true,
+        "stableFallback": "blocked-capability",
+        "manualRecoveryAvailable": false,
+        "stableBuildExample": "1468.30",
+        "stableHasHooks": false,
+        "reason": "Lifecycle hooks require verified EAP capability; unverified stable builds fail closed without writing hook config."
+      }
     },
     "codebuff": {
       "displayName": "Codebuff",
