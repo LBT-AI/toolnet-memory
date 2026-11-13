@@ -83,7 +83,10 @@ const DEFAULT_BUDGET: Record<ResumePacketMode, number> = {
 };
 
 function clean(value: string): string {
-  return value.replace(/[\u0000-\u001f\u007f]/gu, ' ').replace(/\s+/gu, ' ').trim();
+  return value
+    .replace(/[\u0000-\u001f\u007f]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
 }
 
 function requireValue(value: string, field: string): string {
@@ -213,7 +216,9 @@ export function compileResumePacket(
   if (project.currentCodeRevision && checkpoint.codeRevision) {
     if (project.currentCodeRevision !== checkpoint.codeRevision) {
       warnings.push('CODE_REVISION_MISMATCH: verify working tree before editing');
-      required.push('WARNING: code revision differs from acknowledged checkpoint; inspect changes.');
+      required.push(
+        'WARNING: code revision differs from acknowledged checkpoint; inspect changes.'
+      );
     }
   } else {
     warnings.push('CODE_REVISION_NOT_VERIFIED');
