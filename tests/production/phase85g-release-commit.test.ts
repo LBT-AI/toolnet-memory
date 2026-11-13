@@ -495,10 +495,35 @@ describe('Phase 85G — no tag, push or publish', () => {
     /* Before Phase 85I1 nothing is pushed; afterwards the authorized push may
      * only place the release commit on the remote main branch, never on a tag
      * or a side branch. This suite never pushes anything itself. */
+    /*
+     * GitHub Actions `pull_request` checkouts create an ephemeral merge ref
+     * (refs/remotes/pull/<n>/merge, and occasionally refs/pull/<n>/merge)
+     * that points at the temporary merge commit of HEAD. These refs are
+     * synthesized by the runner, are not real remote branches, and are removed
+     * once the run ends — they must not be treated as evidence that the
+     * release commit leaked onto a side branch. Skip them here so the check
+     * keeps protecting real remote branches only. */
+    /*
+     * In a pull-request CI run the checked-out HEAD lives on the feature
+     * branch under review, so its own remote-tracking ref legitimately points
+     * at HEAD. That is the branch being reviewed, not a leak of the release
+     * commit onto a side branch, and must be allowed alongside main/HEAD. */
+    const currentBranch = git(['symbolic-ref', '--short', 'HEAD']).stdout.trim();
+    const allowedBranches = new Set(['main', 'HEAD', currentBranch]);
+    const allowedPattern = new RegExp(
+      `^refs/remotes/[^/]+/(${[...allowedBranches].map((b) => b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`,
+      'u'
+    );
+
     for (const ref of remoteRefs) {
+      if (/^refs\/(remotes\/)?pull\//u.test(ref.refname)) {
+        continue;
+      }
+
       if (ref.objectname === head) {
-        /* `origin/main` plus its symbolic `origin/HEAD` alias only. */
-        expect(ref.refname).toMatch(/^refs\/remotes\/[^/]+\/(main|HEAD)$/u);
+        /* The current branch's remote-tracking ref, origin/main, and the
+         * symbolic origin/HEAD alias only. */
+        expect(ref.refname).toMatch(allowedPattern);
       }
     }
   });
