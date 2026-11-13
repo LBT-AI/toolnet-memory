@@ -236,24 +236,24 @@ export function compileResumePacket(
 
   let text = required.join('\n');
   const omittedOptionalSections: string[] = [];
+  const otherFlows = project.flows
+    .filter((item) => !item.critical)
+    .map(
+      (item) =>
+        `Other flow [${requireValue(item.id, 'FLOW_ID')}]: ${requireValue(item.description, 'FLOW_DESCRIPTION')}`
+    )
+    .join('\n');
+  const otherRules = project.rules
+    .filter((item) => !item.mandatory)
+    .map(
+      (item) =>
+        `Advisory rule [${requireValue(item.id, 'RULE_ID')}]: ${requireValue(item.text, 'RULE_TEXT')}`
+    )
+    .join('\n');
   const optional: Array<[string, string]> = [
     ['evidence', `Evidence: ${values(task.evidenceRefs)}`],
-    [
-      'other-flows',
-      ...project.flows.filter((item) => !item.critical).map((item) =>
-        `Other flow [${requireValue(item.id, 'FLOW_ID')}]: ${requireValue(item.description, 'FLOW_DESCRIPTION')}`
-      ),
-    ].length > 1
-      ? ['other-flows', project.flows.filter((item) => !item.critical).map((item) =>
-          `Other flow [${requireValue(item.id, 'FLOW_ID')}]: ${requireValue(item.description, 'FLOW_DESCRIPTION')}`
-        ).join('\n')]
-      : ['other-flows', ''],
-    [
-      'other-rules',
-      project.rules.filter((item) => !item.mandatory).map((item) =>
-        `Advisory rule [${requireValue(item.id, 'RULE_ID')}]: ${requireValue(item.text, 'RULE_TEXT')}`
-      ).join('\n'),
-    ],
+    ['other-flows', otherFlows],
+    ['other-rules', otherRules],
   ];
 
   if (mode === 'tiny') {
