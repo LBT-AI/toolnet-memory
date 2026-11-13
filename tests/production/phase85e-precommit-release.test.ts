@@ -97,6 +97,9 @@ const PENDING_HARDENING_PATHS = new Set([
   'README.md',
   'CHANGELOG.md',
   'docs/runtime-truth.md',
+  /* CI workflow and verification script tracked in this repo. */
+  '.github/workflows/ci.yml',
+  'scripts/verify-release-contract.mjs',
   'scripts/verify-v0316-contract.mjs',
   'tests/production/phase83-release-intelligence.test.ts',
   'tests/production/phase85d-release-metadata.test.ts',

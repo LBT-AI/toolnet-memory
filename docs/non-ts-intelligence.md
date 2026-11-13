@@ -39,19 +39,30 @@ SQLite FTS5 / BM25
 
 No embeddings, vector database, model, or network service is involved.
 
-## Structural limitation
+## Structural intelligence for Python, Go, Rust, C, C++
 
-For Python, Go, Rust, C, and C++, ToolNet does not invent structural
-symbols. In this release these languages do not automatically receive:
+Python, Go, Rust, C, and C++ are parsed structurally with package-owned
+tree-sitter grammars. Grammar assets ship with the package and resolve
+offline — no grammar is downloaded at index time. Structural parsing derives:
 
-- function/class graph nodes,
+- function/method/class graph nodes,
 - call edges,
 - import edges,
-- inheritance edges,
-- compiler/type resolution.
+- inheritance edges.
 
-Their local text is searchable, but structural graph capability remains
-explicitly unsupported.
+When a grammar asset is unavailable, parsing fails closed to lexical
+indexing for that file and graph coverage records the structural gap —
+a fallback is never reported as a structural success.
+
+Grammar assets resolve from the installed `node_modules` beside the
+package. Standalone single-binary builds are outside the verified parser
+matrix: if an asset does not resolve there, the same fail-closed lexical
+fallback applies.
+
+What structural parsing does not imply:
+
+- compiler/type resolution,
+- LSP-derived graph edges (LSP stays detection-only, see below).
 
 ## LSP bridge foundation
 

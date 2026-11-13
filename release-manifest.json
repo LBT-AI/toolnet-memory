@@ -27,91 +27,148 @@
   "agents": {
     "agy": {
       "displayName": "Agy / Antigravity",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "opencode": {
       "displayName": "OpenCode",
-      "refreshMode": "persistent-plugin"
+      "refreshMode": "persistent-plugin",
+      "captureMode": "hook"
     },
     "codex": {
       "displayName": "Codex",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "claude": {
       "displayName": "Claude Code",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "kiro": {
       "displayName": "Kiro CLI",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "cursor": {
       "displayName": "Cursor CLI",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "copilot": {
       "displayName": "GitHub Copilot CLI",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "grok": {
       "displayName": "Grok Build",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "toolnet-cli": {
       "displayName": "ToolNet CLI",
-      "refreshMode": "native-session"
+      "refreshMode": "native-session",
+      "captureMode": "manual-sync"
     },
     "kilo": {
       "displayName": "Kilo",
-      "refreshMode": "mcp-only"
+      "refreshMode": "mcp-only",
+      "captureMode": "mcp-only"
     },
     "goose": {
       "displayName": "goose",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "qwen": {
       "displayName": "Qwen Code",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "kimi": {
       "displayName": "Kimi Code CLI",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "hermes": {
       "displayName": "Hermes Agent",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "qoder": {
       "displayName": "Qoder CLI",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "aider": {
       "displayName": "Aider",
-      "refreshMode": "managed-wrapper"
+      "refreshMode": "managed-wrapper",
+      "captureMode": "managed-wrapper-session-end"
     },
     "plandex": {
       "displayName": "Plandex",
-      "refreshMode": "native-session"
+      "refreshMode": "native-session",
+      "captureMode": "manual-sync"
     },
     "openrouter": {
       "displayName": "OpenRouter CLI",
-      "refreshMode": "blocked"
+      "refreshMode": "mcp-only",
+      "captureMode": "blocked-product-identity"
     },
     "bob": {
       "displayName": "IBM Bob Shell",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "cline": {
       "displayName": "Cline CLI",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "rovo": {
       "displayName": "Rovo Dev CLI",
-      "refreshMode": "native-lifecycle"
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
     },
     "warp": {
       "displayName": "Warp Agent CLI",
-      "refreshMode": "blocked"
+      "refreshMode": "blocked",
+      "captureMode": "blocked-capability"
+    },
+    "gemini": {
+      "displayName": "Gemini CLI",
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook"
+    },
+    "junie": {
+      "displayName": "Junie",
+      "refreshMode": "native-lifecycle",
+      "captureMode": "hook",
+      "conditionalCapability": {
+        "runtimeResolutionRequired": true,
+        "hookChannel": "eap",
+        "hooksRequireVerifiedCapability": true,
+        "stableFallback": "blocked-capability",
+        "manualRecoveryAvailable": false,
+        "stableBuildExample": "1468.30",
+        "stableHasHooks": false,
+        "reason": "Lifecycle hooks require verified EAP capability; unverified stable builds fail closed without writing hook config."
+      }
+    },
+    "codebuff": {
+      "displayName": "Codebuff",
+      "refreshMode": "mcp-only",
+      "captureMode": "mcp-only"
+    },
+    "freebuff": {
+      "displayName": "Freebuff",
+      "refreshMode": "mcp-only",
+      "captureMode": "mcp-only"
+    },
+    "continue": {
+      "displayName": "Continue",
+      "refreshMode": "native-session",
+      "captureMode": "manual-sync"
     }
   },
   "releasePolicy": {
@@ -154,8 +211,27 @@
     },
     "codeIntelligence": {
       "parserEngine": "typescript-compiler-api",
-      "treeSitterRuntime": false,
-      "supportedExtensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"],
+      "treeSitterRuntime": true,
+      "supportedExtensions": [
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".mts",
+        ".cts",
+        ".mjs",
+        ".cjs",
+        ".py",
+        ".go",
+        ".rs",
+        ".c",
+        ".h",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".hpp",
+        ".hh"
+      ],
       "tsconfigPaths": true,
       "baseUrlResolution": true,
       "projectReferences": true,
@@ -191,7 +267,7 @@
       "storagePlaceholdersFrozen": true
     },
     "codeSearch": {
-      "displayName": "Local Code Search — SQLite FTS5/BM25",
+      "displayName": "Local Code Search \u2014 SQLite FTS5/BM25",
       "engine": "sqlite-fts5-bm25",
       "mode": "lexical",
       "embeddings": false,
@@ -273,7 +349,7 @@
     "nonTsIntelligence": {
       "localCodeSearch": ["python", "go", "rust", "c", "cpp"],
       "engine": "sqlite-fts5-bm25",
-      "structuralParserSupport": false,
+      "structuralParserSupport": true,
       "lspFoundation": "detection-only",
       "automaticLspDownload": false
     },

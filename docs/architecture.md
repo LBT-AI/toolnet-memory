@@ -1871,7 +1871,9 @@ dependency_graph   import/dependency edge completeness
 
 `lexical_search: complete` never implies `call_graph: complete`.
 
-Python / Go / Rust / C / C++ are structurally unsupported today:
+Python / Go / Rust / C / C++ parse structurally via package-owned
+tree-sitter grammars. When a grammar asset is unavailable for a file, that
+file falls back to lexical indexing and coverage reports the gap:
 
 ```text
 lexical_search   -> complete (when no in-scope parse/skip problems)

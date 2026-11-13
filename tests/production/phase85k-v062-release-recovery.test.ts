@@ -319,7 +319,7 @@ describe('Phase 85K — changelog and README', () => {
       changelog.indexOf('## [0.6.1]')
     );
 
-    expect(current).toContain('22-agent');
+    expect(current).toContain('27-agent');
     expect(current).toContain('goose');
     expect(current).toContain('Qwen Code');
     expect(current).toContain('Aider');

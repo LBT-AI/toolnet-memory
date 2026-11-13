@@ -31,6 +31,7 @@ export type UpgradeFailureCode =
   | 'UPGRADE_EPHEMERAL_CLEAR_FAILED'
   | 'UPGRADE_VERIFY_FAILED'
   | 'UPGRADE_DAEMON_RESTART_FAILED'
+  | 'UPGRADE_DAEMON_RESTART_TIMEOUT'
   | 'DAEMON_UPGRADE_BLOCKED_ACTIVE_SESSIONS'
   | 'UPGRADE_PARTIAL_FAILURE';
 
@@ -105,7 +106,10 @@ export interface UpgradePlan {
 
 /** Recovery state when the daemon restart phase cannot finish. */
 export interface DaemonRestartFailure {
-  code: 'UPGRADE_DAEMON_RESTART_FAILED' | 'DAEMON_UPGRADE_BLOCKED_ACTIVE_SESSIONS';
+  code:
+    | 'UPGRADE_DAEMON_RESTART_FAILED'
+    | 'UPGRADE_DAEMON_RESTART_TIMEOUT'
+    | 'DAEMON_UPGRADE_BLOCKED_ACTIVE_SESSIONS';
   message: string;
   runtimeRoot: string;
   socketPath: string;
@@ -167,7 +171,13 @@ export interface RunUpgradeOptions {
   /**
    * Report the plan without touching anything.
    *
-   * Defaults to true: an upgrade runs only when a caller explicitly opts in.
+   * Defaults to true: an upgrade runs only when a caller opts in.
    */
   dryRun?: boolean;
+  /**
+   * Observability hook invoked before each phase runs (including skipped
+   * reporting). Used by `update` to narrate real progress; never drives
+   * control flow.
+   */
+  onPhase?: (phase: UpgradePhase) => void;
 }

@@ -182,6 +182,11 @@ describe('integration registry', () => {
       'cline',
       'rovo',
       'warp',
+      'gemini',
+      'junie',
+      'codebuff',
+      'freebuff',
+      'continue',
     ]);
 
     for (const spec of PIPELINE_AGENTS) {

@@ -19,11 +19,21 @@ import { cursorDetectionPaths } from '../session/cursor/config-paths.js';
 import { copilotDetectionPaths } from '../session/copilot/config-paths.js';
 import { grokDetectionPaths } from '../session/grok/config-paths.js';
 
+import { geminiDetectionPaths } from '../session/gemini/config-paths.js';
+import { junieDetectionPaths } from '../session/junie/config-paths.js';
+import { codebuffDetectionPaths } from '../session/codebuff/config-paths.js';
+import { freebuffDetectionPaths } from '../session/freebuff/config-paths.js';
+import { continueDetectionPaths } from '../session/continue/config-paths.js';
 export type AgentIntegrationId =
   | 'agy'
   | 'opencode'
   | 'codex'
   | 'claude'
+  | 'gemini'
+  | 'junie'
+  | 'codebuff'
+  | 'freebuff'
+  | 'continue'
   | 'kiro'
   | 'toolnet-cli'
   | 'kilo'
@@ -176,6 +186,46 @@ export function detectAgentIntegrations(
       commandExists,
 
       configPaths: agyDetectionPaths({
+        home,
+      }),
+    }),
+    detectOne({
+      agent: 'gemini',
+      command: 'gemini',
+      commandExists,
+      configPaths: geminiDetectionPaths({
+        home,
+      }),
+    }),
+    detectOne({
+      agent: 'junie',
+      command: 'junie',
+      commandExists,
+      configPaths: junieDetectionPaths({
+        home,
+      }),
+    }),
+    detectOne({
+      agent: 'codebuff',
+      command: 'codebuff',
+      commandExists,
+      configPaths: codebuffDetectionPaths({
+        home,
+      }),
+    }),
+    detectOne({
+      agent: 'freebuff',
+      command: 'freebuff',
+      commandExists,
+      configPaths: freebuffDetectionPaths({
+        home,
+      }),
+    }),
+    detectOne({
+      agent: 'continue',
+      command: 'cn',
+      commandExists,
+      configPaths: continueDetectionPaths({
         home,
       }),
     }),
