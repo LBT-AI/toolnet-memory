@@ -26,9 +26,45 @@ export interface TreeSitterRuntime {
   dispose(): void;
 }
 
+/*
+ * One core runtime per process.
+ *
+ * `web-tree-sitter` replaces its global binding module on every `Parser.init()`
+ * (`initializeBinding` uses `Module3 ??= await ...`, so concurrent callers each
+ * start their own instantiation before the first one resolves). Grammar modules
+ * reserve memory inside whichever core module was current at load time, while
+ * `setLanguage` reads the ABI through the current global module. Loading a
+ * grammar while another init is still in flight therefore makes the ABI read
+ * garbage — observed as "Incompatible language version 591881" — because the
+ * language address belongs to a memory that is no longer current.
+ *
+ * The indexer parses files from a bounded worker pool, so several getParser()
+ * calls race on first use. A single shared init promise makes the core module
+ * stable for the life of the process.
+ */
+let parserInitPromise: Promise<void> | null = null;
+
+function initializeParser(): Promise<void> {
+  parserInitPromise ??= Parser.init();
+  return parserInitPromise;
+}
+
+/*
+ * Grammar instantiation mutates the shared core memory. Serialize it so two
+ * concurrent first uses cannot interleave their module setup.
+ */
+let grammarLoadQueue: Promise<unknown> = Promise.resolve();
+
+function loadGrammar(wasmPath: string): Promise<Language> {
+  const load = grammarLoadQueue.then(() => Language.load(wasmPath));
+  grammarLoadQueue = load.catch(() => undefined);
+  return load;
+}
+
 class TreeSitterRuntimeImpl implements TreeSitterRuntime {
   private initialized = false;
   private languages = new Map<string, Language>();
+  private languageLoads = new Map<string, Promise<Language>>();
   private parsers = new Map<string, Parser>();
 
   constructor(
@@ -40,7 +76,7 @@ class TreeSitterRuntimeImpl implements TreeSitterRuntime {
     if (this.initialized) {
       return;
     }
-    await Parser.init();
+    await initializeParser();
     this.initialized = true;
   }
 
@@ -54,9 +90,20 @@ class TreeSitterRuntimeImpl implements TreeSitterRuntime {
     if (!grammar) {
       return null;
     }
-    const lang = await Language.load(grammar.wasmPath);
-    this.languages.set(language, lang);
-    return lang;
+    const inFlight = this.languageLoads.get(language);
+    if (inFlight) {
+      return inFlight;
+    }
+    const load = loadGrammar(grammar.wasmPath).then((lang) => {
+      this.languages.set(language, lang);
+      return lang;
+    });
+    this.languageLoads.set(language, load);
+    try {
+      return await load;
+    } finally {
+      this.languageLoads.delete(language);
+    }
   }
 
   async getParser(language: string): Promise<Parser | null> {
@@ -85,6 +132,7 @@ class TreeSitterRuntimeImpl implements TreeSitterRuntime {
     }
     this.parsers.clear();
     this.languages.clear();
+    this.languageLoads.clear();
   }
 }
 
