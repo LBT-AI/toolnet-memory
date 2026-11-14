@@ -27,3 +27,5 @@ export {
   type CheckpointRecordResult,
   type CheckpointSessionStatus,
 } from './checkpoint-runtime.js';
+
+export * from './strict-mode.js';
