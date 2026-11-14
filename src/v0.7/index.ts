@@ -21,3 +21,8 @@ export {
   type CheckpointRecordResult,
   type CheckpointSessionStatus,
 } from './checkpoint-runtime.js';
+
+// Export security modules
+export * from './security/project-auth.js';
+export * from './security/secret-redaction.js';
+export * from './security/revision-fencing.js';
