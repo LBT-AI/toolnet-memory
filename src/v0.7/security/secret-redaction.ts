@@ -20,7 +20,7 @@ export class SecretRedactor {
   private readonly config: RedactionConfig;
   private readonly secrets = new Set<string>();
 
-  constructor(config: RedactionConfig = {}) {
+  constructor(config: RedactionConfig = {patterns: []}) {
     this.config = {
       patterns: config.patterns || [
         /sk-[a-zA-Z0-9]{20,}/,  // OpenAI keys
@@ -86,7 +86,11 @@ export class SecretRedactor {
       }
 
       if (this.config.preserveStructure) {
-        const result: Record<string, unknown> = {};
+  const result: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(value)) {
+    result[key] = this.redact(val);
+  }
+  return result;
         for (const [key, val] of Object.entries(value)) {
           result[key] = this.redact(val);
         }
@@ -103,7 +107,7 @@ export class SecretRedactor {
     let output = input;
 
     for (const secret of this.secrets) {
-      output = output.replace(new RegExp(secret.replace(/[.*+?^${}()|[\]/g, '\\$&'), 'gi'), '[REDACTED]');
+      output = output.replace(secret.replace(/[.*+?^${}()|[\]/g, '\\$&'), 'gi'), '[REDACTED]');
     }
 
     for (const pattern of this.config.patterns) {

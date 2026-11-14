@@ -3,8 +3,6 @@
  * Project Brain and resume compilation).
  */
 
-export * from './authority-state.js';
-export * from './cloud-authority.js';
 export * from './checkpoint.js';
 export * from './durability-policy.js';
 export * from './project-brain.js';
@@ -28,4 +26,3 @@ export {
   type CheckpointSessionStatus,
 } from './checkpoint-runtime.js';
 
-export * from './strict-mode.js';

@@ -71,7 +71,11 @@ export class RevisionManager {
     return revision;
   }
 
-  validateRevision(projectId: string, expectedVersion: number, actualChecksum: string): RevisionConflict {
+  validateRevision(
+    projectId: string,
+    expectedVersion: number,
+    actualChecksum: string
+  ): RevisionConflict {
     const stored = this.revisions.get(projectId);
     if (!stored) {
       return {
@@ -126,7 +130,12 @@ export class FencingManager {
   private readonly activeFencingTokens = new Map<string, FencingToken>();
   private readonly activeLeases = new Map<string, Lease>();
 
-  issueFencingToken(projectId: string, taskId: string, agentId: string, ttlMs: number): FencingToken {
+  issueFencingToken(
+    projectId: string,
+    taskId: string,
+    agentId: string,
+    ttlMs: number
+  ): FencingToken {
     const existing = this.activeFencingTokens.get(`${projectId}:${taskId}`);
     const token = existing ? existing.token + 1 : 1;
 
@@ -144,7 +153,12 @@ export class FencingManager {
     return fencingToken;
   }
 
-  validateFencing(projectId: string, taskId: string, agentId: string, fencingToken: number): FencingConflict | null {
+  validateFencing(
+    projectId: string,
+    taskId: string,
+    agentId: string,
+    fencingToken: number
+  ): FencingConflict | null {
     const key = `${projectId}:${taskId}`;
     const stored = this.activeFencingTokens.get(key);
 
@@ -193,7 +207,13 @@ export class FencingManager {
     return null;
   }
 
-  acquireLease(projectId: string, taskId: string, agentId: string, ttlMs: number, fencingToken: number): Lease {
+  acquireLease(
+    projectId: string,
+    taskId: string,
+    agentId: string,
+    ttlMs: number,
+    fencingToken: number
+  ): Lease {
     const lease: Lease = {
       projectId,
       taskId,
@@ -266,7 +286,11 @@ export class SecurityLogger {
   private readonly errors: SecurityError[] = [];
   private readonly secrets = new Set<string>();
 
-  logSecurityError(code: string, message: string, context?: { projectId?: string; agentId?: string }): void {
+  logSecurityError(
+    code: string,
+    message: string,
+    context?: { projectId?: string; agentId?: string }
+  ): void {
     const error: SecurityError = {
       code,
       message: this.redactSecrets(message),
@@ -280,15 +304,20 @@ export class SecurityLogger {
 
   detectSecrets(value: unknown): void {
     if (typeof value === 'string') {
-      const matches = value.match(/(sk-[a-zA-Z0-9]{20,}|token=[a-zA-Z0-9_-]+|password=[\\w-]+|api[\\s=:][\\'\\\"][\\w-]+['\\\"])/g);
-      matches?.forEach(match => this.secrets.add(match.toLowerCase()));
+      const matches = value.match(
+        /(sk-[a-zA-Z0-9]{20,}|token=[a-zA-Z0-9_-]+|password=[\\w-]+|api[\\s=:][\\'\\\"][\\w-]+['\\\"])/g
+      );
+      matches?.forEach((match) => this.secrets.add(match.toLowerCase()));
     }
   }
 
   redactSecrets(value: string): string {
     let redacted = value;
     for (const secret of this.secrets) {
-      redacted = redacted.replace(new RegExp(secret.replace(/[.*+?^${}()|[\\]/g, '\\\\$&'), 'gi'), '[REDACTED]');
+      redacted = redacted.replace(
+        new RegExp(secret.replace(/[.*+?^${}()|[\\]/g, '\\\\$&'), 'gi'),
+        '[REDACTED]'
+      );
     }
     return redacted;
   }
@@ -297,6 +326,6 @@ export class SecurityLogger {
     if (!projectId) {
       return this.errors.slice();
     }
-    return this.errors.filter(error => error.projectId === projectId);
+    return this.errors.filter((error) => error.projectId === projectId);
   }
 }
