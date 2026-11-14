@@ -513,6 +513,12 @@ export class SessionCore {
       // Current work is a derived projection and must not break session flush.
     }
 
+    // Learn new WAL events into the immutable learned journal
+    await this.learner.learnNew({ includeDerivedProjections: true });
+
+    // Materialize learned memory batches into canonical MemoryStore
+    const materialization = await this.materializer.materialize(this.project, this.identity);
+
     return {
       uploadedEvents: result.uploadedEvents,
       lastRemoteSequence: result.lastRemoteSequence,
@@ -521,31 +527,27 @@ export class SessionCore {
 
       status: result.status,
 
-      materialization: result.materialization
-        ? {
-            status: result.materialization.status,
+      materialization: {
+        status: materialization.status,
 
-            batchesScanned: result.materialization.batchesScanned,
+        batchesScanned: materialization.batchesScanned,
 
-            candidates: result.materialization.candidates,
+        candidates: materialization.candidates,
 
-            added: result.materialization.added,
+        added: materialization.added,
 
-            duplicates: result.materialization.duplicates,
+        duplicates: materialization.duplicates,
 
-            memories: result.materialization.memories,
+        memories: materialization.memories,
 
-            evidenceUpdated: result.materialization.evidenceUpdated,
+        evidenceUpdated: materialization.evidenceUpdated,
 
-            operationId: result.materialization.operationId,
+        operationId: materialization.operationId,
 
-            durationMs: result.materialization.durationMs,
+        durationMs: materialization.durationMs,
 
-            ...(result.materialization.errorCode
-              ? { errorCode: result.materialization.errorCode }
-              : {}),
-          }
-        : undefined,
+        ...(materialization.errorCode ? { errorCode: materialization.errorCode } : {}),
+      },
     };
   }
 
