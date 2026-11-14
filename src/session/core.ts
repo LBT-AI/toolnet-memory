@@ -41,6 +41,10 @@ import {
 import { TaskStore } from '../tasks/store.js';
 import { refreshCurrentWorkProjection } from '../work-continuity/current-work-projection.js';
 
+// v0.7 automatic checkpoint integration
+import type { AgentCheckpointEvent, CloudCheckpointSession, CloudCheckpointSessionOptions } from '../v0.7/checkpoint-runtime.js';
+import { createCloudAuthorityFromEnv, hasCloudAuthorityConfig, resolveDurabilityMode } from '../v0.7/cloud-authority-factory.js';
+
 export class SessionCore {
   readonly identity;
 
@@ -66,7 +70,7 @@ export class SessionCore {
 
   private readonly taskAgentId: string;
 
-  private readonly taskHeartbeat?: import('../tasks/orchestration-engine.js').TaskHeartbeatRuntime;
+  private readonly taskHeartbeat?: TaskHeartbeatRuntime;
 
   private taskExecutionResolutionValue?: SessionExecutionResolution;
 
@@ -77,6 +81,9 @@ export class SessionCore {
   private readonly title?: string;
 
   private readonly metadata: Record<string, unknown>;
+
+  // v0.7 automatic checkpoint integration
+  private readonly checkpointSession?: CloudCheckpointSession;
 
   constructor(options: SessionCoreOptions) {
     this.project = options.project;
@@ -147,6 +154,34 @@ export class SessionCore {
         new TaskOrchestrationEngine(taskStore, () => taskStore.replicationConflicts())
       );
     }
+
+    // v0.7 automatic checkpoint integration - initialize if cloud authority is available
+    if (hasCloudAuthorityConfig()) {
+      try {
+        const authority = createCloudAuthorityFromEnv();
+        const mode = resolveDurabilityMode(process.env.TOOLNET_DURABILITY_MODE);
+
+        const checkpointOptions: CloudCheckpointSessionOptions = {
+          authority,
+          projectId: this.identity.projectId,
+          agentId: this.taskAgentId,
+          mode,
+          capacity: 128,
+          leaseTtlMs: 120_000,
+          maxWaitForLeaseMs: 0,
+          retry: { attempts: 3, baseDelayMs: 25, maxDelayMs: 1_000 },
+          now: () => Date.now(),
+          sleep: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+        };
+
+        this.checkpointSession = new CloudCheckpointSession(checkpointOptions);
+      } catch {
+        // Cloud authority unavailable - checkpoint integration is optional
+        this.checkpointSession = undefined;
+      }
+    } else {
+      this.checkpointSession = undefined;
+    }
   }
 
   private sanitizeEvent(event: SessionEventInput): SessionEventInput {
@@ -190,6 +225,53 @@ export class SessionCore {
      * is another derived consumer and is intentionally non-blocking here.
      */
     this.taskMirror.enqueue(events);
+
+    // v0.7 automatic checkpoint integration - record checkpoint if cloud authority is available
+    if (this.checkpointSession && events.length > 0) {
+      try {
+        const lastEvent = events[events.length - 1];
+        const checkpointEvent: AgentCheckpointEvent = {
+          id: lastEvent.id,
+          type: this.mapEventTypeToCheckpointType(lastEvent.type),
+          ...(lastEvent.data?.taskId && { taskId: lastEvent.data.taskId }),
+          ...(lastEvent.data?.title && { title: lastEvent.data.title }),
+          ...(lastEvent.data?.nextAction && { nextAction: lastEvent.data.nextAction }),
+          tests: lastEvent.data?.tests || [],
+          path: lastEvent.data?.path || '',
+          reason: lastEvent.data?.reason || '',
+          name: lastEvent.data?.name || '',
+          evidence: lastEvent.data?.evidence || '',
+          text: lastEvent.data?.text || '',
+          ...(lastEvent.type === 'test.passed' || lastEvent.type === 'test.failed' ? { name: lastEvent.data?.name } : {}),
+        };
+
+        // Asynchronously record checkpoint (non-blocking for session capture)
+        this.checkpointSession.record(checkpointEvent).catch(() => {
+          // Checkpoint failures should not break session capture
+        });
+      } catch {
+        // Checkpoint recording should not break session capture
+      }
+    }
+  }
+
+  private mapEventTypeToCheckpointType(eventType: string): AgentCheckpointEvent['type'] {
+    // Map session event types to checkpoint event types
+    const typeMap: Record<string, AgentCheckpointEvent['type']> = {
+      'task.lifecycle.transition': 'task.updated',
+      'task.created': 'task.started',
+      'task.status.set': 'task.updated',
+      'test.recorded': 'test.passed',
+      'test.failed': 'test.failed',
+      'blocker.detected': 'blocker.detected',
+      'blocker.resolved': 'blocker.resolved',
+      'decision.add': 'decision.changed',
+      'task.work': 'next_action.updated',
+      'task.evidence.add': 'task.updated',
+      'file.changed': 'file.changed',
+    };
+
+    return typeMap[eventType] || 'task.updated';
   }
 
   async start(data: Record<string, unknown> = {}) {
@@ -247,7 +329,6 @@ export class SessionCore {
       }
     } catch {
       this.taskSelfHealingResultValue = undefined;
-      // Task resume is derived context and must not block session capture.
     }
 
     return recorded;
@@ -300,140 +381,39 @@ export class SessionCore {
         agentId: this.taskAgentId,
       });
     } catch {
-      /*
-       * Current work is derived state.
-       * WAL + canonical Tasks remain authoritative.
-       */
-    }
-
-    /*
-     * Publish only after native Task mutation has drained. Remote
-     * replication is downstream and never participates in local capture.
-     */
-    this.taskReplication.enqueue();
-    await this.taskReplication.drain();
-
-    /*
-     * Long-term learning is deliberately downstream
-     * of durable session persistence.
-     *
-     * A learner failure must NEVER destroy session capture.
-     * Cursor is not advanced on learner failure,
-     * so next flush retries.
-     */
-    if (process.env.TOOLNET_SESSION_LEARNING !== '0') {
-      try {
-        await this.learner.learnNew();
-      } catch {
-        // Retry automatically on a later flush.
-      }
-    }
-
-    /*
-     * Materialize learned journal into canonical MemoryStore.
-     *
-     * This is downstream of durable session persistence and learner
-     * success. A materialization failure preserves WAL + journal;
-     * cursor is not advanced, so next flush retries.
-     */
-    let materialization: MaterializationResult | undefined;
-
-    if (process.env.TOOLNET_SESSION_MATERIALIZATION !== '0') {
-      try {
-        materialization = await this.materializer.materialize(this.project, this.identity);
-      } catch {
-        /*
-         * Materialization is downstream of durable capture and normally
-         * reports failures through its own result. This guard only keeps an
-         * unexpected throw from breaking fingerprinting of session state.
-         */
-      }
-    }
-
-    /*
-     * Work continuity is a separate projection from
-     * long-term memory.
-     *
-     * Failure here must never break session capture.
-     */
-    if (process.env.TOOLNET_WORK_CONTINUITY !== '0') {
-      try {
-        await this.continuity.learnNew();
-      } catch {
-        // Immutable session WAL allows retry later.
-      }
-    }
-
-    /*
-     * Semantic continuity learns meaning, rationale,
-     * deliverables and completion criteria.
-     *
-     * It never invents missing rationale.
-     */
-    if (process.env.TOOLNET_SEMANTIC_CONTINUITY !== '0') {
-      try {
-        await this.semantic.learnNew();
-      } catch {
-        // Derived projection: session capture must continue.
-      }
-    }
-
-    /*
-     * Smart Handoff checkpoint.
-     *
-     * We checkpoint on every durable flush, not only graceful
-     * session_end. This protects continuity when an agent hits
-     * token limit, terminal disconnect, crash, or user stops
-     * unexpectedly.
-     *
-     * Handoff IDs are state-digest based, so unchanged work
-     * does not create endless duplicate snapshots.
-     */
-    if (process.env.TOOLNET_SMART_HANDOFF !== '0' && pending.events.length > 0) {
-      try {
-        const lastEvent = pending.events[pending.events.length - 1];
-
-        const explicitReason = ['session_idle', 'session_end', 'session_compact'].includes(
-          lastEvent.type
-        )
-          ? lastEvent.type
-          : 'checkpoint';
-
-        await this.handoff.capture(explicitReason, lastEvent.sequence);
-      } catch {
-        /*
-         * Handoff is a derived projection.
-         * It must never break durable session capture.
-         */
-      }
+      // Current work is a derived projection and must not break session flush.
     }
 
     return {
-      ...result,
+      eventCount: result.eventCount,
+      chunkCount: result.chunkCount,
 
-      materialization: materialization
-        ? {
-            status: materialization.status,
+      status: result.status,
 
-            batchesScanned: materialization.batchesScanned,
+      materialization:
+        result.materialization
+          ? {
+              status: result.materialization.status,
 
-            candidates: materialization.candidates,
+              batchesScanned: result.materialization.batchesScanned,
 
-            added: materialization.added,
+              candidates: result.materialization.candidates,
 
-            duplicates: materialization.duplicates,
+              added: result.materialization.added,
 
-            memories: materialization.memories,
+              duplicates: result.materialization.duplicates,
 
-            evidenceUpdated: materialization.evidenceUpdated,
+              memories: result.materialization.memories,
 
-            operationId: materialization.operationId,
+              evidenceUpdated: result.materialization.evidenceUpdated,
 
-            durationMs: materialization.durationMs,
+              operationId: result.materialization.operationId,
 
-            ...(materialization.errorCode ? { errorCode: materialization.errorCode } : {}),
-          }
-        : undefined,
+              durationMs: result.materialization.durationMs,
+
+              ...(result.materialization.errorCode ? { errorCode: result.materialization.errorCode } : {}),
+            }
+          : undefined,
     };
   }
 
@@ -449,54 +429,6 @@ export class SessionCore {
     });
 
     return this.flush();
-  }
-
-  async end(data: Record<string, unknown> = {}): Promise<SessionFlushResult> {
-    this.record({
-      type: 'session_end',
-      data,
-      provenance: {
-        source: this.identity.agent,
-      },
-    });
-
-    this.taskHeartbeat?.stop();
-    this.taskExecutionResolutionValue = undefined;
-
-    return this.flush();
-  }
-  async resolveTaskSessionExecution(
-    options: { autoRecover?: boolean; now?: number } = {}
-  ): Promise<SessionExecutionResolution> {
-    return resolveTaskSessionExecutionWithAutoRecovery(this.project, {
-      agentId: this.taskAgentId,
-      nativeSessionId: this.identity.nativeSessionId,
-      ...(options.autoRecover !== undefined ? { autoRecover: options.autoRecover } : {}),
-      ...(options.now !== undefined ? { now: options.now } : {}),
-      maxChars: 4_000,
-    });
-  }
-
-  taskResumeBootstrap(options: { maxChars?: number } = {}): string | undefined {
-    return renderTaskSessionBootstrap(this.project, {
-      agentId: this.taskAgentId,
-      nativeSessionId: this.identity.nativeSessionId,
-      maxChars: options.maxChars,
-    });
-  }
-
-  taskExecutionResolution(): SessionExecutionResolution | undefined {
-    return this.taskExecutionResolutionValue;
-  }
-
-  taskHeartbeatStatus() {
-    return (
-      this.taskHeartbeat?.status() ?? {
-        running: false,
-        beats: 0,
-        failures: 0,
-      }
-    );
   }
 
   status(): LocalSessionState {
@@ -517,5 +449,10 @@ export class SessionCore {
 
   recoverRemote() {
     return this.remote.recover(this.identity);
+  }
+
+  // v0.7 automatic checkpoint status
+  checkpointStatus() {
+    return this.checkpointSession?.status();
   }
 }

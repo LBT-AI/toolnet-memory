@@ -17,6 +17,11 @@ import { extractSessionMemory } from '../session-extractor.js';
 import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
 import { syncMaterialization, type SyncMaterialization } from '../sync-materialization.js';
 
+// v0.7 automatic checkpoint integration
+import type { AgentCheckpointEvent } from '../../v0.7/checkpoint-runtime.js';
+import { createCloudAuthorityFromEnv, hasCloudAuthorityConfig, resolveDurabilityMode } from '../../v0.7/cloud-authority-factory.js';
+import { CloudCheckpointSession, type CloudCheckpointSessionOptions } from '../../v0.7/checkpoint-runtime.js';
+
 export interface AgySyncOptions {
   project: ProjectManifest;
 
@@ -58,6 +63,9 @@ export interface AgySyncResult {
 
   /** Canonical MemoryStore outcome once the flush boundary completed. */
   materialization?: SyncMaterialization;
+
+  // v0.7 automatic checkpoint status
+  checkpointStatus?: ReturnType<CloudCheckpointSession['status']>;
 }
 
 function expandHome(value: string): string {
@@ -277,6 +285,9 @@ export async function syncAgySession(options: AgySyncOptions): Promise<AgySyncRe
     reset: transcript.reset,
 
     materialization: syncMaterialization(flushed),
+
+    // v0.7 automatic checkpoint status
+    checkpointStatus: core.checkpointStatus(),
   };
 }
 
