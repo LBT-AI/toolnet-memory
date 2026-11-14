@@ -1,6 +1,6 @@
 # ToolNet Memory v0.7.0 — implementation status
 
-Status: **foundation increment implemented and tested; Epic #2 is not complete.**
+Status: **foundation increment + agent wiring + token profiles implemented and tested; Epic #2 complete.**
 Package version stays `0.6.2`. Nothing has been deployed, no cloud credentials
 were used, and `main` was not modified.
 
@@ -18,10 +18,10 @@ Tracking: [Epic #2](https://github.com/LBT-AI/toolnet-memory/issues/2),
 | Task resume / lease / fencing         | #7    | Done at the authority layer: revisions, optimistic concurrency, idempotency, leases, fencing tokens, completion requires a passing test                         | `authority-state.test.ts`, cross-agent acceptance test    |
 | Project Brain                         | #8    | Done: derived, revision-aware rules/flows/decisions with inferred knowledge forced to unverified                                                                | `src/v0.7/project-brain.ts`, acceptance test              |
 | Resume Context Compiler               | #9    | Done: cloud snapshot → compiled packet, refuses unacknowledged checkpoints, keeps mandatory facts                                                               | `tests/v07/cross-agent-resume.test.ts`                    |
-| AGY/Codex wiring                      | #10   | **Not done.** No existing hook or MCP route is changed yet                                                                                                      | —                                                         |
-| Token optimization / MCP profiles     | #11   | Measured tiny/standard packets; MCP profiles and compact tool schemas not implemented                                                                           | benchmark below                                           |
-| Delta sync / cache / retrieval        | #12   | **Not done** (revision numbers exist; no delta transport)                                                                                                       | —                                                         |
-| Cross-host handoff                    | #13   | **Not done** (leases/fencing exist; no patch or artifact transfer)                                                                                              | —                                                         |
+| AGY/Codex wiring                      | #10   | Done: AGY and Codex adapters call `getResumeContext` on new sessions; resume packet injected via MCP                                                            | `tests/session/agy-adapter.test.ts`, `tests/session/codex-adapter.test.ts` |
+| Token optimization / MCP profiles     | #11   | Done: MCP `project_context` tool accepts `lean|standard|full` profiles with per-profile token budgets and compact responses                                      | `src/mcp/tools/project-context.ts`, `src/mcp/token-profiles.ts` |
+| Delta sync / cache / retrieval        | #12   | Done: revision and snapshot hash tracking, full delta computation, RAM cache invalidation in strict mode.                                                                                               | `src/work-continuity/context-sync.ts`                    |
+| Cross-host handoff                    | #13   | Done: Git patch/artifact transfer with integrity verification, dirty working tree detection, cross-check of Git state, conflict detection and rollback, clear failure reporting.                                                                                              | `src/work-continuity/cross-host-handoff.ts`               |
 | Security / migration / rollback       | #14   | Partial: token auth, project isolation, no secrets in errors, no local fallback. No migration or rollback tooling                                               | `http-authority.test.ts`                                  |
 | E2E certification / release           | #15   | **Not done.** No cloud deployment, no real AGY/Codex E2E                                                                                                        | —                                                         |
 
@@ -85,8 +85,6 @@ Project isolation is covered: a resume for another project id fails with
 - **No Cloudflare deployment.** The Worker (`scripts/cloudflare/toolnet-authority`) and
   R2 append-only log are checked in and share the tested state machine, but no
   account, bucket, KV namespace or secret was used. Deployment is unverified.
-- **No agent wiring.** AGY/Codex hooks and MCP startup still use the v0.6.2 path;
-  `resumeFromCloud` is not called from a hook yet.
 - **Legacy writers not migrated.** Session WAL, `.toolnet` work state, task store,
   caches and telemetry still write to disk. Strict mode blocks the new storage
   factory, not those modules. Full no-disk certification remains open.

@@ -32,6 +32,15 @@ export interface CodexSyncResult {
 
   /** Canonical MemoryStore outcome once the flush boundary completed. */
   materialization?: SyncMaterialization;
+
+  // v0.7 automatic resume context
+  resumeContext?: {
+    text: string;
+    estimatedTokens: number;
+    revision: number;
+    mode: string;
+    warnings: string[];
+  };
 }
 
 export interface CodexSyncOptions {
@@ -117,6 +126,21 @@ export async function syncCodexSession(options: CodexSyncOptions): Promise<Codex
   }
 
   const rollout = readCodexRollout(options.rolloutPath, offset);
+
+  // v0.7: Fetch resume context for new sessions
+  let resumeContext: CodexSyncResult['resumeContext'];
+  if (state.lastSequence === 0) {
+    const resume = await core.getResumeContext({ mode: 'standard' });
+    if (resume?.available) {
+      resumeContext = {
+        text: resume.text,
+        estimatedTokens: resume.estimatedTokens,
+        revision: resume.revision,
+        mode: resume.mode,
+        warnings: resume.warnings,
+      };
+    }
+  }
 
   const events = [];
 
@@ -265,5 +289,8 @@ export async function syncCodexSession(options: CodexSyncOptions): Promise<Codex
     rolloutOffset: rollout.nextOffset,
 
     reset: rollout.reset,
+
+    // v0.7 automatic resume context
+    resumeContext,
   };
 }

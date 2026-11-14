@@ -1,6 +1,6 @@
 import type { ProjectManifest } from '../core/types.js';
 import type { NativeTaskMirrorRuntime } from './native-plan/runtime.js';
-import type { SessionWal } from './wal.js';
+import type { SessionWalInterface } from './core.js';
 
 export interface SessionTaskSelfHealingResult {
   projectionRecovered: boolean;
@@ -19,7 +19,7 @@ function errorMessage(error: unknown): string {
 /** Repair derived Task state from the authoritative Task log and Session WAL. */
 export async function recoverSessionTaskState(
   project: Pick<ProjectManifest, 'id' | 'rootPath'>,
-  wal: SessionWal,
+  wal: SessionWalInterface,
   mirror: NativeTaskMirrorRuntime
 ): Promise<SessionTaskSelfHealingResult> {
   const errors: string[] = [];

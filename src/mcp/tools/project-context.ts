@@ -4,6 +4,7 @@ import type { MCPContext } from '../context.js';
 import { getArchitecture } from '../../code-intelligence/graph/architecture.js';
 
 import { loadRelevantAdrContext } from '../adr.js';
+import { getProfileConfig, type MCPProfile, compactResponse } from '../token-profiles.js';
 
 export const projectContextSchema = {
   query: z.string().optional(),
@@ -15,6 +16,12 @@ export const projectContextSchema = {
    */
   filePaths: z.array(z.string()).max(20).optional(),
   symbols: z.array(z.string()).max(20).optional(),
+
+  /**
+   * Token exposure profile: lean (minimal), standard (balanced), full (complete).
+   * Lean profile reduces tokens by omitting raw traces, detailed metrics, and limiting arrays.
+   */
+  profile: z.enum(['lean', 'standard', 'full']).optional(),
 };
 
 export async function projectContext(
@@ -24,15 +31,21 @@ export async function projectContext(
     memoryLimit?: number;
     filePaths?: string[];
     symbols?: string[];
+    profile?: MCPProfile;
   }
 ) {
+  const profileConfig = getProfileConfig(input.profile);
+
   const architecture = getArchitecture(ctx.graph, ctx.project.id);
 
-  const recent = ctx.memory.recent(ctx.project.id, 5);
+  const recent = ctx.memory.recent(ctx.project.id, profileConfig.maxMemoryItems);
 
   const relevant = input.query
     ? ctx.retrieval.search(ctx.project.id, input.query, {
-        topK: input.memoryLimit ?? 5,
+        topK: Math.min(
+          input.memoryLimit ?? profileConfig.maxMemoryItems,
+          profileConfig.maxMemoryItems
+        ),
       })
     : [];
 
@@ -49,7 +62,7 @@ export async function projectContext(
       })
     : undefined;
 
-  return {
+  let result = {
     project: {
       id: ctx.project.id,
 
@@ -64,6 +77,12 @@ export async function projectContext(
 
     relevant: relevant.map((item) => item.memory),
 
-    ...(architectureDecisions && architectureDecisions.length > 0 ? { architectureDecisions } : {}),
+    ...(architectureDecisions && architectureDecisions.length > 0
+      ? { architectureDecisions: architectureDecisions.slice(0, profileConfig.maxDecisions) }
+      : {}),
   };
+
+  result = compactResponse(result, profileConfig);
+
+  return result;
 }

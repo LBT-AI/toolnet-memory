@@ -3,6 +3,7 @@ import { Sanitizer } from '../security/sanitizer.js';
 import type {
   LocalSessionState,
   NormalizedSessionEvent,
+  PendingSessionEvents,
   SessionCoreOptions,
   SessionEventInput,
   SessionEventType,
@@ -14,6 +15,18 @@ import { createSessionIdentity } from './identity.js';
 import { RemoteSessionStore } from './store.js';
 
 import { SessionWal } from './wal.js';
+import { InMemorySessionWal } from './in-memory-wal.js';
+
+export interface SessionWalInterface {
+  append(inputs: SessionEventInput[]): NormalizedSessionEvent[];
+  readAllEvents(): NormalizedSessionEvent[];
+  readEventsFromOffset(offset: number): { events: NormalizedSessionEvent[]; nextOffset: number };
+  readPending(): PendingSessionEvents;
+  markRemote(sequence: number, byteOffset: number): void;
+  setSourceCursor(source: string, value: string | number): void;
+  loadState(): LocalSessionState;
+  eventsFile: string;
+}
 
 import { SessionMemoryLearner } from './learner/learner.js';
 
@@ -50,11 +63,13 @@ import {
   hasCloudAuthorityConfig,
 } from '../v0.7/cloud-authority-factory.js';
 import { resolveDurabilityMode } from '../v0.7/durability-policy.js';
+import { resumeFromCloud, type CloudResumeResult } from '../v0.7/resume.js';
+import type { CloudAuthority } from '../v0.7/cloud-authority.js';
 
 export class SessionCore {
   readonly identity;
 
-  readonly wal: SessionWal;
+  readonly wal: SessionWalInterface;
 
   readonly remote: RemoteSessionStore;
 
@@ -90,6 +105,7 @@ export class SessionCore {
 
   // v0.7 automatic checkpoint integration
   private readonly checkpointSession?: CloudCheckpointSession;
+  private readonly cloudAuthority?: CloudAuthority;
 
   constructor(options: SessionCoreOptions) {
     this.project = options.project;
@@ -100,7 +116,13 @@ export class SessionCore {
 
     this.metadata = this.sanitizer.sanitizeValue(options.metadata ?? {}) as Record<string, unknown>;
 
-    this.wal = new SessionWal(this.identity, options.eventContext);
+    // v0.7: Use in-memory WAL in strict cloud-only mode to avoid disk writes
+    const mode = resolveDurabilityMode(process.env.TOOLNET_DURABILITY_MODE);
+    if (mode === 'strict-cloud-only') {
+      this.wal = new InMemorySessionWal(this.identity, options.eventContext);
+    } else {
+      this.wal = new SessionWal(this.identity, options.eventContext);
+    }
 
     this.remote = new RemoteSessionStore(
       options.storage,
@@ -180,13 +202,16 @@ export class SessionCore {
           sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         };
 
+        this.cloudAuthority = authority;
         this.checkpointSession = new CloudCheckpointSession(checkpointOptions);
       } catch {
         // Cloud authority unavailable - checkpoint integration is optional
         this.checkpointSession = undefined;
+        this.cloudAuthority = undefined;
       }
     } else {
       this.checkpointSession = undefined;
+      this.cloudAuthority = undefined;
     }
   }
 
@@ -236,7 +261,7 @@ export class SessionCore {
     if (this.checkpointSession && events.length > 0) {
       try {
         const lastEvent = events[events.length - 1];
-        const checkpointType = this.mapEventTypeToCheckpointType(lastEvent.type);
+        const checkpointType = this.mapEventTypeToCheckpointType(lastEvent.type, lastEvent.data);
         let checkpointEvent: AgentCheckpointEvent;
 
         switch (checkpointType) {
@@ -377,20 +402,37 @@ export class SessionCore {
     }
   }
 
-  private mapEventTypeToCheckpointType(eventType: SessionEventType): AgentCheckpointEvent['type'] {
+  private mapEventTypeToCheckpointType(
+    eventType: SessionEventType,
+    eventData?: Record<string, unknown>
+  ): AgentCheckpointEvent['type'] {
     // Map session event types to checkpoint event types
+    // For 'test' events, check the outcome from event data
+    if (eventType === 'test') {
+      const outcome = eventData?.outcome;
+      return outcome === 'fail' ? 'test.failed' : 'test.passed';
+    }
+
+    // For 'custom' events, check if they represent task lifecycle or other checkpoint events
+    if (eventType === 'custom') {
+      const customEvent = eventData?.event as string | undefined;
+      if (customEvent === 'task_started' || customEvent === 'task.created') return 'task.started';
+      if (customEvent === 'task_updated' || customEvent === 'task.status.set')
+        return 'task.updated';
+      if (customEvent === 'task_completed') return 'task.completed';
+      if (customEvent === 'blocker_detected') return 'blocker.detected';
+      if (customEvent === 'blocker_resolved') return 'blocker.resolved';
+      if (customEvent === 'decision_changed') return 'decision.changed';
+      if (customEvent === 'next_action_updated') return 'next_action.updated';
+      if (customEvent === 'file_changed') return 'file.changed';
+    }
+
     const typeMap: Record<string, AgentCheckpointEvent['type']> = {
-      'task.lifecycle.transition': 'task.updated',
-      'task.created': 'task.started',
-      'task.status.set': 'task.updated',
-      'test.recorded': 'test.passed',
-      'test.failed': 'test.failed',
-      'blocker.detected': 'blocker.detected',
-      'blocker.resolved': 'blocker.resolved',
-      'decision.add': 'decision.changed',
-      'task.work': 'next_action.updated',
-      'task.evidence.add': 'task.updated',
-      'file.changed': 'file.changed',
+      tool_call: 'file.changed',
+      file_write: 'file.changed',
+      file_edit: 'file.changed',
+      decision: 'decision.changed',
+      todo: 'next_action.updated',
     };
 
     return typeMap[eventType] || 'task.updated';
@@ -413,6 +455,15 @@ export class SessionCore {
         source: this.identity.agent,
       },
     });
+
+    // v0.7: Start cloud checkpoint session if available
+    if (this.checkpointSession) {
+      try {
+        await this.checkpointSession.start({ takeover: false });
+      } catch {
+        // Checkpoint session start failure should not break session startup
+      }
+    }
 
     try {
       this.taskSelfHealingResultValue = await recoverSessionTaskState(
@@ -516,6 +567,12 @@ export class SessionCore {
     // Learn new WAL events into the immutable learned journal
     await this.learner.learnNew({ includeDerivedProjections: true });
 
+    // Learn new WAL events into work continuity journal
+    await this.continuity.learnNew();
+
+    // Learn new WAL events into semantic work journal
+    await this.semantic.learnNew();
+
     // Materialize learned memory batches into canonical MemoryStore
     const materialization = await this.materializer.materialize(this.project, this.identity);
 
@@ -562,6 +619,27 @@ export class SessionCore {
       },
     });
 
+    // v0.7: Record session interrupted checkpoint and release lease
+    if (this.checkpointSession) {
+      try {
+        await this.checkpointSession.record({
+          type: 'session.interrupted',
+          reason: 'session_idle',
+        });
+        await this.checkpointSession.release();
+      } catch {
+        // Checkpoint failures should not break session idle
+      }
+    }
+
+    // Capture smart handoff for unfinished work
+    const state = this.wal.loadState();
+    try {
+      await this.handoff.capture((data.reason as string) ?? 'session_idle', state.lastSequence);
+    } catch {
+      // Handoff capture failures should not break session idle
+    }
+
     return this.flush();
   }
 
@@ -588,5 +666,30 @@ export class SessionCore {
   // v0.7 automatic checkpoint status
   checkpointStatus() {
     return this.checkpointSession?.status();
+  }
+
+  // v0.7 automatic resume context
+  async getResumeContext(
+    options: {
+      mode?: 'tiny' | 'standard' | 'full';
+      budgetTokens?: number;
+      currentCodeRevision?: string;
+    } = {}
+  ): Promise<CloudResumeResult | null> {
+    if (!this.cloudAuthority) {
+      return null;
+    }
+
+    try {
+      return await resumeFromCloud({
+        authority: this.cloudAuthority,
+        projectId: this.identity.projectId,
+        mode: options.mode,
+        budgetTokens: options.budgetTokens,
+        currentCodeRevision: options.currentCodeRevision,
+      });
+    } catch {
+      return null;
+    }
   }
 }
