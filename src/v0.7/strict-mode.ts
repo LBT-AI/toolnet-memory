@@ -6,6 +6,8 @@
  * cloud authority only.
  */
 
+import { statSync, existsSync, readFileSync } from 'node:fs';
+
 export interface StrictModeOptions {
   strictCloudOnly?: boolean;
   allowLocalFallback?: boolean;
@@ -101,8 +103,7 @@ export function checkSwapSpace(): boolean {
   }
 
   try {
-    const fs = require('node:fs');
-    const stats = fs.statSync('/tmp', 'utf8');
+    const stats = statSync('/tmp');
     // Check if /tmp is on a tmpfs or has sufficient space
     // For now, just return true as this is a basic check
     return true;
@@ -118,10 +119,9 @@ export function checkCrashDumpConfiguration(): boolean {
 
   // Basic check for crash dump configuration
   try {
-    const fs = require('node:fs');
     const corePattern = '/proc/sys/kernel/core_pattern';
-    if (fs.existsSync(corePattern)) {
-      const pattern = fs.readFileSync(corePattern, 'utf8').trim();
+    if (existsSync(corePattern)) {
+      const pattern = readFileSync(corePattern, 'utf8').trim();
       // If core_pattern contains a pipe (|), crash dumps go to a file
       // If it contains a path, crash dumps go to a file
       // Both are acceptable for our purposes
@@ -133,4 +133,3 @@ export function checkCrashDumpConfiguration(): boolean {
 
   return true;
 }
-

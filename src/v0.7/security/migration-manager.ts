@@ -6,7 +6,7 @@
  */
 
 import { createHash, createHmac } from 'node:crypto';
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
 export interface BackupRecord {
@@ -156,13 +156,11 @@ export class BackupManager {
   }
 
   private readBackupFiles(backupDir: string): string[] {
-    const fs = require('node:fs');
-    const path = require('node:path');
-    
+
     try {
-      return fs.readdirSync(backupDir)
+      return readdirSync(backupDir)
         .filter((filePath: string) => filePath.endsWith('.json') && filePath.startsWith('exported-'))
-        .map((filePath: string) => path.join(backupDir, filePath));
+        .map((filePath: string) => join(backupDir, filePath));
     } catch {
       return [];
     }
@@ -264,8 +262,7 @@ export class MigrationManager {
   }
 
   private loadV062Data(sourcePath: string): any {
-    const fs = require('node:fs');
-    return JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+    return JSON.parse(readFileSync(sourcePath, 'utf8'));
   }
 
   private validateV062Schema(data: any): boolean {
