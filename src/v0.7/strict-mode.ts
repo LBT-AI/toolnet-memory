@@ -134,7 +134,3 @@ export function checkCrashDumpConfiguration(): boolean {
   return true;
 }
 
-export function isStrictCloudOnly(): boolean {
-  const mode = process.env.TOOLNET_DURABILITY_MODE;
-  return mode === 'strict-cloud-only' || mode === 'strict';
-}

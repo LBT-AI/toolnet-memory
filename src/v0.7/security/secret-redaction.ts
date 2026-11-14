@@ -91,7 +91,7 @@ export class SecretRedactor {
     result[key] = this.redact(val);
   }
   return result;
-        for (const [key, val] of Object.entries(value)) {
+        for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
           result[key] = this.redact(val);
         }
         return result;
@@ -107,7 +107,7 @@ export class SecretRedactor {
     let output = input;
 
     for (const secret of this.secrets) {
-      output = output.replace(secret.replace(/[.*+?^${}()|[\]/g, '\\$&'), 'gi'), '[REDACTED]');
+      output = output.replace(secret, '[REDACTED]');
     }
 
     for (const pattern of this.config.patterns) {
@@ -171,7 +171,8 @@ export class LogSanitizer {
   constructor(private readonly redactor: SecretRedactor) {}
 
   sanitizeLogEntry(entry: Record<string, unknown>): Record<string, unknown> {
-    return this.redactor.redact(entry);
+    const result = this.redactor.redact(entry);
+    return result as Record<string, unknown>;
   }
 
   sanitizeTelemetryPayload(payload: unknown): unknown {

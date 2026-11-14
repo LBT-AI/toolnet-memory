@@ -161,8 +161,8 @@ export class BackupManager {
     
     try {
       return fs.readdirSync(backupDir)
-        .filter(file => file.endsWith('.json') && file.startsWith('exported-'))
-        .map(file => path.join(backupDir, file));
+        .filter((filePath: string) => filePath.endsWith('.json') && filePath.startsWith('exported-'))
+        .map((filePath: string) => path.join(backupDir, filePath));
     } catch {
       return [];
     }
