@@ -5,6 +5,7 @@ import type {
   NormalizedSessionEvent,
   SessionCoreOptions,
   SessionEventInput,
+  SessionEventType,
   SessionFlushResult,
 } from './types.js';
 
@@ -16,7 +17,7 @@ import { SessionWal } from './wal.js';
 
 import { SessionMemoryLearner } from './learner/learner.js';
 
-import { SessionMemoryMaterializer, type MaterializationResult } from './learner/materializer.js';
+import { SessionMemoryMaterializer } from './learner/materializer.js';
 
 import { WorkContinuityLearner } from '../work-continuity/learner.js';
 
@@ -29,10 +30,7 @@ import { checkpointLocalSession } from './local-checkpoint.js';
 import { NativeTaskMirrorRuntime } from './native-plan/runtime.js';
 import { recoverSessionTaskState, type SessionTaskSelfHealingResult } from './task-self-healing.js';
 import { TaskReplicationRuntime } from '../tasks/replication/runtime.js';
-import {
-  resolveTaskSessionExecutionWithAutoRecovery,
-  renderTaskSessionBootstrap,
-} from '../tasks/session-resume.js';
+import { resolveTaskSessionExecutionWithAutoRecovery } from '../tasks/session-resume.js';
 import {
   TaskHeartbeatRuntime,
   TaskOrchestrationEngine,
@@ -42,8 +40,16 @@ import { TaskStore } from '../tasks/store.js';
 import { refreshCurrentWorkProjection } from '../work-continuity/current-work-projection.js';
 
 // v0.7 automatic checkpoint integration
-import type { AgentCheckpointEvent, CloudCheckpointSession, CloudCheckpointSessionOptions } from '../v0.7/checkpoint-runtime.js';
-import { createCloudAuthorityFromEnv, hasCloudAuthorityConfig, resolveDurabilityMode } from '../v0.7/cloud-authority-factory.js';
+import {
+  AgentCheckpointEvent,
+  CloudCheckpointSession,
+  CloudCheckpointSessionOptions,
+} from '../v0.7/checkpoint-runtime.js';
+import {
+  createCloudAuthorityFromEnv,
+  hasCloudAuthorityConfig,
+} from '../v0.7/cloud-authority-factory.js';
+import { resolveDurabilityMode } from '../v0.7/durability-policy.js';
 
 export class SessionCore {
   readonly identity;
@@ -171,7 +177,7 @@ export class SessionCore {
           maxWaitForLeaseMs: 0,
           retry: { attempts: 3, baseDelayMs: 25, maxDelayMs: 1_000 },
           now: () => Date.now(),
-          sleep: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+          sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         };
 
         this.checkpointSession = new CloudCheckpointSession(checkpointOptions);
@@ -230,20 +236,136 @@ export class SessionCore {
     if (this.checkpointSession && events.length > 0) {
       try {
         const lastEvent = events[events.length - 1];
-        const checkpointEvent: AgentCheckpointEvent = {
-          id: lastEvent.id,
-          type: this.mapEventTypeToCheckpointType(lastEvent.type),
-          ...(lastEvent.data?.taskId && { taskId: lastEvent.data.taskId }),
-          ...(lastEvent.data?.title && { title: lastEvent.data.title }),
-          ...(lastEvent.data?.nextAction && { nextAction: lastEvent.data.nextAction }),
-          tests: lastEvent.data?.tests || [],
-          path: lastEvent.data?.path || '',
-          reason: lastEvent.data?.reason || '',
-          name: lastEvent.data?.name || '',
-          evidence: lastEvent.data?.evidence || '',
-          text: lastEvent.data?.text || '',
-          ...(lastEvent.type === 'test.passed' || lastEvent.type === 'test.failed' ? { name: lastEvent.data?.name } : {}),
-        };
+        const checkpointType = this.mapEventTypeToCheckpointType(lastEvent.type);
+        let checkpointEvent: AgentCheckpointEvent;
+
+        switch (checkpointType) {
+          case 'task.started': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'task.started',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              ...(lastEvent.data?.title !== undefined && { title: lastEvent.data.title as string }),
+              ...(lastEvent.data?.nextAction !== undefined && {
+                nextAction: lastEvent.data.nextAction as string,
+              }),
+            };
+            break;
+          }
+          case 'task.updated': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'task.updated',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              ...(lastEvent.data?.nextAction !== undefined && {
+                nextAction: lastEvent.data.nextAction as string,
+              }),
+            };
+            break;
+          }
+          case 'file.changed': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'file.changed',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              path: lastEvent.data?.path as string,
+            };
+            break;
+          }
+          case 'test.passed': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'test.passed',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              name: lastEvent.data?.name as string,
+            };
+            break;
+          }
+          case 'test.failed': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'test.failed',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              name: lastEvent.data?.name as string,
+            };
+            break;
+          }
+          case 'blocker.detected': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'blocker.detected',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              reason: lastEvent.data?.reason as string,
+              ...(lastEvent.data?.nextAction !== undefined && {
+                nextAction: lastEvent.data.nextAction as string,
+              }),
+            };
+            break;
+          }
+          case 'blocker.resolved': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'blocker.resolved',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              ...(lastEvent.data?.nextAction !== undefined && {
+                nextAction: lastEvent.data.nextAction as string,
+              }),
+            };
+            break;
+          }
+          case 'decision.changed': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'decision.changed',
+              text: lastEvent.data?.text as string,
+            };
+            break;
+          }
+          case 'next_action.updated': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'next_action.updated',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              nextAction: lastEvent.data?.nextAction as string,
+            };
+            break;
+          }
+          case 'session.interrupted': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'session.interrupted',
+              ...(lastEvent.data?.reason !== undefined && {
+                reason: lastEvent.data.reason as string,
+              }),
+            };
+            break;
+          }
+          default: {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'task.updated',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+            };
+          }
+        }
 
         // Asynchronously record checkpoint (non-blocking for session capture)
         this.checkpointSession.record(checkpointEvent).catch(() => {
@@ -255,7 +377,7 @@ export class SessionCore {
     }
   }
 
-  private mapEventTypeToCheckpointType(eventType: string): AgentCheckpointEvent['type'] {
+  private mapEventTypeToCheckpointType(eventType: SessionEventType): AgentCheckpointEvent['type'] {
     // Map session event types to checkpoint event types
     const typeMap: Record<string, AgentCheckpointEvent['type']> = {
       'task.lifecycle.transition': 'task.updated',
@@ -306,7 +428,14 @@ export class SessionCore {
       } catch {
         // Current work is a derived projection and must not break session startup.
       }
-      this.taskExecutionResolutionValue = await this.resolveTaskSessionExecution();
+      this.taskExecutionResolutionValue = await resolveTaskSessionExecutionWithAutoRecovery(
+        { id: this.project.id, rootPath: this.project.rootPath },
+        {
+          agentId: this.taskAgentId,
+          nativeSessionId: this.identity.nativeSessionId,
+          now: Date.now(),
+        }
+      );
       try {
         /*
          * resolveTaskSessionExecution() may opt-in recover/claim a Task.
@@ -385,35 +514,38 @@ export class SessionCore {
     }
 
     return {
+      uploadedEvents: result.uploadedEvents,
+      lastRemoteSequence: result.lastRemoteSequence,
       eventCount: result.eventCount,
       chunkCount: result.chunkCount,
 
       status: result.status,
 
-      materialization:
-        result.materialization
-          ? {
-              status: result.materialization.status,
+      materialization: result.materialization
+        ? {
+            status: result.materialization.status,
 
-              batchesScanned: result.materialization.batchesScanned,
+            batchesScanned: result.materialization.batchesScanned,
 
-              candidates: result.materialization.candidates,
+            candidates: result.materialization.candidates,
 
-              added: result.materialization.added,
+            added: result.materialization.added,
 
-              duplicates: result.materialization.duplicates,
+            duplicates: result.materialization.duplicates,
 
-              memories: result.materialization.memories,
+            memories: result.materialization.memories,
 
-              evidenceUpdated: result.materialization.evidenceUpdated,
+            evidenceUpdated: result.materialization.evidenceUpdated,
 
-              operationId: result.materialization.operationId,
+            operationId: result.materialization.operationId,
 
-              durationMs: result.materialization.durationMs,
+            durationMs: result.materialization.durationMs,
 
-              ...(result.materialization.errorCode ? { errorCode: result.materialization.errorCode } : {}),
-            }
-          : undefined,
+            ...(result.materialization.errorCode
+              ? { errorCode: result.materialization.errorCode }
+              : {}),
+          }
+        : undefined,
     };
   }
 

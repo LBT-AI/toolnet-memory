@@ -6,359 +6,355 @@
  * revision checks, lease acquire/heartbeat and fencing.
  */
 
-import { vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
-import type { AuthorityCommitRequest, AuthorityCommitResult } from '../src/v0.7/authority-state.js';
-import type { CloudAuthority } from '../src/v0.7/cloud-authority.js';
-import { CloudCheckpointSession, type AgentCheckpointEvent, type CloudCheckpointSessionOptions } from '../src/v0.7/checkpoint-runtime.js';
+import { InMemoryCloudAuthority } from '../../src/v0.7/cloud-authority.js';
+import { AuthorityError } from '../../src/v0.7/authority-state.js';
+import {
+  CloudCheckpointSession,
+  type AgentCheckpointEvent,
+  type CloudCheckpointSessionOptions,
+} from '../../src/v0.7/checkpoint-runtime.js';
 
-const mockAuthority: CloudAuthority = {
-  kind: 'memory',
+describe('CloudCheckpointSession', () => {
+  let authority: InMemoryCloudAuthority;
 
-  async fetchSnapshot(projectId: string): Promise<import('../src/v0.7/authority-state.js').AuthoritySnapshot> {
-    return {
-      projectId,
+  beforeEach(() => {
+    authority = new InMemoryCloudAuthority();
+    authority.seed({
+      projectId: 'test-project',
       projectName: 'Test Project',
-      revision: 0,
-      sequence: 0,
-      tasks: {},
-      rules: [],
-      flows: [],
-      decisions: [],
-      leases: {},
-      generatedAt: new Date().toISOString(),
+      tasks: [{ id: 'task-1', title: 'Test Task', status: 'in_progress' }],
+    });
+  });
+
+  it('creates and starts successfully', async () => {
+    const options: CloudCheckpointSessionOptions = {
+      authority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
     };
-  },
 
-  async commit(request: AuthorityCommitRequest): Promise<AuthorityCommitResult> {
-    return {
-      revision: 1,
-      acknowledgedAt: new Date().toISOString(),
+    const session = new CloudCheckpointSession(options);
+
+    const startResult = await session.start();
+
+    expect(startResult.ok).toBe(true);
+    if (startResult.ok) {
+      expect(startResult.taskId).toBeDefined();
+      expect(startResult.revision).toBe(0);
+    }
+  });
+
+  it('records checkpoint events', async () => {
+    const options: CloudCheckpointSessionOptions = {
+      authority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
     };
-  },
 
-  async acquireLease(request: import('../src/v0.7/authority-state.js').AcquireLeaseRequest): Promise<import('../src/v0.7/authority-state.js').LeaseGrant> {
-    return {
-      lease: {
-        leaseId: 'test-lease',
-        taskId: request.taskId,
-        agentId: request.agentId,
-        fencingToken: 1,
-        acquiredAt: Date.now(),
-        heartbeatAt: Date.now(),
-        expiresAt: Date.now() + 120_000,
-      },
-      revision: 1,
-    };
-  },
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
+    if (!startResult.ok) {
+      throw new Error(`Session failed to start: ${startResult.reason}`);
+    }
 
-  async heartbeat(request: import('../src/v0.7/authority-state.js').HeartbeatLeaseRequest): Promise<import('../src/v0.7/authority-state.js').LeaseGrant> {
-    return {
-      lease: {
-        leaseId: request.leaseId,
-        taskId: request.taskId,
-        agentId: request.agentId,
-        fencingToken: request.fencingToken,
-        acquiredAt: Date.now(),
-        heartbeatAt: Date.now(),
-        expiresAt: Date.now() + 120_000,
-      },
-      revision: 2,
-    };
-  },
-
-  async release(request: import('../src/v0.7/authority-state.js').ReleaseLeaseRequest): Promise<import('../src/v0.7/authority-state.js').LeaseGrant> {
-    return {
-      lease: {
-        leaseId: request.leaseId,
-        taskId: request.taskId,
-        agentId: request.agentId,
-        fencingToken: request.fencingToken,
-        acquiredAt: Date.now(),
-        heartbeatAt: Date.now(),
-        expiresAt: Date.now() + 120_000,
-      },
-      revision: 3,
-    };
-  },
-};
-
-vi.mock('../src/v0.7/cloud-authority-factory.js', () => ({
-  createCloudAuthorityFromEnv: vi.fn(() => mockAuthority),
-  hasCloudAuthorityConfig: vi.fn(() => true),
-  resolveDurabilityMode: vi.fn(() => 'strict-cloud-only'),
-}));
-
-diTest('CloudCheckpointSession creates and starts successfully', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-  };
-
-  const session = new CloudCheckpointSession(options);
-
-  const startResult = await session.start();
-
-  expect(startResult.ok).toBe(true);
-  expect(startResult.taskId).toBeDefined();
-  expect(startResult.revision).toBe(0);
-});
-
-diTest('CloudCheckpointSession records checkpoint events', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-  };
-
-  const session = new CloudCheckpointSession(options);
-  await session.start();
-
-  const checkpointEvent: AgentCheckpointEvent = {
-    id: 'test-event-1',
-    type: 'task.started',
-    taskId: 'task-1',
-    title: 'Test Task',
-    nextAction: 'Implement feature',
-  };
-
-  const result = await session.record(checkpointEvent);
-
-  expect(result.status).toBe('acknowledged');
-  expect(result.revision).toBe(1);
-});
-
-diTest('CloudCheckpointSession maintains bounded RAM queue', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-    capacity: 2, // Small capacity for testing
-  };
-
-  const session = new CloudCheckpointSession(options);
-  await session.start();
-
-  // Record more events than capacity
-  for (let i = 0; i < 4; i++) {
     const checkpointEvent: AgentCheckpointEvent = {
-      id: `event-${i}`,
+      id: 'test-event-1',
+      type: 'task.started',
+      taskId: 'task-1',
+      title: 'Test Task',
+      nextAction: 'Implement feature',
+    };
+
+    const result = await session.record(checkpointEvent);
+
+    expect(result.status).toBe('acknowledged');
+    expect(result.revision).toBe(1);
+  });
+
+  it('maintains bounded RAM queue when authority is unavailable', async () => {
+    // Create an authority that fails commits
+    const failingAuthority = new InMemoryCloudAuthority();
+    failingAuthority.seed({
+      projectId: 'test-project',
+      projectName: 'Test Project',
+      tasks: [{ id: 'task-1', title: 'Test Task', status: 'in_progress' }],
+    });
+    failingAuthority.failCommits(10); // Fail next 10 commits
+
+    const options: CloudCheckpointSessionOptions = {
+      authority: failingAuthority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
+      capacity: 2,
+    };
+
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
+    if (!startResult.ok) {
+      throw new Error(`Session failed to start: ${startResult.reason}`);
+    }
+
+    // Record more events than capacity - all will fail and be buffered
+    for (let i = 0; i < 4; i++) {
+      const checkpointEvent: AgentCheckpointEvent = {
+        id: `event-${i}`,
+        type: 'task.updated',
+        taskId: 'task-1',
+        nextAction: `Action ${i}`,
+      };
+
+      await session.record(checkpointEvent);
+    }
+
+    const status = session.status();
+
+    // Buffer should be at capacity (2) with 2 dropped
+    expect(status.engine.pendingBatches).toBe(2);
+    expect(status.engine.droppedBatches).toBeGreaterThanOrEqual(2);
+    expect(status.engine.state).toBe('degraded');
+  });
+
+  it('handles idempotency keys for retry scenarios', async () => {
+    // Create an authority that fails once then succeeds on retry
+    const flakyAuthority = new InMemoryCloudAuthority();
+    flakyAuthority.seed({
+      projectId: 'test-project',
+      projectName: 'Test Project',
+      tasks: [{ id: 'task-1', title: 'Test Task', status: 'in_progress' }],
+    });
+    flakyAuthority.failCommits(1); // Fail first commit
+
+    const options: CloudCheckpointSessionOptions = {
+      authority: flakyAuthority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
+      retry: { attempts: 3, baseDelayMs: 10, maxDelayMs: 100 },
+    };
+
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
+    if (!startResult.ok) {
+      throw new Error(`Session failed to start: ${startResult.reason}`);
+    }
+
+    const checkpointEvent: AgentCheckpointEvent = {
+      id: 'test-event-idempotent',
       type: 'task.updated',
       taskId: 'task-1',
-      nextAction: `Action ${i}`,
+      nextAction: 'Retry test',
     };
 
-    await session.record(checkpointEvent);
-  }
+    // First attempt fails, gets buffered, then flush retries and succeeds
+    const result1 = await session.record(checkpointEvent);
+    expect(result1.status).toBe('acknowledged');
 
-  const status = session.status();
+    // Recording again with same idempotency key should return cached ACK
+    const result2 = await session.record(checkpointEvent);
+    expect(result2.status).toBe('acknowledged');
+    expect(result2.revision).toBe(result1.revision);
+  });
 
-  expect(status.engine.pendingBatches).toBe(2); // Should be at capacity (2)
-  expect(status.engine.droppedBatches).toBeAtLeast(1); // At least one dropped
-});
+  it('enforces revision checks with stale expectedRevision', async () => {
+    const options: CloudCheckpointSessionOptions = {
+      authority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
+    };
 
-diTest('CloudCheckpointSession handles idempotency keys', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-  };
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
+    if (!startResult.ok) {
+      throw new Error(`Session failed to start: ${startResult.reason}`);
+    }
 
-  const session = new CloudCheckpointSession(options);
-  await session.start();
+    // First event succeeds and advances revision to 1
+    const firstEvent: AgentCheckpointEvent = {
+      type: 'task.updated',
+      taskId: 'task-1',
+      nextAction: 'First action',
+    };
+    const firstResult = await session.record(firstEvent);
+    expect(firstResult.status).toBe('acknowledged');
 
-  const checkpointEvent: AgentCheckpointEvent = {
-    id: 'test-event-idempotent',
-    type: 'task.started',
-    taskId: 'task-1',
-    title: 'Test Task',
-  };
+    // Now simulate a stale writer by directly manipulating expectedRevision
+    // We can't easily do this through the public API, so we test the authority directly
+    // by creating a commit request with stale expectedRevision
+    const { AuthorityError } = await import('../../src/v0.7/authority-state.js');
 
-  const result1 = await session.record(checkpointEvent);
+    try {
+      await authority.commit({
+        projectId: 'test-project',
+        agentId: 'another-agent',
+        operations: [{ type: 'task.work', taskId: 'task-1', nextAction: 'Stale action' }],
+        expectedRevision: 0, // Stale - authority is at revision 1
+        leaseId: 'test-lease',
+        fencingToken: 1,
+        idempotencyKey: 'stale-test',
+        now: Date.now(),
+      });
+      throw new Error('Expected revision conflict');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AuthorityError);
+      expect((error as InstanceType<typeof AuthorityError>).code).toBe(
+        'AUTHORITY_REVISION_CONFLICT'
+      );
+    }
+  });
 
-  // Record the same event again (should return same ACK without applying twice)
-  const result2 = await session.record(checkpointEvent);
+  it('implements retry/backoff', async () => {
+    const flakyAuthority = new InMemoryCloudAuthority();
+    flakyAuthority.seed({
+      projectId: 'test-project',
+      projectName: 'Test Project',
+      tasks: [{ id: 'task-1', title: 'Test Task', status: 'in_progress' }],
+    });
+    flakyAuthority.failCommits(1); // Fail first commit
 
-  expect(result1.status).toBe(result2.status);
-  expect(result1.revision).toBe(result2.revision);
-});
+    const options: CloudCheckpointSessionOptions = {
+      authority: flakyAuthority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
+      retry: { attempts: 3, baseDelayMs: 10, maxDelayMs: 100 },
+    };
 
-diTest('CloudCheckpointSession enforces revision checks', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-  };
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
+    if (!startResult.ok) {
+      throw new Error(`Session failed to start: ${startResult.reason}`);
+    }
 
-  const session = new CloudCheckpointSession(options);
+    const checkpointEvent: AgentCheckpointEvent = {
+      id: 'retry-test-event',
+      type: 'task.updated',
+      taskId: 'task-1',
+      nextAction: 'Retry test',
+    };
 
-  // Start session
-  const startResult = await session.start();
+    // First attempt fails, gets buffered, then flush retries and succeeds
+    const result1 = await session.record(checkpointEvent);
+    expect(result1.status).toBe('acknowledged');
+  });
 
-  expect(startResult.ok).toBe(true);
+  it('handles lease heartbeat and fencing', async () => {
+    const options: CloudCheckpointSessionOptions = {
+      authority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
+    };
 
-  // Try to record with conflicting revision
-  const checkpointEvent: AgentCheckpointEvent = {
-    type: 'task.started',
-    taskId: 'task-1',
-    title: 'Test Task',
-  };
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
+    if (!startResult.ok) {
+      throw new Error(`Session failed to start: ${startResult.reason}`);
+    }
+    expect(startResult.ok).toBe(true);
 
-  const result = await session.record(checkpointEvent);
+    const heartbeatResult = await session.heartbeat();
+    expect(heartbeatResult.ok).toBe(true);
+    expect(heartbeatResult.expiresAt).toBeDefined();
 
-  expect(result.status).toBe('unacknowledged');
-});
+    await session.release();
+  });
 
-diTest('CloudCheckpointSession implements retry/backoff', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-    retry: { attempts: 3, baseDelayMs: 10, maxDelayMs: 100 },
-  };
+  it('prevents task completion without passing test', async () => {
+    const options: CloudCheckpointSessionOptions = {
+      authority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
+    };
 
-  const session = new CloudCheckpointSession(options);
-  await session.start();
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
+    if (!startResult.ok) {
+      throw new Error(`Session failed to start: ${startResult.reason}`);
+    }
 
-  // Record an event (should succeed)
-  const checkpointEvent: AgentCheckpointEvent = {
-    id: 'retry-test-event',
-    type: 'task.updated',
-    taskId: 'task-1',
-    nextAction: 'Retry test',
-  };
+    const checkpointEvent: AgentCheckpointEvent = {
+      id: 'completion-test-event',
+      type: 'task.completed',
+      taskId: 'task-1',
+      tests: [
+        { name: 'Test 1', outcome: 'fail' },
+        { name: 'Test 2', outcome: 'fail' },
+      ],
+    };
 
-  const result = await session.record(checkpointEvent);
+    const result = await session.record(checkpointEvent);
 
-  expect(result.status).toBe('acknowledged');
-});
+    expect(result.status).toBe('unacknowledged');
+    expect(result.code).toBe('CHECKPOINT_COMPLETION_NEEDS_PASSING_TEST');
+  });
 
-diTest('CloudCheckpointSession handles lease heartbeat and fencing', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-  };
+  it('enforces event validation', async () => {
+    const options: CloudCheckpointSessionOptions = {
+      authority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
+    };
 
-  const session = new CloudCheckpointSession(options);
-  const startResult = await session.start();
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
+    if (!startResult.ok) {
+      throw new Error(`Session failed to start: ${startResult.reason}`);
+    }
 
-  expect(startResult.ok).toBe(true);
+    const checkpointEvent: AgentCheckpointEvent = {
+      id: '',
+      type: 'invalid_type' as any,
+    };
 
-  // Heartbeat
-  const heartbeatResult = await session.heartbeat();
+    const result = await session.record(checkpointEvent);
 
-  expect(heartbeatResult.ok).toBe(true);
-  expect(heartbeatResult.expiresAt).toBeDefined();
+    expect(result.status).toBe('unacknowledged');
+    expect(result.code).toBe('CHECKPOINT_EVENT_INVALID');
+  });
 
-  // Release
-  await session.release();
-});
+  it('handles cloud authority unavailability', async () => {
+    const unavailableAuthority = new InMemoryCloudAuthority();
+    unavailableAuthority.setOffline(true);
 
-diTest('CloudCheckpointSession prevents task completion without passing test', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-  };
+    const options: CloudCheckpointSessionOptions = {
+      authority: unavailableAuthority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
+    };
 
-  const session = new CloudCheckpointSession(options);
-  await session.start();
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
 
-  const checkpointEvent: AgentCheckpointEvent = {
-    id: 'completion-test-event',
-    type: 'task.completed',
-    taskId: 'task-1',
-    tests: [
-      { name: 'Test 1', outcome: 'fail' },
-      { name: 'Test 2', outcome: 'fail' },
-    ],
-  };
+    expect(startResult.ok).toBe(false);
+    if (!startResult.ok) {
+      expect(startResult.code).toBeDefined();
+    }
+  });
 
-  const result = await session.record(checkpointEvent);
+  it('maintains strict cloud-only compliance', async () => {
+    const options: CloudCheckpointSessionOptions = {
+      authority,
+      projectId: 'test-project',
+      agentId: 'agy',
+      mode: 'strict-cloud-only',
+    };
 
-  expect(result.status).toBe('unacknowledged');
-  expect(result.code).toBe('CHECKPOINT_COMPLETION_NEEDS_PASSING_TEST');
-});
+    const session = new CloudCheckpointSession(options);
+    const startResult = await session.start();
 
-diTest('CloudCheckpointSession enforces event validation', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-  };
-
-  const session = new CloudCheckpointSession(options);
-  await session.start();
-
-  // Invalid event (missing required fields)
-  const checkpointEvent: AgentCheckpointEvent = {
-    id: '',
-    type: 'invalid_type' as any,
-  };
-
-  const result = await session.record(checkpointEvent);
-
-  expect(result.status).toBe('unacknowledged');
-  expect(result.code).toBe('CHECKPOINT_EVENT_INVALID');
-});
-
-diTest('CloudCheckpointSession handles cloud authority unavailability', async () => {
-  const mockUnavailableAuthority: CloudAuthority = {
-    kind: 'memory',
-    async fetchSnapshot() {
-      throw new Error('Cloud authority unavailable');
-    },
-    async commit() {
-      throw new Error('Cloud authority unavailable');
-    },
-    async acquireLease() {
-      throw new Error('Cloud authority unavailable');
-    },
-    async heartbeat() {
-      throw new Error('Cloud authority unavailable');
-    },
-    async release() {
-      throw new Error('Cloud authority unavailable');
-    },
-  };
-
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockUnavailableAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-  };
-
-  const session = new CloudCheckpointSession(options);
-  const startResult = await session.start();
-
-  expect(startResult.ok).toBe(false);
-  expect(startResult.code).toBeDefined();
-});
-
-diTest('CloudCheckpointSession maintains strict cloud-only compliance', async () => {
-  const options: CloudCheckpointSessionOptions = {
-    authority: mockAuthority,
-    projectId: 'test-project',
-    agentId: 'agy',
-    mode: 'strict-cloud-only',
-  };
-
-  const session = new CloudCheckpointSession(options);
-
-  // Should succeed when cloud authority is available
-  const startResult = await session.start();
-
-  expect(startResult.ok).toBe(true);
+    expect(startResult.ok).toBe(true);
+    if (startResult.ok) {
+      expect(startResult.taskId).toBeDefined();
+      expect(startResult.revision).toBe(0);
+    }
+  });
 });

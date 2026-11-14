@@ -197,7 +197,7 @@ describe('Session Core', () => {
       Array.from(storage.objects.keys()).filter((key) => key.includes('/events/'))
     ).toHaveLength(3);
 
-    const ended = await core.end({
+    const ended = await core.idle({
       reason: 'agent process exited',
     });
 

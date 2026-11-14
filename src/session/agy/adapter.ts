@@ -16,11 +16,7 @@ import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 import { extractSessionMemory } from '../session-extractor.js';
 import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
 import { syncMaterialization, type SyncMaterialization } from '../sync-materialization.js';
-
-// v0.7 automatic checkpoint integration
-import type { AgentCheckpointEvent } from '../../v0.7/checkpoint-runtime.js';
-import { createCloudAuthorityFromEnv, hasCloudAuthorityConfig, resolveDurabilityMode } from '../../v0.7/cloud-authority-factory.js';
-import { CloudCheckpointSession, type CloudCheckpointSessionOptions } from '../../v0.7/checkpoint-runtime.js';
+import type { CloudCheckpointSession } from '../../v0.7/checkpoint-runtime.js';
 
 export interface AgySyncOptions {
   project: ProjectManifest;
