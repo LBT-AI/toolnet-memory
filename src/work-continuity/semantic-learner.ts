@@ -6,7 +6,7 @@ import type { StorageProvider } from '../storage/types.js';
 
 import type { NormalizedSessionEvent, SessionIdentity } from '../session/types.js';
 
-import type { SessionWal } from '../session/wal.js';
+import type { SessionWalInterface } from '../session/core.js';
 
 import { extractSemanticObservations } from './semantic-extractor.js';
 
@@ -100,7 +100,7 @@ export class SemanticWorkLearner {
 
       identity: SessionIdentity;
 
-      wal: SessionWal;
+      wal: SessionWalInterface;
     }
   ) {
     this.journal = new SemanticObservationJournal(options.storage);
@@ -111,11 +111,7 @@ export class SemanticWorkLearner {
 
     const rawOffset = Number(state.sourceCursors['work.semantic.offset'] ?? 0);
 
-    const read = readEvents(
-      this.options.wal.eventsFile,
-
-      Number.isFinite(rawOffset) ? rawOffset : 0
-    );
+    const read = this.options.wal.readEventsFromOffset(Number.isFinite(rawOffset) ? rawOffset : 0);
 
     if (read.events.length === 0) {
       return {

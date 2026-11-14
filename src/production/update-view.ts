@@ -1,5 +1,7 @@
 import { ansiColorsEnabled } from './ui/color.js';
 
+import type { UpgradePhase } from './upgrade/types.js';
+
 export interface UpdateViewStream {
   isTTY?: boolean;
   columns?: number;
@@ -15,7 +17,12 @@ export interface UpdateFrameState {
   label: string;
   percent: number;
   elapsedMs: number;
-  etaMs: number;
+  /**
+   * Estimated remaining time, or null when the phase has no estimable
+   * duration (e.g. waiting on a daemon restart bounded by a timeout).
+   * Null renders as activity status — never as a fake `ETA: 0.0s`.
+   */
+  etaMs: number | null;
   completed?: boolean;
   failed?: boolean;
 }
@@ -29,8 +36,45 @@ export interface StartUpdateStepOptions {
   status?: string;
 }
 
+export interface StartIndefiniteStepOptions {
+  step: number;
+  label: string;
+  percent: number;
+  status?: string;
+}
+
 export interface RenderUpdateFrameOptions {
   color?: boolean;
+}
+
+/**
+ * Truthful status line for each post-verify local-upgrade phase.
+ *
+ * Shown inside Step 4/4 "Applying local upgrade" so the UI narrates the real
+ * work (including the daemon restart wait) instead of parking at 99% under a
+ * stale "Verifying installation" label.
+ */
+export function upgradePhaseStatusLabel(phase: UpgradePhase): string {
+  switch (phase) {
+    case 'inspect':
+      return 'Inspecting local state...';
+    case 'block_unsupported':
+      return 'Checking upgrade compatibility...';
+    case 'backup_authority':
+      return 'Backing up authority state...';
+    case 'migrate_authority':
+      return 'Migrating local state...';
+    case 'verify_authority':
+      return 'Verifying migrated state...';
+    case 'rebuild_derived':
+      return 'Rebuilding derived stores...';
+    case 'clear_ephemeral':
+      return 'Clearing ephemeral state...';
+    case 'restart_daemon':
+      return 'Restarting ToolNet daemon...';
+    case 'verify_upgrade':
+      return 'Verifying upgraded runtime...';
+  }
 }
 
 const ANSI = {
@@ -177,7 +221,14 @@ export function renderUpdateFrame(
     ? paint(stepText, ANSI.green, color)
     : paint(stepText, ANSI.amber, color);
 
-  const eta = paint(`ETA: ${formatDuration(state.etaMs)}`, ANSI.dim, color);
+  /*
+   * A null ETA means "unknown duration": render elapsed activity instead of
+   * a misleading `ETA: 0.0s` while the updater may still wait tens of seconds.
+   */
+  const eta =
+    state.etaMs === null
+      ? paint(`working… ${formatDuration(state.elapsedMs)} elapsed`, ANSI.dim, color)
+      : paint(`ETA: ${formatDuration(state.etaMs)}`, ANSI.dim, color);
 
   return [
     titleLine(width, color),
@@ -204,7 +255,7 @@ export class UpdateView {
   private step = 1;
   private label = 'Checking registry';
   private percent = 0;
-  private etaMs = 0;
+  private etaMs: number | null = 0;
   private completed = false;
   private failed = false;
 
@@ -213,6 +264,7 @@ export class UpdateView {
   private fromPercent = 0;
   private toPercent = 0;
   private estimatedMs = 1;
+  private indefinite = false;
   private timer?: NodeJS.Timeout;
   private renderedLines = 0;
 
@@ -236,6 +288,17 @@ export class UpdateView {
     this.draw();
   }
 
+  /**
+   * Update the status line inside the current step without moving progress.
+   * Used by the post-verify local-upgrade phase to narrate real work
+   * (inspecting state, restarting the daemon, verifying) instead of leaving
+   * the UI parked on a stale label.
+   */
+  setStatus(status: string): void {
+    this.status = status;
+    this.draw();
+  }
+
   startStep(options: StartUpdateStepOptions): void {
     this.stopTimer();
 
@@ -246,6 +309,7 @@ export class UpdateView {
     this.toPercent = clamp(options.toPercent, this.fromPercent, 100);
     this.percent = this.fromPercent;
     this.estimatedMs = Math.max(250, options.estimatedMs);
+    this.indefinite = false;
     this.stepStartedAt = Date.now();
     this.etaMs = this.estimatedMs;
     this.completed = false;
@@ -260,6 +324,39 @@ export class UpdateView {
     this.timer = setInterval(() => {
       this.tick();
     }, 100);
+
+    this.timer.unref?.();
+  }
+
+  /**
+   * Begin a phase with unknown duration (daemon restart bounded by a
+   * timeout). Progress holds at a fixed percent while elapsed time ticks —
+   * no fake percentage creep, no fake ETA.
+   */
+  startIndefiniteStep(options: StartIndefiniteStepOptions): void {
+    this.stopTimer();
+
+    this.step = options.step;
+    this.label = options.label;
+    this.status = options.status ?? 'Updating...';
+    this.fromPercent = clamp(options.percent, 0, 100);
+    this.toPercent = this.fromPercent;
+    this.percent = this.fromPercent;
+    this.indefinite = true;
+    this.stepStartedAt = Date.now();
+    this.etaMs = null;
+    this.completed = false;
+    this.failed = false;
+
+    this.draw();
+
+    if (!this.interactive) {
+      return;
+    }
+
+    this.timer = setInterval(() => {
+      this.tick();
+    }, 250);
 
     this.timer.unref?.();
   }
@@ -314,6 +411,12 @@ export class UpdateView {
   }
 
   private tick(): void {
+    if (this.indefinite) {
+      /* Unknown duration: hold progress, keep elapsed ticking, ETA stays null. */
+      this.draw();
+      return;
+    }
+
     const elapsed = Date.now() - this.stepStartedAt;
 
     /*

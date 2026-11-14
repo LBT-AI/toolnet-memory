@@ -17,8 +17,9 @@ concurrency:
 
 jobs:
   test:
-    name: Test / Build / Package
+    name: Test / Build / Package (Node 22)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -36,6 +37,9 @@ jobs:
       - name: Validate installer
         run: bash -n scripts/install.sh
 
+      - name: Whitespace gate
+        run: git diff --check
+
       - name: Lint code
         run: npm run lint
 
@@ -47,9 +51,70 @@ jobs:
 
       - name: Run tests
         run: npm test
+        timeout-minutes: 30
 
       - name: Build production release
         run: npm run build:release
+        timeout-minutes: 15
+
+      - name: Verify static release contract
+        run: npm run release:verify:static
+
+      - name: Certify production release
+        run: node bundle/production-certify.js
+        timeout-minutes: 20
 
       - name: Verify npm package contents
         run: npm pack --dry-run
+
+      - name: Upload certification summary on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-certification-summary-node22
+          path: |
+            npm-debug.log*
+            /tmp/opencode/*.log
+          if-no-files-found: ignore
+
+  compatibility-node24:
+    name: Compatibility (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build production release
+        run: npm run build:release
+        timeout-minutes: 15
+
+      - name: Verify static release contract
+        run: npm run release:verify:static
+
+      - name: Certify production release
+        run: node bundle/production-certify.js
+        timeout-minutes: 20
+
+      - name: Upload certification summary on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-certification-summary-node24
+          path: |
+            npm-debug.log*
+            /tmp/opencode/*.log
+          if-no-files-found: ignore

@@ -68,12 +68,29 @@ export function getStructuralParserAdapters(): StructuralParserAdapter[] {
   const runtime = ensureRuntime();
   const adapters: StructuralParserAdapter[] = [];
 
-  if (runtime) {
-    adapters.push(new TreeSitterPythonAdapter(runtime));
-    adapters.push(new TreeSitterGoAdapter(runtime));
-    adapters.push(new TreeSitterRustAdapter(runtime));
-    adapters.push(new TreeSitterCAdapter(runtime));
-    adapters.push(new TreeSitterCppAdapter(runtime));
+  /*
+   * An adapter is registered only when its grammar asset is present in the
+   * runtime. A missing grammar fails closed: no adapter, structural parse
+   * returns null, the caller falls back to lexical indexing and graph
+   * coverage records the gap — never a fake structural success.
+   */
+  if (runtime?.available) {
+    const grammars = runtime.grammars;
+    if (grammars['python']) {
+      adapters.push(new TreeSitterPythonAdapter(runtime));
+    }
+    if (grammars['go']) {
+      adapters.push(new TreeSitterGoAdapter(runtime));
+    }
+    if (grammars['rust']) {
+      adapters.push(new TreeSitterRustAdapter(runtime));
+    }
+    if (grammars['c']) {
+      adapters.push(new TreeSitterCAdapter(runtime));
+    }
+    if (grammars['cpp']) {
+      adapters.push(new TreeSitterCppAdapter(runtime));
+    }
   }
 
   cachedAdapters = adapters;
@@ -126,5 +143,5 @@ export function treeSitterRuntime(): TreeSitterRuntime | null {
 
 export function isTreeSitterRuntimeAvailable(): boolean {
   ensureRuntime();
-  return cachedRuntime !== null;
+  return cachedRuntime?.available === true;
 }

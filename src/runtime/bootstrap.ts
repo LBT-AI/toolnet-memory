@@ -2,11 +2,9 @@ import 'dotenv/config';
 
 import { loadConfig, ProjectManager } from '../core/index.js';
 
-import {
-  createStorageProvider,
-  withStorageRetry,
-  ProjectScopedStorageProvider,
-} from '../storage/index.js';
+import { withStorageRetry, ProjectScopedStorageProvider } from '../storage/index.js';
+
+import { createDurabilityAwareStorageProvider } from '../v0.7/cloud-storage.js';
 
 import { ToolNetMemoryRuntime } from './toolnet-memory-runtime.js';
 
@@ -15,13 +13,16 @@ export function createToolNetMemoryRuntime(rootPath: string = process.cwd()) {
 
   const project = new ProjectManager().detect(rootPath);
 
-  const rawStorage = createStorageProvider({
-    provider: config.storage.provider,
-    r2: config.storage.r2,
-    s3: config.storage.s3,
-    huggingface: config.storage.huggingface,
-    localRoot: config.storage.localRoot,
-  });
+  const rawStorage = createDurabilityAwareStorageProvider(
+    {
+      provider: config.storage.provider,
+      r2: config.storage.r2,
+      s3: config.storage.s3,
+      huggingface: config.storage.huggingface,
+      localRoot: config.storage.localRoot,
+    },
+    config.durability.mode
+  );
 
   const retryStorage = withStorageRetry(rawStorage, {
     attempts: Number(process.env.TOOLNET_STORAGE_RETRIES ?? 3),

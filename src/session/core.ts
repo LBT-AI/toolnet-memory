@@ -3,8 +3,10 @@ import { Sanitizer } from '../security/sanitizer.js';
 import type {
   LocalSessionState,
   NormalizedSessionEvent,
+  PendingSessionEvents,
   SessionCoreOptions,
   SessionEventInput,
+  SessionEventType,
   SessionFlushResult,
 } from './types.js';
 
@@ -13,10 +15,22 @@ import { createSessionIdentity } from './identity.js';
 import { RemoteSessionStore } from './store.js';
 
 import { SessionWal } from './wal.js';
+import { InMemorySessionWal } from './in-memory-wal.js';
+
+export interface SessionWalInterface {
+  append(inputs: SessionEventInput[]): NormalizedSessionEvent[];
+  readAllEvents(): NormalizedSessionEvent[];
+  readEventsFromOffset(offset: number): { events: NormalizedSessionEvent[]; nextOffset: number };
+  readPending(): PendingSessionEvents;
+  markRemote(sequence: number, byteOffset: number): void;
+  setSourceCursor(source: string, value: string | number): void;
+  loadState(): LocalSessionState;
+  eventsFile: string;
+}
 
 import { SessionMemoryLearner } from './learner/learner.js';
 
-import { SessionMemoryMaterializer, type MaterializationResult } from './learner/materializer.js';
+import { SessionMemoryMaterializer } from './learner/materializer.js';
 
 import { WorkContinuityLearner } from '../work-continuity/learner.js';
 
@@ -29,10 +43,7 @@ import { checkpointLocalSession } from './local-checkpoint.js';
 import { NativeTaskMirrorRuntime } from './native-plan/runtime.js';
 import { recoverSessionTaskState, type SessionTaskSelfHealingResult } from './task-self-healing.js';
 import { TaskReplicationRuntime } from '../tasks/replication/runtime.js';
-import {
-  resolveTaskSessionExecutionWithAutoRecovery,
-  renderTaskSessionBootstrap,
-} from '../tasks/session-resume.js';
+import { resolveTaskSessionExecutionWithAutoRecovery } from '../tasks/session-resume.js';
 import {
   TaskHeartbeatRuntime,
   TaskOrchestrationEngine,
@@ -41,10 +52,24 @@ import {
 import { TaskStore } from '../tasks/store.js';
 import { refreshCurrentWorkProjection } from '../work-continuity/current-work-projection.js';
 
+// v0.7 automatic checkpoint integration
+import {
+  AgentCheckpointEvent,
+  CloudCheckpointSession,
+  CloudCheckpointSessionOptions,
+} from '../v0.7/checkpoint-runtime.js';
+import {
+  createCloudAuthorityFromEnv,
+  hasCloudAuthorityConfig,
+} from '../v0.7/cloud-authority-factory.js';
+import { resolveDurabilityMode } from '../v0.7/durability-policy.js';
+import { resumeFromCloud, type CloudResumeResult } from '../v0.7/resume.js';
+import type { CloudAuthority } from '../v0.7/cloud-authority.js';
+
 export class SessionCore {
   readonly identity;
 
-  readonly wal: SessionWal;
+  readonly wal: SessionWalInterface;
 
   readonly remote: RemoteSessionStore;
 
@@ -66,7 +91,7 @@ export class SessionCore {
 
   private readonly taskAgentId: string;
 
-  private readonly taskHeartbeat?: import('../tasks/orchestration-engine.js').TaskHeartbeatRuntime;
+  private readonly taskHeartbeat?: TaskHeartbeatRuntime;
 
   private taskExecutionResolutionValue?: SessionExecutionResolution;
 
@@ -78,6 +103,10 @@ export class SessionCore {
 
   private readonly metadata: Record<string, unknown>;
 
+  // v0.7 automatic checkpoint integration
+  private readonly checkpointSession?: CloudCheckpointSession;
+  private readonly cloudAuthority?: CloudAuthority;
+
   constructor(options: SessionCoreOptions) {
     this.project = options.project;
 
@@ -87,7 +116,13 @@ export class SessionCore {
 
     this.metadata = this.sanitizer.sanitizeValue(options.metadata ?? {}) as Record<string, unknown>;
 
-    this.wal = new SessionWal(this.identity, options.eventContext);
+    // v0.7: Use in-memory WAL in strict cloud-only mode to avoid disk writes
+    const mode = resolveDurabilityMode(process.env.TOOLNET_DURABILITY_MODE);
+    if (mode === 'strict-cloud-only') {
+      this.wal = new InMemorySessionWal(this.identity, options.eventContext);
+    } else {
+      this.wal = new SessionWal(this.identity, options.eventContext);
+    }
 
     this.remote = new RemoteSessionStore(
       options.storage,
@@ -147,6 +182,37 @@ export class SessionCore {
         new TaskOrchestrationEngine(taskStore, () => taskStore.replicationConflicts())
       );
     }
+
+    // v0.7 automatic checkpoint integration - initialize if cloud authority is available
+    if (hasCloudAuthorityConfig()) {
+      try {
+        const authority = createCloudAuthorityFromEnv();
+        const mode = resolveDurabilityMode(process.env.TOOLNET_DURABILITY_MODE);
+
+        const checkpointOptions: CloudCheckpointSessionOptions = {
+          authority,
+          projectId: this.identity.projectId,
+          agentId: this.taskAgentId,
+          mode,
+          capacity: 128,
+          leaseTtlMs: 120_000,
+          maxWaitForLeaseMs: 0,
+          retry: { attempts: 3, baseDelayMs: 25, maxDelayMs: 1_000 },
+          now: () => Date.now(),
+          sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        };
+
+        this.cloudAuthority = authority;
+        this.checkpointSession = new CloudCheckpointSession(checkpointOptions);
+      } catch {
+        // Cloud authority unavailable - checkpoint integration is optional
+        this.checkpointSession = undefined;
+        this.cloudAuthority = undefined;
+      }
+    } else {
+      this.checkpointSession = undefined;
+      this.cloudAuthority = undefined;
+    }
   }
 
   private sanitizeEvent(event: SessionEventInput): SessionEventInput {
@@ -190,6 +256,186 @@ export class SessionCore {
      * is another derived consumer and is intentionally non-blocking here.
      */
     this.taskMirror.enqueue(events);
+
+    // v0.7 automatic checkpoint integration - record checkpoint if cloud authority is available
+    if (this.checkpointSession && events.length > 0) {
+      try {
+        const lastEvent = events[events.length - 1];
+        const checkpointType = this.mapEventTypeToCheckpointType(lastEvent.type, lastEvent.data);
+        let checkpointEvent: AgentCheckpointEvent;
+
+        switch (checkpointType) {
+          case 'task.started': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'task.started',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              ...(lastEvent.data?.title !== undefined && { title: lastEvent.data.title as string }),
+              ...(lastEvent.data?.nextAction !== undefined && {
+                nextAction: lastEvent.data.nextAction as string,
+              }),
+            };
+            break;
+          }
+          case 'task.updated': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'task.updated',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              ...(lastEvent.data?.nextAction !== undefined && {
+                nextAction: lastEvent.data.nextAction as string,
+              }),
+            };
+            break;
+          }
+          case 'file.changed': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'file.changed',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              path: lastEvent.data?.path as string,
+            };
+            break;
+          }
+          case 'test.passed': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'test.passed',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              name: lastEvent.data?.name as string,
+            };
+            break;
+          }
+          case 'test.failed': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'test.failed',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              name: lastEvent.data?.name as string,
+            };
+            break;
+          }
+          case 'blocker.detected': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'blocker.detected',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              reason: lastEvent.data?.reason as string,
+              ...(lastEvent.data?.nextAction !== undefined && {
+                nextAction: lastEvent.data.nextAction as string,
+              }),
+            };
+            break;
+          }
+          case 'blocker.resolved': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'blocker.resolved',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              ...(lastEvent.data?.nextAction !== undefined && {
+                nextAction: lastEvent.data.nextAction as string,
+              }),
+            };
+            break;
+          }
+          case 'decision.changed': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'decision.changed',
+              text: lastEvent.data?.text as string,
+            };
+            break;
+          }
+          case 'next_action.updated': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'next_action.updated',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+              nextAction: lastEvent.data?.nextAction as string,
+            };
+            break;
+          }
+          case 'session.interrupted': {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'session.interrupted',
+              ...(lastEvent.data?.reason !== undefined && {
+                reason: lastEvent.data.reason as string,
+              }),
+            };
+            break;
+          }
+          default: {
+            checkpointEvent = {
+              id: lastEvent.id,
+              type: 'task.updated',
+              ...(lastEvent.data?.taskId !== undefined && {
+                taskId: lastEvent.data.taskId as string,
+              }),
+            };
+          }
+        }
+
+        // Asynchronously record checkpoint (non-blocking for session capture)
+        this.checkpointSession.record(checkpointEvent).catch(() => {
+          // Checkpoint failures should not break session capture
+        });
+      } catch {
+        // Checkpoint recording should not break session capture
+      }
+    }
+  }
+
+  private mapEventTypeToCheckpointType(
+    eventType: SessionEventType,
+    eventData?: Record<string, unknown>
+  ): AgentCheckpointEvent['type'] {
+    // Map session event types to checkpoint event types
+    // For 'test' events, check the outcome from event data
+    if (eventType === 'test') {
+      const outcome = eventData?.outcome;
+      return outcome === 'fail' ? 'test.failed' : 'test.passed';
+    }
+
+    // For 'custom' events, check if they represent task lifecycle or other checkpoint events
+    if (eventType === 'custom') {
+      const customEvent = eventData?.event as string | undefined;
+      if (customEvent === 'task_started' || customEvent === 'task.created') return 'task.started';
+      if (customEvent === 'task_updated' || customEvent === 'task.status.set')
+        return 'task.updated';
+      if (customEvent === 'task_completed') return 'task.completed';
+      if (customEvent === 'blocker_detected') return 'blocker.detected';
+      if (customEvent === 'blocker_resolved') return 'blocker.resolved';
+      if (customEvent === 'decision_changed') return 'decision.changed';
+      if (customEvent === 'next_action_updated') return 'next_action.updated';
+      if (customEvent === 'file_changed') return 'file.changed';
+    }
+
+    const typeMap: Record<string, AgentCheckpointEvent['type']> = {
+      tool_call: 'file.changed',
+      file_write: 'file.changed',
+      file_edit: 'file.changed',
+      decision: 'decision.changed',
+      todo: 'next_action.updated',
+    };
+
+    return typeMap[eventType] || 'task.updated';
   }
 
   async start(data: Record<string, unknown> = {}) {
@@ -210,6 +456,15 @@ export class SessionCore {
       },
     });
 
+    // v0.7: Start cloud checkpoint session if available
+    if (this.checkpointSession) {
+      try {
+        await this.checkpointSession.start({ takeover: false });
+      } catch {
+        // Checkpoint session start failure should not break session startup
+      }
+    }
+
     try {
       this.taskSelfHealingResultValue = await recoverSessionTaskState(
         this.project,
@@ -224,7 +479,14 @@ export class SessionCore {
       } catch {
         // Current work is a derived projection and must not break session startup.
       }
-      this.taskExecutionResolutionValue = await this.resolveTaskSessionExecution();
+      this.taskExecutionResolutionValue = await resolveTaskSessionExecutionWithAutoRecovery(
+        { id: this.project.id, rootPath: this.project.rootPath },
+        {
+          agentId: this.taskAgentId,
+          nativeSessionId: this.identity.nativeSessionId,
+          now: Date.now(),
+        }
+      );
       try {
         /*
          * resolveTaskSessionExecution() may opt-in recover/claim a Task.
@@ -247,7 +509,6 @@ export class SessionCore {
       }
     } catch {
       this.taskSelfHealingResultValue = undefined;
-      // Task resume is derived context and must not block session capture.
     }
 
     return recorded;
@@ -300,140 +561,50 @@ export class SessionCore {
         agentId: this.taskAgentId,
       });
     } catch {
-      /*
-       * Current work is derived state.
-       * WAL + canonical Tasks remain authoritative.
-       */
+      // Current work is a derived projection and must not break session flush.
     }
 
-    /*
-     * Publish only after native Task mutation has drained. Remote
-     * replication is downstream and never participates in local capture.
-     */
-    this.taskReplication.enqueue();
-    await this.taskReplication.drain();
+    // Learn new WAL events into the immutable learned journal
+    await this.learner.learnNew({ includeDerivedProjections: true });
 
-    /*
-     * Long-term learning is deliberately downstream
-     * of durable session persistence.
-     *
-     * A learner failure must NEVER destroy session capture.
-     * Cursor is not advanced on learner failure,
-     * so next flush retries.
-     */
-    if (process.env.TOOLNET_SESSION_LEARNING !== '0') {
-      try {
-        await this.learner.learnNew();
-      } catch {
-        // Retry automatically on a later flush.
-      }
-    }
+    // Learn new WAL events into work continuity journal
+    await this.continuity.learnNew();
 
-    /*
-     * Materialize learned journal into canonical MemoryStore.
-     *
-     * This is downstream of durable session persistence and learner
-     * success. A materialization failure preserves WAL + journal;
-     * cursor is not advanced, so next flush retries.
-     */
-    let materialization: MaterializationResult | undefined;
+    // Learn new WAL events into semantic work journal
+    await this.semantic.learnNew();
 
-    if (process.env.TOOLNET_SESSION_MATERIALIZATION !== '0') {
-      try {
-        materialization = await this.materializer.materialize(this.project, this.identity);
-      } catch {
-        /*
-         * Materialization is downstream of durable capture and normally
-         * reports failures through its own result. This guard only keeps an
-         * unexpected throw from breaking fingerprinting of session state.
-         */
-      }
-    }
-
-    /*
-     * Work continuity is a separate projection from
-     * long-term memory.
-     *
-     * Failure here must never break session capture.
-     */
-    if (process.env.TOOLNET_WORK_CONTINUITY !== '0') {
-      try {
-        await this.continuity.learnNew();
-      } catch {
-        // Immutable session WAL allows retry later.
-      }
-    }
-
-    /*
-     * Semantic continuity learns meaning, rationale,
-     * deliverables and completion criteria.
-     *
-     * It never invents missing rationale.
-     */
-    if (process.env.TOOLNET_SEMANTIC_CONTINUITY !== '0') {
-      try {
-        await this.semantic.learnNew();
-      } catch {
-        // Derived projection: session capture must continue.
-      }
-    }
-
-    /*
-     * Smart Handoff checkpoint.
-     *
-     * We checkpoint on every durable flush, not only graceful
-     * session_end. This protects continuity when an agent hits
-     * token limit, terminal disconnect, crash, or user stops
-     * unexpectedly.
-     *
-     * Handoff IDs are state-digest based, so unchanged work
-     * does not create endless duplicate snapshots.
-     */
-    if (process.env.TOOLNET_SMART_HANDOFF !== '0' && pending.events.length > 0) {
-      try {
-        const lastEvent = pending.events[pending.events.length - 1];
-
-        const explicitReason = ['session_idle', 'session_end', 'session_compact'].includes(
-          lastEvent.type
-        )
-          ? lastEvent.type
-          : 'checkpoint';
-
-        await this.handoff.capture(explicitReason, lastEvent.sequence);
-      } catch {
-        /*
-         * Handoff is a derived projection.
-         * It must never break durable session capture.
-         */
-      }
-    }
+    // Materialize learned memory batches into canonical MemoryStore
+    const materialization = await this.materializer.materialize(this.project, this.identity);
 
     return {
-      ...result,
+      uploadedEvents: result.uploadedEvents,
+      lastRemoteSequence: result.lastRemoteSequence,
+      eventCount: result.eventCount,
+      chunkCount: result.chunkCount,
 
-      materialization: materialization
-        ? {
-            status: materialization.status,
+      status: result.status,
 
-            batchesScanned: materialization.batchesScanned,
+      materialization: {
+        status: materialization.status,
 
-            candidates: materialization.candidates,
+        batchesScanned: materialization.batchesScanned,
 
-            added: materialization.added,
+        candidates: materialization.candidates,
 
-            duplicates: materialization.duplicates,
+        added: materialization.added,
 
-            memories: materialization.memories,
+        duplicates: materialization.duplicates,
 
-            evidenceUpdated: materialization.evidenceUpdated,
+        memories: materialization.memories,
 
-            operationId: materialization.operationId,
+        evidenceUpdated: materialization.evidenceUpdated,
 
-            durationMs: materialization.durationMs,
+        operationId: materialization.operationId,
 
-            ...(materialization.errorCode ? { errorCode: materialization.errorCode } : {}),
-          }
-        : undefined,
+        durationMs: materialization.durationMs,
+
+        ...(materialization.errorCode ? { errorCode: materialization.errorCode } : {}),
+      },
     };
   }
 
@@ -448,55 +619,28 @@ export class SessionCore {
       },
     });
 
-    return this.flush();
-  }
-
-  async end(data: Record<string, unknown> = {}): Promise<SessionFlushResult> {
-    this.record({
-      type: 'session_end',
-      data,
-      provenance: {
-        source: this.identity.agent,
-      },
-    });
-
-    this.taskHeartbeat?.stop();
-    this.taskExecutionResolutionValue = undefined;
-
-    return this.flush();
-  }
-  async resolveTaskSessionExecution(
-    options: { autoRecover?: boolean; now?: number } = {}
-  ): Promise<SessionExecutionResolution> {
-    return resolveTaskSessionExecutionWithAutoRecovery(this.project, {
-      agentId: this.taskAgentId,
-      nativeSessionId: this.identity.nativeSessionId,
-      ...(options.autoRecover !== undefined ? { autoRecover: options.autoRecover } : {}),
-      ...(options.now !== undefined ? { now: options.now } : {}),
-      maxChars: 4_000,
-    });
-  }
-
-  taskResumeBootstrap(options: { maxChars?: number } = {}): string | undefined {
-    return renderTaskSessionBootstrap(this.project, {
-      agentId: this.taskAgentId,
-      nativeSessionId: this.identity.nativeSessionId,
-      maxChars: options.maxChars,
-    });
-  }
-
-  taskExecutionResolution(): SessionExecutionResolution | undefined {
-    return this.taskExecutionResolutionValue;
-  }
-
-  taskHeartbeatStatus() {
-    return (
-      this.taskHeartbeat?.status() ?? {
-        running: false,
-        beats: 0,
-        failures: 0,
+    // v0.7: Record session interrupted checkpoint and release lease
+    if (this.checkpointSession) {
+      try {
+        await this.checkpointSession.record({
+          type: 'session.interrupted',
+          reason: 'session_idle',
+        });
+        await this.checkpointSession.release();
+      } catch {
+        // Checkpoint failures should not break session idle
       }
-    );
+    }
+
+    // Capture smart handoff for unfinished work
+    const state = this.wal.loadState();
+    try {
+      await this.handoff.capture((data.reason as string) ?? 'session_idle', state.lastSequence);
+    } catch {
+      // Handoff capture failures should not break session idle
+    }
+
+    return this.flush();
   }
 
   status(): LocalSessionState {
@@ -517,5 +661,35 @@ export class SessionCore {
 
   recoverRemote() {
     return this.remote.recover(this.identity);
+  }
+
+  // v0.7 automatic checkpoint status
+  checkpointStatus() {
+    return this.checkpointSession?.status();
+  }
+
+  // v0.7 automatic resume context
+  async getResumeContext(
+    options: {
+      mode?: 'tiny' | 'standard' | 'full';
+      budgetTokens?: number;
+      currentCodeRevision?: string;
+    } = {}
+  ): Promise<CloudResumeResult | null> {
+    if (!this.cloudAuthority) {
+      return null;
+    }
+
+    try {
+      return await resumeFromCloud({
+        authority: this.cloudAuthority,
+        projectId: this.identity.projectId,
+        mode: options.mode,
+        budgetTokens: options.budgetTokens,
+        currentCodeRevision: options.currentCodeRevision,
+      });
+    } catch {
+      return null;
+    }
   }
 }

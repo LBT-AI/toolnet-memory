@@ -38,6 +38,8 @@ export interface PackageUpgradeRequest {
   migrations?: readonly AuthorityMigration[];
   /** Defaults to true; an upgrade only runs when a caller opts in. */
   dryRun?: boolean;
+  /** Observability hook invoked before each upgrade phase runs. */
+  onPhase?: (phase: import('./types.js').UpgradePhase) => void;
 }
 
 export interface PackageUpgradeOutcome {
@@ -58,6 +60,7 @@ export async function orchestratePackageUpgrade(
 
   const result = await runUpgrade(plan, request.ports, {
     dryRun: request.dryRun !== false,
+    ...(request.onPhase !== undefined ? { onPhase: request.onPhase } : {}),
   });
 
   return {

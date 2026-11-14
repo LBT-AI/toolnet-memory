@@ -1071,7 +1071,13 @@ describe('Phase 84C — update command integration', () => {
 
     const upgradeFunction = source.slice(source.indexOf('async function orchestrateLocalUpgrade'));
 
-    expect(upgradeFunction).toContain('orchestrateLocalUpgrade(beforeBuild, latest)');
+    /*
+     * Phase 86E.7A: the call gained a phase reporter (Step 4 UI narration)
+     * as a third argument. The identity data flow pinned here is unchanged:
+     * the pre-install `before` descriptor and `latest` still travel
+     * positionally, and the function still never re-derives the build.
+     */
+    expect(upgradeFunction).toContain('orchestrateLocalUpgrade(beforeBuild, latest,');
     expect(upgradeFunction.slice(0, 600)).not.toContain('currentBuildDescriptor(');
   });
 

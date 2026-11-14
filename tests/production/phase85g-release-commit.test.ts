@@ -44,7 +44,11 @@ function git(args: string[]): { status: number; stdout: string } {
 }
 
 function committedPaths(): string[] {
-  return git(['show', '--name-only', '--format=', 'HEAD']).stdout.split(/\r?\n/u).filter(Boolean);
+  /* Additions/modifications only: removing scratch paths is a cleanup, not
+   * content the release commit introduces. */
+  return git(['show', '--name-only', '--format=', '--diff-filter=ACMR', 'HEAD'])
+    .stdout.split(/\r?\n/u)
+    .filter(Boolean);
 }
 
 function parentAvailable(): boolean {
@@ -149,6 +153,9 @@ const PENDING_HARDENING_PATHS = new Set([
   'tests/production/phase85j-final-release-repair.test.ts',
   'tests/production/phase85k-v061-release-recovery.test.ts',
   'tests/production/phase85k-v062-release-recovery.test.ts',
+  /* CI workflow and verification script tracked in this repo. */
+  '.github/workflows/ci.yml',
+  'scripts/verify-release-contract.mjs',
 ]);
 
 function isPendingHardeningPath(path: string): boolean {
@@ -342,7 +349,7 @@ describe('Phase 85G — commit contents', () => {
 
     const unexpected = committedPaths().filter(
       (path) =>
-        !/^(src\/|tests\/|docs\/|bundle\/|bin\/|packages\/|scripts\/|package\.json$|package-lock\.json$|\.release-target$|release-manifest\.json$|CHANGELOG\.md$|README\.md$|phase\d+[a-z0-9.-]*\.md$|toolnet-[a-z0-9.-]*\.md$)/u.test(
+        !/^(src\/|tests\/|docs\/|bundle\/|bin\/|packages\/|scripts\/|\.github\/|package\.json$|package-lock\.json$|\.release-target$|release-manifest\.json$|CHANGELOG\.md$|README\.md$|phase\d+[a-z0-9.-]*\.md$|toolnet-[a-z0-9.-]*\.md$)/u.test(
           path
         )
     );
@@ -488,10 +495,35 @@ describe('Phase 85G — no tag, push or publish', () => {
     /* Before Phase 85I1 nothing is pushed; afterwards the authorized push may
      * only place the release commit on the remote main branch, never on a tag
      * or a side branch. This suite never pushes anything itself. */
+    /*
+     * GitHub Actions `pull_request` checkouts create an ephemeral merge ref
+     * (refs/remotes/pull/<n>/merge, and occasionally refs/pull/<n>/merge)
+     * that points at the temporary merge commit of HEAD. These refs are
+     * synthesized by the runner, are not real remote branches, and are removed
+     * once the run ends — they must not be treated as evidence that the
+     * release commit leaked onto a side branch. Skip them here so the check
+     * keeps protecting real remote branches only. */
+    /*
+     * In a pull-request CI run the checked-out HEAD lives on the feature
+     * branch under review, so its own remote-tracking ref legitimately points
+     * at HEAD. That is the branch being reviewed, not a leak of the release
+     * commit onto a side branch, and must be allowed alongside main/HEAD. */
+    const currentBranch = git(['symbolic-ref', '--short', 'HEAD']).stdout.trim();
+    const allowedBranches = new Set(['main', 'HEAD', currentBranch]);
+    const allowedPattern = new RegExp(
+      `^refs/remotes/[^/]+/(${[...allowedBranches].map((b) => b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`,
+      'u'
+    );
+
     for (const ref of remoteRefs) {
+      if (/^refs\/(remotes\/)?pull\//u.test(ref.refname)) {
+        continue;
+      }
+
       if (ref.objectname === head) {
-        /* `origin/main` plus its symbolic `origin/HEAD` alias only. */
-        expect(ref.refname).toMatch(/^refs\/remotes\/[^/]+\/(main|HEAD)$/u);
+        /* The current branch's remote-tracking ref, origin/main, and the
+         * symbolic origin/HEAD alias only. */
+        expect(ref.refname).toMatch(allowedPattern);
       }
     }
   });
