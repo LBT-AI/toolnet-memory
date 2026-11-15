@@ -63,6 +63,7 @@ async function main() {
     console.log(`Binary detected  : ${status.binaryDetected ? '✓' : '✗'}`);
     console.log(`Config ready     : ${status.configReady ? '✓' : '✗'}`);
     console.log(`Hooks available  : ${status.hooksAvailable ? '✓' : '✗'}`);
+    console.log(`Preview / experimental: yes — ${status.previewReason}`);
 
     if (status.configPath) {
       console.log(`Config path      : ${status.configPath}`);

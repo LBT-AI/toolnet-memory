@@ -16,6 +16,7 @@ import { shouldFilterEvent, filterEventData } from '../transcript-filter.js';
 import { extractSessionMemory } from '../session-extractor.js';
 import { shouldArchiveRawTranscript, shouldArchiveRemote } from '../session-memory-policy.js';
 import { syncMaterialization, type SyncMaterialization } from '../sync-materialization.js';
+import type { CloudCheckpointSession } from '../../v0.7/checkpoint-runtime.js';
 
 export interface AgySyncOptions {
   project: ProjectManifest;
@@ -58,6 +59,18 @@ export interface AgySyncResult {
 
   /** Canonical MemoryStore outcome once the flush boundary completed. */
   materialization?: SyncMaterialization;
+
+  // v0.7 automatic checkpoint status
+  checkpointStatus?: ReturnType<CloudCheckpointSession['status']>;
+
+  // v0.7 automatic resume context
+  resumeContext?: {
+    text: string;
+    estimatedTokens: number;
+    revision: number;
+    mode: string;
+    warnings: string[];
+  };
 }
 
 function expandHome(value: string): string {
@@ -118,6 +131,21 @@ export async function syncAgySession(options: AgySyncOptions): Promise<AgySyncRe
   const transcript = readAgyTranscript(transcriptPath, {
     offset: Number.isFinite(offset) ? offset : 0,
   });
+
+  // v0.7: Fetch resume context for new sessions
+  let resumeContext: AgySyncResult['resumeContext'];
+  if (state.lastSequence === 0) {
+    const resume = await core.getResumeContext({ mode: 'standard' });
+    if (resume?.available) {
+      resumeContext = {
+        text: resume.text,
+        estimatedTokens: resume.estimatedTokens,
+        revision: resume.revision,
+        mode: resume.mode,
+        warnings: resume.warnings,
+      };
+    }
+  }
 
   const events = [];
 
@@ -277,6 +305,12 @@ export async function syncAgySession(options: AgySyncOptions): Promise<AgySyncRe
     reset: transcript.reset,
 
     materialization: syncMaterialization(flushed),
+
+    // v0.7 automatic checkpoint status
+    checkpointStatus: core.checkpointStatus(),
+
+    // v0.7 automatic resume context
+    resumeContext,
   };
 }
 

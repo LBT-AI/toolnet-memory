@@ -699,4 +699,19 @@ export class SessionWal {
       });
     });
   }
+
+  readEventsFromOffset(offset: number): { events: NormalizedSessionEvent[]; nextOffset: number } {
+    return this.withLock(() => {
+      this.recoverStateUnsafe();
+      const events = readWalEvents(this.eventsFile);
+
+      const start = Number.isFinite(offset) ? Math.max(0, offset) : 0;
+
+      if (start >= events.length) {
+        return { events: [], nextOffset: events.length };
+      }
+
+      return { events: events.slice(start), nextOffset: events.length };
+    });
+  }
 }

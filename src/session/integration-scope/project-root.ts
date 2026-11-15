@@ -32,8 +32,19 @@ function toolnetManifest(root: string): string {
 function findToolnetRoot(start: string): string | undefined {
   let current = resolve(start);
   const filesystemRoot = parse(current).root;
+  const systemRoots = ['/tmp', '/var', '/usr', '/opt', '/etc', '/boot', '/sys', '/proc', '/dev'];
 
   for (;;) {
+    // Skip system directories entirely - don't even check for manifests there
+    if (systemRoots.includes(current)) {
+      const parent = dirname(current);
+      if (parent === current) {
+        return undefined;
+      }
+      current = parent;
+      continue;
+    }
+
     if (existsSync(toolnetManifest(current))) {
       return current;
     }

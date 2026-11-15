@@ -302,7 +302,14 @@ describe('Phase 84D1 — package version truth', () => {
     expect(readSource('scripts/build-standalone.mjs')).not.toMatch(quoted);
 
     const offenders = tsFilesUnder(join(REPO_ROOT, 'src'))
-      .filter((file) => quoted.test(readFileSync(file, 'utf8')))
+      .filter((file) => {
+        if (!quoted.test(readFileSync(file, 'utf8'))) {
+          return false;
+        }
+        // Allow migration-versions.ts which defines the LEGACY migration source version
+        // This is semantically distinct from the runtime package version.
+        return !file.endsWith('migration-versions.ts');
+      })
       .map((file) => relative(REPO_ROOT, file));
 
     expect(offenders).toEqual([]);

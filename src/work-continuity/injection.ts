@@ -8,6 +8,14 @@ import type { ProjectManifest } from '../core/types.js';
 
 import type { StorageProvider } from '../storage/types.js';
 
+import {
+  createCloudAuthorityFromEnv,
+  hasCloudAuthorityConfig,
+  resolveDurabilityMode,
+} from '../v0.7/index.js';
+
+import { resumeFromCloud } from '../v0.7/resume.js';
+
 import { sha256, writeJsonAtomic } from '../session/utils.js';
 
 import { getStartupBriefForInjection } from './brief-cache.js';
@@ -199,7 +207,35 @@ export async function buildAgyContinuityContext(options: {
     maxChars: 900,
   });
 
-  return [continuity, offloadGraph, memoryAgentStartupGuidance()]
+  /*
+   * v0.7 cloud-backed resume: prefer the acknowledged cloud packet when a
+   * cloud authority is configured. Never falls back to fabricating data.
+   */
+  let cloudResumeText = '';
+  try {
+    const strict =
+      resolveDurabilityMode(process.env.TOOLNET_DURABILITY_MODE) === 'strict-cloud-only';
+    if (hasCloudAuthorityConfig() || !strict) {
+      const authority = createCloudAuthorityFromEnv();
+      const result = await resumeFromCloud({
+        authority,
+        projectId: options.project.id,
+        mode: 'standard',
+        budgetTokens: 1_500,
+      });
+      if (result.available) {
+        cloudResumeText = result.text;
+      }
+    }
+  } catch {
+    cloudResumeText = '';
+  }
+
+  const combinedContinuity = cloudResumeText
+    ? `${cloudResumeText}\n\n${continuity}`.trim()
+    : continuity;
+
+  return [combinedContinuity, offloadGraph, memoryAgentStartupGuidance()]
     .filter(Boolean)
     .join('\n\n')
     .trim();

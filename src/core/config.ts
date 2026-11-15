@@ -1,6 +1,12 @@
 import './global-env.js';
 
+import { resolveDurabilityMode, type DurabilityMode } from '../v0.7/durability-policy.js';
+
 export interface ToolNetMemoryConfig {
+  durability: {
+    mode: DurabilityMode;
+  };
+
   memory: {
     autoCapture: boolean;
     autoRetrieve: boolean;
@@ -69,6 +75,10 @@ function envNumber(value: string | undefined, fallback: number): number {
 
 export function loadConfig(): ToolNetMemoryConfig {
   return {
+    durability: {
+      mode: resolveDurabilityMode(process.env.TOOLNET_DURABILITY_MODE),
+    },
+
     memory: {
       autoCapture: envBool(process.env.MEMORY_AUTO_CAPTURE, true),
 

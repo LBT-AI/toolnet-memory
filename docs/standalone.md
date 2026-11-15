@@ -98,6 +98,33 @@ Graph UI HTML and `3d-force-graph` browser asset are packaged into the
 standalone virtual filesystem. Graph security from Phase 25 remains in
 effect.
 
+## Parser capability
+
+TypeScript / JavaScript structural parsing (TypeScript Compiler API) and
+lexical search work the same as in the npm distribution.
+
+Python, Go, Rust, C, and C++ structural parsing is intentionally
+unsupported in the standalone binary: tree-sitter grammar assets resolve
+from installed `node_modules`, which a single-file target does not have,
+and the single-binary runtime cannot safely bundle the grammar assets
+today. Those languages remain lexically searchable, and
+`code:capabilities` reports `structural=no` with an explicit fallback note
+in this runtime instead of claiming support. Structural parsing for those
+languages requires the npm distribution. A file whose grammar is
+unavailable fails closed to lexical indexing; a fallback is never reported
+as a structural success.
+
+## Single-binary runtime limitation
+
+The standalone executable embeds its JavaScript but cannot evaluate a few
+dependency patterns that assume loadable sibling files (dynamic `require`
+of SDK transports and compiler internals). Commands verified working in
+the single binary include `--version`, `identity`, and
+`code:capabilities`; commands that must load those patterns (`init`,
+`index`, daemon lifecycle) fail fast with an explicit error instead of
+hanging. Server-backed workflows remain npm-distribution features until
+the single-binary packaging supports those patterns.
+
 ## Service limitations
 
 The current ToolNet daemon transport uses a Unix-domain socket. Therefore:

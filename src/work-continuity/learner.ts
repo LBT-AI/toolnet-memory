@@ -6,7 +6,7 @@ import type { StorageProvider } from '../storage/types.js';
 
 import type { NormalizedSessionEvent, SessionIdentity } from '../session/types.js';
 
-import type { SessionWal } from '../session/wal.js';
+import type { SessionWalInterface } from '../session/core.js';
 
 import { extractWorkObservations } from './extractor.js';
 
@@ -104,7 +104,7 @@ export class WorkContinuityLearner {
 
       identity: SessionIdentity;
 
-      wal: SessionWal;
+      wal: SessionWalInterface;
     }
   ) {
     this.journal = new WorkObservationJournal(options.storage);
@@ -115,11 +115,7 @@ export class WorkContinuityLearner {
 
     const rawOffset = Number(state.sourceCursors['work.continuity.offset'] ?? 0);
 
-    const read = readEvents(
-      this.options.wal.eventsFile,
-
-      Number.isFinite(rawOffset) ? rawOffset : 0
-    );
+    const read = this.options.wal.readEventsFromOffset(Number.isFinite(rawOffset) ? rawOffset : 0);
 
     if (read.events.length === 0) {
       return {

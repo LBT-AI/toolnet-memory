@@ -6,7 +6,7 @@ import type { StorageProvider } from '../../storage/types.js';
 
 import type { NormalizedSessionEvent, SessionIdentity } from '../types.js';
 
-import type { SessionWal } from '../wal.js';
+import type { SessionWalInterface } from '../core.js';
 
 import { runMemoryPipelineV2 } from '../../memory/pipeline-v2.js';
 
@@ -109,7 +109,7 @@ export class SessionMemoryLearner {
 
       identity: SessionIdentity;
 
-      wal: SessionWal;
+      wal: SessionWalInterface;
     }
   ) {
     this.journal = new SessionMemoryJournal(options.storage);
@@ -136,11 +136,7 @@ export class SessionMemoryLearner {
 
     const offset = Number.isFinite(rawOffset) ? rawOffset : 0;
 
-    const read = readEvents(
-      this.options.wal.eventsFile,
-
-      offset
-    );
+    const read = this.options.wal.readEventsFromOffset(offset);
 
     if (read.events.length === 0) {
       return {

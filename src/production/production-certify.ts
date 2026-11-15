@@ -16,6 +16,8 @@ import { tmpdir } from 'node:os';
 
 import { basename, dirname, join, resolve } from 'node:path';
 
+import { createRequire } from 'node:module';
+
 import { fileURLToPath } from 'node:url';
 import { parsePackManifestEntries } from '../code-intelligence/release/package-audit.js';
 import { certifyMemoryQualityGA } from './memory-quality-ga-certify.js';
@@ -57,6 +59,13 @@ export const PRODUCTION_PACK_REQUIRED_FILES = [
   'bundle/agy.js',
   'bundle/agy-hook.js',
   'bundle/opencode.js',
+  'bundle/gemini.js',
+  'bundle/gemini-hook.js',
+  'bundle/junie.js',
+  'bundle/junie-hook.js',
+  'bundle/codebuff.js',
+  'bundle/freebuff.js',
+  'bundle/continue.js',
   'bundle/codex.js',
   'bundle/codex-context.js',
   'bundle/claude.js',
@@ -69,6 +78,8 @@ export const PRODUCTION_PACK_REQUIRED_FILES = [
   'bundle/copilot-hook.js',
   'bundle/grok.js',
   'bundle/grok-hook.js',
+  'bundle/gemini.js',
+  'bundle/gemini-hook.js',
   'bundle/toolnet-cli.js',
   'bundle/kilo.js',
   'bundle/integration-status.js',
@@ -157,6 +168,12 @@ interface CommandResult {
   stdout: string;
 
   stderr: string;
+
+  /** True when the subprocess was killed for exceeding its time budget. */
+  timedOut: boolean;
+
+  /** Wall-clock time spent waiting on the subprocess. */
+  elapsedMs: number;
 }
 
 interface RuntimeMirrorResult {
@@ -210,12 +227,66 @@ function currentPackageRoot(): string {
   return process.cwd();
 }
 
-function run(
+export interface RunCommandBudget {
+  /**
+   * Hard bound for one subprocess invocation.
+   *
+   * Short interactive checks keep the 30s default. Packaging/build probes
+   * (npm pack runs the prepack build first) use PACKAGING_PROBE_TIMEOUT_MS.
+   */
+  timeoutMs?: number;
+  /** Human label for timeout diagnostics (command + purpose). */
+  label?: string;
+}
+
+/** Default bound for short certification subprocesses (init, CLI, bundles). */
+export const SHORT_CHECK_TIMEOUT_MS = 30_000;
+
+/**
+ * Bound for packaging/build probes.
+ *
+ * `npm pack` runs the prepack build first; build:prod measured 64s on a
+ * constrained host, so 300s leaves ample headroom for slow CI/VPS runners
+ * while still failing closed on a genuinely hung build.
+ */
+export const PACKAGING_PROBE_TIMEOUT_MS = 300_000;
+
+function isTimeoutError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === 'ETIMEDOUT' || /timed out/i.test(error.message);
+}
+
+function describeTimeout(
+  command: string,
+  args: string[],
+  timeoutMs: number,
+  elapsedMs: number
+): string {
+  return (
+    `CERTIFY_SUBPROCESS_TIMEOUT command=${command} ` +
+    `args=${JSON.stringify(args)} budgetMs=${timeoutMs} elapsedMs=${elapsedMs}`
+  );
+}
+
+/**
+ * Run one certification subprocess with a hard bound.
+ *
+ * Exported for timeout fault-injection tests. Production callers use the
+ * short-check default; packaging/build probes pass PACKAGING_PROBE_TIMEOUT_MS.
+ */
+export function run(
   command: string,
   args: string[],
   cwd: string,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  budget: RunCommandBudget = {}
 ): CommandResult {
+  const timeoutMs = budget.timeoutMs ?? SHORT_CHECK_TIMEOUT_MS;
+  const startedAt = Date.now();
+
   const result = spawnSync(command, args, {
     cwd,
 
@@ -223,10 +294,27 @@ function run(
 
     encoding: 'utf8',
 
-    timeout: 30_000,
+    timeout: timeoutMs,
 
     maxBuffer: 10 * 1024 * 1024,
   });
+
+  const elapsedMs = Date.now() - startedAt;
+  const timedOut = isTimeoutError(result.error);
+
+  if (timedOut) {
+    return {
+      status: result.status,
+
+      stdout: '',
+
+      stderr: describeTimeout(command, args, timeoutMs, elapsedMs),
+
+      timedOut: true,
+
+      elapsedMs,
+    };
+  }
 
   return {
     status: result.status,
@@ -234,6 +322,10 @@ function run(
     stdout: result.stdout ?? '',
 
     stderr: result.stderr ?? '',
+
+    timedOut: false,
+
+    elapsedMs,
   };
 }
 
@@ -300,7 +392,24 @@ function npmPackedFiles(packageRoot: string): {
 
   error?: string;
 } {
-  const result = run('npm', ['pack', '--dry-run', '--json'], packageRoot);
+  /*
+   * `npm pack` runs the prepack build first (measured 64s for build:prod on
+   * a constrained host), so this probe gets the packaging budget rather
+   * than the 30s short-check default. A hung build still fails closed via
+   * CERTIFY_SUBPROCESS_TIMEOUT.
+   */
+  const result = run('npm', ['pack', '--dry-run', '--json'], packageRoot, process.env, {
+    timeoutMs: PACKAGING_PROBE_TIMEOUT_MS,
+    label: 'npm-pack-manifest',
+  });
+
+  if (result.timedOut) {
+    return {
+      files: [],
+
+      error: compactError(result),
+    };
+  }
 
   if (result.status !== 0) {
     return {
@@ -334,6 +443,111 @@ function readManifestId(file: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+export interface PackagedParserGate {
+  passed: boolean;
+  detail?: string;
+}
+
+/**
+ * Phase 86E.7A — packaged parser release gate.
+ *
+ * A release fails certification when the manifest claims structural support
+ * but the packaged runtime cannot actually load the grammars. Resolution is
+ * anchored at the package (never `process.cwd()`), so this gate holds for
+ * global installs running from any project directory.
+ */
+export function certifyPackagedParserRuntime(
+  packageRoot = currentPackageRoot()
+): PackagedParserGate {
+  const fail = (detail: string): PackagedParserGate => ({ passed: false, detail });
+
+  let packageJson: { dependencies?: Record<string, string> };
+  let manifest: {
+    hardening?: {
+      codeIntelligence?: { treeSitterRuntime?: unknown; supportedExtensions?: unknown };
+      nonTsIntelligence?: { structuralParserSupport?: unknown };
+    };
+  };
+
+  try {
+    packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+    };
+  } catch {
+    return fail('package.json is unreadable.');
+  }
+
+  try {
+    manifest = JSON.parse(readFileSync(join(packageRoot, 'release-manifest.json'), 'utf8'));
+  } catch {
+    return fail('release-manifest.json is unreadable.');
+  }
+
+  if (manifest?.hardening?.codeIntelligence?.treeSitterRuntime !== true) {
+    return fail('release-manifest does not claim treeSitterRuntime=true.');
+  }
+
+  if (manifest?.hardening?.nonTsIntelligence?.structuralParserSupport !== true) {
+    return fail('release-manifest does not claim nonTs structuralParserSupport=true.');
+  }
+
+  const manifestExtensions = manifest?.hardening?.codeIntelligence?.supportedExtensions;
+  const requiredExtensions = [
+    '.py',
+    '.go',
+    '.rs',
+    '.c',
+    '.h',
+    '.cc',
+    '.cpp',
+    '.cxx',
+    '.hpp',
+    '.hh',
+  ];
+  const missingExtensions = Array.isArray(manifestExtensions)
+    ? requiredExtensions.filter((extension) => !manifestExtensions.includes(extension))
+    : requiredExtensions;
+  if (missingExtensions.length > 0) {
+    return fail(`release-manifest omits structural extensions: ${missingExtensions.join(', ')}.`);
+  }
+
+  const requiredDeps: Array<{ package: string; asset: string }> = [
+    { package: 'web-tree-sitter', asset: '' },
+    { package: 'tree-sitter-python', asset: 'tree-sitter-python.wasm' },
+    { package: 'tree-sitter-go', asset: 'tree-sitter-go.wasm' },
+    { package: 'tree-sitter-rust', asset: 'tree-sitter-rust.wasm' },
+    { package: 'tree-sitter-c', asset: 'tree-sitter-c.wasm' },
+    { package: 'tree-sitter-cpp', asset: 'tree-sitter-cpp.wasm' },
+  ];
+
+  const missingDeps = requiredDeps.filter(({ package: name }) => !packageJson.dependencies?.[name]);
+  if (missingDeps.length > 0) {
+    return fail(
+      `grammar runtime missing from dependencies: ${missingDeps.map((item) => item.package).join(', ')}.`
+    );
+  }
+
+  const packageRequire = createRequire(join(packageRoot, 'package.json'));
+  const missingAssets: string[] = [];
+  for (const { package: name, asset } of requiredDeps) {
+    if (!asset) {
+      continue;
+    }
+    try {
+      packageRequire.resolve(`${name}/${asset}`);
+    } catch {
+      missingAssets.push(`${name}/${asset}`);
+    }
+  }
+  if (missingAssets.length > 0) {
+    return fail(
+      `grammar assets do not resolve from the packaged tree: ${missingAssets.join(', ')}.`
+    );
+  }
+
+  return { passed: true };
 }
 
 function runPackagedRuntimeInit(packageRoot: string): RuntimeMirrorResult {
@@ -489,6 +703,8 @@ export async function certifyProductionReadiness(
 
   const packedValidation = validatePackedRuntimeFiles(packed.files);
 
+  const packagedParser = certifyPackagedParserRuntime(packageRoot);
+
   checks.push(
     check(
       'npm-package',
@@ -505,6 +721,15 @@ export async function certifyProductionReadiness(
         ]
           .filter(Boolean)
           .join('\n')
+    )
+  );
+
+  checks.push(
+    check(
+      'packaged-parser-runtime',
+      'packaged parser grammars resolve and manifest claims structural truth',
+      packagedParser.passed,
+      packagedParser.detail
     )
   );
 
@@ -526,6 +751,10 @@ export async function certifyProductionReadiness(
         stdout: '',
 
         stderr: 'CLI file does not exist.',
+
+        timedOut: false,
+
+        elapsedMs: 0,
       };
 
   checks.push(

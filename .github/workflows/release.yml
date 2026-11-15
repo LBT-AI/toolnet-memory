@@ -122,6 +122,8 @@ jobs:
         run: npm test
       - name: Build production release
         run: npm run build:release
+      - name: Verify static release contract
+        run: npm run release:verify:static
       - name: Certify production release
         run: node bundle/production-certify.js
       - name: Pack release artifact

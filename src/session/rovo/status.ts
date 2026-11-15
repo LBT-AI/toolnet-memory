@@ -12,7 +12,19 @@ export interface RovoStatus {
   hooksAvailable: boolean;
 
   configPath?: string;
+
+  /**
+   * Atlassian Rovo hook API is preview/experimental: automatic capture is
+   * functional but may change on stabilization. Always true until the API
+   * stabilizes; status and docs must keep saying so (README Rovo section).
+   */
+  preview: true;
+
+  previewReason: string;
 }
+
+export const ROVO_PREVIEW_REASON =
+  'Atlassian Rovo hook API is preview/experimental; capture behavior may change on stabilization.';
 
 export function inspectRovoStatus(): RovoStatus {
   const binaryDetected =
@@ -39,5 +51,7 @@ export function inspectRovoStatus(): RovoStatus {
     configReady,
     hooksAvailable,
     configPath,
+    preview: true as const,
+    previewReason: ROVO_PREVIEW_REASON,
   };
 }

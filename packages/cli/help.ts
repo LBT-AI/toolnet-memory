@@ -353,6 +353,31 @@ export const COMMANDS: CommandMetadata[] = [
     category: 'integration',
   },
   {
+    name: 'integrate:gemini',
+    description: 'Install Gemini CLI integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:junie',
+    description: 'Install Junie CLI integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:codebuff',
+    description: 'Install Codebuff CLI integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:freebuff',
+    description: 'Install Freebuff CLI integration',
+    category: 'integration',
+  },
+  {
+    name: 'integrate:continue',
+    description: 'Install Continue CLI integration',
+    category: 'integration',
+  },
+  {
     name: 'integrate:codex',
     description: 'Install Codex integration',
     category: 'integration',
@@ -521,6 +546,43 @@ export const COMMANDS: CommandMetadata[] = [
     description: 'Agy session hook',
     category: 'session',
     hidden: true,
+  },
+  {
+    name: 'session:gemini-sync',
+    description: 'Sync Gemini CLI session',
+    category: 'session',
+  },
+  {
+    name: 'session:gemini-recover',
+    description: 'Recover Gemini CLI sessions',
+    category: 'session',
+  },
+  {
+    name: 'session:gemini-hook',
+    description: 'Gemini CLI session hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:junie-recover',
+    description: 'Recover Junie CLI sessions',
+    category: 'session',
+  },
+  {
+    name: 'session:junie-hook',
+    description: 'Junie CLI session hook',
+    category: 'session',
+    hidden: true,
+  },
+  {
+    name: 'session:continue-sync',
+    description: 'Sync Continue CLI session',
+    category: 'session',
+  },
+  {
+    name: 'session:continue-recover',
+    description: 'Recover Continue CLI sessions',
+    category: 'session',
   },
   {
     name: 'session:codex-sync',

@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 
 import { ProjectManager } from '../core/project-manager.js';
 
 import { daemonRuntimeRoot } from '../daemon/paths.js';
 
-import { UpdateView } from './update-view.js';
+import { UpdateView, upgradePhaseStatusLabel } from './update-view.js';
 
 import {
   collectLocalStoreObservations,
@@ -17,7 +17,7 @@ import {
   orchestratePackageUpgrade,
 } from './upgrade/index.js';
 
-import type { BuildDescriptor, PackageUpgradeOutcome } from './upgrade/index.js';
+import type { BuildDescriptor, PackageUpgradeOutcome, UpgradePhase } from './upgrade/index.js';
 
 const PACKAGE = 'toolnet-memory';
 
@@ -27,12 +27,57 @@ interface RunResult {
   stderr: string;
 }
 
+/*
+ * The npm child currently running, if any.
+ *
+ * SIGINT/SIGTERM forwarding is scoped to the npm phases: while a child is
+ * active the handlers below kill it so Ctrl+C never leaves the updater UI
+ * alive with an orphaned install. Outside those phases no handler is
+ * installed and the process keeps default signal semantics (immediate,
+ * bounded termination); the daemon-restart child is separately bounded by
+ * the upgrade timeout in `upgrade/ports.ts`.
+ */
+let activeChild: ChildProcess | null = null;
+
 function run(command: string, args: string[]): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env,
     });
+
+    activeChild = child;
+
+    let signalCount = 0;
+
+    const forwardSignal = (signal: NodeJS.Signals): void => {
+      signalCount += 1;
+
+      if (signalCount > 1) {
+        process.exit(130);
+      }
+
+      try {
+        child.kill('SIGTERM');
+      } catch {
+        // best-effort: the child may already be gone
+      }
+    };
+
+    const onSigint = (): void => forwardSignal('SIGINT');
+    const onSigterm = (): void => forwardSignal('SIGTERM');
+
+    const cleanupSignals = (): void => {
+      if (activeChild === child) {
+        activeChild = null;
+      }
+
+      process.removeListener('SIGINT', onSigint);
+      process.removeListener('SIGTERM', onSigterm);
+    };
+
+    process.once('SIGINT', onSigint);
+    process.once('SIGTERM', onSigterm);
 
     let stdout = '';
     let stderr = '';
@@ -48,9 +93,13 @@ function run(command: string, args: string[]): Promise<RunResult> {
       stderr += chunk;
     });
 
-    child.once('error', reject);
+    child.once('error', (error) => {
+      cleanupSignals();
+      reject(error);
+    });
 
     child.once('close', (code) => {
+      cleanupSignals();
       resolve({
         status: code ?? 1,
         stdout,
@@ -99,10 +148,15 @@ function detectPrefix(root: string): string | null {
  * upgrade always requires a daemon restart.
  *
  * Read-only against the project: the project is located, never created.
+ *
+ * `onPhase` narrates real upgrade progress to the Step 4 UI. The daemon
+ * restart phase is bounded by the upgrade timeout owner
+ * (`upgrade/ports.ts`), so this callback always terminates.
  */
 async function orchestrateLocalUpgrade(
   before: BuildDescriptor,
-  latest: string
+  latest: string,
+  onPhase?: (phase: UpgradePhase) => void
 ): Promise<PackageUpgradeOutcome> {
   const after = { ...before, packageVersion: latest };
 
@@ -116,6 +170,7 @@ async function orchestrateLocalUpgrade(
     after,
     ports: project ? createRealUpgradePorts({ project }) : createDaemonOnlyUpgradePorts(),
     dryRun: false,
+    ...(onPhase !== undefined ? { onPhase } : {}),
   });
 }
 
@@ -254,15 +309,41 @@ async function main(): Promise<void> {
 
   view.completeStep(99);
 
+  /*
+   * Step 4/4 — the work after package verification.
+   *
+   * Previously the UI parked at 99% under "Verifying installation" while
+   * local migration and the daemon restart were still running, so a hung
+   * restart looked like a hung verify. This step has no estimable duration:
+   * progress holds at 99% while the status line narrates the real phase and
+   * elapsed time ticks instead of a fake ETA.
+   */
+  view.startIndefiniteStep({
+    step: 4,
+    label: 'Applying local upgrade',
+    percent: 99,
+    status: 'Inspecting local state...',
+  });
+
   let upgrade: PackageUpgradeOutcome;
 
   try {
-    upgrade = await orchestrateLocalUpgrade(beforeBuild, latest);
+    upgrade = await orchestrateLocalUpgrade(beforeBuild, latest, (phase) => {
+      view.setStatus(upgradePhaseStatusLabel(phase));
+    });
   } catch (error) {
     view.fail('Local upgrade orchestration failed');
 
     console.error('');
     console.error(error instanceof Error ? error.message : String(error));
+    console.error('');
+    console.error(`Package installed: yes (${latest})`);
+    console.error('Local upgrade applied: no');
+    console.error('Retryable: yes');
+    console.error('');
+    console.error('Recover with:');
+    console.error('  toolnet-memory daemon:restart');
+    console.error('  toolnet-memory update');
     console.error('');
 
     process.exitCode = 1;
@@ -293,6 +374,21 @@ async function main(): Promise<void> {
       console.error(`  authority backup: ${result.backupId}`);
     }
 
+    /*
+     * The npm package already installed successfully at this point: never
+     * imply a rollback happened. Report package truth and local truth
+     * separately so the user knows a reinstall is unnecessary.
+     */
+    const retryable = result.failure?.restartFailure?.retryable ?? result.outcome === 'blocked';
+
+    console.error('');
+    console.error(`Package installed: yes (${latest})`);
+    console.error('Local upgrade applied: no');
+    console.error(`Retryable: ${retryable ? 'yes' : 'no'}`);
+    console.error('');
+    console.error('Recover with:');
+    console.error('  toolnet-memory daemon:restart');
+    console.error('  toolnet-memory update');
     console.error('');
 
     process.exitCode = 1;

@@ -25,11 +25,7 @@ function occurrences(input: string, pattern: string): number {
 }
 
 function stripAnsi(input: string): string {
-  return input.replace(
-    // eslint-disable-next-line no-control-regex
-    /\x1b\[[0-9;]*[A-Za-z]/g,
-    ''
-  );
+  return input.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
 }
 
 afterEach(() => {

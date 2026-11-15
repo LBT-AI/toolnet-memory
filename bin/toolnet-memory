@@ -434,6 +434,84 @@ case "$COMMAND" in
     exec "$TSX" "$ROOT/src/session/agy/cli.ts" install-hooks "$@"
     ;;
 
+  session:gemini-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/gemini-hook.js" ]; then
+      exec node "$ROOT/bundle/gemini-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/gemini/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/gemini/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
+  session:gemini-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/gemini.js" ]; then
+      exec node "$ROOT/bundle/gemini.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/gemini/cli.ts" sync "$@"
+    ;;
+
+  session:gemini-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/gemini.js" ]; then
+      exec node "$ROOT/bundle/gemini.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/gemini/cli.ts" recover "$@"
+    ;;
+
+  integrate:gemini)
+    shift
+
+    if [ -f "$ROOT/bundle/gemini.js" ]; then
+      exec node "$ROOT/bundle/gemini.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/gemini/cli.ts" install-hooks "$@"
+    ;;
+
+  session:junie-hook)
+    shift
+
+    if [ -f "$ROOT/bundle/junie-hook.js" ]; then
+      exec node "$ROOT/bundle/junie-hook.js" "$@"
+    fi
+
+    if [ -x "${TSX:-}" ] && [ -f "$ROOT/src/session/junie/hook.ts" ]; then
+      exec "$TSX" "$ROOT/src/session/junie/hook.ts" "$@"
+    fi
+
+    exit 0
+    ;;
+
+  session:junie-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/junie.js" ]; then
+      exec node "$ROOT/bundle/junie.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/junie/cli.ts" recover "$@"
+    ;;
+
+  integrate:junie)
+    shift
+
+    if [ -f "$ROOT/bundle/junie.js" ]; then
+      exec node "$ROOT/bundle/junie.js" install-hooks "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/junie/cli.ts" install-hooks "$@"
+    ;;
+
   certify:continuity)
     shift
 
@@ -568,6 +646,56 @@ case "$COMMAND" in
   integrate:kilo)
     shift
     run bundle/kilo.js src/session/kilo/cli.ts "$@"
+    ;;
+
+  integrate:codebuff)
+    shift
+
+    if [ -f "$ROOT/bundle/codebuff.js" ]; then
+      exec node "$ROOT/bundle/codebuff.js" install "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/codebuff/cli.ts" install "$@"
+    ;;
+
+  integrate:freebuff)
+    shift
+
+    if [ -f "$ROOT/bundle/freebuff.js" ]; then
+      exec node "$ROOT/bundle/freebuff.js" install "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/freebuff/cli.ts" install "$@"
+    ;;
+
+  integrate:continue)
+    shift
+
+    if [ -f "$ROOT/bundle/continue.js" ]; then
+      exec node "$ROOT/bundle/continue.js" status "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/continue/cli.ts" status "$@"
+    ;;
+
+  session:continue-sync)
+    shift
+
+    if [ -f "$ROOT/bundle/continue.js" ]; then
+      exec node "$ROOT/bundle/continue.js" sync "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/continue/cli.ts" sync "$@"
+    ;;
+
+  session:continue-recover)
+    shift
+
+    if [ -f "$ROOT/bundle/continue.js" ]; then
+      exec node "$ROOT/bundle/continue.js" recover "$@"
+    fi
+
+    exec "$TSX" "$ROOT/src/session/continue/cli.ts" recover "$@"
     ;;
 
   integrate:all)

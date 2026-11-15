@@ -78,8 +78,19 @@ function findExistingProjectRoot(startPath: string, stopAt?: string): string | n
   let current = resolve(startPath);
 
   const filesystemRoot = parse(current).root;
+  const systemRoots = ['/tmp', '/var', '/usr', '/opt', '/etc', '/boot', '/sys', '/proc', '/dev'];
 
   while (true) {
+    // Skip system directories entirely - don't even check for manifests there
+    if (systemRoots.includes(current)) {
+      const parent = dirname(current);
+      if (parent === current) {
+        break;
+      }
+      current = parent;
+      continue;
+    }
+
     if (hasProjectManifest(current)) {
       return current;
     }
@@ -109,6 +120,7 @@ function findRepositoryRoot(startPath: string): string {
   let current = resolve(startPath);
 
   const filesystemRoot = parse(current).root;
+  const systemRoots = ['/tmp', '/var', '/usr', '/opt', '/etc', '/boot', '/sys', '/proc', '/dev'];
 
   const markers = [
     '.git',
@@ -120,6 +132,16 @@ function findRepositoryRoot(startPath: string): string {
   ];
 
   while (true) {
+    // Skip system directories entirely - don't even check for markers there
+    if (systemRoots.includes(current)) {
+      const parent = dirname(current);
+      if (parent === current) {
+        break;
+      }
+      current = parent;
+      continue;
+    }
+
     if (markers.some((marker) => existsSync(join(current, marker)))) {
       return current;
     }

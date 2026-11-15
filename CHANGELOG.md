@@ -16,15 +16,15 @@ The project follows semantic versioning while it is in the `0.x` development ser
 - Hardened integration setup/repair lifecycle.
 - Wiki/Fleet state recovery hardening.
 - Zero-touch OpenCode/Codex/Agy capture where supported.
-- Extended agent integrations: goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, Aider, Plandex, OpenRouter capability entry, IBM Bob Shell, Cline CLI, Rovo Dev CLI, Warp capability entry.
-- 22-agent release/package contract.
+- Extended agent integrations: goose, Qwen Code, Kimi Code CLI, Hermes Agent, Qoder CLI, Aider, Plandex, OpenRouter capability entry, IBM Bob Shell, Cline CLI, Rovo Dev CLI, Warp capability entry, Gemini CLI, Junie, Codebuff, Freebuff, and Continue CLI.
+- 27-agent release/package contract.
 
 ### Changed
 
 - README integration matrix and capability documentation.
-- Production release certification expanded to 22-integration contract.
+- Production release certification expanded to the 27-integration contract.
 - Bundle/package requirements include expanded integration bundles.
-- Release manifest and metadata for 22-agent release series.
+- Release manifest and metadata for the 27-agent release series.
 
 ### Limitations
 
@@ -35,6 +35,10 @@ The project follows semantic versioning while it is in the `0.x` development ser
 - OpenRouter CLI product identity remains unresolved; ToolNet does not auto-install an integration for an unidentified product.
 - Warp Agent CLI has no verified native hook system; capability entry documents the gap rather than claiming native automatic capture.
 - Rovo event hooks are a preview/experimental feature; automatic capture is functional but may change when Atlassian stabilizes the hook API.
+- Junie hooks are an EAP surface; the ToolNet adapter registers SessionStart, Stop, and SessionEnd and tolerates payload changes that omit optional fields.
+- Gemini CLI capture depends on user-scope hooks in ~/.gemini/settings.json and a transcript path supplied by the host.
+- Codebuff and Freebuff expose no native lifecycle hooks; both are MCP-only integrations with no automatic session capture.
+- Continue CLI exposes no hooks; sessions are imported manually from ~/.continue/sessions.
 
 ### Compatibility
 

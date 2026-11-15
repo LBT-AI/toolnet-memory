@@ -9,6 +9,7 @@ const EXPECTED_AGENTS = {
   agy: {
     displayName: 'Agy / Antigravity',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'agy.js',
     command: 'integrate:agy',
   },
@@ -16,6 +17,7 @@ const EXPECTED_AGENTS = {
   opencode: {
     displayName: 'OpenCode',
     refreshMode: 'persistent-plugin',
+    captureMode: 'hook',
     bundle: 'opencode.js',
     command: 'integrate:opencode',
   },
@@ -23,6 +25,7 @@ const EXPECTED_AGENTS = {
   codex: {
     displayName: 'Codex',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'codex.js',
     command: 'integrate:codex',
   },
@@ -30,6 +33,7 @@ const EXPECTED_AGENTS = {
   claude: {
     displayName: 'Claude Code',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'claude.js',
     command: 'integrate:claude',
   },
@@ -37,6 +41,7 @@ const EXPECTED_AGENTS = {
   kiro: {
     displayName: 'Kiro CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'kiro.js',
     command: 'integrate:kiro',
   },
@@ -44,6 +49,7 @@ const EXPECTED_AGENTS = {
   cursor: {
     displayName: 'Cursor CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'cursor.js',
     command: 'integrate:cursor',
   },
@@ -51,6 +57,7 @@ const EXPECTED_AGENTS = {
   copilot: {
     displayName: 'GitHub Copilot CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'copilot.js',
     command: 'integrate:copilot',
   },
@@ -58,6 +65,7 @@ const EXPECTED_AGENTS = {
   grok: {
     displayName: 'Grok Build',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'grok.js',
     command: 'integrate:grok',
   },
@@ -65,6 +73,7 @@ const EXPECTED_AGENTS = {
   'toolnet-cli': {
     displayName: 'ToolNet CLI',
     refreshMode: 'native-session',
+    captureMode: 'manual-sync',
     bundle: 'toolnet-cli.js',
     command: 'integrate:toolnet-cli',
   },
@@ -72,6 +81,7 @@ const EXPECTED_AGENTS = {
   kilo: {
     displayName: 'Kilo',
     refreshMode: 'mcp-only',
+    captureMode: 'mcp-only',
     bundle: 'kilo.js',
     command: 'integrate:kilo',
   },
@@ -79,6 +89,7 @@ const EXPECTED_AGENTS = {
   goose: {
     displayName: 'goose',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'goose.js',
     command: 'integrate:goose',
   },
@@ -86,6 +97,7 @@ const EXPECTED_AGENTS = {
   qwen: {
     displayName: 'Qwen Code',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'qwen.js',
     command: 'integrate:qwen',
   },
@@ -93,6 +105,7 @@ const EXPECTED_AGENTS = {
   kimi: {
     displayName: 'Kimi Code CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'kimi.js',
     command: 'integrate:kimi',
   },
@@ -100,6 +113,7 @@ const EXPECTED_AGENTS = {
   hermes: {
     displayName: 'Hermes Agent',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'hermes.js',
     command: 'integrate:hermes',
   },
@@ -107,6 +121,7 @@ const EXPECTED_AGENTS = {
   qoder: {
     displayName: 'Qoder CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'qoder.js',
     command: 'integrate:qoder',
   },
@@ -114,6 +129,7 @@ const EXPECTED_AGENTS = {
   aider: {
     displayName: 'Aider',
     refreshMode: 'managed-wrapper',
+    captureMode: 'managed-wrapper-session-end',
     bundle: 'aider.js',
     command: 'integrate:aider',
   },
@@ -121,13 +137,15 @@ const EXPECTED_AGENTS = {
   plandex: {
     displayName: 'Plandex',
     refreshMode: 'native-session',
+    captureMode: 'manual-sync',
     bundle: 'plandex.js',
     command: 'integrate:plandex',
   },
 
   openrouter: {
     displayName: 'OpenRouter CLI',
-    refreshMode: 'blocked',
+    refreshMode: 'mcp-only',
+    captureMode: 'blocked-product-identity',
     bundle: 'openrouter.js',
     command: 'integrate:openrouter',
   },
@@ -135,6 +153,7 @@ const EXPECTED_AGENTS = {
   bob: {
     displayName: 'IBM Bob Shell',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'bob.js',
     command: 'integrate:bob',
   },
@@ -142,6 +161,7 @@ const EXPECTED_AGENTS = {
   cline: {
     displayName: 'Cline CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'cline.js',
     command: 'integrate:cline',
   },
@@ -149,6 +169,7 @@ const EXPECTED_AGENTS = {
   rovo: {
     displayName: 'Rovo Dev CLI',
     refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
     bundle: 'rovo.js',
     command: 'integrate:rovo',
   },
@@ -156,8 +177,49 @@ const EXPECTED_AGENTS = {
   warp: {
     displayName: 'Warp Agent CLI',
     refreshMode: 'blocked',
+    captureMode: 'blocked-capability',
     bundle: 'warp.js',
     command: 'integrate:warp',
+  },
+
+  gemini: {
+    displayName: 'Gemini CLI',
+    refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
+    bundle: 'gemini.js',
+    command: 'integrate:gemini',
+  },
+
+  junie: {
+    displayName: 'Junie',
+    refreshMode: 'native-lifecycle',
+    captureMode: 'hook',
+    bundle: 'junie.js',
+    command: 'integrate:junie',
+  },
+
+  codebuff: {
+    displayName: 'Codebuff',
+    refreshMode: 'mcp-only',
+    captureMode: 'mcp-only',
+    bundle: 'codebuff.js',
+    command: 'integrate:codebuff',
+  },
+
+  freebuff: {
+    displayName: 'Freebuff',
+    refreshMode: 'mcp-only',
+    captureMode: 'mcp-only',
+    bundle: 'freebuff.js',
+    command: 'integrate:freebuff',
+  },
+
+  continue: {
+    displayName: 'Continue',
+    refreshMode: 'native-session',
+    captureMode: 'manual-sync',
+    bundle: 'continue.js',
+    command: 'integrate:continue',
   },
 };
 
@@ -326,6 +388,8 @@ for (const [agent, expected] of Object.entries(EXPECTED_AGENTS)) {
 
   exact(`${agent} refresh mode`, actual.refreshMode, expected.refreshMode);
 
+  exact(`${agent} capture mode`, actual.captureMode, expected.captureMode);
+
   contains(`${agent} capability registry`, capabilities, `'${agent}'`);
 
   contains(`${agent} CLI help`, help, `name: '${expected.command}'`);
@@ -334,6 +398,41 @@ for (const [agent, expected] of Object.entries(EXPECTED_AGENTS)) {
 
   contains(`${agent} production package`, productionCert, `'bundle/${expected.bundle}'`);
 }
+
+exact(
+  'junie capability is conditional',
+  manifestAgents.junie?.conditionalCapability?.runtimeResolutionRequired,
+  true
+);
+exact('junie hook channel is EAP', manifestAgents.junie?.conditionalCapability?.hookChannel, 'eap');
+exact(
+  'junie stable fallback is blocked',
+  manifestAgents.junie?.conditionalCapability?.stableFallback,
+  'blocked-capability'
+);
+exact(
+  'junie manual recovery is not offered',
+  manifestAgents.junie?.conditionalCapability?.manualRecoveryAvailable,
+  false
+);
+exact(
+  'junie stable example has no hooks',
+  manifestAgents.junie?.conditionalCapability?.stableHasHooks,
+  false
+);
+
+const junieReadme = read('README.md') ?? '';
+contains('README documents verified EAP requirement', junieReadme, 'verified hook-capable EAP');
+contains(
+  'README documents blocked stable fallback',
+  readme,
+  'stable builds report blocked capability'
+);
+contains(
+  'README rejects manual recovery claim',
+  readme,
+  'Manual recovery is not offered for stable Junie'
+);
 
 console.log('');
 console.log('=== RELEASE POLICY ===');
@@ -383,6 +482,11 @@ for (const expected of [
   "kilo: 'src/session/kilo/cli.ts'",
   "'background-refresh': 'src/multi-host/background-refresh-cli.ts'",
   "'integration-status': 'src/session/new-agents/scoped-status-cli.ts'",
+  "gemini: 'src/session/gemini/cli.ts'",
+  "junie: 'src/session/junie/cli.ts'",
+  "codebuff: 'src/session/codebuff/cli.ts'",
+  "freebuff: 'src/session/freebuff/cli.ts'",
+  "continue: 'src/session/continue/cli.ts'",
 ]) {
   contains(`bundle entry ${expected.split(':')[0]}`, buildBundle, expected);
 }
@@ -405,7 +509,7 @@ absent('stale MEMORY_AUTO_SUMMARIZE removed', envExample, 'MEMORY_AUTO_SUMMARIZE
 console.log('');
 console.log('=== README CONTRACT ===');
 
-  contains('README 22-agent wording', readme, '22-agent continuity ring');
+contains('README 27-agent wording', readme, '27-agent continuity ring');
 
 for (const { displayName } of Object.values(EXPECTED_AGENTS)) {
   contains(`README agent ${displayName}`, readme, displayName);
@@ -438,8 +542,79 @@ if (!envFiles.length) {
 }
 
 console.log('');
-console.log('=== FINAL CERTIFIER CONTRACT ===');
+console.log('=== PARSER TRUTH CONTRACT (Phase 86E.7A) ===');
 
+const parserCapabilities = read('src/code-intelligence/parsers/capabilities.ts');
+const treeSitterRuntime = read('src/code-intelligence/parsers/tree-sitter/runtime.ts');
+const upgradePorts = read('src/production/upgrade/ports.ts');
+
+exact(
+  'manifest treeSitterRuntime matches packaged runtime',
+  manifest?.hardening?.codeIntelligence?.treeSitterRuntime,
+  true
+);
+
+exact(
+  'manifest nonTs structuralParserSupport matches packaged runtime',
+  manifest?.hardening?.nonTsIntelligence?.structuralParserSupport,
+  true
+);
+
+const manifestExtensions = Array.isArray(manifest?.hardening?.codeIntelligence?.supportedExtensions)
+  ? manifest.hardening.codeIntelligence.supportedExtensions
+  : [];
+
+for (const extension of [
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mts',
+  '.cts',
+  '.mjs',
+  '.cjs',
+  '.py',
+  '.go',
+  '.rs',
+  '.c',
+  '.h',
+  '.cc',
+  '.cpp',
+  '.cxx',
+  '.hpp',
+  '.hh',
+]) {
+  if (manifestExtensions.includes(extension)) {
+    pass(`manifest supportedExtensions includes ${extension}`);
+  } else {
+    fail(`manifest supportedExtensions includes ${extension}`);
+  }
+}
+
+for (const dependency of [
+  'web-tree-sitter',
+  'tree-sitter-python',
+  'tree-sitter-go',
+  'tree-sitter-rust',
+  'tree-sitter-c',
+  'tree-sitter-cpp',
+]) {
+  if (pkg?.dependencies?.[dependency]) {
+    pass(`grammar runtime dependency: ${dependency}`);
+  } else {
+    fail(`grammar runtime dependency: ${dependency}`);
+  }
+}
+
+contains('canonical parser authority declares tree-sitter', parserCapabilities, "'tree-sitter'");
+contains('canonical parser authority declares python', parserCapabilities, "'python'");
+contains('canonical parser authority declares cpp', parserCapabilities, "'cpp'");
+contains('grammar resolution is package-relative', treeSitterRuntime, 'createRequire');
+contains('daemon restart timeout owner', upgradePorts, 'DEFAULT_DAEMON_RESTART_TIMEOUT_MS');
+contains('daemon restart timeout code', upgradePorts, 'UPGRADE_DAEMON_RESTART_TIMEOUT');
+
+console.log('');
+console.log('=== FINAL CERTIFIER CONTRACT ===');
 for (const gate of [
   'V0316_FEATURE_CONTRACT',
   'PROJECT_IDENTITY_AUDIT',

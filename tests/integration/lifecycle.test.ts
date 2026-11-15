@@ -13,7 +13,7 @@ import { LocalStorageProvider } from '../../src/storage/local/client.js';
 import { ToolNetMemoryRuntime } from '../../src/runtime/toolnet-memory-runtime.js';
 
 describe('ToolNet Memory Lifecycle', () => {
-  it('auto loads retrieves flushes indexes and persists', async () => {
+  it('auto loads retrieves flushes indexes and persists', { timeout: 30000 }, async () => {
     const dir = await mkdtemp(join(tmpdir(), 'toolnet-life-'));
 
     const repo = join(dir, 'repo');

@@ -1,0 +1,23 @@
+# ToolNet Memory v0.7 cloud authority (Cloudflare Workers)
+name = "toolnet-authority"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+# One Durable Object per project. It owns revisions, leases and task state.
+[durable_objects]
+bindings = [{ name = "PROJECT_AUTHORITY", class_name = "ProjectAuthority" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ProjectAuthority"]
+
+# Immutable, append-only commit history.
+[[r2_buckets]]
+binding = "AUTHORITY_EVENTS"
+bucket_name = "toolnet-authority-events"
+
+# Project seeds: seed:<projectId> => { projectId, projectName, tasks, rules, flows }
+# Create the namespace with `wrangler kv namespace create PROJECT_SEEDS` and paste its id.
+[[kv_namespaces]]
+binding = "PROJECT_SEEDS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"

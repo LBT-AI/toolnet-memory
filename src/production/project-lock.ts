@@ -109,6 +109,10 @@ export class ProjectLock {
 
     this.acquired = false;
 
-    process.off('exit', this.exitHandler);
+    try {
+      process.off('exit', this.exitHandler);
+    } catch {
+      // handler already removed
+    }
   }
 }

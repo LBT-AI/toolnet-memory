@@ -226,7 +226,17 @@ function createPhaseRunners(
                 newDaemonStarted: false,
                 retryable: true,
               }
-            : undefined);
+            : candidate.code === 'UPGRADE_DAEMON_RESTART_TIMEOUT'
+              ? {
+                  code: 'UPGRADE_DAEMON_RESTART_TIMEOUT' as const,
+                  message: errorMessage(error),
+                  runtimeRoot: candidate.runtimeRoot ?? '',
+                  socketPath: '',
+                  oldDaemonStopped: false,
+                  newDaemonStarted: false,
+                  retryable: true,
+                }
+              : undefined);
 
         /* An old daemon must never keep serving a new CLI unnoticed. */
         return {
@@ -297,6 +307,8 @@ export async function runUpgrade(
   const steps: UpgradeStepRecord[] = [];
 
   for (const phase of phases) {
+    options.onPhase?.(phase);
+
     const outcome = await runners[phase]();
 
     if (outcome.status !== 'failed') {

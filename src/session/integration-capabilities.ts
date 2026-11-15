@@ -10,6 +10,7 @@ export type IntegrationRefreshMode =
 
 export type SupportedIntegrationAgent =
   | 'agy'
+  | 'gemini'
   | 'opencode'
   | 'codex'
   | 'claude'
@@ -22,6 +23,10 @@ export type SupportedIntegrationAgent =
   | 'goose'
   | 'qwen'
   | 'kimi'
+  | 'junie'
+  | 'codebuff'
+  | 'freebuff'
+  | 'continue'
   | 'hermes'
   | 'qoder'
   | 'aider'
@@ -50,9 +55,28 @@ export type IntegrationCaptureMode =
   | 'blocked-product-identity'
   | 'blocked-capability';
 
+export interface ConditionalIntegrationCapture {
+  runtimeResolutionRequired: true;
+
+  hookChannel: 'eap';
+
+  stableFallback: 'blocked-capability';
+
+  manualRecoveryAvailable: false;
+
+  reason: string;
+}
+
 export interface AgentIntegrationCapabilities extends IntegrationCapabilities {
   agent: SupportedIntegrationAgent;
   refreshMode: IntegrationRefreshMode;
+
+  /**
+   * Present when product-level lifecycle support is conditional on a runtime
+   * capability check. The static capture mode describes the capable path; the
+   * runtime resolver must downgrade unsupported builds.
+   */
+  conditionalCapture?: ConditionalIntegrationCapture;
 
   /**
    * How session events actually reach ToolNet. Distinct from refreshMode:
@@ -103,6 +127,11 @@ export const REQUIRED_HOOK_EVENTS: Readonly<Record<SupportedIntegrationAgent, re
     cline: ['TaskComplete', 'TaskStart'],
     rovo: ['on_tool_permission'],
     warp: [],
+    gemini: ['SessionStart', 'SessionEnd'],
+    junie: ['SessionStart', 'Stop', 'SessionEnd'],
+    codebuff: [],
+    freebuff: [],
+    continue: [],
   };
 
 const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptureMode>> = {
@@ -128,6 +157,11 @@ const CAPTURE_MODES: Readonly<Record<SupportedIntegrationAgent, IntegrationCaptu
   cline: 'hook',
   rovo: 'hook',
   warp: 'blocked-capability',
+  gemini: 'hook',
+  junie: 'hook',
+  codebuff: 'mcp-only',
+  freebuff: 'mcp-only',
+  continue: 'manual-sync',
 };
 
 export const MCP_ONLY_CAPABILITIES: IntegrationCapabilities = {
@@ -164,7 +198,7 @@ export const NATIVE_SESSION_IMPORT_CAPABILITIES: IntegrationCapabilities = {
   level: 'native-capture',
 };
 
-const NATIVE_LIFECYCLE_CAPABILITIES: IntegrationCapabilities = {
+export const NATIVE_LIFECYCLE_CAPABILITIES: IntegrationCapabilities = {
   mcp: true,
   continuityRead: true,
   nativeCapture: true,
@@ -237,6 +271,20 @@ export const AGENT_INTEGRATION_CAPABILITIES: Readonly<
   cline: profile('cline', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
   rovo: profile('rovo', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
   warp: profile('warp', BLOCKED_CAPABILITIES, 'blocked'),
+  gemini: profile('gemini', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+  junie: {
+    ...profile('junie', NATIVE_LIFECYCLE_CAPABILITIES, 'native-lifecycle'),
+    conditionalCapture: {
+      runtimeResolutionRequired: true,
+      hookChannel: 'eap',
+      stableFallback: 'blocked-capability',
+      manualRecoveryAvailable: false,
+      reason: 'lifecycle hooks require verified EAP capability; unverified builds fail closed',
+    },
+  },
+  codebuff: profile('codebuff', MCP_ONLY_CAPABILITIES, 'mcp-only'),
+  freebuff: profile('freebuff', MCP_ONLY_CAPABILITIES, 'mcp-only'),
+  continue: profile('continue', NATIVE_SESSION_IMPORT_CAPABILITIES, 'native-session'),
 };
 
 export function isSupportedIntegrationAgent(agent: string): agent is SupportedIntegrationAgent {
@@ -276,6 +324,11 @@ export const SUPPORTED_INTEGRATION_AGENTS: readonly SupportedIntegrationAgent[] 
   'cline',
   'rovo',
   'warp',
+  'gemini',
+  'junie',
+  'codebuff',
+  'freebuff',
+  'continue',
 ] as const;
 
 export function integrationCapabilityLabel(agent: string): string {

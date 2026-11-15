@@ -1,0 +1,22 @@
+name = "toolnet-memory-authority"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [
+  { name = "AUTHORITY", class_name = "Authority" }
+]
+
+[[r2_buckets]]
+binding = "MEMORY_EVENTS"
+bucket_name = "toolnet-memory-events"
+
+[vars]
+TOOLNET_AUTH_TOKEN = ""
+
+[observability]
+enabled = true
+
+[build]
+command = "npm run build:worker"
