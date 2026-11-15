@@ -1,6 +1,10 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { ProjectAuthenticator, type ProjectAuthConfig, type AuthResult } from '../../src/v0.7/security/project-auth.js';
+import {
+  ProjectAuthenticator,
+  type ProjectAuthConfig,
+  type AuthResult,
+} from '../../src/v0.7/security/project-auth.js';
 
 describe('v0.7 Security Tests', () => {
   describe('Project Authentication Tests', () => {

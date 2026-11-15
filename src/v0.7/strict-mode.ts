@@ -6,14 +6,10 @@
  * cloud authority only.
  */
 
-import { statSync, existsSync, readFileSync } from 'node:fs';
-
 export interface StrictModeOptions {
   strictCloudOnly?: boolean;
   allowLocalFallback?: boolean;
-  checkSwapSpace?: boolean;
   maxMemoryBufferSize?: number;
-  preventCrashDumps?: boolean;
 }
 
 export class StrictCloudMode {
@@ -24,9 +20,7 @@ export class StrictCloudMode {
     this.options = {
       strictCloudOnly: true,
       allowLocalFallback: false,
-      checkSwapSpace: true,
       maxMemoryBufferSize: 100 * 1024 * 1024, // 100MB
-      preventCrashDumps: true,
       ...options,
     };
   }
@@ -71,7 +65,9 @@ export class StrictCloudMode {
       return true;
     }
 
-    this.violations.push(`STRICT_MODE: Memory buffer overflow for project ${projectId}: ${dataSize} > ${this.options.maxMemoryBufferSize}`);
+    this.violations.push(
+      `STRICT_MODE: Memory buffer overflow for project ${projectId}: ${dataSize} > ${this.options.maxMemoryBufferSize}`
+    );
     return false;
   }
 
@@ -95,41 +91,4 @@ export class StrictCloudMode {
   clearViolations(): void {
     this.violations.length = 0;
   }
-}
-
-export function checkSwapSpace(): boolean {
-  if (!process.platform.startsWith('linux')) {
-    return true; // Assume OK on non-Linux systems
-  }
-
-  try {
-    const stats = statSync('/tmp');
-    // Check if /tmp is on a tmpfs or has sufficient space
-    // For now, just return true as this is a basic check
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function checkCrashDumpConfiguration(): boolean {
-  if (!process.platform.startsWith('linux')) {
-    return true;
-  }
-
-  // Basic check for crash dump configuration
-  try {
-    const corePattern = '/proc/sys/kernel/core_pattern';
-    if (existsSync(corePattern)) {
-      const pattern = readFileSync(corePattern, 'utf8').trim();
-      // If core_pattern contains a pipe (|), crash dumps go to a file
-      // If it contains a path, crash dumps go to a file
-      // Both are acceptable for our purposes
-      return pattern.includes('|') || !pattern.startsWith('/');
-    }
-  } catch {
-    // Can't read core pattern, assume it's safe
-  }
-
-  return true;
 }

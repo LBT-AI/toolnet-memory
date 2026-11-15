@@ -58,7 +58,9 @@ export class BackupManager {
   createIntegrityHash(data: unknown): { checksum: string; hmac: string } {
     const dataString = JSON.stringify(data, null, 2);
     const checksum = createHash('sha256').update(dataString).digest('hex');
-    const hmac = createHmac('sha256', Buffer.from(checksum, 'hex')).update(dataString).digest('hex');
+    const hmac = createHmac('sha256', Buffer.from(checksum, 'hex'))
+      .update(dataString)
+      .digest('hex');
 
     return { checksum, hmac };
   }
@@ -88,7 +90,9 @@ export class BackupManager {
     }
 
     const currentData = JSON.parse(readFileSync(original.backupPath, 'utf8'));
-    const currentChecksum = createHash('sha256').update(JSON.stringify(currentData, null, 2)).digest('hex');
+    const currentChecksum = createHash('sha256')
+      .update(JSON.stringify(currentData, null, 2))
+      .digest('hex');
 
     return {
       original,
@@ -156,10 +160,11 @@ export class BackupManager {
   }
 
   private readBackupFiles(backupDir: string): string[] {
-
     try {
       return readdirSync(backupDir)
-        .filter((filePath: string) => filePath.endsWith('.json') && filePath.startsWith('exported-'))
+        .filter(
+          (filePath: string) => filePath.endsWith('.json') && filePath.startsWith('exported-')
+        )
         .map((filePath: string) => join(backupDir, filePath));
     } catch {
       return [];
@@ -212,7 +217,6 @@ export class MigrationManager {
       };
 
       return migrationResult;
-
     } catch (error) {
       return {
         success: false,
@@ -266,11 +270,13 @@ export class MigrationManager {
   }
 
   private validateV062Schema(data: any): boolean {
-    return data &&
+    return (
+      data &&
       typeof data === 'object' &&
       'version' in data &&
       data.version === '0.6.2' &&
-      'projects' in data;
+      'projects' in data
+    );
   }
 
   private transformV062ToV070(sourceData: any): any {

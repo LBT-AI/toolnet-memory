@@ -97,18 +97,24 @@ export class ProjectAuthorizer {
     return this.validateOperationContext(operation, config, context);
   }
 
-    private validateOperationContext(
+  private validateOperationContext(
     operation: string,
     config: ProjectAuthConfig,
     context?: Record<string, unknown>
   ): boolean {
     switch (operation) {
       case 'lease':
-        return !context?.taskId || !context?.agentId || context.agentId === config.allowedAgents?.[0];
+        return (
+          !context?.taskId || !context?.agentId || context.agentId === config.allowedAgents?.[0]
+        );
       case 'commit':
-        return (context?.agentId === undefined || context?.agentId === null) || 
-               (context?.fencingToken === undefined || context?.fencingToken === null) || 
-               config.allowedOperations?.includes('write') === true;
+        return (
+          context?.agentId === undefined ||
+          context?.agentId === null ||
+          context?.fencingToken === undefined ||
+          context?.fencingToken === null ||
+          config.allowedOperations?.includes('write') === true
+        );
       case 'write':
         return true;
       case 'read':

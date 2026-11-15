@@ -20,17 +20,17 @@ export class SecretRedactor {
   private readonly config: RedactionConfig;
   private readonly secrets = new Set<string>();
 
-  constructor(config: RedactionConfig = {patterns: []}) {
+  constructor(config: RedactionConfig = { patterns: [] }) {
     this.config = {
       patterns: config.patterns || [
-        /sk-[a-zA-Z0-9]{20,}/,  // OpenAI keys
-        /sk-[a-zA-Z0-9]{32,}/,  // Generic keys
-        /token=[a-zA-Z0-9_-]+/,  // URL tokens
-        /auth[\s=:]+['"][^'"]+['"]/,  // Auth headers
-        /password[\s=:]+['"][^'"]+['"]/,  // Passwords
-        /api[\s=:]+['"][^'"]+['"]/,  // API keys
-        /key[\s=:]+['"][^'"]+['"]/,  // Generic keys
-        /bearer[\s=:][a-zA-Z0-9\-_.~]+/i,  // Bearer tokens
+        /sk-[a-zA-Z0-9]{20,}/, // OpenAI keys
+        /sk-[a-zA-Z0-9]{32,}/, // Generic keys
+        /token=[a-zA-Z0-9_-]+/, // URL tokens
+        /auth[\s=:]+['"][^'"]+['"]/, // Auth headers
+        /password[\s=:]+['"][^'"]+['"]/, // Passwords
+        /api[\s=:]+['"][^'"]+['"]/, // API keys
+        /key[\s=:]+['"][^'"]+['"]/, // Generic keys
+        /bearer[\s=:][a-zA-Z0-9\-_.~]+/i, // Bearer tokens
       ],
       urlPatterns: config.urlPatterns || [
         /https?:\/\/[^\/]+@[\w\.-]+/,
@@ -50,7 +50,7 @@ export class SecretRedactor {
       const sample = 'sk-test1234567890abcdefghijklmnopqrstuvwx';
       const matches = sample.match(regex);
       if (matches) {
-        matches.forEach(match => {
+        matches.forEach((match) => {
           if (typeof match === 'string' && match.trim()) {
             this.secrets.add(match.toLowerCase().trim());
           }
@@ -69,7 +69,7 @@ export class SecretRedactor {
     }
 
     if (Array.isArray(value)) {
-      return value.map(item => this.redact(item));
+      return value.map((item) => this.redact(item));
     }
 
     if (typeof value === 'object') {
@@ -86,11 +86,11 @@ export class SecretRedactor {
       }
 
       if (this.config.preserveStructure) {
-  const result: Record<string, unknown> = {};
-  for (const [key, val] of Object.entries(value)) {
-    result[key] = this.redact(val);
-  }
-  return result;
+        const result: Record<string, unknown> = {};
+        for (const [key, val] of Object.entries(value)) {
+          result[key] = this.redact(val);
+        }
+        return result;
         for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
           result[key] = this.redact(val);
         }
@@ -147,7 +147,7 @@ export class SecretRedactor {
     return {
       patterns: [
         /sk-[a-zA-Z0-9]{20,}/,
-        /token=[a-zA-Z0-9_-]+/, 
+        /token=[a-zA-Z0-9_-]+/,
         /auth[\s=:]+['"][^'"]+['"]/,
         /password[\s=:]+['"][^'"]+['"]/,
         /api[\s=:]+['"][^'"]+['"]/,

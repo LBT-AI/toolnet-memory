@@ -292,8 +292,19 @@ function findProjectIdentity(start: string): ProjectIdentity | null {
   let current = resolve(start);
 
   const filesystemRoot = parse(current).root;
+  const systemRoots = ['/tmp', '/var', '/usr', '/opt', '/etc', '/boot', '/sys', '/proc', '/dev'];
 
   for (;;) {
+    // Skip system directories entirely - don't even check for identities there
+    if (systemRoots.includes(current)) {
+      const parent = dirname(current);
+      if (parent === current) {
+        return null;
+      }
+      current = parent;
+      continue;
+    }
+
     const identity = parseProjectIdentity(current);
 
     if (identity) {

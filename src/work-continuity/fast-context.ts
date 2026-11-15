@@ -35,11 +35,22 @@ interface FastContextOptions {
 
 /**
  * Find project root by looking for .toolnet directory.
+ *
+ * Excludes system directories like /tmp, /var, /usr, etc. from being detected
+ * as project roots to avoid false positives with system .toolnet directories.
  */
 export function findProjectRoot(startPath: string): string | null {
   let currentPath = path.resolve(startPath);
   const root = path.parse(currentPath).root;
+  const systemRoots = ['/tmp', '/var', '/usr', '/opt', '/etc', '/boot', '/sys', '/proc', '/dev'];
+
   while (currentPath !== root) {
+    // Skip system directories
+    if (systemRoots.includes(currentPath)) {
+      currentPath = path.dirname(currentPath);
+      continue;
+    }
+
     const toolnetDir = path.join(currentPath, '.toolnet');
     if (fs.existsSync(toolnetDir) && fs.statSync(toolnetDir).isDirectory()) {
       return currentPath;
