@@ -9,6 +9,12 @@ import { createHash, createHmac } from 'node:crypto';
 import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
+import {
+  LEGACY_MIGRATION_SOURCE_VERSION,
+  LEGACY_MIGRATION_TARGET_VERSION,
+  LEGACY_MIGRATION_IDENTIFIER,
+} from './migration-versions.js';
+
 export interface BackupRecord {
   projectId: string;
   timestamp: number;
@@ -188,7 +194,7 @@ export class MigrationManager {
 
     try {
       const backup = this.backupManager.createBackup(
-        { sourcePath, version: '0.6.2', timestamp: startTime },
+        { sourcePath, version: LEGACY_MIGRATION_SOURCE_VERSION, timestamp: startTime },
         `${targetProjectId}-pre-migration`
       );
 
@@ -274,25 +280,25 @@ export class MigrationManager {
       data &&
       typeof data === 'object' &&
       'version' in data &&
-      data.version === '0.6.2' &&
+      data.version === LEGACY_MIGRATION_SOURCE_VERSION &&
       'projects' in data
     );
   }
 
   private transformV062ToV070(sourceData: any): any {
     const target = {
-      version: '0.7.0',
+      version: LEGACY_MIGRATION_TARGET_VERSION,
       projects: sourceData.projects.map((project: any) => ({
         ...project,
         metadata: {
           ...project.metadata,
-          migrationVersion: '0.6.2-0.7.0',
+          migrationVersion: LEGACY_MIGRATION_IDENTIFIER,
           migratedAt: new Date().toISOString(),
         },
       })),
       _migration: {
         sourceVersion: sourceData.version,
-        targetVersion: '0.7.0',
+        targetVersion: LEGACY_MIGRATION_TARGET_VERSION,
         migrationTimestamp: new Date().toISOString(),
       },
     };
