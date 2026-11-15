@@ -28,7 +28,7 @@ import {
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.6.2';
+const VERSION = '0.7.0';
 const PHASE85G_MARKER = 'PHASE85G_RELEASE_COMMIT=PASS';
 
 function git(args: string[]): { status: number; stdout: string } {
@@ -194,7 +194,7 @@ const report = runReleaseAnalysis({
  * ================================================================== */
 
 describe('Phase 85G — HEAD version truth', () => {
-  it('ships package version 0.6.2 at HEAD or in the pending release set', () => {
+  it('ships package version 0.7.0 at HEAD or in the pending release set', () => {
     expect(releaseSetPackageVersion()).toBe(VERSION);
 
     if (RELEASE_SET_COMMITTED) {
@@ -203,7 +203,7 @@ describe('Phase 85G — HEAD version truth', () => {
     } else {
       /* The release set is still pending: HEAD must still carry the previously
        * published release, never an arbitrary value. */
-      expect(headPackageVersion()).toBe('0.6.1');
+      expect(headPackageVersion()).toBe('0.6.2');
     }
   });
 
@@ -211,7 +211,7 @@ describe('Phase 85G — HEAD version truth', () => {
     if (!RELEASE_SET_COMMITTED) {
       /* The recovery commit does not exist yet, so HEAD is its future parent
        * and must carry the previous published release version. */
-      expect(headPackageVersion()).toBe('0.6.1');
+      expect(headPackageVersion()).toBe('0.6.2');
       return;
     }
 
@@ -441,7 +441,7 @@ describe('Phase 85G — source / bundle parity', () => {
     const digest = runtimeSourceDigest(REPO_ROOT);
     const expectedMarker = `${VERSION}+${digest.slice(0, 16)}`;
 
-    expect(expectedMarker.startsWith('0.6.2')).toBe(true);
+    expect(expectedMarker.startsWith(VERSION)).toBe(true);
     expect(readFileSync(join(REPO_ROOT, 'bundle', 'mcp.js'), 'utf8')).toContain(expectedMarker);
     expect(readFileSync(join(REPO_ROOT, 'bundle', 'identity.js'), 'utf8')).toContain(
       expectedMarker

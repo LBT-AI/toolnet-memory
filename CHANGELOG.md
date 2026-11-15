@@ -4,6 +4,68 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.7.0] - 2026-11-15
+
+### Added
+
+- ToolNet v0.7 Continuity Foundation: cloud-only authority, checkpoints, Project Brain, and resume compilation.
+- Strict Cloud-Only mode enforcement: zero-disk storage requirements, all memory operations go through cloud authority only.
+- Zero-Disk Runtime Audit: comprehensive test suite verifying 13 memory write paths never touch VPS disk in strict mode.
+- Project authentication and authorization per project with token management.
+- Revision tracking, lease management, and fencing tokens for secure project access.
+- Secret redaction for logs, telemetry, and API errors.
+- Migration system v0.6.2 → v0.7.0 with idempotent migration, conflict detection, and rollback.
+- Backup integrity verification with cryptographic checksums.
+- Cross-agent continuity: AGY → Codex resume with cloud-acknowledged checkpoints.
+- Token benchmark with real tokenizer showing 68% reduction in tiny mode.
+- Production build identity with source digest verification.
+
+### Changed
+
+- Strict mode removes filesystem diagnostics; all memory writes blocked in strict-cloud-only mode.
+- Project root detection excludes system directories (/tmp, /var, etc.).
+- Project lock release fixed; exit handler removed for proper cleanup.
+- Lifecycle test timeout resolved with 30s timeout.
+- Migration manager backup version inference from source data.
+
+### Fixed
+
+- ESLint require-imports errors in strict-mode.ts and migration-manager.ts.
+- Migration rollback test path handling and backup corruption handling.
+- Secret redaction global regex replacement for all occurrences.
+- Revision manager history tracking for proper validation.
+- Cloud authority failCommitsWith for non-retryable error simulation.
+- Durability policy error messages include error codes.
+
+### Security
+
+- Project-scoped authentication with agent/operation allowlists.
+- Fencing tokens prevent stale writer conflicts.
+- Secret detection and redaction for OpenAI keys, tokens, passwords, API keys.
+- Cross-project access prevention via ProjectAuthenticator.
+
+### Compatibility
+
+- Purely additive from v0.6.2: 0 public breaking changes across MCP tools, CLI commands, daemon protocol, and artifact schema.
+- Minor release: new integrations, security hardening, and zero-disk certification only.
+
+### Known Limitations
+
+- Cloudflare Workers + R2 deployment requires operator credentials (not available in certification environment).
+- Live AGY → Codex E2E certification blocked on Cloudflare deployment.
+- Cross-host handoff live testing blocked on Cloudflare deployment.
+- ToolNet CLI remains manual-sync until verified native lifecycle hook coverage is complete.
+- Plandex remains manual-sync because plan state and session identity are not exposed through a stable verified native lifecycle hook.
+- Kilo is MCP-only; no native session-capture path is provided.
+- Aider is a managed wrapper; capture depends on session-end behavior of the wrapper launcher.
+- OpenRouter CLI product identity remains unresolved; ToolNet does not auto-install an integration for an unidentified product.
+- Warp Agent CLI has no verified native hook system; capability entry documents the gap rather than claiming native automatic capture.
+- Rovo event hooks are a preview/experimental feature; automatic capture is functional but may change when Atlassian stabilizes the hook API.
+- Junie hooks are an EAP surface; the ToolNet adapter registers SessionStart, Stop, and SessionEnd and tolerates payload changes that omit optional fields.
+- Gemini CLI capture depends on user-scope hooks in ~/.gemini/settings.json and a transcript path supplied by the host.
+- Codebuff and Freebuff expose no native lifecycle hooks; both are MCP-only integrations with no automatic session capture.
+- Continue CLI exposes no hooks; sessions are imported manually from ~/.continue/sessions.
+
 ## [0.6.2] - 2026-10-02
 
 ### Added

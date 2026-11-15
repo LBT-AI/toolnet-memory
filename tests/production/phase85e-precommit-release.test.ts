@@ -1,7 +1,7 @@
 /*
  * Phase 85E — Pre-Commit Release Certification.
  *
- * Certifies the whole v0.6.2 working tree before a release commit exists.
+ * Certifies the whole v0.7.0 working tree before a release commit exists.
  * This suite is read-only: it never stages, commits, pushes, tags or publishes,
  * and it never mutates release metadata. Its only job is to prove the tree is
  * releasable at HEAD + working changes.
@@ -38,7 +38,8 @@ import {
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.6.2';
+const VERSION = '0.7.0';
+const PREVIOUS_VERSION = '0.6.2';
 const PHASE85E_MARKER = 'PHASE85E_PRECOMMIT_RELEASE=PASS';
 
 function readJson(relativePath: string): Record<string, any> {
@@ -148,7 +149,7 @@ const blockerCodes = report.blockers.map((blocker) => blocker.code);
  * ================================================================== */
 
 describe('Phase 85E — version truth', () => {
-  it('agrees on 0.6.2 across every authoritative version source', () => {
+  it('agrees on 0.7.0 across every authoritative version source', () => {
     const pkg = readJson('package.json');
     const lock = readJson('package-lock.json');
     const target = readFileSync(join(REPO_ROOT, '.release-target'), 'utf8').trim();
@@ -181,11 +182,11 @@ describe('Phase 85E — version truth', () => {
  * ================================================================== */
 
 describe('Phase 85E — manifest truth', () => {
-  it('declares 0.6.2 on the 0.6.x series', () => {
+  it('declares 0.7.0 on the 0.7.x series', () => {
     const manifest = readJson('release-manifest.json');
 
     expect(manifest.version).toBe(VERSION);
-    expect(manifest.releaseSeries).toBe('0.6.x');
+    expect(manifest.releaseSeries).toBe('0.7.x');
     expect(manifest.schemaVersion).toBeGreaterThan(0);
   });
 
@@ -194,7 +195,7 @@ describe('Phase 85E — manifest truth', () => {
 
     expect(engineering?.sourcePhase).toBe(84);
     expect(engineering?.certificationThrough).toBe('Phase85B');
-    expect(engineering?.releaseBaseline).toBe('v0.6.1');
+    expect(engineering?.releaseBaseline).toBe(`v${PREVIOUS_VERSION}`);
     expect(engineering?.targetVersion).toBe(VERSION);
     expect(engineering?.additiveFromBaseline).toBe(true);
     expect(engineering?.publicBreakingChanges).toBe(0);
@@ -248,7 +249,7 @@ describe('Phase 85E — manifest truth', () => {
  * ================================================================== */
 
 describe('Phase 85E — changelog truth', () => {
-  it('documents the 0.6.2 release exactly once', () => {
+  it('documents the 0.7.0 release exactly once', () => {
     const changelog = readFileSync(join(REPO_ROOT, 'CHANGELOG.md'), 'utf8');
     const headings =
       changelog.match(new RegExp(`^## \\[${VERSION.replace(/\./gu, '\\.')}\\]`, 'gmu')) ?? [];
@@ -278,11 +279,11 @@ describe('Phase 85E — changelog truth', () => {
  * ================================================================== */
 
 describe('Phase 85E — README current release', () => {
-  it('advertises 0.6.2 as the current release', () => {
+  it('advertises 0.7.0 as the current release', () => {
     const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
 
-    expect(readme).toContain('Current release: **v0.6.2**');
-    expect(readme).toContain('### v0.6.2');
+    expect(readme).toContain(`Current release: **v${VERSION}**`);
+    expect(readme).toContain(`### v${VERSION}`);
   });
 
   it('never claims 0.5.3 is the current release anywhere in the README', () => {
@@ -303,11 +304,11 @@ describe('Phase 85E — README current release', () => {
  * ================================================================== */
 
 describe('Phase 85E — source / bundle parity', () => {
-  it('stamps the packaged runtime with the fresh 0.6.2 source digest', () => {
+  it('stamps the packaged runtime with the fresh 0.7.0 source digest', () => {
     const digest = runtimeSourceDigest(REPO_ROOT);
     const expectedMarker = `${VERSION}+${digest.slice(0, 16)}`;
 
-    expect(expectedMarker.startsWith('0.6.2')).toBe(true);
+    expect(expectedMarker.startsWith(VERSION)).toBe(true);
 
     const bundle = readFileSync(join(REPO_ROOT, 'bundle', 'mcp.js'), 'utf8');
 
@@ -623,9 +624,9 @@ describe('Phase 85E — no stale artifact', () => {
  * ================================================================== */
 
 describe('Phase 85E — no release mutation', () => {
-  it('never creates the 0.6.2 release tag; the release tag targets the release commit', () => {
+  it('never creates the 0.7.0 release tag; the release tag targets the release commit', () => {
     /*
-     * Read-only. The authorized release tag must target the certified 0.6.2
+     * Read-only. The authorized release tag must target the certified 0.7.0
      * release commit — HEAD before any follow-up hardening commit, an ancestor
      * of HEAD afterwards. This certification never creates, moves or pushes a
      * tag.
@@ -660,7 +661,7 @@ describe('Phase 85E — no release mutation', () => {
     const headVersion = JSON.parse(git(['show', 'HEAD:package.json']).stdout || '{}').version as
       string | undefined;
 
-    expect(['0.5.3', '0.6.0', '0.6.1', VERSION]).toContain(headVersion);
+    expect(['0.5.3', '0.6.0', PREVIOUS_VERSION, VERSION]).toContain(headVersion);
   });
 
   it('never stages anything while certifying', () => {

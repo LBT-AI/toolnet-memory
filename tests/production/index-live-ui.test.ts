@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IndexLiveUI } from '../../src/production/index-live-ui.js';
 
@@ -28,7 +28,14 @@ function stripAnsi(input: string): string {
   return input.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
 }
 
+const previousTerm = process.env.TERM;
+
+beforeEach(() => {
+  process.env.TERM = 'xterm-256color';
+});
+
 afterEach(() => {
+  process.env.TERM = previousTerm;
   vi.useRealTimers();
 });
 

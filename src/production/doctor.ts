@@ -420,7 +420,7 @@ async function main(): Promise<void> {
 
     output(result);
 
-    process.exitCode = 1;
+    process.exit(1);
     return;
   }
 
@@ -557,7 +557,7 @@ async function main(): Promise<void> {
 
   output(result);
 
-  process.exitCode = result.ok ? 0 : 1;
+  process.exit(result.ok ? 0 : 1);
 }
 
 main().catch((error) => {
@@ -583,5 +583,5 @@ main().catch((error) => {
     console.error('');
   }
 
-  process.exitCode = 1;
+  process.exit(1);
 });

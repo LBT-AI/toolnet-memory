@@ -27,7 +27,7 @@ import {
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.6.2';
+const VERSION = '0.7.0';
 
 function readJson(path: string): Record<string, any> {
   return JSON.parse(readFileSync(path, 'utf8')) as Record<string, any>;
@@ -57,7 +57,7 @@ describe('Phase 85D — release metadata', () => {
     expect(lock.packages?.['']?.version).toBe(VERSION);
     expect(target).toBe(VERSION);
     expect(manifest.version).toBe(VERSION);
-    expect(manifest.releaseSeries).toBe('0.6.x');
+    expect(manifest.releaseSeries).toBe('0.7.x');
   });
 
   it('declares source phase 84 and certification through Phase85B', () => {
@@ -66,7 +66,7 @@ describe('Phase 85D — release metadata', () => {
 
     expect(engineering?.sourcePhase).toBe(84);
     expect(engineering?.certificationThrough).toBe('Phase85B');
-    expect(engineering?.releaseBaseline).toBe('v0.6.1');
+    expect(engineering?.releaseBaseline).toBe('v0.6.2');
     expect(engineering?.targetVersion).toBe(VERSION);
     expect(engineering?.additiveFromBaseline).toBe(true);
     expect(engineering?.publicBreakingChanges).toBe(0);
@@ -126,16 +126,16 @@ describe('Phase 85D — release metadata', () => {
     expect(report.warnings.map((warning) => warning.code)).not.toContain('RELEASE_MANIFEST_STALE');
   });
 
-  it('reflects v0.6.2 in the changelog and README current release', () => {
+  it('reflects v0.7.0 in the changelog and README current release', () => {
     const changelog = readFileSync('CHANGELOG.md', 'utf8');
     const readme = readFileSync('README.md', 'utf8');
 
-    expect(changelog).toContain('## [0.6.2]');
+    expect(changelog).toContain('## [0.7.0]');
     expect(changelog).toContain('### Compatibility');
-    expect(changelog).toContain('### Known limitations');
+    expect(changelog).toContain('### Known Limitations');
 
-    expect(readme).toContain('Current release: **v0.6.2**');
-    expect(readme).toContain('### v0.6.2');
+    expect(readme).toContain(`Current release: **v${VERSION}**`);
+    expect(readme).toContain(`### v${VERSION}`);
   });
 
   it('leaves historical release entries untouched', () => {
@@ -238,6 +238,6 @@ describe('Phase 85D — release metadata', () => {
   it('emits the Phase 85D PASS marker', () => {
     console.log('PHASE85D_RELEASE_METADATA=PASS');
 
-    expect(VERSION).toBe('0.6.2');
+    expect(VERSION).toBe('0.7.0');
   });
 });
