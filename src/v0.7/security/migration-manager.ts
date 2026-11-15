@@ -36,7 +36,12 @@ export class BackupManager {
   private readonly backups = new Map<string, BackupRecord>();
   private readonly integrityCache = new Map<string, Map<string, BackupRecord>>();
 
-  createBackup(data: unknown, projectId: string, backupDir: string = './backups', version?: string): BackupRecord {
+  createBackup(
+    data: unknown,
+    projectId: string,
+    backupDir: string = './backups',
+    version?: string
+  ): BackupRecord {
     const timestamp = Date.now();
     const backupPath = join(backupDir, `backup-${projectId}-${timestamp}.json`);
 
