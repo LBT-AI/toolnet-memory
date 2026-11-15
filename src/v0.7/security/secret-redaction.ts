@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
 export type SecretPattern = RegExp | string;
 
 export interface RedactionConfig {
-  patterns: SecretPattern[];
+  patterns?: SecretPattern[];
   urlPatterns?: SecretPattern[];
   customRedactors?: ((value: unknown) => unknown)[];
   preserveStructure?: boolean;
@@ -20,23 +20,25 @@ export class SecretRedactor {
   private readonly config: RedactionConfig;
   private readonly secrets = new Set<string>();
 
-  constructor(config: RedactionConfig = { patterns: [] }) {
+  constructor(config: RedactionConfig = {}) {
     this.config = {
-      patterns: config.patterns || [
-        /sk-[a-zA-Z0-9]{20,}/, // OpenAI keys
-        /sk-[a-zA-Z0-9]{32,}/, // Generic keys
-        /token=[a-zA-Z0-9_-]+/, // URL tokens
-        /auth[\s=:]+['"][^'"]+['"]/, // Auth headers
-        /password[\s=:]+['"][^'"]+['"]/, // Passwords
-        /api[\s=:]+['"][^'"]+['"]/, // API keys
-        /key[\s=:]+['"][^'"]+['"]/, // Generic keys
-        /bearer[\s=:][a-zA-Z0-9\-_.~]+/i, // Bearer tokens
-      ],
-      urlPatterns: config.urlPatterns || [
-        /https?:\/\/[^\/]+@[\w\.-]+/,
-        /ftp:\/\/[^\/]+@[\w\.-]+/,
-        /ssh:\/\/[^\/]+@[^\/]+/,
-      ],
+      patterns:
+        config.patterns && config.patterns.length > 0
+          ? config.patterns
+          : [
+              /sk-[a-zA-Z0-9]{20,}/, // OpenAI keys
+              /sk-[a-zA-Z0-9]{32,}/, // Generic keys
+              /token=[a-zA-Z0-9_-]+/, // URL tokens
+              /auth[\s=:]+['"][^'"]+['"]/, // Auth headers
+              /password[\s=:]+['"][^'"]+['"]/, // Passwords
+              /api[\s=:]+['"][^'"]+['"]/, // API keys
+              /key[\s=:]+['"][^'"]+['"]/, // Generic keys
+              /bearer[\s=:][a-zA-Z0-9\-_.~]+/i, // Bearer tokens
+            ],
+      urlPatterns:
+        config.urlPatterns && config.urlPatterns.length > 0
+          ? config.urlPatterns
+          : [/https?:\/\/[^\/]+@[\w\.-]+/, /ftp:\/\/[^\/]+@[\w\.-]+/, /ssh:\/\/[^\/]+@[^\/]+/],
       customRedactors: config.customRedactors || [],
       preserveStructure: config.preserveStructure ?? true,
     };
@@ -45,7 +47,7 @@ export class SecretRedactor {
   }
 
   private buildSecretCache(): void {
-    for (const pattern of this.config.patterns) {
+    for (const pattern of this.config.patterns ?? []) {
       const regex = pattern instanceof RegExp ? pattern : new RegExp(pattern, 'gi');
       const sample = 'sk-test1234567890abcdefghijklmnopqrstuvwx';
       const matches = sample.match(regex);
@@ -88,11 +90,8 @@ export class SecretRedactor {
       if (this.config.preserveStructure) {
         const result: Record<string, unknown> = {};
         for (const [key, val] of Object.entries(value)) {
-          result[key] = this.redact(val);
-        }
-        return result;
-        for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-          result[key] = this.redact(val);
+          const redactedKey = this.redactString(key);
+          result[redactedKey] = this.redact(val);
         }
         return result;
       }
@@ -107,18 +106,31 @@ export class SecretRedactor {
     let output = input;
 
     for (const secret of this.secrets) {
-      output = output.replace(secret, '[REDACTED]');
+      output = output.replaceAll(secret, '[REDACTED]');
     }
 
-    for (const pattern of this.config.patterns) {
+    for (const pattern of this.config.patterns ?? []) {
       if (pattern instanceof RegExp) {
-        output = output.replace(pattern, '[REDACTED]');
+        const globalPattern = pattern.flags.includes('g')
+          ? pattern
+          : new RegExp(pattern.source, pattern.flags + 'g');
+        output = output.replace(globalPattern, '[REDACTED]');
+      } else {
+        output = output.replaceAll(pattern, '[REDACTED]');
       }
     }
 
     for (const pattern of this.config.urlPatterns || []) {
       if (pattern instanceof RegExp) {
-        output = output.replace(pattern, (match: string) => {
+        const globalPattern = pattern.flags.includes('g')
+          ? pattern
+          : new RegExp(pattern.source, pattern.flags + 'g');
+        output = output.replace(globalPattern, (match: string) => {
+          const beforeAt = match.split('@')[0];
+          return beforeAt + '@[REDACTED_HOST]';
+        });
+      } else {
+        output = output.replaceAll(pattern, (match: string) => {
           const beforeAt = match.split('@')[0];
           return beforeAt + '@[REDACTED_HOST]';
         });

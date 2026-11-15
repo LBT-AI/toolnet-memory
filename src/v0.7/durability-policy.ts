@@ -27,7 +27,7 @@ export class DurabilityPolicyError extends Error {
   readonly code: DurabilityErrorCode;
 
   constructor(code: DurabilityErrorCode, message: string) {
-    super(message);
+    super(`[${code}] ${message}`);
     this.name = 'DurabilityPolicyError';
     this.code = code;
   }

@@ -51,7 +51,7 @@ export interface FencingConflict {
 }
 
 export class RevisionManager {
-  private readonly revisions = new Map<string, Revision>();
+  private readonly revisions = new Map<string, Revision[]>();
   private readonly leases = new Map<string, Lease>();
   private readonly fencingTokens = new Map<string, FencingToken>();
 
@@ -67,7 +67,9 @@ export class RevisionManager {
       agentId,
     };
 
-    this.revisions.set(projectId, revision);
+    const history = this.revisions.get(projectId) || [];
+    history.push(revision);
+    this.revisions.set(projectId, history);
     return revision;
   }
 
@@ -76,8 +78,8 @@ export class RevisionManager {
     expectedVersion: number,
     actualChecksum: string
   ): RevisionConflict {
-    const stored = this.revisions.get(projectId);
-    if (!stored) {
+    const history = this.revisions.get(projectId);
+    if (!history || history.length === 0) {
       return {
         projectId,
         expectedRevision: expectedVersion,
@@ -86,11 +88,13 @@ export class RevisionManager {
       };
     }
 
-    if (stored.version !== expectedVersion) {
+    const stored = history.find((r) => r.version === expectedVersion);
+    if (!stored) {
+      const latest = history[history.length - 1];
       return {
         projectId,
         expectedRevision: expectedVersion,
-        actualRevision: stored.version,
+        actualRevision: latest.version,
         error: 'REVISION_CONFLICT',
       };
     }
@@ -113,7 +117,12 @@ export class RevisionManager {
   }
 
   getCurrentRevision(projectId: string): Revision | undefined {
-    return this.revisions.get(projectId);
+    const history = this.revisions.get(projectId);
+    return history?.[history.length - 1];
+  }
+
+  getRevisionHistory(projectId: string): Revision[] {
+    return this.revisions.get(projectId) || [];
   }
 
   private calculateChecksum(data: unknown): string {
@@ -121,8 +130,8 @@ export class RevisionManager {
   }
 
   private getNextRevision(projectId: string): number {
-    const current = this.revisions.get(projectId);
-    return (current?.version || 0) + 1;
+    const history = this.revisions.get(projectId);
+    return (history?.[history.length - 1]?.version || 0) + 1;
   }
 }
 

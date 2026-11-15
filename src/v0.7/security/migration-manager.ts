@@ -36,7 +36,7 @@ export class BackupManager {
   private readonly backups = new Map<string, BackupRecord>();
   private readonly integrityCache = new Map<string, Map<string, BackupRecord>>();
 
-  createBackup(data: unknown, projectId: string, backupDir: string = './backups'): BackupRecord {
+  createBackup(data: unknown, projectId: string, backupDir: string = './backups', version?: string): BackupRecord {
     const timestamp = Date.now();
     const backupPath = join(backupDir, `backup-${projectId}-${timestamp}.json`);
 
@@ -46,10 +46,13 @@ export class BackupManager {
     const checksum = createHash('sha256').update(dataString).digest('hex');
     const dataSize = Buffer.byteLength(dataString);
 
+    // Infer version from data if not provided
+    const inferredVersion = (data as any)?.version ?? '0.7.0';
+
     const record: BackupRecord = {
       projectId,
       timestamp,
-      version: '0.7.0',
+      version: version ?? inferredVersion,
       checksum,
       backupPath,
       dataSize,
@@ -95,7 +98,19 @@ export class BackupManager {
       };
     }
 
-    const currentData = JSON.parse(readFileSync(original.backupPath, 'utf8'));
+    let currentData: unknown;
+    try {
+      currentData = JSON.parse(readFileSync(original.backupPath, 'utf8'));
+    } catch {
+      return {
+        original,
+        current: original,
+        checksumMatches: false,
+        sizeMatches: false,
+        dataCorrupted: true,
+      };
+    }
+
     const currentChecksum = createHash('sha256')
       .update(JSON.stringify(currentData, null, 2))
       .digest('hex');
@@ -193,20 +208,22 @@ export class MigrationManager {
     const startTime = Date.now();
 
     try {
-      const backup = this.backupManager.createBackup(
-        { sourcePath, version: LEGACY_MIGRATION_SOURCE_VERSION, timestamp: startTime },
-        `${targetProjectId}-pre-migration`
-      );
-
       const sourceData = this.loadV062Data(sourcePath);
 
       if (!this.validateV062Schema(sourceData)) {
         throw new Error('MIGRATION_SCHEMA_INVALID');
       }
 
+      // Create backup of the actual source data for integrity verification
+      const backup = this.backupManager.createBackup(
+        sourceData,
+        `${targetProjectId}-pre-migration`
+      );
+
       const targetData = this.transformV062ToV070(sourceData);
 
-      const integrity = this.backupManager.verifyIntegrity(targetData, backup.checksum);
+      // Verify source data integrity
+      const integrity = this.backupManager.verifyIntegrity(sourceData, backup.checksum);
       if (!integrity.valid) {
         throw new Error('MIGRATION_INTEGRITY_FAILED');
       }

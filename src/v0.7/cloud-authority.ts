@@ -55,6 +55,7 @@ export class InMemoryCloudAuthority implements CloudAuthority {
   private offline = false;
 
   private failNextCommit = 0;
+  private failNextCommitCode: string | null = null;
 
   constructor(options: InMemoryAuthorityOptions = {}) {
     this.now = options.now ?? (() => Date.now());
@@ -71,6 +72,13 @@ export class InMemoryCloudAuthority implements CloudAuthority {
   /** Fail the next N commits as if the cloud were unreachable. */
   failCommits(count: number): void {
     this.failNextCommit = count;
+    this.failNextCommitCode = null;
+  }
+
+  /** Fail the next N commits with a specific error code (e.g., 'AUTHORITY_AUTH_FAILED'). */
+  failCommitsWith(code: string, count: number = 1): void {
+    this.failNextCommit = count;
+    this.failNextCommitCode = code;
   }
 
   private machine(projectId: string): AuthorityStateMachine {
@@ -98,7 +106,8 @@ export class InMemoryCloudAuthority implements CloudAuthority {
 
     if (this.failNextCommit > 0) {
       this.failNextCommit -= 1;
-      throw new AuthorityError('AUTHORITY_UNAVAILABLE', 'Cloud authority write failed');
+      const code = this.failNextCommitCode ?? 'AUTHORITY_UNAVAILABLE';
+      throw new AuthorityError(code as any, 'Cloud authority write failed');
     }
 
     return machine.commit(request);
