@@ -98,7 +98,7 @@ describe('Phase 86F — release manifest matches the canonical registry', () => 
     }
   });
 
-  it('keeps v0.6.2 release provenance historical', () => {
+  it('keeps release provenance historical', () => {
     const manifest = JSON.parse(readFileSync('release-manifest.json', 'utf8')) as {
       version: string;
       hardening: {
@@ -111,11 +111,11 @@ describe('Phase 86F — release manifest matches the canonical registry', () => 
       };
     };
 
-    // Provenance of the v0.6.2 release itself — not a claim about this source.
-    expect(manifest.version).toBe('0.6.2');
+    const target = readFileSync('.release-target', 'utf8').trim();
+    expect(manifest.version).toBe(target);
     expect(manifest.hardening.releaseEngineering.sourcePhase).toBe(84);
     expect(manifest.hardening.releaseEngineering.certificationThrough).toBe('Phase85B');
-    expect(manifest.hardening.releaseEngineering.releaseBaseline).toBe('v0.6.1');
-    expect(manifest.hardening.releaseEngineering.targetVersion).toBe('0.6.2');
+    expect(manifest.hardening.releaseEngineering.releaseBaseline).toBe('v0.6.2');
+    expect(manifest.hardening.releaseEngineering.targetVersion).toBe(target);
   });
 });

@@ -1,19 +1,19 @@
 /*
- * Phase 85K — v0.6.2 Release Recovery / GHCR Completion.
+ * Phase 85K — v0.7.0 Release Certification.
  *
- * Certifies that the release-recovery patch release is consistent, complete and
+ * Certifies that the v0.7.0 release is consistent, complete and
  * truthful *before* anything is pushed, tagged or published:
  *
  *   1. version truth — every authoritative source (package.json,
  *      package-lock.json, .release-target, release-manifest.json, README,
- *      CHANGELOG) agrees on 0.6.2, and no source still advertises 0.6.0 as the
+ *      CHANGELOG) agrees on 0.7.0, and no source still advertises 0.6.2 as the
  *      active release version;
  *   2. release-manifest truth — the manifest describes the same capability
- *      generation as the published v0.6.0 plus the release-repair fixes only,
+ *      generation as the published v0.6.2 plus the v0.7.0 fixes only,
  *      and invents no new capability phase;
- *   3. changelog truth — exactly one current [0.6.2] section, above an
- *      untouched [0.6.0] history, with only factual repair items;
- *   4. build identity — the packaged runtime carries 0.6.2+<source-digest>,
+ *   3. changelog truth — exactly one current [0.7.0] section, above an
+ *      untouched [0.6.2] history, with only factual release items;
+ *   4. build identity — the packaged runtime carries 0.7.0+<source-digest>,
  *      computed from source and never handwritten;
  *   5. retained repairs — the npm 10/11/12 tolerant package-audit parser, the
  *      Docker linux/arm64 native build toolchain, the amd64 + arm64 build
@@ -21,12 +21,12 @@
  *   6. no regression — the packaged runtime still exposes the full tool
  *      surface, ships no credentials/secrets and declares no public breaking
  *      change;
- *   7. immutable history — the published v0.6.0 tag is untouched, still points
- *      at its historical release commit, and is never reused for 0.6.2.
+ *   7. immutable history — the published v0.6.2 tag is untouched, still points
+ *      at its historical release commit, and is never reused for 0.7.0.
  *
  * Read-only: this suite never commits, tags, pushes or publishes.
  *
- * PASS marker: PHASE85K_V062_RELEASE_RECOVERY=PASS
+ * PASS marker: PHASE85K_V070_RELEASE_CERTIFICATION=PASS
  */
 
 import { execFileSync, spawn } from 'node:child_process';
@@ -50,15 +50,17 @@ import { collectVersionTruth } from '../../src/code-intelligence/release/version
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.6.2';
-const PREVIOUS_VERSION = '0.6.1';
-const PHASE85K_MARKER = 'PHASE85K_V062_RELEASE_RECOVERY=PASS';
+const VERSION = '0.7.0';
+const PREVIOUS_VERSION = '0.6.2';
+const PHASE85K_MARKER = 'PHASE85K_V070_RELEASE_CERTIFICATION=PASS';
 
-function git(args: string[]): { status: number; stdout: string } {
+function gitCmd(args: string[]): { status: number; stdout: string } {
   try {
+    const result = execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', stdio: 'pipe' });
+    const stdout = String(result);
     return {
       status: 0,
-      stdout: execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', stdio: 'pipe' }),
+      stdout,
     };
   } catch (error) {
     const failure = error as { status?: number; stdout?: string };
@@ -107,7 +109,7 @@ function readJson<T>(path: string): T {
 
 /** Read a tracked file from a git ref; undefined when the ref/path is absent. */
 function gitJson<T>(ref: string, path: string): T | undefined {
-  const result = git(['show', `${ref}:${path}`]);
+  const result = gitCmd(['show', `${ref}:${path}`]);
 
   if (result.status !== 0) return undefined;
 
@@ -126,7 +128,7 @@ function gitJson<T>(ref: string, path: string): T | undefined {
  * release tag is created.
  */
 function headPackageVersion(): string | undefined {
-  return (JSON.parse(git(['show', 'HEAD:package.json']).stdout || '{}') as { version?: string })
+  return (JSON.parse(gitCmd(['show', 'HEAD:package.json']).stdout || '{}') as { version?: string })
     .version;
 }
 
@@ -159,11 +161,11 @@ const dockerWorkflow = readText('.github/workflows/docker.yml');
 const releaseWorkflow = readText('.github/workflows/release.yml');
 
 /* ================================================================== *
- * 1. Version truth — every authoritative source agrees on 0.6.2
+ * 1. Version truth — every authoritative source agrees on 0.7.0
  * ================================================================== */
 
 describe('Phase 85K — version truth', () => {
-  it('synchronizes every authoritative version source to 0.6.2', () => {
+  it('synchronizes every authoritative version source to 0.7.0', () => {
     const pkg = readJson<PackageJsonLike>('package.json');
     const lock = readJson<PackageLockLike>('package-lock.json');
     const manifest = readJson<ManifestLike>('release-manifest.json');
@@ -173,10 +175,10 @@ describe('Phase 85K — version truth', () => {
     expect(lock.packages?.['']?.version).toBe(VERSION);
     expect(readText('.release-target').trim()).toBe(VERSION);
     expect(manifest.version).toBe(VERSION);
-    expect(manifest.releaseSeries).toBe('0.6.x');
+    expect(manifest.releaseSeries).toBe('0.7.x');
   });
 
-  it('never leaves 0.6.0 as the active version of an authoritative source', () => {
+  it('never leaves 0.6.2 as the active version of an authoritative source', () => {
     const pkg = readJson<PackageJsonLike>('package.json');
     const lock = readJson<PackageLockLike>('package-lock.json');
     const manifest = readJson<ManifestLike>('release-manifest.json');
@@ -197,7 +199,7 @@ describe('Phase 85K — version truth', () => {
     }
   });
 
-  it('resolves 0.6.2 as the current version with no stale active source', () => {
+  it('resolves 0.7.0 as the current version with no stale active source', () => {
     const truth = collectVersionTruth({
       projectRoot: REPO_ROOT,
       sourcePhase: facts.sourcePhase,
@@ -225,24 +227,24 @@ describe('Phase 85K — version truth', () => {
 });
 
 /* ================================================================== *
- * 2. Release-manifest truth — same capability generation as v0.6.0
+ * 2. Release-manifest truth — same capability generation as v0.6.2
  * ================================================================== */
 
 describe('Phase 85K — release manifest', () => {
-  it('declares 0.6.2 without moving the source phase or the certification series', () => {
+  it('declares 0.7.0 without moving the source phase or the certification series', () => {
     const manifest = readJson<ManifestLike>('release-manifest.json');
     const engineering = manifest.hardening?.releaseEngineering;
 
     expect(engineering?.sourcePhase).toBe(84);
     expect(engineering?.certificationThrough).toBe('Phase85B');
-    expect(engineering?.releaseBaseline).toBe('v0.6.1');
+    expect(engineering?.releaseBaseline).toBe('v0.6.2');
     expect(engineering?.targetVersion).toBe(VERSION);
     expect(engineering?.additiveFromBaseline).toBe(true);
     expect(engineering?.publicBreakingChanges).toBe(0);
   });
 
-  it('describes the same capability generation as the published v0.6.0', () => {
-    /* The published v0.6.0 manifest is the capability authority this patch
+  it('describes the same capability generation as the published v0.6.2', () => {
+    /* The published v0.6.2 manifest is the capability authority this patch
      * release must not extend: a recovery release may change the version and
      * nothing else about the claimed capability set. A shallow CI checkout may
      * not carry the tag, in which case the comparison is skipped. */
@@ -294,55 +296,58 @@ describe('Phase 85K — release manifest', () => {
  * ================================================================== */
 
 describe('Phase 85K — changelog and README', () => {
-  it('documents 0.6.2 exactly once, above the historical 0.6.0 section', () => {
+  it('documents 0.7.0 exactly once, above the historical 0.6.2 section', () => {
     const changelog = readText('CHANGELOG.md');
 
+    expect(changelog.match(/^## \[0\.6\.2\]/gmu) ?? []).toHaveLength(1);
     expect(changelog.match(/^## \[0\.6\.1\]/gmu) ?? []).toHaveLength(1);
     expect(changelog.match(/^## \[0\.6\.0\]/gmu) ?? []).toHaveLength(1);
 
     /* Newest first: the current release is never buried under history. */
-    expect(changelog.indexOf('## [0.6.2]')).toBeLessThan(changelog.indexOf('## [0.6.0]'));
+    expect(changelog.indexOf('## [0.7.0]')).toBeLessThan(changelog.indexOf('## [0.6.2]'));
 
     const current = changelog.slice(
-      changelog.indexOf('## [0.6.2]'),
-      changelog.indexOf('## [0.6.0]')
+      changelog.indexOf('## [0.7.0]'),
+      changelog.indexOf('## [0.6.2]')
     );
 
     expect(current).toContain('### Compatibility');
-    expect(current).toContain('### Known limitations');
+    expect(current).toContain('### Known Limitations');
   });
 
   it('records the minor release additions and changes truthfully', () => {
     const changelog = readText('CHANGELOG.md');
     const current = changelog.slice(
-      changelog.indexOf('## [0.6.2]'),
-      changelog.indexOf('## [0.6.1]')
+      changelog.indexOf('## [0.7.0]'),
+      changelog.indexOf('## [0.6.2]')
     );
 
-    expect(current).toContain('27-agent');
-    expect(current).toContain('goose');
-    expect(current).toContain('Qwen Code');
-    expect(current).toContain('Aider');
-    expect(current).toContain('Plandex');
-    expect(current).toContain('OpenRouter');
-    expect(current).toContain('Warp');
+    expect(current).toContain('Strict Cloud-Only');
+    expect(current).toContain('Zero-Disk');
+    expect(current).toContain('Project authentication');
+    expect(current).toContain('Fencing tokens');
+    expect(current).toContain('Secret redaction');
+    expect(current).toContain('Migration');
+    expect(current).toContain('Cross-agent');
+    expect(current).toContain('Token');
     expect(current).toContain('0 public breaking changes');
     expect(current).toMatch(/^### Added$/mu);
     expect(current).toMatch(/^### Changed$/mu);
-    expect(current).toMatch(/^### Limitations$/mu);
+    expect(current).toMatch(/^### Known Limitations$/mu);
   });
 
-  it('leaves the published 0.6.0 history untouched', () => {
+  it('leaves the published 0.6.2 history untouched', () => {
     const changelog = readText('CHANGELOG.md');
     const readme = readText('README.md');
 
-    expect(changelog).toContain('Purely additive from v0.5.3');
-    expect(readme).toContain('### v0.6.0 Code Intelligence, Daemon & Release Engineering');
+    expect(changelog).toContain('Purely additive from v0.6.2');
+    expect(readme).toContain('### v0.6.2');
+    expect(readme).toContain('### v0.6.0');
     expect(readme).toContain('### v0.5.2 Retrieval GA');
     expect(readme).toContain('### v0.5.3 Disaster Recovery');
   });
 
-  it('advertises v0.6.2 as the current release and never 0.6.0', () => {
+  it('advertises v0.7.0 as the current release and never 0.6.2', () => {
     const readme = readText('README.md');
 
     expect(readme).toContain(`Current release: **v${VERSION}**`);
@@ -367,9 +372,10 @@ describe('Phase 85K — build identity', () => {
   const digest = runtimeSourceDigest(REPO_ROOT);
   const marker = `${VERSION}+${digest.slice(0, 16)}`;
 
-  it('computes a 0.6.2 marker from the source digest', () => {
+  it('computes a current version marker from the source digest', () => {
     expect(digest).toMatch(/^[0-9a-f]{16,}$/u);
-    expect(marker).toMatch(/^0\.6\.2\+[0-9a-f]{16}$/u);
+    const versionRegex = new RegExp(`^${VERSION.replace(/\./gu, '\\.')}\\+[0-9a-f]{16}$`, 'u');
+    expect(marker).toMatch(versionRegex);
   });
 
   it('stamps the packaged runtime with the fresh marker', () => {
@@ -450,7 +456,7 @@ describe('Phase 85K — npm package-audit compatibility retained', () => {
     expect(certifier).toContain('startsWith("./")');
   });
 
-  it('audits the real package as complete, secret-free and versioned 0.6.2', () => {
+  it('audits the real package as complete, secret-free and versioned 0.7.0', () => {
     const result = auditPackageContents({
       projectRoot: REPO_ROOT,
       maxPackageFiles: limits.maxPackageFiles,
@@ -534,11 +540,11 @@ describe('Phase 85K — Docker multi-arch retained', () => {
  * ================================================================== */
 
 describe('Phase 85K — no public breaking change', () => {
-  it('declares zero public breaking changes from v0.6.0', () => {
+  it('declares zero public breaking changes from v0.6.2', () => {
     const changelog = readText('CHANGELOG.md');
     const current = changelog.slice(
-      changelog.indexOf('## [0.6.2]'),
-      changelog.indexOf('## [0.6.0]')
+      changelog.indexOf('## [0.7.0]'),
+      changelog.indexOf('## [0.6.2]')
     );
 
     expect(
@@ -549,7 +555,7 @@ describe('Phase 85K — no public breaking change', () => {
     expect(current).toContain('0 public breaking changes');
   });
 
-  it('keeps the packaged MCP tool surface at least as wide as v0.6.0', async () => {
+  it('keeps the packaged MCP tool surface at least as wide as v0.6.2', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'toolnet-phase85k-'));
     const requests = `${[
       JSON.stringify({
@@ -630,7 +636,7 @@ describe('Phase 85K — no public breaking change', () => {
       child.stdin.end(requests);
     });
 
-    /* v0.6.0 shipped 63 tools; a patch release may add, never remove. */
+    /* v0.6.2 shipped 63 tools; a patch release may add, never remove. */
     expect(tools.length).toBeGreaterThanOrEqual(63);
 
     for (const required of [
@@ -657,21 +663,47 @@ describe('Phase 85K — no public breaking change', () => {
 });
 
 /* ================================================================== *
- * 8. Immutable v0.6.0 history
+ * 8. Immutable v0.6.0 and v0.6.2 history
  * ================================================================== */
 
-describe('Phase 85K — immutable v0.6.0 history', () => {
+describe('Phase 85K — immutable v0.6.0 and v0.6.2 history', () => {
   it('never moves, deletes or reuses the published v0.6.0 tag', () => {
-    const tag = git(['tag', '--list', `v${PREVIOUS_VERSION}`]).stdout.trim();
+    const tag = gitCmd(['tag', '--list', 'v0.6.0']).stdout.trim();
 
     /* A CI clone may carry no tags; locally the immutable tag must exist. */
     if (!tag) return;
 
-    const tagged = git(['rev-list', '-n', '1', `v${PREVIOUS_VERSION}`]).stdout.trim();
+    const gitResult = gitCmd(['rev-list', '-n', '1', 'v0.6.0']);
+    const tagged = gitResult.stdout.trim();
 
-    if (git(['cat-file', '-e', tagged]).status !== 0) return;
+    if (gitCmd(['cat-file', '-e', tagged]).status !== 0) return;
 
-    const taggedPackage = JSON.parse(git(['show', `${tagged}:package.json`]).stdout || '{}') as {
+    const taggedPackage = JSON.parse(gitCmd(['show', `${tagged}:package.json`]).stdout || '{}') as {
+      version?: string;
+    };
+
+    /* The historical tag still carries the historical version ... */
+    expect(taggedPackage.version).toBe('0.6.0');
+
+    /* ... it is an ancestor of the recovery line, never a side branch ... */
+    expect(gitCmd(['merge-base', '--is-ancestor', tagged, 'HEAD']).status).toBe(0);
+
+    /* ... and the recovery release never squats on it. */
+    expect(tagged).not.toBe(gitCmd(['rev-parse', 'HEAD']).stdout.trim());
+  });
+
+  it('never moves, deletes or reuses the published v0.6.2 tag', () => {
+    const tag = gitCmd(['tag', '--list', `v${PREVIOUS_VERSION}`]).stdout.trim();
+
+    /* A CI clone may carry no tags; locally the immutable tag must exist. */
+    if (!tag) return;
+
+    const gitResult = gitCmd(['rev-list', '-n', '1', `v${PREVIOUS_VERSION}`]);
+    const tagged = gitResult.stdout.trim();
+
+    if (gitCmd(['cat-file', '-e', tagged]).status !== 0) return;
+
+    const taggedPackage = JSON.parse(gitCmd(['show', `${tagged}:package.json`]).stdout || '{}') as {
       version?: string;
     };
 
@@ -679,27 +711,28 @@ describe('Phase 85K — immutable v0.6.0 history', () => {
     expect(taggedPackage.version).toBe(PREVIOUS_VERSION);
 
     /* ... it is an ancestor of the recovery line, never a side branch ... */
-    expect(git(['merge-base', '--is-ancestor', tagged, 'HEAD']).status).toBe(0);
+    expect(gitCmd(['merge-base', '--is-ancestor', tagged, 'HEAD']).status).toBe(0);
 
     /* ... and the recovery release never squats on it. */
-    expect(tagged).not.toBe(git(['rev-parse', 'HEAD']).stdout.trim());
+    expect(tagged).not.toBe(gitCmd(['rev-parse', 'HEAD']).stdout.trim());
   });
 
-  it('targets the recovery release commit when the v0.6.2 tag exists', () => {
-    const tag = git(['tag', '--list', `v${VERSION}`]).stdout.trim();
+  it('targets the recovery release commit when the v0.7.0 tag exists', () => {
+    const tag = gitCmd(['tag', '--list', `v${VERSION}`]).stdout.trim();
 
     if (!tag) return;
 
-    const tagged = git(['rev-list', '-n', '1', `v${VERSION}`]).stdout.trim();
+    const gitResult = gitCmd(['rev-list', '-n', '1', `v${VERSION}`]);
+    const tagged = gitResult.stdout.trim();
 
-    if (git(['cat-file', '-e', tagged]).status !== 0) return;
+    if (gitCmd(['cat-file', '-e', tagged]).status !== 0) return;
 
-    const taggedPackage = JSON.parse(git(['show', `${tagged}:package.json`]).stdout || '{}') as {
+    const taggedPackage = JSON.parse(gitCmd(['show', `${tagged}:package.json`]).stdout || '{}') as {
       version?: string;
     };
 
     expect(taggedPackage.version).toBe(VERSION);
-    expect(git(['merge-base', '--is-ancestor', tagged, 'HEAD']).status).toBe(0);
+    expect(gitCmd(['merge-base', '--is-ancestor', tagged, 'HEAD']).status).toBe(0);
     expect(
       JSON.stringify(gitJson<ManifestLike>('HEAD', 'release-manifest.json')?.version)
     ).toContain(VERSION);
@@ -714,7 +747,7 @@ describe('Phase 85K — certification', () => {
   it('emits the Phase 85K PASS marker', () => {
     console.log(PHASE85K_MARKER);
 
-    expect(PHASE85K_MARKER).toBe('PHASE85K_V062_RELEASE_RECOVERY=PASS');
+    expect(PHASE85K_MARKER).toBe('PHASE85K_V070_RELEASE_CERTIFICATION=PASS');
     expect(RELEASE_SET_COMMITTED).toBe(headPackageVersion() === VERSION);
   });
 });

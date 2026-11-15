@@ -15,6 +15,8 @@ import {
   LEGACY_MIGRATION_IDENTIFIER,
 } from './migration-versions.js';
 
+const DEFAULT_BACKUP_VERSION = LEGACY_MIGRATION_TARGET_VERSION;
+
 export interface BackupRecord {
   projectId: string;
   timestamp: number;
@@ -52,7 +54,7 @@ export class BackupManager {
     const dataSize = Buffer.byteLength(dataString);
 
     // Infer version from data if not provided
-    const inferredVersion = (data as any)?.version ?? '0.7.0';
+    const inferredVersion = (data as any)?.version ?? DEFAULT_BACKUP_VERSION;
 
     const record: BackupRecord = {
       projectId,
@@ -175,7 +177,7 @@ export class BackupManager {
         const record: BackupRecord = {
           projectId: data.projectId,
           timestamp: data.timestamp || Date.now(),
-          version: data.version || '0.7.0',
+          version: data.version || DEFAULT_BACKUP_VERSION,
           checksum: data.checksum,
           backupPath: file,
           dataSize: data.dataSize || Buffer.byteLength(JSON.stringify(data, null, 2)),

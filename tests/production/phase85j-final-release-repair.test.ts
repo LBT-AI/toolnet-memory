@@ -44,7 +44,7 @@ import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
 const PHASE85J_MARKER = 'PHASE85J_FINAL_RELEASE_REPAIR=PASS';
-const VERSION = '0.6.2';
+const VERSION = '0.7.0';
 
 const REQUIRED_PACKAGE_FILES = ['package.json', 'bundle/mcp.js', 'release-manifest.json'];
 const AUDIT_LIMITS = { maxPackageFiles: 20_000, maxPackageJsonBytes: 16 * 1024 * 1024 };
@@ -369,8 +369,9 @@ describe('Phase 85J — build identity', () => {
   const marker = `${VERSION}+${digest.slice(0, 16)}`;
 
   it('derives the build marker from version + source digest', () => {
-    expect(VERSION).toBe('0.6.2');
-    expect(marker).toMatch(/^0\.6\.2\+[0-9a-f]{16}$/u);
+    expect(VERSION).toBe('0.7.0');
+    const versionRegex = new RegExp(`^${VERSION.replace(/\./gu, '\\.')}\\+[0-9a-f]{16}$`, 'u');
+    expect(marker).toMatch(versionRegex);
     expect(readText('bundle/mcp.js')).toContain(marker);
     expect(readText('bundle/identity.js')).toContain(marker);
   });

@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.6.2**
+Current release: **v0.7.0**
 
 </div>
 
@@ -33,6 +33,19 @@ ToolNet Memory combines four layers:
 ToolNet Memory is **not a raw transcript dump**. Raw session history is kept separate from durable project memory and is protected from normal agent reads.
 
 Memory promotion, retrieval, conflict handling, and continuity decisions are deterministic and local. ToolNet Memory does not require an LLM or embedding provider for its memory runtime.
+
+### v0.7.0 Continuity Foundation
+
+v0.7.0 introduces the ToolNet Continuity Foundation: cloud-only authority, checkpoints, Project Brain, and resume compilation for seamless cross-agent handoff.
+
+- **Strict Cloud-Only Mode**: Zero-disk storage requirements enforced; all memory operations go through cloud authority only.
+- **Zero-Disk Runtime**: 13 memory write paths verified to never touch VPS disk in strict mode.
+- **Project Authentication**: Per-project token management with agent/operation allowlists.
+- **Revision & Fencing**: Revision tracking, lease management, and fencing tokens prevent stale writer conflicts.
+- **Secret Redaction**: Comprehensive secret detection for OpenAI keys, tokens, passwords, API keys in logs and telemetry.
+- **Migration System**: v0.6.2 → v0.7.0 idempotent migration with conflict detection, rollback, and backup integrity.
+- **Cross-Agent Continuity**: AGY → Codex resume with cloud-acknowledged checkpoints.
+- **Token Benchmark**: Real tokenizer showing 68% reduction in tiny mode.
 
 ### v0.3.15 Hardening
 
