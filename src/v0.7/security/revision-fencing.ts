@@ -283,6 +283,20 @@ export class FencingManager {
   }
 }
 
+const SECRET_PATTERNS: readonly RegExp[] = [
+  /sk-[a-zA-Z0-9_-]{20,}/g,
+  /hf_[a-zA-Z0-9]{20,}/g,
+  /gh[pousr]_[a-zA-Z0-9]{30,}/g,
+  /\btoken=[a-zA-Z0-9._~+/=-]+/gi,
+  /\bpassword\s*[:=]\s*['"]?[^\s"'`]+['"]?/gi,
+  /\bapi[_-]?key\s*[:=]\s*['"]?[^\s"'`]+['"]?/gi,
+  /\bbearer\s+[a-zA-Z0-9._~+/=-]{16,}/gi,
+];
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export interface SecurityError {
   code: string;
   message: string;
@@ -312,22 +326,31 @@ export class SecurityLogger {
   }
 
   detectSecrets(value: unknown): void {
-    if (typeof value === 'string') {
-      const matches = value.match(
-        /(sk-[a-zA-Z0-9]{20,}|token=[a-zA-Z0-9_-]+|password=[\\w-]+|api[\\s=:][\\'\\\"][\\w-]+['\\\"])/g
-      );
-      matches?.forEach((match) => this.secrets.add(match.toLowerCase()));
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    for (const pattern of SECRET_PATTERNS) {
+      const matches = value.match(pattern);
+      matches?.forEach((match) => {
+        const trimmed = match.trim();
+        if (trimmed) {
+          this.secrets.add(trimmed.toLowerCase());
+        }
+      });
     }
   }
 
   redactSecrets(value: string): string {
     let redacted = value;
-    for (const secret of this.secrets) {
-      redacted = redacted.replace(
-        new RegExp(secret.replace(/[.*+?^${}()|[\\]/g, '\\\\$&'), 'gi'),
-        '[REDACTED]'
-      );
+
+    // Longest first so a shorter secret cannot partially mask a longer one.
+    const secrets = [...this.secrets].sort((left, right) => right.length - left.length);
+
+    for (const secret of secrets) {
+      redacted = redacted.replace(new RegExp(escapeRegExp(secret), 'gi'), '[REDACTED]');
     }
+
     return redacted;
   }
 

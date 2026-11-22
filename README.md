@@ -39,7 +39,7 @@ Memory promotion, retrieval, conflict handling, and continuity decisions are det
 v0.7.0 introduces the ToolNet Continuity Foundation: cloud-only authority, checkpoints, Project Brain, and resume compilation for seamless cross-agent handoff.
 
 - **Strict Cloud-Only Mode**: Zero-disk storage requirements enforced; all memory operations go through cloud authority only.
-- **Zero-Disk Runtime**: 13 memory write paths verified to never touch VPS disk in strict mode.
+- **Zero-Disk Runtime**: 12 memory write paths verified to never touch VPS disk in strict mode.
 - **Project Authentication**: Per-project token management with agent/operation allowlists.
 - **Revision & Fencing**: Revision tracking, lease management, and fencing tokens prevent stale writer conflicts.
 - **Secret Redaction**: Comprehensive secret detection for OpenAI keys, tokens, passwords, API keys in logs and telemetry.

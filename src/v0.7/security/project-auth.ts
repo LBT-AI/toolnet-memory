@@ -5,7 +5,7 @@
  * for cloud authority operations in v0.7.0.
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export interface ProjectAuthConfig {
   projectId: string;
@@ -46,7 +46,7 @@ export class ProjectAuthenticator {
       return { valid: false, error: 'PROJECT_AUTH_PROJECT_UNKNOWN' };
     }
 
-    if (config.token !== token) {
+    if (!tokensMatch(config.token, token)) {
       return { valid: false, error: 'PROJECT_AUTH_TOKEN_MISMATCH' };
     }
 
@@ -58,15 +58,23 @@ export class ProjectAuthenticator {
   }
 
   getConfig(projectId: string): ProjectAuthConfig | undefined {
-    return this.configs.get(projectId);
+    const config = this.configs.get(projectId);
+    return config ? { ...config } : undefined;
   }
 
+  /**
+   * Issue a fresh random token for a registered project and return it.
+   * The previously registered token stops being valid immediately.
+   */
   generateToken(projectId: string): string {
     const config = this.configs.get(projectId);
     if (!config) {
       throw new Error('PROJECT_AUTH_PROJECT_UNKNOWN');
     }
-    return config.token;
+
+    const token = randomBytes(32).toString('hex');
+    this.configs.set(projectId, { ...config, token });
+    return token;
   }
 }
 
@@ -103,18 +111,44 @@ export class ProjectAuthorizer {
     context?: Record<string, unknown>
   ): boolean {
     switch (operation) {
-      case 'lease':
-        return (
-          !context?.taskId || !context?.agentId || context.agentId === config.allowedAgents?.[0]
-        );
-      case 'commit':
-        return (
-          context?.agentId === undefined ||
-          context?.agentId === null ||
-          context?.fencingToken === undefined ||
-          context?.fencingToken === null ||
-          config.allowedOperations?.includes('write') === true
-        );
+      case 'lease': {
+        const taskId = context?.taskId;
+        const agentId = context?.agentId;
+
+        // A lease claim without an explicit task and agent cannot be authorized.
+        if (typeof taskId !== 'string' || !taskId.trim()) {
+          return false;
+        }
+
+        if (typeof agentId !== 'string' || !agentId.trim()) {
+          return false;
+        }
+
+        return agentAllowed(config, agentId);
+      }
+      case 'commit': {
+        const agentId = context?.agentId;
+        const fencingToken = context?.fencingToken;
+
+        // A commit must carry the live lease's agent and fencing token.
+        if (typeof agentId !== 'string' || !agentId.trim()) {
+          return false;
+        }
+
+        if (
+          typeof fencingToken !== 'number' ||
+          !Number.isSafeInteger(fencingToken) ||
+          fencingToken <= 0
+        ) {
+          return false;
+        }
+
+        if (config.allowedOperations?.includes('write') !== true) {
+          return false;
+        }
+
+        return agentAllowed(config, agentId);
+      }
       case 'write':
         return true;
       case 'read':
@@ -123,6 +157,23 @@ export class ProjectAuthorizer {
         return false;
     }
   }
+}
+
+function agentAllowed(config: ProjectAuthConfig, agentId: string): boolean {
+  return !config.allowedAgents?.length || config.allowedAgents.includes(agentId);
+}
+
+function tokensMatch(expected: string, provided: string): boolean {
+  const expectedBytes = Buffer.from(expected, 'utf8');
+  const providedBytes = Buffer.from(provided, 'utf8');
+
+  if (expectedBytes.length !== providedBytes.length) {
+    // Compare a same-length dummy value so the failure path stays constant-time.
+    timingSafeEqual(expectedBytes, expectedBytes);
+    return false;
+  }
+
+  return timingSafeEqual(expectedBytes, providedBytes);
 }
 
 export function createProjectIdentity(projectId: string, agentId: string): string {

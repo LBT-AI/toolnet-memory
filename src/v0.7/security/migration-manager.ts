@@ -5,7 +5,7 @@
  * for ToolNet memory data with cryptographic integrity guarantees.
  */
 
-import { createHash, createHmac } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
@@ -36,25 +36,39 @@ export interface BackupIntegrity {
 
 export class BackupManager {
   private readonly backups = new Map<string, BackupRecord>();
-  private readonly integrityCache = new Map<string, Map<string, BackupRecord>>();
+  private readonly inMemoryBackups = new Map<string, string>();
+  private readonly integrityKey = randomBytes(32);
 
+  /**
+   * Create a backup.
+   *
+   * Without an explicit `backupDir` the backup is kept in memory only, which
+   * keeps the default migration path free of local disk writes. Callers that
+   * want a durable local copy must opt in with a directory.
+   */
   createBackup(
     data: unknown,
     projectId: string,
-    backupDir: string = './backups',
+    backupDir?: string,
     version?: string
   ): BackupRecord {
     const timestamp = Date.now();
-    const backupPath = join(backupDir, `backup-${projectId}-${timestamp}.json`);
-
-    mkdirSync(dirname(backupPath), { recursive: true });
-
     const dataString = JSON.stringify(data, null, 2);
     const checksum = createHash('sha256').update(dataString).digest('hex');
     const dataSize = Buffer.byteLength(dataString);
 
     // Infer version from data if not provided
     const inferredVersion = (data as any)?.version ?? DEFAULT_BACKUP_VERSION;
+
+    let backupPath = '';
+
+    if (backupDir) {
+      backupPath = join(backupDir, `backup-${safeFileSegment(projectId)}-${timestamp}.json`);
+      mkdirSync(dirname(backupPath), { recursive: true });
+      writeFileSync(backupPath, dataString, 'utf8');
+    } else {
+      this.inMemoryBackups.set(projectId, dataString);
+    }
 
     const record: BackupRecord = {
       projectId,
@@ -65,18 +79,18 @@ export class BackupManager {
       dataSize,
     };
 
-    writeFileSync(backupPath, dataString, 'utf8');
     this.backups.set(projectId, record);
 
     return record;
   }
 
-  createIntegrityHash(data: unknown): { checksum: string; hmac: string } {
+  createIntegrityHash(
+    data: unknown,
+    secret: string | Buffer = this.integrityKey
+  ): { checksum: string; hmac: string } {
     const dataString = JSON.stringify(data, null, 2);
     const checksum = createHash('sha256').update(dataString).digest('hex');
-    const hmac = createHmac('sha256', Buffer.from(checksum, 'hex'))
-      .update(dataString)
-      .digest('hex');
+    const hmac = createHmac('sha256', secret).update(dataString).digest('hex');
 
     return { checksum, hmac };
   }
@@ -95,7 +109,13 @@ export class BackupManager {
       return null;
     }
 
-    if (!existsSync(original.backupPath)) {
+    const raw = original.backupPath
+      ? existsSync(original.backupPath)
+        ? readFileSync(original.backupPath, 'utf8')
+        : null
+      : (this.inMemoryBackups.get(projectId) ?? null);
+
+    if (raw === null) {
       return {
         original,
         current: original,
@@ -107,7 +127,7 @@ export class BackupManager {
 
     let currentData: unknown;
     try {
-      currentData = JSON.parse(readFileSync(original.backupPath, 'utf8'));
+      currentData = JSON.parse(raw);
     } catch {
       return {
         original,
@@ -140,12 +160,24 @@ export class BackupManager {
       return false;
     }
 
-    if (!existsSync(record.backupPath)) {
-      return false;
+    let data: string | undefined;
+
+    if (record.backupPath) {
+      if (!existsSync(record.backupPath)) {
+        return false;
+      }
+      data = readFileSync(record.backupPath, 'utf8');
+    } else {
+      data = this.inMemoryBackups.get(projectId);
     }
 
     const targetPath = restorePath || record.backupPath;
-    const data = readFileSync(record.backupPath, 'utf8');
+
+    if (data === undefined || !targetPath) {
+      return false;
+    }
+
+    mkdirSync(dirname(targetPath), { recursive: true });
     writeFileSync(targetPath, data, 'utf8');
 
     return true;
@@ -155,15 +187,30 @@ export class BackupManager {
     const exported: Map<string, BackupRecord> = new Map();
 
     for (const [projectId, record] of this.backups) {
-      if (existsSync(record.backupPath)) {
-        const sourceData = readFileSync(record.backupPath, 'utf8');
-        const targetPath = join(backupDir, `exported-${projectId}-${record.timestamp}.json`);
+      let sourceData: string | undefined;
 
-        mkdirSync(dirname(targetPath), { recursive: true });
-        writeFileSync(targetPath, sourceData, 'utf8');
-
-        exported.set(projectId, { ...record, backupPath: targetPath });
+      if (record.backupPath) {
+        if (!existsSync(record.backupPath)) {
+          continue;
+        }
+        sourceData = readFileSync(record.backupPath, 'utf8');
+      } else {
+        sourceData = this.inMemoryBackups.get(projectId);
       }
+
+      if (sourceData === undefined) {
+        continue;
+      }
+
+      const targetPath = join(
+        backupDir,
+        `exported-${safeFileSegment(projectId)}-${record.timestamp}.json`
+      );
+
+      mkdirSync(dirname(targetPath), { recursive: true });
+      writeFileSync(targetPath, sourceData, 'utf8');
+
+      exported.set(projectId, { ...record, backupPath: targetPath });
     }
 
     return exported;
@@ -200,11 +247,21 @@ export class BackupManager {
   }
 }
 
+export interface MigrationManagerOptions {
+  /** Optional local backup directory. Omit to keep backups in memory only. */
+  backupDir?: string;
+}
+
 export class MigrationManager {
   private readonly backupManager: BackupManager;
+  private readonly backupDir?: string;
 
-  constructor(backupManager: BackupManager = new BackupManager()) {
+  constructor(
+    backupManager: BackupManager = new BackupManager(),
+    options: MigrationManagerOptions = {}
+  ) {
     this.backupManager = backupManager;
+    this.backupDir = options.backupDir;
   }
 
   async migrateFromV062(
@@ -224,7 +281,8 @@ export class MigrationManager {
       // Create backup of the actual source data for integrity verification
       const backup = this.backupManager.createBackup(
         sourceData,
-        `${targetProjectId}-pre-migration`
+        `${targetProjectId}-pre-migration`,
+        options.backupDir ?? this.backupDir
       );
 
       const targetData = this.transformV062ToV070(sourceData);
@@ -363,6 +421,8 @@ export interface MigrationOptions {
   dryRun?: boolean;
   backup?: boolean;
   verify?: boolean;
+  /** Optional local directory for the pre-migration backup. */
+  backupDir?: string;
 }
 
 export interface MigrationResult {
@@ -380,6 +440,10 @@ export interface MigrationResult {
 export interface RollbackOptions {
   dryRun?: boolean;
   force?: boolean;
+}
+
+function safeFileSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '_');
 }
 
 export interface RollbackResult {

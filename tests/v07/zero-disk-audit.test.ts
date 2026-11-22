@@ -83,7 +83,7 @@ describe('v0.7 Zero-Disk Runtime Audit - All Write Paths', () => {
   };
 
   describe('StrictCloudMode enforcement', () => {
-    it('blocks all 13 memory write classes in strict mode', () => {
+    it('blocks all 12 memory write classes in strict mode', () => {
       const writeClasses = [
         'session.wal',
         'taskstore.write',

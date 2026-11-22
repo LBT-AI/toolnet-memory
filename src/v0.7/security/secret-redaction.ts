@@ -18,7 +18,6 @@ export interface RedactionConfig {
 
 export class SecretRedactor {
   private readonly config: RedactionConfig;
-  private readonly secrets = new Set<string>();
 
   constructor(config: RedactionConfig = {}) {
     this.config = {
@@ -42,26 +41,9 @@ export class SecretRedactor {
       customRedactors: config.customRedactors || [],
       preserveStructure: config.preserveStructure ?? true,
     };
-
-    this.buildSecretCache();
   }
 
-  private buildSecretCache(): void {
-    for (const pattern of this.config.patterns ?? []) {
-      const regex = pattern instanceof RegExp ? pattern : new RegExp(pattern, 'gi');
-      const sample = 'sk-test1234567890abcdefghijklmnopqrstuvwx';
-      const matches = sample.match(regex);
-      if (matches) {
-        matches.forEach((match) => {
-          if (typeof match === 'string' && match.trim()) {
-            this.secrets.add(match.toLowerCase().trim());
-          }
-        });
-      }
-    }
-  }
-
-  redact(value: unknown): unknown {
+  redact(value: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
     if (value === null || value === undefined) {
       return value;
     }
@@ -70,44 +52,46 @@ export class SecretRedactor {
       return this.redactString(value);
     }
 
+    if (typeof value !== 'object') {
+      return value;
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (seen.has(value)) {
+      return '[Circular]';
+    }
+
+    seen.add(value);
+
     if (Array.isArray(value)) {
-      return value.map((item) => this.redact(item));
+      return value.map((item) => this.redact(item, seen));
     }
 
-    if (typeof value === 'object') {
-      if (value instanceof Date) {
-        return value.toISOString();
-      }
-
-      if (value instanceof Error) {
-        return {
-          name: value.name,
-          message: this.redactString(value.message),
-          stack: value.stack ? this.redactString(value.stack) : undefined,
-        };
-      }
-
-      if (this.config.preserveStructure) {
-        const result: Record<string, unknown> = {};
-        for (const [key, val] of Object.entries(value)) {
-          const redactedKey = this.redactString(key);
-          result[redactedKey] = this.redact(val);
-        }
-        return result;
-      }
-
-      return this.redactObject(value as Record<string, unknown>);
+    if (value instanceof Error) {
+      return {
+        name: value.name,
+        message: this.redactString(value.message),
+        stack: value.stack ? this.redactString(value.stack) : undefined,
+      };
     }
 
-    return value;
+    if (this.config.preserveStructure) {
+      const result: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(value)) {
+        const redactedKey = this.redactString(key);
+        result[redactedKey] = this.redact(val, seen);
+      }
+      return result;
+    }
+
+    return this.redactObject(value as Record<string, unknown>, seen);
   }
 
   private redactString(input: string): string {
     let output = input;
-
-    for (const secret of this.secrets) {
-      output = output.replaceAll(secret, '[REDACTED]');
-    }
 
     for (const pattern of this.config.patterns ?? []) {
       if (pattern instanceof RegExp) {
@@ -138,18 +122,19 @@ export class SecretRedactor {
     }
 
     for (const redactor of this.config.customRedactors || []) {
-      output = redactor(output) as string;
+      const redacted = redactor(output);
+      output = typeof redacted === 'string' ? redacted : String(redacted);
     }
 
     return output;
   }
 
-  private redactObject(obj: Record<string, unknown>): unknown {
+  private redactObject(obj: Record<string, unknown>, seen: WeakSet<object>): unknown {
     const result: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(obj)) {
       const redactedKey = this.redactString(key);
-      result[redactedKey] = this.redact(value);
+      result[redactedKey] = this.redact(value, seen);
     }
 
     return result;

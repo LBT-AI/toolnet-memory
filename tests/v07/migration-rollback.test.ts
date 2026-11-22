@@ -21,8 +21,10 @@ describe('v0.7 Migration & Rollback', () => {
 
   beforeEach(() => {
     backupManager = new BackupManager();
-    migrationManager = new MigrationManager(backupManager);
     tempDir = mkdtempSync(join(tmpdir(), 'toolnet-migration-test-'));
+    migrationManager = new MigrationManager(backupManager, {
+      backupDir: join(tempDir, 'backups'),
+    });
   });
 
   function createV062Project(projectId: string, projectName: string, tasks: any[] = []): string {
