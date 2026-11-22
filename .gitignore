@@ -16,6 +16,7 @@ coverage/
 projects/
 *.bak-*
 toolnet-memory-backups/
+backups/
 tmp/
 
 # Python generated cache

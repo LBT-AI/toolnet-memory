@@ -1,3 +1,5 @@
+import { DurableObject } from 'cloudflare:workers';
+
 import {
   AuthorityStateMachine,
   type AuthoritySnapshot,
@@ -10,46 +12,59 @@ import {
   type AuthoritySeed,
   createAuthorityState,
   restoreAuthorityState,
-} from '../src/v0.7/authority-state.js';
+} from '../../src/v0.7/authority-state.js';
+
+interface Env {
+  MEMORY_EVENTS: R2Bucket;
+}
 
 interface StoredSnapshot {
   snapshot: AuthoritySnapshot;
   updatedAt: string;
 }
 
-export class Authority {
-  private stateMachine: AuthorityStateMachine;
-  private readonly env: { MEMORY_EVENTS: R2Bucket };
+export class Authority extends DurableObject<Env> {
+  private stateMachine: AuthorityStateMachine | undefined;
   private readonly projectId: string;
 
-  constructor(
-    private readonly state: DurableObjectState,
-    private readonly env: { MEMORY_EVENTS: R2Bucket }
-  ) {
-    this.env = env;
-    this.projectId = state.id.toString();
-    this.stateMachine = this.loadStateMachine();
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.projectId = ctx.id.toString();
   }
 
-  private loadStateMachine(): AuthorityStateMachine {
-    const stored = this.state.storage.get<StoredSnapshot>('snapshot');
+  private async machine(): Promise<AuthorityStateMachine> {
+    if (this.stateMachine) {
+      return this.stateMachine;
+    }
+
+    const stored = await this.ctx.storage.get<StoredSnapshot>('snapshot');
+
     if (stored) {
-      return restoreAuthorityState(stored.snapshot);
+      this.stateMachine = restoreAuthorityState(stored.snapshot);
+      return this.stateMachine;
     }
 
     const seed: AuthoritySeed = {
       projectId: this.projectId,
       projectName: this.projectId,
     };
-    return createAuthorityState(seed, Date.now());
+
+    this.stateMachine = createAuthorityState(seed, Date.now());
+    return this.stateMachine;
   }
 
-  private async persist(): Promise<void> {
-    const snapshot = this.stateMachine.snapshot();
-    await this.state.storage.put('snapshot', { snapshot, updatedAt: new Date().toISOString() });
+  private async persist(machine: AuthorityStateMachine): Promise<void> {
+    const snapshot = machine.snapshot();
+    await this.ctx.storage.put('snapshot', {
+      snapshot,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
-  private async appendEventToR2(request: AuthorityCommitRequest, result: AuthorityCommitResult): Promise<void> {
+  private async appendEventToR2(
+    request: AuthorityCommitRequest,
+    result: AuthorityCommitResult
+  ): Promise<void> {
     const eventRecord = {
       projectId: request.projectId,
       agentId: request.agentId,
@@ -72,45 +87,52 @@ export class Authority {
     const path = url.pathname;
 
     try {
+      const machine = await this.machine();
+
       if (path === '/state' && request.method === 'GET') {
-        const snapshot = this.stateMachine.snapshot();
-        return Response.json(snapshot);
+        return Response.json(machine.snapshot());
       }
 
       if (path === '/commit' && request.method === 'POST') {
-        const body = await request.json() as AuthorityCommitRequest;
-        const result = this.stateMachine.commit(body);
-        await this.persist();
+        const body = (await request.json()) as AuthorityCommitRequest;
+        const result = machine.commit(body);
+        await this.persist(machine);
         await this.appendEventToR2(body, result);
         return Response.json(result);
       }
 
       if (path === '/leases/acquire' && request.method === 'POST') {
-        const body = await request.json() as AcquireLeaseRequest;
-        const grant = this.stateMachine.acquireLease(body);
-        await this.persist();
+        const body = (await request.json()) as AcquireLeaseRequest;
+        const grant = machine.acquireLease(body);
+        await this.persist(machine);
         return Response.json(grant);
       }
 
       if (path === '/leases/heartbeat' && request.method === 'POST') {
-        const body = await request.json() as HeartbeatLeaseRequest;
-        const grant = this.stateMachine.heartbeat(body);
-        await this.persist();
+        const body = (await request.json()) as HeartbeatLeaseRequest;
+        const grant = machine.heartbeat(body);
+        await this.persist(machine);
         return Response.json(grant);
       }
 
       if (path === '/leases/release' && request.method === 'POST') {
-        const body = await request.json() as ReleaseLeaseRequest;
-        const lease = this.stateMachine.release(body);
-        await this.persist();
-        return Response.json({ lease, revision: this.stateMachine.revision() });
+        const body = (await request.json()) as ReleaseLeaseRequest;
+        const lease = machine.release(body);
+        await this.persist(machine);
+        return Response.json({ lease, revision: machine.revision() });
       }
 
-      return Response.json({ error: { code: 'AUTHORITY_INVALID_OPERATION', message: 'Not found' } }, 404);
+      return Response.json(
+        { error: { code: 'AUTHORITY_INVALID_OPERATION', message: 'Not found' } },
+        { status: 404 }
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Internal error';
-      const code = error instanceof Error && 'code' in error ? (error as { code: string }).code : 'AUTHORITY_UNAVAILABLE';
-      return Response.json({ error: { code, message } }, 500);
+      const code =
+        error instanceof Error && 'code' in error
+          ? (error as { code: string }).code
+          : 'AUTHORITY_UNAVAILABLE';
+      return Response.json({ error: { code, message } }, { status: 500 });
     }
   }
 }

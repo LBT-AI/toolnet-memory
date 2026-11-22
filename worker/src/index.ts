@@ -1,4 +1,6 @@
-import { Hono } from 'hono';
+import { timingSafeEqual } from 'node:crypto';
+
+import { Hono, type Context } from 'hono';
 import { Authority } from './authority.js';
 
 export { Authority } from './authority.js';
@@ -11,17 +13,50 @@ interface Env {
 
 const app = new Hono<{ Bindings: Env }>();
 
+function unauthorized(c: Context<{ Bindings: Env }>): Response {
+  return c.json(
+    { error: { code: 'AUTHORITY_AUTH_FAILED', message: 'Invalid or missing token' } },
+    401
+  );
+}
+
+function tokensMatch(expected: string, provided: string): boolean {
+  const expectedBytes = Buffer.from(expected, 'utf8');
+  const providedBytes = Buffer.from(provided, 'utf8');
+
+  if (expectedBytes.length !== providedBytes.length) {
+    timingSafeEqual(expectedBytes, expectedBytes);
+    return false;
+  }
+
+  return timingSafeEqual(expectedBytes, providedBytes);
+}
+
+function authorized(request: Request, env: Env): boolean {
+  const expected = env.TOOLNET_AUTH_TOKEN;
+
+  if (!expected) {
+    return false;
+  }
+
+  const header = request.headers.get('authorization');
+  const match = header ? /^Bearer\s+(\S+)$/i.exec(header.trim()) : null;
+
+  if (!match) {
+    return false;
+  }
+
+  return tokensMatch(expected, match[1]);
+}
+
 app.get('/health', (c) => c.json({ status: 'ok', service: 'toolnet-memory-authority' }));
 
 app.get('/v1/projects/:projectId/state', async (c) => {
-  const projectId = c.req.param('projectId');
-  const authHeader = c.req.header('authorization');
-  const token = authHeader?.replace('Bearer ', '');
-
-  if (!token || token !== c.env.TOOLNET_AUTH_TOKEN) {
-    return c.json({ error: { code: 'AUTHORITY_AUTH_FAILED', message: 'Invalid or missing token' } }, 401);
+  if (!authorized(c.req.raw, c.env)) {
+    return unauthorized(c);
   }
 
+  const projectId = c.req.param('projectId');
   const id = c.env.AUTHORITY.idFromName(projectId);
   const stub = c.env.AUTHORITY.get(id);
   const response = await stub.fetch(`http://internal/state`, { method: 'GET' });
@@ -30,14 +65,11 @@ app.get('/v1/projects/:projectId/state', async (c) => {
 });
 
 app.post('/v1/projects/:projectId/commit', async (c) => {
-  const projectId = c.req.param('projectId');
-  const authHeader = c.req.header('authorization');
-  const token = authHeader?.replace('Bearer ', '');
-
-  if (!token || token !== c.env.TOOLNET_AUTH_TOKEN) {
-    return c.json({ error: { code: 'AUTHORITY_AUTH_FAILED', message: 'Invalid or missing token' } }, 401);
+  if (!authorized(c.req.raw, c.env)) {
+    return unauthorized(c);
   }
 
+  const projectId = c.req.param('projectId');
   const body = await c.req.json();
   const id = c.env.AUTHORITY.idFromName(projectId);
   const stub = c.env.AUTHORITY.get(id);
@@ -51,14 +83,11 @@ app.post('/v1/projects/:projectId/commit', async (c) => {
 });
 
 app.post('/v1/projects/:projectId/leases/acquire', async (c) => {
-  const projectId = c.req.param('projectId');
-  const authHeader = c.req.header('authorization');
-  const token = authHeader?.replace('Bearer ', '');
-
-  if (!token || token !== c.env.TOOLNET_AUTH_TOKEN) {
-    return c.json({ error: { code: 'AUTHORITY_AUTH_FAILED', message: 'Invalid or missing token' } }, 401);
+  if (!authorized(c.req.raw, c.env)) {
+    return unauthorized(c);
   }
 
+  const projectId = c.req.param('projectId');
   const body = await c.req.json();
   const id = c.env.AUTHORITY.idFromName(projectId);
   const stub = c.env.AUTHORITY.get(id);
@@ -72,14 +101,11 @@ app.post('/v1/projects/:projectId/leases/acquire', async (c) => {
 });
 
 app.post('/v1/projects/:projectId/leases/heartbeat', async (c) => {
-  const projectId = c.req.param('projectId');
-  const authHeader = c.req.header('authorization');
-  const token = authHeader?.replace('Bearer ', '');
-
-  if (!token || token !== c.env.TOOLNET_AUTH_TOKEN) {
-    return c.json({ error: { code: 'AUTHORITY_AUTH_FAILED', message: 'Invalid or missing token' } }, 401);
+  if (!authorized(c.req.raw, c.env)) {
+    return unauthorized(c);
   }
 
+  const projectId = c.req.param('projectId');
   const body = await c.req.json();
   const id = c.env.AUTHORITY.idFromName(projectId);
   const stub = c.env.AUTHORITY.get(id);
@@ -93,14 +119,11 @@ app.post('/v1/projects/:projectId/leases/heartbeat', async (c) => {
 });
 
 app.post('/v1/projects/:projectId/leases/release', async (c) => {
-  const projectId = c.req.param('projectId');
-  const authHeader = c.req.header('authorization');
-  const token = authHeader?.replace('Bearer ', '');
-
-  if (!token || token !== c.env.TOOLNET_AUTH_TOKEN) {
-    return c.json({ error: { code: 'AUTHORITY_AUTH_FAILED', message: 'Invalid or missing token' } }, 401);
+  if (!authorized(c.req.raw, c.env)) {
+    return unauthorized(c);
   }
 
+  const projectId = c.req.param('projectId');
   const body = await c.req.json();
   const id = c.env.AUTHORITY.idFromName(projectId);
   const stub = c.env.AUTHORITY.get(id);

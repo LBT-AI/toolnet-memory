@@ -8,6 +8,10 @@ bindings = [
   { name = "AUTHORITY", class_name = "Authority" }
 ]
 
+[exports.Authority]
+type = "durable-object"
+storage = "sqlite"
+
 [[r2_buckets]]
 binding = "MEMORY_EVENTS"
 bucket_name = "toolnet-memory-events"
