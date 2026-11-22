@@ -1,19 +1,19 @@
 /*
- * Phase 85K — v0.7.0 Release Certification.
+ * Phase 85K — v0.7.1 Release Certification.
  *
- * Certifies that the v0.7.0 release is consistent, complete and
+ * Certifies that the v0.7.1 release is consistent, complete and
  * truthful *before* anything is pushed, tagged or published:
  *
  *   1. version truth — every authoritative source (package.json,
  *      package-lock.json, .release-target, release-manifest.json, README,
- *      CHANGELOG) agrees on 0.7.0, and no source still advertises 0.6.2 as the
+ *      CHANGELOG) agrees on 0.7.1, and no source still advertises 0.6.2 as the
  *      active release version;
  *   2. release-manifest truth — the manifest describes the same capability
- *      generation as the published v0.6.2 plus the v0.7.0 fixes only,
+ *      generation as the published v0.6.2 plus the v0.7.1 fixes only,
  *      and invents no new capability phase;
- *   3. changelog truth — exactly one current [0.7.0] section, above an
+ *   3. changelog truth — exactly one current [0.7.1] section, above an
  *      untouched [0.6.2] history, with only factual release items;
- *   4. build identity — the packaged runtime carries 0.7.0+<source-digest>,
+ *   4. build identity — the packaged runtime carries 0.7.1+<source-digest>,
  *      computed from source and never handwritten;
  *   5. retained repairs — the npm 10/11/12 tolerant package-audit parser, the
  *      Docker linux/arm64 native build toolchain, the amd64 + arm64 build
@@ -22,7 +22,7 @@
  *      surface, ships no credentials/secrets and declares no public breaking
  *      change;
  *   7. immutable history — the published v0.6.2 tag is untouched, still points
- *      at its historical release commit, and is never reused for 0.7.0.
+ *      at its historical release commit, and is never reused for 0.7.1.
  *
  * Read-only: this suite never commits, tags, pushes or publishes.
  *
@@ -50,7 +50,7 @@ import { collectVersionTruth } from '../../src/code-intelligence/release/version
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 const PREVIOUS_VERSION = '0.6.2';
 const PHASE85K_MARKER = 'PHASE85K_V070_RELEASE_CERTIFICATION=PASS';
 
@@ -161,11 +161,11 @@ const dockerWorkflow = readText('.github/workflows/docker.yml');
 const releaseWorkflow = readText('.github/workflows/release.yml');
 
 /* ================================================================== *
- * 1. Version truth — every authoritative source agrees on 0.7.0
+ * 1. Version truth — every authoritative source agrees on 0.7.1
  * ================================================================== */
 
 describe('Phase 85K — version truth', () => {
-  it('synchronizes every authoritative version source to 0.7.0', () => {
+  it('synchronizes every authoritative version source to 0.7.1', () => {
     const pkg = readJson<PackageJsonLike>('package.json');
     const lock = readJson<PackageLockLike>('package-lock.json');
     const manifest = readJson<ManifestLike>('release-manifest.json');
@@ -199,7 +199,7 @@ describe('Phase 85K — version truth', () => {
     }
   });
 
-  it('resolves 0.7.0 as the current version with no stale active source', () => {
+  it('resolves 0.7.1 as the current version with no stale active source', () => {
     const truth = collectVersionTruth({
       projectRoot: REPO_ROOT,
       sourcePhase: facts.sourcePhase,
@@ -231,7 +231,7 @@ describe('Phase 85K — version truth', () => {
  * ================================================================== */
 
 describe('Phase 85K — release manifest', () => {
-  it('declares 0.7.0 without moving the source phase or the certification series', () => {
+  it('declares 0.7.1 without moving the source phase or the certification series', () => {
     const manifest = readJson<ManifestLike>('release-manifest.json');
     const engineering = manifest.hardening?.releaseEngineering;
 
@@ -296,7 +296,7 @@ describe('Phase 85K — release manifest', () => {
  * ================================================================== */
 
 describe('Phase 85K — changelog and README', () => {
-  it('documents 0.7.0 exactly once, above the historical 0.6.2 section', () => {
+  it('documents 0.7.1 exactly once, above the historical 0.6.2 section', () => {
     const changelog = readText('CHANGELOG.md');
 
     expect(changelog.match(/^## \[0\.6\.2\]/gmu) ?? []).toHaveLength(1);
@@ -304,10 +304,10 @@ describe('Phase 85K — changelog and README', () => {
     expect(changelog.match(/^## \[0\.6\.0\]/gmu) ?? []).toHaveLength(1);
 
     /* Newest first: the current release is never buried under history. */
-    expect(changelog.indexOf('## [0.7.0]')).toBeLessThan(changelog.indexOf('## [0.6.2]'));
+    expect(changelog.indexOf('## [0.7.1]')).toBeLessThan(changelog.indexOf('## [0.6.2]'));
 
     const current = changelog.slice(
-      changelog.indexOf('## [0.7.0]'),
+      changelog.indexOf('## [0.7.1]'),
       changelog.indexOf('## [0.6.2]')
     );
 
@@ -318,7 +318,7 @@ describe('Phase 85K — changelog and README', () => {
   it('records the minor release additions and changes truthfully', () => {
     const changelog = readText('CHANGELOG.md');
     const current = changelog.slice(
-      changelog.indexOf('## [0.7.0]'),
+      changelog.indexOf('## [0.7.1]'),
       changelog.indexOf('## [0.6.2]')
     );
 
@@ -347,7 +347,7 @@ describe('Phase 85K — changelog and README', () => {
     expect(readme).toContain('### v0.5.3 Disaster Recovery');
   });
 
-  it('advertises v0.7.0 as the current release and never 0.6.2', () => {
+  it('advertises v0.7.1 as the current release and never 0.6.2', () => {
     const readme = readText('README.md');
 
     expect(readme).toContain(`Current release: **v${VERSION}**`);
@@ -456,7 +456,7 @@ describe('Phase 85K — npm package-audit compatibility retained', () => {
     expect(certifier).toContain('startsWith("./")');
   });
 
-  it('audits the real package as complete, secret-free and versioned 0.7.0', () => {
+  it('audits the real package as complete, secret-free and versioned 0.7.1', () => {
     const result = auditPackageContents({
       projectRoot: REPO_ROOT,
       maxPackageFiles: limits.maxPackageFiles,
@@ -543,7 +543,7 @@ describe('Phase 85K — no public breaking change', () => {
   it('declares zero public breaking changes from v0.6.2', () => {
     const changelog = readText('CHANGELOG.md');
     const current = changelog.slice(
-      changelog.indexOf('## [0.7.0]'),
+      changelog.indexOf('## [0.7.1]'),
       changelog.indexOf('## [0.6.2]')
     );
 
@@ -717,7 +717,7 @@ describe('Phase 85K — immutable v0.6.0 and v0.6.2 history', () => {
     expect(tagged).not.toBe(gitCmd(['rev-parse', 'HEAD']).stdout.trim());
   });
 
-  it('targets the recovery release commit when the v0.7.0 tag exists', () => {
+  it('targets the recovery release commit when the v0.7.1 tag exists', () => {
     const tag = gitCmd(['tag', '--list', `v${VERSION}`]).stdout.trim();
 
     if (!tag) return;

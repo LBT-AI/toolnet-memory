@@ -11,7 +11,7 @@
 
 **One project. Multiple coding agents. Continuous context.**
 
-Current release: **v0.7.0**
+Current release: **v0.7.1**
 
 </div>
 
@@ -33,6 +33,10 @@ ToolNet Memory combines four layers:
 ToolNet Memory is **not a raw transcript dump**. Raw session history is kept separate from durable project memory and is protected from normal agent reads.
 
 Memory promotion, retrieval, conflict handling, and continuity decisions are deterministic and local. ToolNet Memory does not require an LLM or embedding provider for its memory runtime.
+
+### v0.7.1 Security & Reliability Patch
+
+v0.7.1 hardens project authorization and secret redaction, keeps migration backups in memory by default, and restores the Cloudflare worker build against current Wrangler and Workers types.
 
 ### v0.7.0 Continuity Foundation
 

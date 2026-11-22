@@ -28,7 +28,7 @@ import {
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 const PHASE85G_MARKER = 'PHASE85G_RELEASE_COMMIT=PASS';
 
 function git(args: string[]): { status: number; stdout: string } {
@@ -194,7 +194,7 @@ const report = runReleaseAnalysis({
  * ================================================================== */
 
 describe('Phase 85G — HEAD version truth', () => {
-  it('ships package version 0.7.0 at HEAD or in the pending release set', () => {
+  it('ships package version 0.7.1 at HEAD or in the pending release set', () => {
     expect(releaseSetPackageVersion()).toBe(VERSION);
 
     if (RELEASE_SET_COMMITTED) {
@@ -203,15 +203,15 @@ describe('Phase 85G — HEAD version truth', () => {
     } else {
       /* The release set is still pending: HEAD must still carry the previously
        * published release, never an arbitrary value. */
-      expect(headPackageVersion()).toBe('0.6.2');
+      expect(headPackageVersion()).toBe('0.7.0');
     }
   });
 
   it('introduced the release on top of the previous published release', () => {
     if (!RELEASE_SET_COMMITTED) {
-      /* The recovery commit does not exist yet, so HEAD is its future parent
+      /* The release commit does not exist yet, so HEAD is its future parent
        * and must carry the previous published release version. */
-      expect(headPackageVersion()).toBe('0.6.2');
+      expect(headPackageVersion()).toBe('0.7.0');
       return;
     }
 
@@ -227,7 +227,7 @@ describe('Phase 85G — HEAD version truth', () => {
     if (git(['rev-parse', `${release}^`]).status === 0) {
       const parentPackage = JSON.parse(git(['show', `${release}^:package.json`]).stdout || '{}');
 
-      expect(parentPackage.version).toMatch(/^(0\.5\.3|0\.6\.\d+)$/u);
+      expect(parentPackage.version).toMatch(/^(0\.5\.3|0\.6\.\d+|0\.7\.\d+)$/u);
     }
   });
 });

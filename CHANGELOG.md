@@ -4,6 +4,21 @@ All notable changes to ToolNet Memory are documented here.
 
 The project follows semantic versioning while it is in the `0.x` development series.
 
+## [0.7.1] - 2026-11-22
+
+### Fixed
+
+- Project authorization no longer fails open for lease and commit operations; task, agent, and fencing context are required.
+- Project tokens use high-entropy randomness and constant-time comparison.
+- Secret detection and redaction now cover passwords and API keys, and circular objects no longer overflow the stack.
+- Migration backups stay in memory by default and are written to disk only when a backup directory is configured.
+- The Cloudflare worker builds against current Wrangler and Workers types with centralized bearer authentication.
+
+### Changed
+
+- Upgraded Vitest to v5 to clear critical development dependency advisories.
+- Refreshed production bundles and removed stray debug and phase report files.
+
 ## [0.7.0] - 2026-11-15
 
 ### Added

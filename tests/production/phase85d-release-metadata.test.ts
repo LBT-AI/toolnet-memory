@@ -27,7 +27,7 @@ import {
 import { runtimeSourceDigest } from '../../src/runtime/build-identity.js';
 
 const REPO_ROOT = process.cwd();
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 
 function readJson(path: string): Record<string, any> {
   return JSON.parse(readFileSync(path, 'utf8')) as Record<string, any>;
@@ -126,11 +126,11 @@ describe('Phase 85D — release metadata', () => {
     expect(report.warnings.map((warning) => warning.code)).not.toContain('RELEASE_MANIFEST_STALE');
   });
 
-  it('reflects v0.7.0 in the changelog and README current release', () => {
+  it('reflects v0.7.1 in the changelog and README current release', () => {
     const changelog = readFileSync('CHANGELOG.md', 'utf8');
     const readme = readFileSync('README.md', 'utf8');
 
-    expect(changelog).toContain('## [0.7.0]');
+    expect(changelog).toContain('## [0.7.1]');
     expect(changelog).toContain('### Compatibility');
     expect(changelog).toContain('### Known Limitations');
 
@@ -238,6 +238,6 @@ describe('Phase 85D — release metadata', () => {
   it('emits the Phase 85D PASS marker', () => {
     console.log('PHASE85D_RELEASE_METADATA=PASS');
 
-    expect(VERSION).toBe('0.7.0');
+    expect(VERSION).toBe('0.7.1');
   });
 });
